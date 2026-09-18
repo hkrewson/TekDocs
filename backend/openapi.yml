@@ -14030,7 +14030,45 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/vendors:
     get:
-      operationId: workspaces_msp_vendors_retrieve
+      operationId: msp_vendor_list
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - asset_count
+          - -asset_count
+          type: string
+          x-spec-enum-id: 12db383fbb931ab8
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `asset_count` - asset_count
+          * `-asset_count` - -asset_count
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - workspaces
       security:
@@ -14042,6 +14080,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DerivedVendorResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/vendors/{vendor_entity_id}:
+    get:
+      operationId: msp_vendor_retrieve
+      parameters:
+      - in: path
+        name: vendor_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DerivedVendor'
           description: ''
           headers:
             X-Request-ID:
@@ -29024,10 +29090,81 @@ paths:
                 format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/vendors:
     get:
-      operationId: workspaces_organizations_vendors_retrieve
+      operationId: organization_vendor_list
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - asset_count
+          - -asset_count
+          type: string
+          x-spec-enum-id: 12db383fbb931ab8
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `asset_count` - asset_count
+          * `-asset_count` - -asset_count
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DerivedVendorResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/vendors/{vendor_entity_id}:
+    get:
+      operationId: organization_vendor_retrieve
       parameters:
       - in: path
         name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: vendor_entity_id
         schema:
           type: string
           format: uuid
@@ -29042,7 +29179,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DerivedVendorResult'
+                $ref: '#/components/schemas/DerivedVendor'
           description: ''
           headers:
             X-Request-ID:
@@ -33138,10 +33275,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DerivedVendor'
+        page:
+          type: integer
+        page_size:
+          type: integer
         count:
           type: integer
+        has_more:
+          type: boolean
       required:
       - count
+      - has_more
+      - page
+      - page_size
       - results
     DiagramFailure:
       type: object

@@ -13,7 +13,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
-| 4 — Operational records | In progress: Organizations/People/Sites accepted; Stock workspace complete | Complete the connected vendor catalog, products, and licenses, then run grouped live-stack acceptance; see [operational-records.md](operational-records.md) and [stock-workspace.md](stock-workspace.md) |
+| 4 — Operational records | In progress: Organizations/People/Sites accepted; Stock and Vendors workspaces complete | Complete Products and Licenses, then run grouped live-stack acceptance; see [operational-records.md](operational-records.md), [stock-workspace.md](stock-workspace.md), and [vendor-workspace.md](vendor-workspace.md) |
 | 5 — Documentation/files | Pending | All planned migrations |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
@@ -46,6 +46,14 @@ Completed the Stock piece of the vendor catalog, products, licenses, and stock m
 The server rejects undeclared collection parameters, caps page size, returns canonical metadata, and exposes scoped detail reads while retaining the existing invoice permission and tenant boundary. Immediate dirty-state notification closes a keyboard timing gap found by the responsive browser run: Escape directly after typing now always offers Keep editing or Discard changes. OpenAPI and generated TypeScript types are aligned.
 
 Verified: six focused PostgreSQL scenarios pass. All 21 Stock browser scenarios pass across Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels, including long values, bounds, focus, accessibility, and immediate dirty dismissal. The project frontend gate passes all 590 tests across 117 files, localization enforcement, coverage, typechecking, the production build, and unchanged compressed bundle budgets. Vendor catalog, products, and licenses remain before grouped live-stack acceptance. Version, deployment, Wiki publication, and existing user/demo data remain unchanged.
+
+## Vendor collection and supplier record workspace checkpoint — 2026-09-17
+
+Completed the Vendors piece of the connected operational-record milestone under #81. The former static supplier list is replaced by a bounded, searchable, sortable, paginated directory. Search, sort, page, and the selected supplier are URL-addressed; direct links retrieve authorized suppliers outside the current page. Supplier names open a responsive read-only record with classification, legal identity, website, connected asset count, and links to the supplier workspace and product catalog.
+
+The server rejects undeclared parameters, caps page size, returns canonical page metadata, and applies the existing asset-view permission and derived client scope to direct retrieval. A supplier connected only to another client remains unavailable. OpenAPI and generated TypeScript types are aligned. The route permission inventory also now describes the previously implemented Stock detail read method, closing a contract mismatch found by the complete route check.
+
+Verified: focused PostgreSQL and route-contract scenarios pass. All 21 Vendor browser scenarios pass across Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels, including long values, bounds, focus, accessibility, direct retrieval, and URL restoration. The project frontend gate passes all 592 tests across 117 files, localization enforcement, coverage, typechecking, the production build, and unchanged compressed bundle budgets. Products and Licenses remain before grouped live-stack acceptance; Documents follows in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged.
 
 ## Verified — Assets collection checkpoint
 

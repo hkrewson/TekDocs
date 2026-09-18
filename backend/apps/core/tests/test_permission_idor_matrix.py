@@ -416,6 +416,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
             "artifact_entity_id",
         ),
         "organization-client-vendor-list": ("organization_entity_id",),
+        "organization-client-vendor-detail": ("organization_entity_id", "vendor_entity_id"),
         "organization-person-detail": ("organization_entity_id", "person_entity_id"),
         "organization-site-list-create": ("organization_entity_id",),
         "organization-document-list-create": ("organization_entity_id",),
@@ -561,6 +562,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "client-portal-invoice-csv": ("invoice_entity_id",),
         "msp-stock-detail": ("item_id",),
         "msp-stock-movement-create": ("item_id",),
+        "msp-vendor-detail": ("vendor_entity_id",),
     }
     if route_name in {"msp-collection-preferences", "organization-collection-preferences"}:
         kwargs = {"feature": "assets"}

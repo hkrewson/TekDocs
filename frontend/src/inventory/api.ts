@@ -81,6 +81,15 @@ export type DerivedVendor = {
   classifications: string[]
   asset_count: number
 }
+export type VendorOrdering = 'name' | '-name' | 'asset_count' | '-asset_count'
+export type VendorQuery = { q: string; ordering: VendorOrdering; page: number; page_size: number }
+export type VendorResult = {
+  results: DerivedVendor[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+}
 export type AssetCsvPreview = {
   schema_version: string
   rows: Array<{ row: number; asset_id: string; name: string; kind: 'hardware' | 'software'; action: 'create' | 'update' | 'skip'; changes: string[] }>
@@ -111,7 +120,8 @@ export interface InventoryClient {
   assignLicenseSeat(workspace: WorkspaceContext, licenseId: string, values: { person_id?: string | null; installation_id?: string | null }): Promise<SoftwareLicense>
   revokeLicenseSeat(workspace: WorkspaceContext, licenseId: string, seatId: string): Promise<SoftwareLicense>
   loadDocument(workspace: WorkspaceContext, assetId: string, publicationId: string): Promise<AssetDocument & { sanitized_html: string }>
-  listVendors(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: DerivedVendor[]; count: number }>
+  listVendors(workspace: WorkspaceContext, query: VendorQuery, signal?: AbortSignal): Promise<VendorResult>
+  retrieveVendor(workspace: WorkspaceContext, vendorId: string, signal?: AbortSignal): Promise<DerivedVendor>
   artifactUrl(workspace: WorkspaceContext, assetId: string, publicationId: string, artifactId: string): string
   assetCsvTemplateUrl(workspace: WorkspaceContext): string
   assetCsvExportUrl(workspace: WorkspaceContext): string
@@ -191,7 +201,16 @@ export const browserInventoryClient: InventoryClient = {
   assignLicenseSeat: (workspace, licenseId, values) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}/seats`, 'POST', values),
   revokeLicenseSeat: (workspace, licenseId, seatId) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}/seats/${encodeURIComponent(seatId)}`, 'DELETE'),
   loadDocument: (workspace, assetId, publicationId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}`),
-  listVendors: (workspace, signal) => get(`${basePath(workspace)}/vendors`, signal),
+  listVendors: (workspace, query, signal) => {
+    const parameters = new URLSearchParams({
+      ordering: query.ordering,
+      page: String(query.page),
+      page_size: String(query.page_size),
+    })
+    if (query.q) parameters.set('q', query.q)
+    return get(`${basePath(workspace)}/vendors?${parameters}`, signal)
+  },
+  retrieveVendor: (workspace, vendorId, signal) => get(`${basePath(workspace)}/vendors/${encodeURIComponent(vendorId)}`, signal),
   artifactUrl: (workspace, assetId, publicationId, artifactId) => `${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/documents/${encodeURIComponent(publicationId)}/artifacts/${encodeURIComponent(artifactId)}/download`,
   assetCsvTemplateUrl: (workspace) => `${basePath(workspace)}/assets/csv/template`,
   assetCsvExportUrl: (workspace) => `${basePath(workspace)}/assets/csv/export`,

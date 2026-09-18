@@ -268,7 +268,10 @@ from apps.core.inventory_views import (
     ClientHardwareDetailView,
     ClientHardwareDisposalView,
     ClientHardwareLifecycleView,
-    ClientVendorListView,
+    MSPVendorDetailView,
+    MSPVendorListView,
+    OrganizationVendorDetailView,
+    OrganizationVendorListView,
 )
 from apps.core.invoice_views import (
     InvoiceAccountingExportView,
@@ -1839,9 +1842,15 @@ urlpatterns = [
     ),
     path(
         "api/v1/workspaces/msp/vendors",
-        ClientVendorListView.as_view(),
+        MSPVendorListView.as_view(),
         {"organization_entity_id": None},
         name="msp-vendor-list",
+    ),
+    path(
+        "api/v1/workspaces/msp/vendors/<uuid:vendor_entity_id>",
+        MSPVendorDetailView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-vendor-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/model-choices",
@@ -1995,8 +2004,13 @@ urlpatterns = [
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/vendors",
-        ClientVendorListView.as_view(),
+        OrganizationVendorListView.as_view(),
         name="organization-client-vendor-list",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/vendors/<uuid:vendor_entity_id>",
+        OrganizationVendorDetailView.as_view(),
+        name="organization-client-vendor-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/from-template",

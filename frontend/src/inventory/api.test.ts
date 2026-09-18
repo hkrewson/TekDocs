@@ -12,11 +12,17 @@ describe('inventory API client', () => {
     await browserInventoryClient.listAssets(workspace, 2)
     await browserInventoryClient.listModelChoices(workspace, 'edge switch')
     await browserInventoryClient.createAsset(workspace, 'model/1', 'Core switch')
-    await browserInventoryClient.listVendors(workspace)
+    await browserInventoryClient.listVendors(workspace, { q: 'north wind', ordering: '-asset_count', page: 2, page_size: 25 })
+    await browserInventoryClient.retrieveVendor(workspace, 'vendor/1')
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/assets/model-choices?q=edge%20switch',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/vendors?ordering=-asset_count&page=2&page_size=25&q=north+wind',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/vendors/vendor%2F1', expect.any(Object))
     const post = vi.mocked(fetch).mock.calls.find(([, options]) => options?.method === 'POST')
     expect(post?.[0]).toBe('/api/v1/workspaces/organizations/client%2F1/assets')
     expect((post?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('inventory-csrf')
@@ -26,11 +32,11 @@ describe('inventory API client', () => {
     const workspace = { kind: 'msp', id: 'tenant/1' } as never
     await browserInventoryClient.listAssets(workspace, 1)
     await browserInventoryClient.listLicenses(workspace, 3)
-    await browserInventoryClient.listVendors(workspace)
+    await browserInventoryClient.listVendors(workspace, { q: '', ordering: 'name', page: 1, page_size: 25 })
 
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets?page=1&page_size=50', expect.any(Object))
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses?page=3&page_size=50', expect.any(Object))
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors?ordering=name&page=1&page_size=25', expect.any(Object))
   })
 
   it('sends CSV preview and apply as CSRF-protected multipart requests', async () => {

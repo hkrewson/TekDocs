@@ -4,10 +4,17 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_field
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_field,
+    extend_schema_view,
+)
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -379,7 +386,19 @@ class DerivedVendorSerializer(serializers.Serializer):
 
 class DerivedVendorResultSerializer(serializers.Serializer):
     results = DerivedVendorSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
     count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
+class DerivedVendorQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "asset_count", "-asset_count"),
+        required=False,
+        default="name",
+    )
 
 
 def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey) -> ResolvedWorkspace:  # type: ignore[no-untyped-def]
@@ -743,8 +762,72 @@ class ClientAssetDocumentArtifactDownloadView(APIView):
 
 
 class ClientVendorListView(APIView):
-    @extend_schema(responses={200: DerivedVendorResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        query = DerivedVendorQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
         vendors = vendors_for_scope(workspace.data_scope)
-        return Response(DerivedVendorResultSerializer({"results": vendors, "count": vendors.count()}).data)
+        if values["q"]:
+            vendors = vendors.filter(
+                Q(entity__display_name__icontains=values["q"])
+                | Q(legal_name__icontains=values["q"])
+                | Q(website__icontains=values["q"])
+            )
+        descending = values["ordering"].startswith("-")
+        field = values["ordering"].removeprefix("-")
+        order_field = "entity__display_name" if field == "name" else field
+        vendors = vendors.order_by(f"-{order_field}" if descending else order_field, "entity_id")
+        page = paginate(vendors, page=values["page"], page_size=values["page_size"])
+        return Response(
+            DerivedVendorResultSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                }
+            ).data
+        )
+
+
+class ClientVendorDetailView(APIView):
+    def get(self, request, organization_entity_id, vendor_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        vendor = get_object_or_404(vendors_for_scope(workspace.data_scope), entity_id=vendor_entity_id)
+        return Response(DerivedVendorSerializer(vendor).data)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="msp_vendor_list",
+        parameters=[DerivedVendorQuerySerializer],
+        responses={200: DerivedVendorResultSerializer},
+    )
+)
+class MSPVendorListView(ClientVendorListView):
+    pass
+
+
+@extend_schema_view(get=extend_schema(operation_id="msp_vendor_retrieve", responses={200: DerivedVendorSerializer}))
+class MSPVendorDetailView(ClientVendorDetailView):
+    pass
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="organization_vendor_list",
+        parameters=[DerivedVendorQuerySerializer],
+        responses={200: DerivedVendorResultSerializer},
+    )
+)
+class OrganizationVendorListView(ClientVendorListView):
+    pass
+
+
+@extend_schema_view(
+    get=extend_schema(operation_id="organization_vendor_retrieve", responses={200: DerivedVendorSerializer})
+)
+class OrganizationVendorDetailView(ClientVendorDetailView):
+    pass

@@ -593,10 +593,30 @@ def test_client_asset_retains_catalog_and_static_document_provenance(owner_clien
     assert document_projection.status_code == 200
     assert "Retained instructions" in document_projection.json()["sanitized_html"]
 
-    vendors = owner_client.get(
-        reverse("organization-client-vendor-list", kwargs={"organization_entity_id": client.entity_id})
-    ).json()
+    vendor_list_url = reverse(
+        "organization-client-vendor-list", kwargs={"organization_entity_id": client.entity_id}
+    )
+    vendors_response = owner_client.get(vendor_list_url, {"q": "Northwind", "page_size": 1})
+    assert vendors_response.status_code == 200
+    vendors = vendors_response.json()
     assert [(item["name"], item["asset_count"]) for item in vendors["results"]] == [("Northwind Networks", 1)]
+    assert {key: vendors[key] for key in ("page", "page_size", "count", "has_more")} == {
+        "page": 1, "page_size": 1, "count": 1, "has_more": False,
+    }
+    vendor_detail_url = reverse(
+        "organization-client-vendor-detail",
+        kwargs={"organization_entity_id": client.entity_id, "vendor_entity_id": supplier.entity_id},
+    )
+    vendor_detail = owner_client.get(vendor_detail_url)
+    assert vendor_detail.status_code == 200
+    assert vendor_detail.json()["legal_name"] == "Northwind Networks, Inc."
+    assert owner_client.get(vendor_list_url, {"unexpected": "value"}).status_code == 400
+    assert owner_client.get(
+        reverse(
+            "organization-client-vendor-detail",
+            kwargs={"organization_entity_id": sibling.entity_id, "vendor_entity_id": supplier.entity_id},
+        )
+    ).status_code == 404
 
     hidden = owner_client.get(
         reverse(

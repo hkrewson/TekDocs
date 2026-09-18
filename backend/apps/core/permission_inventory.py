@@ -604,7 +604,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "msp-stock-detail",
-        ("PATCH", "DELETE"),
+        ("GET", "PATCH", "DELETE"),
+        PermissionKey.INVOICES_VIEW,
         mutations=(PermissionKey.INVOICES_EDIT, PermissionKey.INVOICES_EDIT),
     ),
     route(
@@ -807,6 +808,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-asset-document-detail", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-asset-document-artifact-download", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-vendor-list", ("GET",), PermissionKey.ASSETS_VIEW),
+    route("msp-vendor-detail", ("GET",), PermissionKey.ASSETS_VIEW),
     route(
         "organization-client-asset-list-create",
         ("GET", "POST"),
@@ -972,6 +974,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-client-vendor-list",
+        ("GET",),
+        PermissionKey.ASSETS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-client-vendor-detail",
         ("GET",),
         PermissionKey.ASSETS_VIEW,
         organization_scoped=True,

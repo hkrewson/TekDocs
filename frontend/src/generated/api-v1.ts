@@ -3932,7 +3932,23 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_vendors_retrieve"];
+        readonly get: operations["msp_vendor_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/vendors/{vendor_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["msp_vendor_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -7518,7 +7534,23 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_organizations_vendors_retrieve"];
+        readonly get: operations["organization_vendor_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/vendors/{vendor_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["organization_vendor_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -9218,7 +9250,10 @@ export interface components {
         };
         readonly DerivedVendorResult: {
             readonly results: readonly components["schemas"]["DerivedVendor"][];
+            readonly page: number;
+            readonly page_size: number;
             readonly count: number;
+            readonly has_more: boolean;
         };
         readonly DiagramFailure: {
             readonly code: string;
@@ -25252,9 +25287,20 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_vendors_retrieve: {
+    readonly msp_vendor_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `asset_count` - asset_count
+                 *     * `-asset_count` - -asset_count
+                 */
+                readonly ordering?: "name" | "-name" | "asset_count" | "-asset_count";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -25269,6 +25315,29 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["DerivedVendorResult"];
+                };
+            };
+        };
+    };
+    readonly msp_vendor_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly vendor_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DerivedVendor"];
                 };
             };
         };
@@ -35369,9 +35438,20 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_organizations_vendors_retrieve: {
+    readonly organization_vendor_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `asset_count` - asset_count
+                 *     * `-asset_count` - -asset_count
+                 */
+                readonly ordering?: "name" | "-name" | "asset_count" | "-asset_count";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -35388,6 +35468,30 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["DerivedVendorResult"];
+                };
+            };
+        };
+    };
+    readonly organization_vendor_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly vendor_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DerivedVendor"];
                 };
             };
         };

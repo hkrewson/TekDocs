@@ -5,7 +5,7 @@ from uuid import UUID
 from django.db import IntegrityError
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_field
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -28,6 +28,7 @@ from .catalogs import (
     revise_model,
     update_product,
 )
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import (
     InventoryError,
     archive_product_document,
@@ -193,7 +194,21 @@ class CatalogProductSerializer(serializers.Serializer):
 
 class CatalogProductResultSerializer(serializers.Serializer):
     results = CatalogProductSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
+
+
+class CatalogProductQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
+    kind = serializers.ChoiceField(
+        choices=("", *CatalogProductKind.values), required=False, allow_blank=True, default=""
+    )
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "updated_at", "-updated_at"), required=False, default="name"
+    )
 
 
 class SpecificationVersionSerializer(serializers.Serializer):
@@ -243,22 +258,35 @@ def _supplier_organization(workspace: ResolvedWorkspace) -> Organization:
     return workspace.organization
 
 
+def _product_context(workspace: ResolvedWorkspace) -> dict[str, bool]:
+    return {
+        "include_documents": context_has_permission(
+            workspace.member, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization
+        )
+    }
+
+
 def _products(workspace: ResolvedWorkspace, request) -> Response:  # type: ignore[no-untyped-def]
-    query = str(request.query_params.get("q", "")).strip()[:240]
-    kind = str(request.query_params.get("kind", "")).strip()
-    if kind and kind not in CatalogProductKind.values:
-        raise serializers.ValidationError({"kind": "Choose hardware or software."})
+    query = CatalogProductQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    products = products_for_scope(workspace.data_scope, query=values["q"], kind=values["kind"])
+    descending = values["ordering"].startswith("-")
+    field = values["ordering"].removeprefix("-")
+    order_field = "entity__display_name" if field == "name" else field
+    products = products.order_by(f"-{order_field}" if descending else order_field, "entity_id")
+    page = paginate(products, page=values["page"], page_size=values["page_size"])
     return Response(
         CatalogProductResultSerializer(
             {
-                "results": products_for_scope(workspace.data_scope, query=query, kind=kind),
+                "results": page.records,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
                 "can_manage": _can_manage(workspace),
             },
-            context={
-                "include_documents": context_has_permission(
-                    workspace.member, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization
-                )
-            },
+            context=_product_context(workspace),
         ).data
     )
 
@@ -290,7 +318,7 @@ def _definition_version(workspace: ResolvedWorkspace, version_id: UUID) -> Catal
 class CatalogProductListCreateView(APIView):
     @extend_schema(
         operation_id="organization_catalog_products_list",
-        parameters=[OpenApiParameter("q", str), OpenApiParameter("kind", str)],
+        parameters=[CatalogProductQuerySerializer],
         responses={200: CatalogProductResultSerializer},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
@@ -317,7 +345,11 @@ class CatalogProductDetailView(APIView):
     @extend_schema(operation_id="organization_catalog_products_retrieve", responses={200: CatalogProductSerializer})
     def get(self, request, organization_entity_id, product_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
-        return Response(CatalogProductSerializer(_product(workspace, product_entity_id)).data)
+        return Response(
+            CatalogProductSerializer(
+                _product(workspace, product_entity_id), context=_product_context(workspace)
+            ).data
+        )
 
     @extend_schema(request=ProductUpdateSerializer, responses={200: CatalogProductSerializer})
     def patch(self, request, organization_entity_id, product_entity_id):  # type: ignore[no-untyped-def]

@@ -8115,6 +8115,10 @@ export interface components {
         };
         readonly CatalogProductResult: {
             readonly results: readonly components["schemas"]["CatalogProduct"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
             readonly can_manage: boolean;
         };
         readonly CertificateEndpoint: {
@@ -26180,7 +26184,21 @@ export interface operations {
     readonly organization_catalog_products_list: {
         readonly parameters: {
             readonly query?: {
-                readonly kind?: string;
+                /**
+                 * @description * `` -
+                 *     * `hardware` - hardware
+                 *     * `software` - software
+                 */
+                readonly kind?: "" | "hardware" | "software";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `updated_at` - updated_at
+                 *     * `-updated_at` - -updated_at
+                 */
+                readonly ordering?: "name" | "-name" | "updated_at" | "-updated_at";
+                readonly page?: number;
+                readonly page_size?: number;
                 readonly q?: string;
             };
             readonly header?: never;

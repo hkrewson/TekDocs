@@ -198,6 +198,29 @@ def test_catalog_requires_supplier_classification_and_exact_workspace(client, in
     )
     assert hidden.status_code == 404
 
+    listed = client.get(
+        reverse(
+            "organization-catalog-product-list-create",
+            kwargs={"organization_entity_id": supplier.entity_id},
+        ),
+        {"q": "Scoped", "ordering": "-updated_at", "page": 1, "page_size": 1},
+    )
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()["results"]] == [product_id]
+    assert {key: listed.json()[key] for key in ("page", "page_size", "count", "has_more")} == {
+        "page": 1,
+        "page_size": 1,
+        "count": 1,
+        "has_more": False,
+    }
+    assert client.get(
+        reverse(
+            "organization-catalog-product-list-create",
+            kwargs={"organization_entity_id": supplier.entity_id},
+        ),
+        {"unexpected": "value"},
+    ).status_code == 400
+
 
 @pytest.mark.django_db
 def test_supplier_with_catalog_must_retain_supplier_classification(client, installation, supplier):

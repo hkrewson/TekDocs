@@ -83,6 +83,9 @@ export type CatalogProduct = {
   documents: CatalogProductDocument[]
 }
 export type ProductDraft = { name: string; kind: ProductKind; description: string; unit_amount?: string | null; currency?: string }
+export type ProductOrdering = 'name' | '-name' | 'updated_at' | '-updated_at'
+export type ProductQuery = { q: string; kind: ProductKind | ''; ordering: ProductOrdering; page: number; page_size: number }
+export type ProductResult = { results: CatalogProduct[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type DefinitionDraft = { name: string; product_kind: ProductKind; schema: SpecificationSchema }
 export type ModelDraft = {
   name: string
@@ -94,7 +97,8 @@ export type ModelDraft = {
 }
 
 export interface CatalogClient {
-  listProducts(workspace: WorkspaceContext, query: string, kind: ProductKind | '', signal?: AbortSignal): Promise<{ results: CatalogProduct[]; can_manage: boolean }>
+  listProducts(workspace: WorkspaceContext, query: ProductQuery, signal?: AbortSignal): Promise<ProductResult>
+  retrieveProduct(workspace: WorkspaceContext, productId: string, signal?: AbortSignal): Promise<CatalogProduct>
   createProduct(workspace: WorkspaceContext, draft: ProductDraft): Promise<CatalogProduct>
   updateProduct(workspace: WorkspaceContext, productId: string, draft: Omit<ProductDraft, 'kind'>): Promise<CatalogProduct>
   archiveProduct(workspace: WorkspaceContext, productId: string): Promise<void>
@@ -146,13 +150,13 @@ async function mutate<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body
 }
 
 export const browserCatalogClient: CatalogClient = {
-  async listProducts(workspace, query, kind, signal) {
-    const parameters = new URLSearchParams()
-    if (query) parameters.set('q', query)
-    if (kind) parameters.set('kind', kind)
-    const suffix = parameters.size ? `?${parameters}` : ''
-    return parse(await fetch(`${basePath(workspace)}/products${suffix}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  async listProducts(workspace, query, signal) {
+    const parameters = new URLSearchParams({ ordering: query.ordering, page: String(query.page), page_size: String(query.page_size) })
+    if (query.q) parameters.set('q', query.q)
+    if (query.kind) parameters.set('kind', query.kind)
+    return parse(await fetch(`${basePath(workspace)}/products?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
+  retrieveProduct: async (workspace, productId, signal) => parse(await fetch(`${basePath(workspace)}/products/${encodeURIComponent(productId)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   createProduct: (workspace, draft) => mutate(`${basePath(workspace)}/products`, 'POST', draft),
   updateProduct: (workspace, productId, draft) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}`, 'PATCH', draft),
   archiveProduct: (workspace, productId) => mutate(`${basePath(workspace)}/products/${encodeURIComponent(productId)}`, 'DELETE'),

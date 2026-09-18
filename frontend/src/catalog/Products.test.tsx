@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { Products } from './Products'
 import type { CatalogClient, CatalogProduct, SpecificationDefinition } from './api'
@@ -45,7 +46,8 @@ const product: CatalogProduct = {
 
 function catalogClient(overrides: Partial<CatalogClient> = {}): CatalogClient {
   return {
-    listProducts: vi.fn().mockResolvedValue({ results: [product], can_manage: true }),
+    listProducts: vi.fn().mockResolvedValue({ results: [product], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true }),
+    retrieveProduct: vi.fn().mockResolvedValue(product),
     createProduct: vi.fn().mockResolvedValue(product),
     updateProduct: vi.fn().mockResolvedValue(product),
     archiveProduct: vi.fn().mockResolvedValue(undefined),
@@ -62,10 +64,15 @@ function catalogClient(overrides: Partial<CatalogClient> = {}): CatalogClient {
   }
 }
 
+function renderProducts(client: CatalogClient, initialEntry = '/workspaces/organizations/supplier-1/products') {
+  return render(<MemoryRouter initialEntries={[initialEntry]}><Products workspace={workspace} client={client} /></MemoryRouter>)
+}
+
 describe('Products', () => {
   it('shows supplier products, current specifications, and saved version history', async () => {
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={catalogClient()} />)
+    renderProducts(catalogClient())
+    await user.click(await screen.findByRole('button', { name: 'EdgeSwitch' }))
     expect(await screen.findByRole('heading', { name: 'EdgeSwitch' })).toBeInTheDocument()
     expect(screen.getByText('ES-24 · Active · version 1')).toBeInTheDocument()
     expect(screen.getByText('24')).toBeInTheDocument()
@@ -79,9 +86,8 @@ describe('Products', () => {
     const createProduct = vi.fn().mockResolvedValue({ ...product, id: 'product-2', name: 'Cloud Gateway' })
     const api = catalogClient({ createProduct })
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={api} />)
-    await user.click(await screen.findByRole('button', { name: 'New product' }))
-    const editor = screen.getByRole('heading', { name: 'New product' }).closest('section')!
+    renderProducts(api, '/workspaces/organizations/supplier-1/products?product=new')
+    const editor = await screen.findByRole('dialog')
     await user.type(within(editor).getByLabelText('Product name'), 'Cloud Gateway')
     await user.selectOptions(within(editor).getByLabelText('Type'), 'software')
     await user.type(within(editor).getByLabelText('Description'), 'Cloud-managed gateway')
@@ -96,9 +102,9 @@ describe('Products', () => {
     const versionDefinition = vi.fn().mockResolvedValue(definition.versions[0])
     const api = catalogClient({ createDefinition, versionDefinition })
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={api} />)
+    renderProducts(api)
     await user.click(await screen.findByRole('tab', { name: 'Specification templates' }))
-    await user.click(screen.getByRole('button', { name: 'New specification template' }))
+    await user.click(await screen.findByRole('button', { name: 'New specification template' }))
     let editor = screen.getByRole('heading', { name: 'New specification template' }).closest('section')!
     await user.type(within(editor).getByLabelText('Template name'), 'Wireless access point')
     await user.type(within(editor).getByLabelText('Import name'), 'radio_count')
@@ -125,10 +131,11 @@ describe('Products', () => {
     const createModel = vi.fn()
     const api = catalogClient({
       createModel,
-      listProducts: vi.fn().mockResolvedValue({ results: [{ ...product, models: [] }], can_manage: true }),
+      listProducts: vi.fn().mockResolvedValue({ results: [{ ...product, models: [] }], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true }),
       listDefinitions: vi.fn().mockResolvedValue({ results: definitions, can_manage: true }),
     })
-    render(<Products workspace={workspace} client={api} />)
+    renderProducts(api)
+    await user.click(await screen.findByRole('button', { name: 'EdgeSwitch' }))
     await user.click(await screen.findByRole('button', { name: 'Add model' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Create a hardware specification template before adding a model.')
     expect(screen.getByRole('heading', { name: 'EdgeSwitch' })).toBeInTheDocument()
@@ -147,7 +154,8 @@ describe('Products', () => {
     const reviseModel = vi.fn().mockResolvedValue(product.models[0])
     const api = catalogClient({ createModel, reviseModel })
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={api} />)
+    renderProducts(api)
+    await user.click(await screen.findByRole('button', { name: 'EdgeSwitch' }))
     await user.click(await screen.findByRole('button', { name: 'Add model' }))
     let editor = screen.getByRole('heading', { name: 'Add model' }).closest('section')!
     await user.type(within(editor).getByLabelText('Model name'), 'EdgeSwitch 48')
@@ -174,7 +182,8 @@ describe('Products', () => {
       }] }),
     })
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={api} />)
+    renderProducts(api)
+    await user.click(await screen.findByRole('button', { name: 'EdgeSwitch' }))
     await user.click(await screen.findByRole('button', { name: 'Add document' }))
     await user.selectOptions(screen.getByLabelText('Published document'), 'publication-1')
     await user.selectOptions(screen.getByLabelText('Applies to'), 'model-1')
@@ -185,14 +194,14 @@ describe('Products', () => {
 
   it('renders empty, denial, loading failure, and mutation failure states', async () => {
     const denied = catalogClient({
-      listProducts: vi.fn().mockResolvedValue({ results: [], can_manage: false }),
+      listProducts: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false, can_manage: false }),
       listDefinitions: vi.fn().mockResolvedValue({ results: [], can_manage: false }),
     })
-    const { unmount } = render(<Products workspace={workspace} client={denied} />)
+    const { unmount } = renderProducts(denied)
     expect(await screen.findByText('No products match this view.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'New product' })).not.toBeInTheDocument()
     unmount()
-    render(<Products workspace={workspace} client={catalogClient({ listProducts: vi.fn().mockRejectedValue(new Error('Denied')) })} />)
+    renderProducts(catalogClient({ listProducts: vi.fn().mockRejectedValue(new Error('Denied')) }))
     expect(await screen.findByRole('heading', { name: 'Products unavailable' })).toBeInTheDocument()
   })
 
@@ -200,7 +209,8 @@ describe('Products', () => {
     const archiveProduct = vi.fn().mockResolvedValue(undefined)
     const archiveModel = vi.fn().mockResolvedValue(undefined)
     const user = userEvent.setup()
-    render(<Products workspace={workspace} client={catalogClient({ archiveProduct, archiveModel })} />)
+    renderProducts(catalogClient({ archiveProduct, archiveModel }))
+    await user.click(await screen.findByRole('button', { name: 'EdgeSwitch' }))
 
     await user.click(await screen.findByRole('button', { name: 'Archive EdgeSwitch' }))
     let confirmation = screen.getByRole('alertdialog')

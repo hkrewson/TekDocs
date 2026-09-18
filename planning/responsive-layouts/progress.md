@@ -1,6 +1,6 @@
 # Progress and verification
 
-Updated 2026-09-17. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+Updated 2026-09-18. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
 ## Completed implementation slices
 
@@ -13,7 +13,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
-| 4 — Operational records | In progress: Organizations/People/Sites accepted; Stock and Vendors workspaces complete | Complete Products and Licenses, then run grouped live-stack acceptance; see [operational-records.md](operational-records.md), [stock-workspace.md](stock-workspace.md), and [vendor-workspace.md](vendor-workspace.md) |
+| 4 — Operational records | In progress: Organizations/People/Sites accepted; Stock, Vendors, and Products workspaces complete | Complete Licenses, then run grouped live-stack acceptance; see [operational-records.md](operational-records.md), [stock-workspace.md](stock-workspace.md), [vendor-workspace.md](vendor-workspace.md), and [product-workspace.md](product-workspace.md) |
 | 5 — Documentation/files | Pending | All planned migrations |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
@@ -54,6 +54,14 @@ Completed the Vendors piece of the connected operational-record milestone under 
 The server rejects undeclared parameters, caps page size, returns canonical page metadata, and applies the existing asset-view permission and derived client scope to direct retrieval. A supplier connected only to another client remains unavailable. OpenAPI and generated TypeScript types are aligned. The route permission inventory also now describes the previously implemented Stock detail read method, closing a contract mismatch found by the complete route check.
 
 Verified: focused PostgreSQL and route-contract scenarios pass. All 21 Vendor browser scenarios pass across Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels, including long values, bounds, focus, accessibility, direct retrieval, and URL restoration. The project frontend gate passes all 592 tests across 117 files, localization enforcement, coverage, typechecking, the production build, and unchanged compressed bundle budgets. Products and Licenses remain before grouped live-stack acceptance; Documents follows in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged.
+
+## Product catalog collection and record workspace checkpoint — 2026-09-18
+
+Completed the Products piece of the connected operational-record milestone under #81. The former unbounded split list/detail page and separate product editor are replaced by a bounded, searchable, filterable, sortable, paginated directory and one URL-addressed responsive record drawer. The drawer combines product editing, schema-driven models, append-only specification history, published-document associations, and explicit archive workflows. Direct URLs retrieve authorized products outside the current page, and no product is selected implicitly.
+
+The server rejects undeclared collection parameters, caps page size, returns canonical metadata, and applies the same document-view permission context to list and direct-detail serialization. Existing supplier classification, workspace scope, permissions, version history, and archive rules remain unchanged. OpenAPI and generated TypeScript types are aligned.
+
+Verified: the five-test PostgreSQL catalog module and eleven focused frontend tests pass. All 21 Product browser scenarios pass across Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels, including long values, bounds, focus, accessibility, editing, model/document content, direct retrieval, and URL restoration. The nine existing product language and no-template scenarios also pass across the three engines. The project frontend gate passes all 592 tests across 117 files, localization enforcement, coverage, typechecking, generated-client agreement, production build, and unchanged bundle budgets. Its first run exposed an existing Stock test that clicked before the asynchronous list loaded; the corrected wait passed in isolation and in the complete clean rerun. Licenses remains before grouped live-stack acceptance; Documents follows in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged.
 
 ## Verified — Assets collection checkpoint
 

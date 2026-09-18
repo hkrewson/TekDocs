@@ -30,6 +30,10 @@ test('supplier products use plain version language and explain archive consequen
       id: 'product-1', name: 'EdgeSwitch', kind: 'hardware', description: 'Managed switching product line', updated_at: '2026-09-05T12:00:00Z', documents: [],
       models: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', current_revision: { id: 'revision-1', revision: 1, parent_id: null, specification_version_id: 'template-version-1', specification_definition_id: 'template-1', specification_definition_name: 'Managed switch', specification_version: 1, lifecycle: 'active', specifications: { ports: 24 }, notes: '', checksum: 'b'.repeat(64), created_by: 'Primary Owner', created_at: '2026-09-05T12:00:00Z' }, revisions: [] }],
     }],
+    page: 1,
+    page_size: 25,
+    count: 1,
+    has_more: false,
     can_manage: true,
   } }))
 
@@ -37,19 +41,19 @@ test('supplier products use plain version language and explain archive consequen
   await page.goto(`/workspaces/organizations/${supplierId}/products`)
   await expect(page.getByRole('heading', { name: 'Example Manufacturer products' })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Specification templates' })).toBeVisible()
-  await expect(page.getByText('ES-24 · Active · version 1')).toBeVisible()
+  await page.getByRole('button', { name: 'EdgeSwitch', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'EdgeSwitch' }).getByText('ES-24 · Active · version 1')).toBeVisible()
 
+  await page.getByRole('link', { name: 'Back to products' }).click()
   await page.getByRole('button', { name: 'New product' }).click()
-  const editor = page.getByRole('heading', { name: 'New product' }).locator('..').locator('..').locator('..')
-  await expect(page.getByLabel('Product name')).toBeFocused()
-  expect(await editor.evaluate((element) => {
-    const layout = document.querySelector('.catalog-layout')
-    return Boolean(layout && (element.compareDocumentPosition(layout) & Node.DOCUMENT_POSITION_FOLLOWING))
-  })).toBe(true)
+  const editor = page.getByRole('dialog', { name: 'New product' })
+  await expect(editor.getByRole('heading', { name: 'New product' })).toBeFocused()
+  await expect(editor.getByRole('heading', { name: 'Product details' })).toBeVisible()
   expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-  await page.getByRole('button', { name: 'Cancel' }).click()
+  await editor.getByRole('button', { name: 'Cancel' }).click()
 
-  await page.getByRole('button', { name: 'Archive EdgeSwitch' }).click()
+  await page.getByRole('button', { name: 'EdgeSwitch', exact: true }).click()
+  await page.getByRole('dialog', { name: 'EdgeSwitch' }).getByRole('button', { name: 'Archive EdgeSwitch' }).click()
   const confirmation = page.getByRole('alertdialog')
   await expect(confirmation).toContainText('Existing assets keep their saved product and model details.')
   await expect(confirmation).toContainText('TekDocs does not provide a restore action')
@@ -84,6 +88,10 @@ for (const width of [1280, 390]) {
       id: 'product-1', name: 'EdgeSwitch', kind: 'hardware', description: 'Managed switching product line', updated_at: '2026-09-05T12:00:00Z', documents: [],
       models: [{ id: 'model-1', name: 'EdgeSwitch 24', model_number: 'ES-24', current_revision: { id: 'revision-1', revision: 1, parent_id: null, specification_version_id: 'template-version-1', specification_definition_id: 'template-1', specification_definition_name: 'Managed switch', specification_version: 1, lifecycle: 'active', specifications: { ports: 24 }, notes: '', checksum: 'b'.repeat(64), created_by: 'Primary Owner', created_at: '2026-09-05T12:00:00Z' }, revisions: [] }],
     }],
+    page: 1,
+    page_size: 25,
+    count: 1,
+    has_more: false,
     can_manage: true,
   } }))
 
@@ -92,14 +100,18 @@ for (const width of [1280, 390]) {
     page.on('pageerror', (error) => errors.push(error.message))
     await page.setViewportSize({ width, height: 900 })
     await page.goto(`/workspaces/organizations/${supplierId}/products`)
-    await page.getByRole('button', { name: 'Add model', exact: true }).click()
+    await page.getByRole('button', { name: 'EdgeSwitch', exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'EdgeSwitch' })
+    await drawer.getByRole('button', { name: 'Add model', exact: true }).click()
     await expect(page.getByRole('alert')).toHaveText('Create a hardware specification template before adding a model.')
     await expect(page.getByRole('heading', { name: 'Example Manufacturer products' })).toBeVisible()
     expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
     expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
-    await page.getByRole('button', { name: 'Cancel', exact: true }).focus()
+    await drawer.getByRole('button', { name: 'Cancel', exact: true }).focus()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Add model' })).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(drawer).toHaveCount(0)
     await page.getByRole('tab', { name: 'Specification templates' }).click()
     await page.getByRole('button', { name: 'New specification template' }).click()
     await expect(page.getByRole('heading', { name: 'New specification template' })).toBeVisible()

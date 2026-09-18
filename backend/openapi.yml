@@ -15405,7 +15405,31 @@ paths:
       - in: query
         name: kind
         schema:
+          enum:
+          - ''
+          - hardware
+          - software
           type: string
+          x-spec-enum-id: 5aded443857b1518
+          default: ''
+        description: "* `` - \n* `hardware` - hardware\n* `software` - software"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - updated_at
+          - -updated_at
+          type: string
+          x-spec-enum-id: 50c347ae7c3fc627
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `updated_at` - updated_at
+          * `-updated_at` - -updated_at
       - in: path
         name: organization_entity_id
         schema:
@@ -15413,9 +15437,25 @@ paths:
           format: uuid
         required: true
       - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
         name: q
         schema:
           type: string
+          default: ''
+          maxLength: 240
       tags:
       - workspaces
       security:
@@ -30551,10 +30591,22 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CatalogProduct'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
       required:
       - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
       - results
     CertificateEndpoint:
       type: object

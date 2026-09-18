@@ -12,11 +12,13 @@ describe('catalog API client', () => {
     const workspace = { id: 'supplier/1' } as never
     const ok = (body: unknown = {}) => new Response(JSON.stringify(body), { status: 200 })
     fetchMock.mockImplementation(() => Promise.resolve(ok()))
-    await browserCatalogClient.listProducts(workspace, 'edge switch', 'hardware')
+    await browserCatalogClient.listProducts(workspace, { q: 'edge switch', kind: 'hardware', ordering: '-updated_at', page: 2, page_size: 25 })
     expect(fetchMock).toHaveBeenLastCalledWith(
-      '/api/v1/workspaces/organizations/supplier%2F1/catalog/products?q=edge+switch&kind=hardware',
+      '/api/v1/workspaces/organizations/supplier%2F1/catalog/products?ordering=-updated_at&page=2&page_size=25&q=edge+switch&kind=hardware',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
+    await browserCatalogClient.retrieveProduct(workspace, 'product/1')
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/v1/workspaces/organizations/supplier%2F1/catalog/products/product%2F1', expect.any(Object))
     await browserCatalogClient.listDefinitions(workspace)
     await browserCatalogClient.createProduct(workspace, { name: 'Edge', kind: 'hardware', description: '' })
     await browserCatalogClient.updateProduct(workspace, 'product/1', { name: 'Edge 2', description: '' })
@@ -30,9 +32,9 @@ describe('catalog API client', () => {
     await browserCatalogClient.associateDocument(workspace, 'product/1', 'publication/1', 'model/1')
     await browserCatalogClient.archiveDocumentAssociation(workspace, 'product/1', 'association/1')
     await browserCatalogClient.archiveProduct(workspace, 'product/1')
-    const mutationCall = fetchMock.mock.calls.find(([path]) => {
+    const mutationCall = fetchMock.mock.calls.find(([path, options]) => {
       const value = typeof path === 'string' ? path : path instanceof URL ? path.href : path.url
-      return value.includes('/catalog/products/product%2F1')
+      return value.includes('/catalog/products/product%2F1') && options?.method === 'PATCH'
     })
     expect(mutationCall?.[0]).toContain('/catalog/products/product%2F1')
     expect((mutationCall?.[1]?.headers as Record<string, string>)['X-CSRFToken']).toBe('catalog-csrf')

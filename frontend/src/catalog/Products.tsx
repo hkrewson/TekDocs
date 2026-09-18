@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronRight, FileText, History, Plus, Search, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, FileText, History, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { useSearchParams } from 'react-router'
+import { QuickDrawer } from '../collections/QuickDrawer'
+import '../collections/collections.css'
 import { FilterMenu } from '../FilterMenu'
 import { translate } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
@@ -11,7 +14,11 @@ import type {
   CatalogPublicationChoice,
   DefinitionDraft,
   ModelDraft,
+  ProductDraft,
   ProductKind,
+  ProductOrdering,
+  ProductQuery,
+  ProductResult,
   SpecificationDefinition,
   SpecificationProperty,
   SpecificationSchema,
@@ -22,6 +29,20 @@ type PropertyDraft = { key: string; label: string; type: 'string' | 'integer' | 
 
 const EMPTY_PRODUCT = { name: '', kind: 'hardware' as ProductKind, description: '', unit_amount: '', currency: 'USD' }
 const EMPTY_PROPERTY: PropertyDraft = { key: '', label: '', type: 'string', required: false, choices: '' }
+const INITIAL_QUERY: ProductQuery = { q: '', kind: '', ordering: 'name', page: 1, page_size: 25 }
+
+function initialQuery(parameters: URLSearchParams): ProductQuery {
+  const ordering = parameters.get('product_order')
+  const kind = parameters.get('product_kind')
+  const page = Number(parameters.get('product_page'))
+  return {
+    ...INITIAL_QUERY,
+    q: parameters.get('q') ?? '',
+    kind: kind === 'hardware' || kind === 'software' ? kind : '',
+    ordering: ['name', '-name', 'updated_at', '-updated_at'].includes(ordering ?? '') ? ordering as ProductOrdering : 'name',
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+  }
+}
 
 function latestDefinitionVersion(definition: SpecificationDefinition) {
   return definition.versions[definition.versions.length - 1]
@@ -149,15 +170,24 @@ function DefinitionEditor({ definition, saving, onCancel, onSave }: { definition
   </section>
 }
 
+function ProductForm({ draft, creating, saving, onChange, onCancel, onSave }: { draft: ProductDraft; creating: boolean; saving: boolean; onChange: (draft: ProductDraft) => void; onCancel: () => void; onSave: () => void }) {
+  return <section className="catalog-editor product-editor" aria-labelledby="product-editor-heading">
+    <div className="section-heading"><div><h3 id="product-editor-heading">{translate(creating ? 'catalog.productDetails' : 'catalog.editProduct')}</h3><p>{translate(creating ? 'catalog.newProductHelp' : 'catalog.editProductHelp')}</p></div></div>
+    <div className="catalog-form-grid"><label><span>{translate('catalog.productName')}</span><input autoFocus value={draft.name} onChange={(event) => onChange({ ...draft, name: event.target.value })} /></label><label><span>{translate('catalog.type')}</span><select value={draft.kind} disabled={!creating} onChange={(event) => onChange({ ...draft, kind: event.target.value as ProductKind })}><option value="hardware">{translate('catalog.hardware')}</option><option value="software">{translate('catalog.software')}</option></select></label><label><span>{translate('catalog.defaultInvoicePrice')}</span><input type="number" min="0" step="0.0001" value={draft.unit_amount ?? ''} onChange={(event) => onChange({ ...draft, unit_amount: event.target.value })} /></label><label><span>{translate('catalog.currency')}</span><input maxLength={3} value={draft.currency ?? ''} onChange={(event) => onChange({ ...draft, currency: event.target.value.toUpperCase() })} /></label><label className="wide-field"><span>{translate('catalog.description')}</span><textarea rows={3} value={draft.description} onChange={(event) => onChange({ ...draft, description: event.target.value })} /></label></div>
+    <div className="form-actions"><button type="button" className="primary-button" disabled={saving || !draft.name.trim()} onClick={onSave}>{saving ? translate('common.saving') : translate(creating ? 'catalog.createProduct' : 'catalog.saveProduct')}</button><button type="button" className="secondary-button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button></div>
+  </section>
+}
+
 export function Products({ workspace, client }: { workspace: WorkspaceContext; client: CatalogClient }) {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState<Tab>('products')
-  const [products, setProducts] = useState<CatalogProduct[]>([])
+  const [query, setQuery] = useState<ProductQuery>(() => initialQuery(searchParams))
+  const [loaded, setLoaded] = useState<{ scope: string; result: ProductResult } | null>(null)
   const [definitions, setDefinitions] = useState<SpecificationDefinition[]>([])
   const [canManage, setCanManage] = useState(false)
-  const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<ProductKind | ''>('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [productDraft, setProductDraft] = useState<typeof EMPTY_PRODUCT | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<{ scope: string; record: CatalogProduct } | null>(null)
+  const [drawerErrorId, setDrawerErrorId] = useState<string | null>(null)
+  const [productDraft, setProductDraft] = useState<ProductDraft | null>(() => searchParams.get('product') === 'new' ? { ...EMPTY_PRODUCT } : null)
   const [definitionDraft, setDefinitionDraft] = useState<SpecificationDefinition | 'new' | null>(null)
   const [modelDraft, setModelDraft] = useState<CatalogModel | 'new' | null>(null)
   const [historyId, setHistoryId] = useState<string | null>(null)
@@ -170,16 +200,52 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
   const [archivingProduct, setArchivingProduct] = useState<CatalogProduct | null>(null)
   const [archivingModel, setArchivingModel] = useState<CatalogModel | null>(null)
   const [removingDocument, setRemovingDocument] = useState<CatalogProductDocument | null>(null)
+  const scope = workspace.id
+  const drawerId = searchParams.get('product')
+  const result = loaded?.scope === scope ? loaded.result : null
+  const products = result?.results ?? []
+  const listedProduct = drawerId && drawerId !== 'new' ? products.find((product) => product.id === drawerId) : null
+  const selected = listedProduct ?? (selectedProduct?.scope === scope && selectedProduct.record.id === drawerId ? selectedProduct.record : null)
+  const activeProductDraft = productDraft ?? (drawerId === 'new' ? EMPTY_PRODUCT : null)
+  const drawerPhase = drawerErrorId === drawerId ? 'error' : selected || drawerId === 'new' ? 'ready' : 'loading'
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.all([client.listProducts(workspace, query, kind, controller.signal), client.listDefinitions(workspace, controller.signal)])
-      .then(([productResult, definitionResult]) => { setProducts(productResult.results); setDefinitions(definitionResult.results); setCanManage(productResult.can_manage && definitionResult.can_manage); setPhase('ready') })
+    const timer = window.setTimeout(() => {
+      Promise.all([client.listProducts(workspace, query, controller.signal), client.listDefinitions(workspace, controller.signal)])
+        .then(([productResult, definitionResult]) => { if (!controller.signal.aborted) { setLoaded({ scope, result: productResult }); setDefinitions(definitionResult.results); setCanManage(productResult.can_manage && definitionResult.can_manage); setPhase('ready') } })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
-    return () => controller.abort()
-  }, [client, kind, query, refresh, workspace])
+    }, 180)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [client, query, refresh, scope, workspace])
 
-  const selected = useMemo(() => products.find((product) => product.id === selectedId) ?? products[0], [products, selectedId])
+  useEffect(() => {
+    if (!drawerId || drawerId === 'new' || listedProduct) return
+    const controller = new AbortController()
+    client.retrieveProduct(workspace, drawerId, controller.signal)
+      .then((record) => { if (!controller.signal.aborted) { setSelectedProduct({ scope, record }); setDrawerErrorId(null) } })
+      .catch(() => { if (!controller.signal.aborted) setDrawerErrorId(drawerId) })
+    return () => controller.abort()
+  }, [client, drawerId, listedProduct, scope, workspace])
+
+  const updateDrawerUrl = useCallback((id: string | null, replace = false) => {
+    const next = new URLSearchParams(searchParams)
+    if (id) next.set('product', id); else next.delete('product')
+    setSearchParams(next, { replace })
+  }, [searchParams, setSearchParams])
+
+  const changeQuery = (changes: Partial<ProductQuery>) => {
+    const nextQuery = { ...query, ...changes, page: changes.page ?? 1 }
+    const next = new URLSearchParams(searchParams)
+    if (nextQuery.q) next.set('q', nextQuery.q); else next.delete('q')
+    if (nextQuery.kind) next.set('product_kind', nextQuery.kind); else next.delete('product_kind')
+    if (nextQuery.ordering !== 'name') next.set('product_order', nextQuery.ordering); else next.delete('product_order')
+    if (nextQuery.page > 1) next.set('product_page', String(nextQuery.page)); else next.delete('product_page')
+    setQuery(nextQuery); setSearchParams(next, { replace: true })
+  }
+  const sort = (field: 'name' | 'updated_at') => changeQuery({ ordering: query.ordering === field ? `-${field}` : field })
+  const sortIndicator = (field: string) => query.ordering === field ? <ArrowUp size={13} aria-hidden="true" /> : query.ordering === `-${field}` ? <ArrowDown size={13} aria-hidden="true" /> : null
+  const closeDrawer = () => { setProductDraft(null); setModelDraft(null); setDocumentDraft(null); setArchivingProduct(null); setArchivingModel(null); setRemovingDocument(null); updateDrawerUrl(null) }
 
   async function perform(action: () => Promise<unknown>) {
     setSaving(true); setError(null)
@@ -206,32 +272,32 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
 
   return <>
     <header className="page-header"><div><h1>{translate('catalog.heading', { supplier: workspace.name })}</h1></div>
-      {canManage && tab === 'products' && <button className="primary-button" type="button" aria-label={translate('products.new')} title={translate('products.new')} onClick={() => setProductDraft({ ...EMPTY_PRODUCT })}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('products.new')}</span></button>}
+      {canManage && tab === 'products' && <button className="primary-button" type="button" aria-label={translate('products.new')} title={translate('products.new')} onClick={() => { setProductDraft({ ...EMPTY_PRODUCT }); updateDrawerUrl('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('products.new')}</span></button>}
       {canManage && tab === 'definitions' && <button className="primary-button" type="button" aria-label={translate('catalog.newTemplate')} title={translate('catalog.newTemplate')} onClick={() => setDefinitionDraft('new')}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('catalog.newTemplate')}</span></button>}
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     <div className="mode-tabs catalog-tabs" role="tablist" aria-label={translate('catalog.sections')}>
       <button type="button" role="tab" aria-selected={tab === 'products'} className={tab === 'products' ? 'selected' : ''} onClick={() => setTab('products')}>{translate('catalog.productsAndModels')}</button>
-      <button type="button" role="tab" aria-selected={tab === 'definitions'} className={tab === 'definitions' ? 'selected' : ''} onClick={() => setTab('definitions')}>{translate('catalog.specificationTemplates')}</button>
+      <button type="button" role="tab" aria-selected={tab === 'definitions'} className={tab === 'definitions' ? 'selected' : ''} onClick={() => { setTab('definitions'); closeDrawer() }}>{translate('catalog.specificationTemplates')}</button>
     </div>
-    {productDraft && <section className="content-section catalog-editor" aria-labelledby="product-editor-heading">
-      <div className="section-heading"><div><h2 id="product-editor-heading">{translate('products.new')}</h2><p>{translate('catalog.newProductHelp')}</p></div></div>
-      <div className="catalog-form-grid"><label><span>{translate('catalog.productName')}</span><input autoFocus value={productDraft.name} onChange={(event) => setProductDraft({ ...productDraft, name: event.target.value })} /></label><label><span>{translate('catalog.type')}</span><select value={productDraft.kind} onChange={(event) => setProductDraft({ ...productDraft, kind: event.target.value as ProductKind })}><option value="hardware">{translate('catalog.hardware')}</option><option value="software">{translate('catalog.software')}</option></select></label><label><span>{translate('catalog.defaultInvoicePrice')}</span><input type="number" min="0" step="0.0001" value={productDraft.unit_amount} onChange={(event) => setProductDraft({ ...productDraft, unit_amount: event.target.value })} /></label><label><span>{translate('catalog.currency')}</span><input maxLength={3} value={productDraft.currency} onChange={(event) => setProductDraft({ ...productDraft, currency: event.target.value.toUpperCase() })} /></label><label className="wide-field"><span>{translate('catalog.description')}</span><textarea rows={3} value={productDraft.description} onChange={(event) => setProductDraft({ ...productDraft, description: event.target.value })} /></label></div>
-      <div className="form-actions"><button type="button" className="primary-button" disabled={saving || !productDraft.name.trim()} onClick={() => { void perform(async () => { const created = await client.createProduct(workspace, { ...productDraft, unit_amount: productDraft.unit_amount || null, currency: productDraft.unit_amount ? productDraft.currency : '' }); setSelectedId(created.id) }) }}>{saving ? translate('common.saving') : translate('catalog.createProduct')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => setProductDraft(null)}>{translate('common.cancel')}</button></div>
-    </section>}
     {phase === 'loading' && <section className="content-section" role="status">{translate('catalog.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('catalog.unavailable')}</h2><p>{translate('catalog.loadFailed')}</p></section>}
-    {phase === 'ready' && tab === 'products' && <div className="catalog-layout">
-      <section className="content-section catalog-index">
+    {phase === 'ready' && tab === 'products' && <section className="content-section catalog-index" aria-labelledby="product-directory-heading">
+        <div className="section-heading"><h2 id="product-directory-heading">{translate('catalog.productDirectory')}</h2><span>{result ? translate('pagination.range', { first: result.count ? (result.page - 1) * result.page_size + 1 : 0, last: Math.min(result.page * result.page_size, result.count), count: result.count }) : translate('common.loading')}</span></div>
         <div className="catalog-filters">
-          <label><span className="sr-only">{translate('catalog.search')}</span><Search size={16} /><input type="search" placeholder={translate('catalog.searchPlaceholder')} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-          <FilterMenu groups={[{ kind: 'choices', label: translate('catalog.type'), value: kind, choices: [{ value: '', label: translate('catalog.allTypes') }, { value: 'hardware', label: translate('catalog.hardware') }, { value: 'software', label: translate('catalog.software') }], onChange: (value) => setKind(value as ProductKind | '') }]} activeCount={kind ? 1 : 0} onClear={() => setKind('')} menuLabel={translate('catalog.filters')} />
+          <label><span className="sr-only">{translate('catalog.search')}</span><Search size={16} /><input type="search" aria-label={translate('catalog.search')} placeholder={translate('catalog.searchPlaceholder')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} /></label>
+          <FilterMenu groups={[{ kind: 'choices', label: translate('catalog.type'), value: query.kind, choices: [{ value: '', label: translate('catalog.allTypes') }, { value: 'hardware', label: translate('catalog.hardware') }, { value: 'software', label: translate('catalog.software') }], onChange: (value) => changeQuery({ kind: value as ProductKind | '' }) }]} activeCount={query.kind ? 1 : 0} onClear={() => changeQuery({ kind: '' })} menuLabel={translate('catalog.filters')} />
         </div>
-        {products.length === 0 ? <p className="empty-state">{translate('catalog.noProducts')}</p> : <ul className="catalog-product-list">{products.map((product) => <li key={product.id}><button type="button" className={selected?.id === product.id ? 'selected' : ''} onClick={() => { setSelectedId(product.id); setDocumentDraft(null); setArchivingProduct(null); setArchivingModel(null); setRemovingDocument(null) }}><span><strong>{product.name}</strong><small>{productKindLabel(product.kind)} · {translate(product.models.length === 1 ? 'catalog.modelCount' : 'catalog.modelCountPlural', { count: product.models.length })}</small></span><ChevronRight size={16} /></button></li>)}</ul>}
-      </section>
-      <section className="content-section catalog-detail">{selected ? <>
-        <div className="section-heading"><div><h2>{selected.name}</h2><p>{selected.description || translate('catalog.noDescription', { type: productKindLabel(selected.kind).toLowerCase() })}</p></div><span>{productKindLabel(selected.kind)}</span></div>
-        {canManage && <div className="catalog-detail-actions"><button type="button" className="secondary-button" onClick={() => setModelDraft('new')}><Plus size={15} />{translate('catalog.addModel')}</button><button type="button" className="icon-button" title={translate('catalog.archiveProduct', { name: selected.name })} aria-label={translate('catalog.archiveProduct', { name: selected.name })} onClick={() => { setArchivingProduct(selected); setArchivingModel(null); setRemovingDocument(null) }}><Trash2 size={15} /></button></div>}
+        {products.length === 0 ? <p className="empty-state">{translate('catalog.noProducts')}</p> : <div className="people-table-wrap" role="group" aria-label={translate('catalog.productsTable')} tabIndex={0}><table className="people-table"><thead><tr><th scope="col" aria-sort={query.ordering === 'name' ? 'ascending' : query.ordering === '-name' ? 'descending' : 'none'}><button type="button" onClick={() => sort('name')}>{translate('catalog.productName')}{sortIndicator('name')}</button></th><th scope="col">{translate('catalog.type')}</th><th scope="col">{translate('catalog.models')}</th><th scope="col">{translate('catalog.defaultInvoicePrice')}</th><th scope="col" aria-sort={query.ordering === 'updated_at' ? 'ascending' : query.ordering === '-updated_at' ? 'descending' : 'none'}><button type="button" onClick={() => sort('updated_at')}>{translate('catalog.updated')}{sortIndicator('updated_at')}</button></th></tr></thead><tbody>{products.map((product) => <tr key={product.id}><td data-label={translate('catalog.productName')}><button id={`product-row-${product.id}`} className="collection-name" type="button" onClick={() => { setSelectedProduct({ scope, record: product }); setDrawerErrorId(null); updateDrawerUrl(product.id) }}>{product.name}</button><span className="collection-secondary">{product.description || translate('catalog.noDescription', { type: productKindLabel(product.kind).toLowerCase() })}</span></td><td data-label={translate('catalog.type')}>{productKindLabel(product.kind)}</td><td data-label={translate('catalog.models')}>{product.models.length}</td><td data-label={translate('catalog.defaultInvoicePrice')}>{product.unit_amount ? `${product.currency} ${product.unit_amount}` : translate('catalog.noDefaultPrice')}</td><td data-label={translate('catalog.updated')}>{new Date(product.updated_at).toLocaleDateString()}</td></tr>)}</tbody></table></div>}
+        {result && result.count > result.page_size && <nav className="people-pagination" aria-label={translate('catalog.productPages')}><button className="secondary-button" type="button" disabled={result.page === 1} onClick={() => changeQuery({ page: result.page - 1 })}><ChevronLeft size={15} aria-hidden="true" />{translate('pagination.previous')}</button><span>{translate('pagination.page', { page: result.page })}</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => changeQuery({ page: result.page + 1 })}>{translate('pagination.next')}<ChevronRight size={15} aria-hidden="true" /></button></nav>}
+      </section>}
+    {drawerId && tab === 'products' && <QuickDrawer title={drawerId === 'new' ? translate('products.new') : selected?.name ?? translate('catalog.productRecord')} onClose={closeDrawer} returnFocusId={drawerId === 'new' ? undefined : `product-row-${drawerId}`} returnHref={`/workspaces/organizations/${workspace.id}/products`} returnLabel={translate('catalog.backToProducts')}>
+      {drawerId === 'new' && activeProductDraft && <ProductForm draft={activeProductDraft} creating saving={saving} onChange={setProductDraft} onCancel={closeDrawer} onSave={() => { void perform(async () => { const created = await client.createProduct(workspace, { ...activeProductDraft, unit_amount: activeProductDraft.unit_amount || null, currency: activeProductDraft.unit_amount ? activeProductDraft.currency : '' }); setSelectedProduct({ scope, record: created }); updateDrawerUrl(created.id, true) }) }} />}
+      {drawerId !== 'new' && drawerPhase === 'loading' && <p role="status">{translate('catalog.loadingProduct')}</p>}
+      {drawerId !== 'new' && drawerPhase === 'error' && <div className="workspace-error" role="alert"><h3>{translate('catalog.productUnavailable')}</h3><p>{translate('catalog.productUnavailableHelp')}</p></div>}
+      {drawerId !== 'new' && drawerPhase === 'ready' && selected && (productDraft ? <ProductForm draft={productDraft} creating={false} saving={saving} onChange={setProductDraft} onCancel={() => setProductDraft(null)} onSave={() => { void perform(async () => { const updated = await client.updateProduct(workspace, selected.id, { name: productDraft.name, description: productDraft.description, unit_amount: productDraft.unit_amount || null, currency: productDraft.unit_amount ? productDraft.currency : '' }); setSelectedProduct({ scope, record: updated }) }) }} /> : <section className="catalog-detail">
+        <div className="section-heading"><div><h3>{translate('catalog.productDetails')}</h3><p>{selected.description || translate('catalog.noDescription', { type: productKindLabel(selected.kind).toLowerCase() })}</p></div><span>{productKindLabel(selected.kind)}</span></div>
+        {canManage && <div className="catalog-detail-actions"><button type="button" className="secondary-button" onClick={() => setProductDraft({ name: selected.name, kind: selected.kind, description: selected.description, unit_amount: selected.unit_amount ?? '', currency: selected.currency ?? '' })}><Pencil size={15} />{translate('catalog.editProduct')}</button><button type="button" className="secondary-button" onClick={() => setModelDraft('new')}><Plus size={15} />{translate('catalog.addModel')}</button><button type="button" className="icon-button" title={translate('catalog.archiveProduct', { name: selected.name })} aria-label={translate('catalog.archiveProduct', { name: selected.name })} onClick={() => { setArchivingProduct(selected); setArchivingModel(null); setRemovingDocument(null) }}><Trash2 size={15} /></button></div>}
         {selected.models.length === 0 ? <p className="empty-state">{translate('catalog.noModels')}</p> : <ul className="catalog-model-list">{selected.models.map((model) => <li key={model.id}>
           <div className="catalog-model-heading"><div><strong>{model.name}</strong><span>{translate('catalog.modelSummary', { number: model.model_number, status: lifecycleLabel(model.current_revision.lifecycle), version: model.current_revision.revision })}</span></div><div>
             {canManage && <button type="button" className="secondary-button" onClick={() => setModelDraft(model)}>{translate('catalog.updateModel')}</button>}
@@ -249,9 +315,9 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
           {documentDraft && <div className="catalog-document-form"><label><span>{translate('catalog.publishedDocument')}</span><select aria-label={translate('catalog.publishedDocument')} value={documentDraft.publicationId} onChange={(event) => setDocumentDraft({ ...documentDraft, publicationId: event.target.value })}><option value="">{translate('catalog.choosePublishedDocument')}</option>{publicationChoices.map((publication) => <option key={publication.id} value={publication.id}>{publication.title}</option>)}</select></label><label><span>{translate('catalog.appliesTo')}</span><select aria-label={translate('catalog.appliesTo')} value={documentDraft.modelId} onChange={(event) => setDocumentDraft({ ...documentDraft, modelId: event.target.value })}><option value="">{translate('catalog.allModels')}</option>{selected.models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label><div className="form-actions"><button type="button" className="primary-button" disabled={saving || !documentDraft.publicationId} onClick={() => { void perform(() => client.associateDocument(workspace, selected.id, documentDraft.publicationId, documentDraft.modelId || null)) }}>{translate('catalog.addDocument')}</button><button type="button" className="secondary-button" onClick={() => setDocumentDraft(null)}>{translate('common.cancel')}</button></div></div>}
           {removingDocument && <div className="archive-confirmation" role="alertdialog" aria-labelledby="remove-product-document-heading"><div><strong id="remove-product-document-heading">{translate('catalog.removeDocumentHeading', { name: removingDocument.title })}</strong><p>{translate('catalog.removeDocumentHelp')}</p></div><div className="form-actions"><button type="button" className="danger-button" disabled={saving} onClick={() => { void perform(() => client.archiveDocumentAssociation(workspace, selected.id, removingDocument.id)) }}>{translate('catalog.removeDocumentAction')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => setRemovingDocument(null)}>{translate('common.cancel')}</button></div></div>}
         </section>
-        {archivingProduct && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-product-heading"><div><strong id="archive-product-heading">{translate('catalog.archiveProductHeading', { name: archivingProduct.name })}</strong><p>{translate('catalog.archiveProductHelp')}</p></div><div className="form-actions"><button type="button" className="danger-button" disabled={saving} onClick={() => { void perform(() => client.archiveProduct(workspace, archivingProduct.id)) }}>{translate('catalog.archiveProductAction')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => setArchivingProduct(null)}>{translate('common.cancel')}</button></div></div>}
-      </> : <p className="empty-state">{translate('catalog.chooseProduct')}</p>}</section>
-    </div>}
+        {archivingProduct && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-product-heading"><div><strong id="archive-product-heading">{translate('catalog.archiveProductHeading', { name: archivingProduct.name })}</strong><p>{translate('catalog.archiveProductHelp')}</p></div><div className="form-actions"><button type="button" className="danger-button" disabled={saving} onClick={() => { void perform(async () => { await client.archiveProduct(workspace, archivingProduct.id); closeDrawer() }) }}>{translate('catalog.archiveProductAction')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => setArchivingProduct(null)}>{translate('common.cancel')}</button></div></div>}
+      </section>)}
+    </QuickDrawer>}
     {phase === 'ready' && tab === 'definitions' && <section className="content-section">
       <div className="section-heading"><div><h2>{translate('catalog.specificationTemplates')}</h2><p>{translate('catalog.templatesHelp')}</p></div></div>
       {definitions.length === 0 ? <p className="empty-state">{translate('catalog.noTemplates')}</p> : <ul className="catalog-definition-list">{definitions.map((definition) => { const latest = latestDefinitionVersion(definition); return <li key={definition.id}><div><strong>{definition.name}</strong><span>{productKindLabel(definition.product_kind)} · {translate(definition.versions.length === 1 ? 'catalog.versionCount' : 'catalog.versionCountPlural', { count: definition.versions.length })} · {translate(Object.keys(latest.schema.properties).length === 1 ? 'catalog.fieldCount' : 'catalog.fieldCountPlural', { count: Object.keys(latest.schema.properties).length })}</span></div>{canManage && <button type="button" className="secondary-button" onClick={() => setDefinitionDraft(definition)}>{translate('catalog.updateTemplate')}</button>}</li> })}</ul>}

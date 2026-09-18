@@ -30,7 +30,7 @@ describe('Stock', () => {
   it('shows exact stock and supplier provenance', async () => {
     renderStock()
     expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Cat6 bulk cable' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cat6 bulk cable' }))
     expect(screen.getAllByText('1000.000 foot').length).toBeGreaterThan(0)
     expect(screen.getAllByText('USD 0.145430').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /ORDER-1001/ })).toHaveAttribute('href', item.order_url)

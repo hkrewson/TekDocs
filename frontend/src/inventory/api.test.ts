@@ -31,11 +31,13 @@ describe('inventory API client', () => {
   it('uses dedicated MSP-owned routes without an organization identifier', async () => {
     const workspace = { kind: 'msp', id: 'tenant/1' } as never
     await browserInventoryClient.listAssets(workspace, 1)
-    await browserInventoryClient.listLicenses(workspace, 3)
+    await browserInventoryClient.listLicenses(workspace, { q: 'secure agent', kind: 'subscription', status: 'active', ordering: '-renews_on', page: 3, page_size: 25 })
+    await browserInventoryClient.retrieveLicense(workspace, 'license/1')
     await browserInventoryClient.listVendors(workspace, { q: '', ordering: 'name', page: 1, page_size: 25 })
 
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/assets?page=1&page_size=50', expect.any(Object))
-    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses?page=3&page_size=50', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses?ordering=-renews_on&page=3&page_size=25&q=secure+agent&kind=subscription&status=active', expect.any(Object))
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/licenses/license%2F1', expect.any(Object))
     expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/workspaces/msp/vendors?ordering=name&page=1&page_size=25', expect.any(Object))
   })
 

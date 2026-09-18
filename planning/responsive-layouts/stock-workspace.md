@@ -17,4 +17,4 @@ The list endpoint now validates declared query parameters, caps page size, and r
 - All 21 focused browser scenarios pass in Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels. They cover long values, page and drawer bounds, heading focus, accessibility, and immediate keyboard dismissal protection.
 - The project frontend gate passes all 590 tests across 117 files, localization enforcement, coverage, typechecking, the production build, and existing compressed bundle budgets.
 
-Vendor catalog, products, and licenses remain in the grouped milestone. Its real browser-to-Django-to-PostgreSQL acceptance stays deferred until those connected pieces are integrated. Existing user and demo data was preserved; no version, deployment, or Wiki publication change is part of this checkpoint.
+Vendor catalog, products, licenses, and the grouped real browser-to-Django-to-PostgreSQL acceptance are now complete. Documents is next in Phase 5. Existing user and demo data was preserved; no version, deployment, or Wiki publication change is part of this checkpoint.

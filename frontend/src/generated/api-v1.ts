@@ -22736,8 +22736,31 @@ export interface operations {
     readonly workspaces_msp_licenses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `subscription` - subscription
+                 *     * `perpetual` - perpetual
+                 *     * `trial` - trial
+                 */
+                readonly kind?: "" | "subscription" | "perpetual" | "trial";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `renews_on` - renews_on
+                 *     * `-renews_on` - -renews_on
+                 */
+                readonly ordering?: "name" | "-name" | "renews_on" | "-renews_on";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `` -
+                 *     * `active` - active
+                 *     * `suspended` - suspended
+                 *     * `expired` - expired
+                 *     * `terminated` - terminated
+                 */
+                readonly status?: "" | "active" | "suspended" | "expired" | "terminated";
             };
             readonly header?: never;
             readonly path?: never;
@@ -31613,8 +31636,31 @@ export interface operations {
     readonly workspaces_organizations_licenses_retrieve_list: {
         readonly parameters: {
             readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `subscription` - subscription
+                 *     * `perpetual` - perpetual
+                 *     * `trial` - trial
+                 */
+                readonly kind?: "" | "subscription" | "perpetual" | "trial";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `renews_on` - renews_on
+                 *     * `-renews_on` - -renews_on
+                 */
+                readonly ordering?: "name" | "-name" | "renews_on" | "-renews_on";
                 readonly page?: number;
                 readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `` -
+                 *     * `active` - active
+                 *     * `suspended` - suspended
+                 *     * `expired` - expired
+                 *     * `terminated` - terminated
+                 */
+                readonly status?: "" | "active" | "suspended" | "expired" | "terminated";
             };
             readonly header?: never;
             readonly path: {

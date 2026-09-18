@@ -13,8 +13,8 @@ The Assets summary collection and typed browser API client are implemented under
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
-| 4 — Operational records | In progress: Organizations/People/Sites accepted; Stock, Vendors, and Products workspaces complete | Complete Licenses, then run grouped live-stack acceptance; see [operational-records.md](operational-records.md), [stock-workspace.md](stock-workspace.md), [vendor-workspace.md](vendor-workspace.md), and [product-workspace.md](product-workspace.md) |
-| 5 — Documentation/files | Pending | All planned migrations |
+| 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
+| 5 — Documentation/files | Next | Begin the grouped document library, reader, editor, template, block, review, publication, export, and file workspace migration |
 | 6 — Financial/compliance/integrations | Pending | All planned migrations |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
@@ -62,6 +62,16 @@ Completed the Products piece of the connected operational-record milestone under
 The server rejects undeclared collection parameters, caps page size, returns canonical metadata, and applies the same document-view permission context to list and direct-detail serialization. Existing supplier classification, workspace scope, permissions, version history, and archive rules remain unchanged. OpenAPI and generated TypeScript types are aligned.
 
 Verified: the five-test PostgreSQL catalog module and eleven focused frontend tests pass. All 21 Product browser scenarios pass across Chromium, Firefox, and WebKit at 320, 390, 768, 1024, 1280, and 1440 pixels, including long values, bounds, focus, accessibility, editing, model/document content, direct retrieval, and URL restoration. The nine existing product language and no-template scenarios also pass across the three engines. The project frontend gate passes all 592 tests across 117 files, localization enforcement, coverage, typechecking, generated-client agreement, production build, and unchanged bundle budgets. Its first run exposed an existing Stock test that clicked before the asynchronous list loaded; the corrected wait passed in isolation and in the complete clean rerun. Licenses remains before grouped live-stack acceptance; Documents follows in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged.
+
+## Licenses and connected operational-record acceptance — 2026-09-18
+
+Completed the Licenses workspace and the connected Stock/Vendors/Products/Licenses milestone under #81. The former unbounded list and permanently visible detail area are replaced by a bounded, searchable, filterable, sortable, paginated directory and one URL-addressed responsive record drawer. The record combines entitlement and renewal facts, covered installations, active seat assignments, history, guarded create/edit, installation linking, seat assignment, and revocation. Direct URLs retrieve authorized records outside the current page, and no license is selected implicitly.
+
+The server rejects undeclared collection parameters, caps page size, returns canonical metadata, and preserves existing workspace, permission, seat, installation, and event-history rules. OpenAPI and generated TypeScript types are aligned. Successful creation now waits for the cleared editor to leave the navigation guard before opening the saved record, preventing the saved transition from being mistaken for abandoned work.
+
+Verified: focused PostgreSQL inventory coverage and nine focused component/API-client scenarios pass. All 21 License browser scenarios pass across Chromium, Firefox, and WebKit at the six required widths. The clean frontend gate passes all 594 tests across 117 files with coverage, localization enforcement, typechecking, linting, production build, and unchanged bundle budgets. The isolated real browser-to-Django-to-PostgreSQL journey passes the complete connected workflow, including Product creation, software asset installation, License creation, seat assignment, renewal editing, downstream Contracts and accounting, plus independent database assertions. Earlier journey attempts exposed stale Product/Vendor navigation assumptions, the saved-create guard race, and a missing explicit License drawer close; each was corrected at its source before the green rerun.
+
+Phase 4 is accepted. Documents is next in Phase 5. Version, deployment, Wiki publication, and existing user/demo data remain unchanged. See [license-workspace.md](license-workspace.md).
 
 ## Verified — Assets collection checkpoint
 

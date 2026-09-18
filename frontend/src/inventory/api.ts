@@ -60,6 +60,9 @@ export type SoftwareLicenseSeat = { id: string; seat_number: number; person_id: 
 export type SoftwareLicenseEvent = { id: string; event_type: string; installation_name: string | null; person_name: string | null; seat_number: number | null; occurred_at: string }
 export type SoftwareLicense = { id: string; name: string; supplier_name: string; product_id: string; product_name: string; model_name: string | null; kind: 'subscription' | 'perpetual' | 'trial'; status: 'active' | 'suspended' | 'expired' | 'terminated'; seat_limit: number; active_seats: number; starts_on: string | null; renews_on: string | null; ends_on: string | null; renewal_interval: 'none' | 'monthly' | 'annual' | 'multi_year'; auto_renew: boolean; reference: string; installations: Array<{ id: string; name: string }>; seats: SoftwareLicenseSeat[]; events: SoftwareLicenseEvent[] }
 export type SoftwareChoices = { installations: SoftwareInstallation[]; people: Array<{ id: string; name: string }> }
+export type LicenseOrdering = 'name' | '-name' | 'renews_on' | '-renews_on'
+export type LicenseQuery = { q: string; kind: SoftwareLicense['kind'] | ''; status: SoftwareLicense['status'] | ''; ordering: LicenseOrdering; page: number; page_size: number }
+export type LicenseResult = { results: SoftwareLicense[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type ModelChoice = {
   id: string
   name: string
@@ -112,7 +115,8 @@ export interface InventoryClient {
   createAssetMACAddress(workspace: WorkspaceContext, assetId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
   updateAssetMACAddress(workspace: WorkspaceContext, assetId: string, macId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
   updateSoftwareInstallation(workspace: WorkspaceContext, assetId: string, values: Partial<SoftwareInstallation>): Promise<SoftwareInstallation>
-  listLicenses(workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<{ results: SoftwareLicense[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }>
+  listLicenses(workspace: WorkspaceContext, query: LicenseQuery, signal?: AbortSignal): Promise<LicenseResult>
+  retrieveLicense(workspace: WorkspaceContext, licenseId: string, signal?: AbortSignal): Promise<SoftwareLicense>
   createLicense(workspace: WorkspaceContext, values: object): Promise<SoftwareLicense>
   updateLicense(workspace: WorkspaceContext, licenseId: string, values: object): Promise<SoftwareLicense>
   softwareChoices(workspace: WorkspaceContext): Promise<SoftwareChoices>
@@ -193,7 +197,18 @@ export const browserInventoryClient: InventoryClient = {
   createAssetMACAddress: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses`, 'POST', values),
   updateAssetMACAddress: (workspace, assetId, macId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses/${encodeURIComponent(macId)}`, 'PATCH', values),
   updateSoftwareInstallation: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/software`, 'PATCH', values),
-  listLicenses: (workspace, page, signal) => get(`${basePath(workspace)}/licenses?page=${page}&page_size=50`, signal),
+  listLicenses: (workspace, query, signal) => {
+    const parameters = new URLSearchParams({
+      ordering: query.ordering,
+      page: String(query.page),
+      page_size: String(query.page_size),
+    })
+    if (query.q) parameters.set('q', query.q)
+    if (query.kind) parameters.set('kind', query.kind)
+    if (query.status) parameters.set('status', query.status)
+    return get(`${basePath(workspace)}/licenses?${parameters}`, signal)
+  },
+  retrieveLicense: (workspace, licenseId, signal) => get(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}`, signal),
   createLicense: (workspace, values) => mutate(`${basePath(workspace)}/licenses`, 'POST', values),
   updateLicense: (workspace, licenseId, values) => mutate(`${basePath(workspace)}/licenses/${encodeURIComponent(licenseId)}`, 'PATCH', values),
   softwareChoices: (workspace) => get(`${basePath(workspace)}/licenses/choices`),

@@ -885,6 +885,20 @@ def test_software_installation_license_seats_renewal_and_isolation(owner_client,
     assert license_page.json()["count"] == 1
     assert license_page.json()["has_more"] is False
     assert owner_client.get(license_collection, {"page_size": 101}).status_code == 400
+    filtered_licenses = owner_client.get(
+        license_collection,
+        {
+            "q": "contract-reference",
+            "kind": "subscription",
+            "status": "active",
+            "ordering": "-renews_on",
+            "page": 1,
+            "page_size": 25,
+        },
+    )
+    assert filtered_licenses.status_code == 200
+    assert [item["id"] for item in filtered_licenses.json()["results"]] == [payload["id"]]
+    assert owner_client.get(license_collection, {"unexpected": "value"}).status_code == 400
     linked = owner_client.post(
         reverse(
             "organization-software-license-installation",

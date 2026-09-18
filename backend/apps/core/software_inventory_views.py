@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
@@ -152,6 +153,19 @@ class LicenseResultSerializer(serializers.Serializer):
     can_manage = serializers.BooleanField()
 
 
+class LicenseQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
+    kind = serializers.ChoiceField(
+        choices=("", *SoftwareLicenseKind.values), required=False, allow_blank=True, default=""
+    )
+    status = serializers.ChoiceField(
+        choices=("", *SoftwareLicenseStatus.values), required=False, allow_blank=True, default=""
+    )
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "renews_on", "-renews_on"), required=False, default="name"
+    )
+
+
 class ChoiceResultSerializer(serializers.Serializer):
     installations = SoftwareInstallationSerializer(many=True)
     people = serializers.ListField()
@@ -197,12 +211,30 @@ class ClientSoftwareInstallationDetailView(APIView):
 
 
 class SoftwareLicenseListCreateView(APIView):
-    @extend_schema(parameters=[BoundedCollectionQuerySerializer], responses={200: LicenseResultSerializer})
+    @extend_schema(parameters=[LicenseQuerySerializer], responses={200: LicenseResultSerializer})
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = LicenseQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(licenses_for_scope(workspace.data_scope), **query.validated_data)
+        values = query.validated_data
+        licenses = licenses_for_scope(workspace.data_scope)
+        if values["q"]:
+            licenses = licenses.filter(
+                Q(entity__display_name__icontains=values["q"])
+                | Q(supplier__entity__display_name__icontains=values["q"])
+                | Q(product__entity__display_name__icontains=values["q"])
+                | Q(reference__icontains=values["q"])
+            )
+        if values["kind"]:
+            licenses = licenses.filter(kind=values["kind"])
+        if values["status"]:
+            licenses = licenses.filter(status=values["status"])
+        descending = values["ordering"].startswith("-")
+        field = values["ordering"].removeprefix("-")
+        order_field = "entity__display_name" if field == "name" else field
+        expression = F(order_field).desc(nulls_last=True) if descending else F(order_field).asc(nulls_last=True)
+        licenses = licenses.order_by(expression, "entity_id")
+        page = paginate(licenses, page=values["page"], page_size=values["page_size"])
         return Response(
             LicenseResultSerializer(
                 {

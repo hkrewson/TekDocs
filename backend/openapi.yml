@@ -10328,6 +10328,36 @@ paths:
       operationId: workspaces_msp_licenses_retrieve_list
       parameters:
       - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - subscription
+          - perpetual
+          - trial
+          type: string
+          x-spec-enum-id: 6236671310621c1f
+          default: ''
+        description: "* `` - \n* `subscription` - subscription\n* `perpetual` - perpetual\n\
+          * `trial` - trial"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - renews_on
+          - -renews_on
+          type: string
+          x-spec-enum-id: 1373eda4f6967b65
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `renews_on` - renews_on
+          * `-renews_on` - -renews_on
+      - in: query
         name: page
         schema:
           type: integer
@@ -10341,6 +10371,26 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - ''
+          - active
+          - suspended
+          - expired
+          - terminated
+          type: string
+          x-spec-enum-id: 0c989d5f1b108a88
+          default: ''
+        description: "* `` - \n* `active` - active\n* `suspended` - suspended\n* `expired`\
+          \ - expired\n* `terminated` - terminated"
       tags:
       - workspaces
       security:
@@ -23233,6 +23283,36 @@ paths:
     get:
       operationId: workspaces_organizations_licenses_retrieve_list
       parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - subscription
+          - perpetual
+          - trial
+          type: string
+          x-spec-enum-id: 6236671310621c1f
+          default: ''
+        description: "* `` - \n* `subscription` - subscription\n* `perpetual` - perpetual\n\
+          * `trial` - trial"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - renews_on
+          - -renews_on
+          type: string
+          x-spec-enum-id: 1373eda4f6967b65
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `renews_on` - renews_on
+          * `-renews_on` - -renews_on
       - in: path
         name: organization_entity_id
         schema:
@@ -23253,6 +23333,26 @@ paths:
           maximum: 100
           minimum: 1
           default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: status
+        schema:
+          enum:
+          - ''
+          - active
+          - suspended
+          - expired
+          - terminated
+          type: string
+          x-spec-enum-id: 0c989d5f1b108a88
+          default: ''
+        description: "* `` - \n* `active` - active\n* `suspended` - suspended\n* `expired`\
+          \ - expired\n* `terminated` - terminated"
       tags:
       - workspaces
       security:

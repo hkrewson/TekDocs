@@ -80,6 +80,7 @@ function inventoryClient(overrides: Partial<InventoryClient> = {}): InventoryCli
     updateAssetMACAddress: vi.fn(),
     updateSoftwareInstallation: vi.fn(),
     listLicenses: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true }),
+    retrieveLicense: vi.fn(),
     createLicense: vi.fn(),
     updateLicense: vi.fn(),
     softwareChoices: vi.fn().mockResolvedValue({ installations: [], people: [] }),

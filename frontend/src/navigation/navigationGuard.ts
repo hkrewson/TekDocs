@@ -14,6 +14,12 @@ export function useNavigationGuard() {
   return context.attempt
 }
 
+export function useNavigationGuardStatus() {
+  const context = useContext(NavigationGuardContext)
+  if (!context) throw new Error('NavigationGuardProvider is required')
+  return context.isGuarded
+}
+
 export function useUnsavedChanges(dirty: boolean, busy = false, onDiscard?: () => void, active = dirty) {
   const context = useContext(NavigationGuardContext)
   if (!context) throw new Error('NavigationGuardProvider is required')

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .collection_pagination import StrictQuerySerializer
 from .models import Organization, StockItem, StockMovement, StockMovementType, Tenant
 from .money import render_amount
 from .stock import StockError, archive_stock_item, change_stock, create_stock_item, update_stock_item
@@ -128,9 +129,24 @@ class StockItemSerializer(serializers.ModelSerializer):
 
 class StockResultSerializer(serializers.Serializer):
     results = StockItemSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     vendors = serializers.ListField(child=serializers.DictField())
     clients = serializers.ListField(child=serializers.DictField())
+
+
+class StockQuerySerializer(StrictQuerySerializer):
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "quantity_on_hand", "-quantity_on_hand", "updated_at", "-updated_at"),
+        required=False,
+        default="name",
+    )
+    page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
 
 def _query(workspace: ResolvedWorkspace) -> QuerySet[StockItem]:
@@ -160,14 +176,35 @@ def _choices(tenant: Tenant, kind: str) -> list[dict[str, str]]:
 
 
 class StockItemListCreateView(APIView):
-    @extend_schema(responses={200: StockResultSerializer})
+    @extend_schema(operation_id="stock_list", responses={200: StockResultSerializer})
     def get(self, request):  # type: ignore[no-untyped-def]
         workspace = resolve_msp_workspace(request.user)
         require_permission(request.user, PermissionKey.INVOICES_VIEW)
+        query = StockQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = _query(workspace)
+        if values["q"]:
+            records = records.filter(
+                Q(name__icontains=values["q"])
+                | Q(description__icontains=values["q"])
+                | Q(vendor_part_number__icontains=values["q"])
+                | Q(vendor__entity__display_name__icontains=values["q"])
+            )
+        descending = values["ordering"].startswith("-")
+        order_field = values["ordering"].removeprefix("-")
+        records = records.order_by(f"-{order_field}" if descending else order_field, "id")
+        count = records.count()
+        offset = (values["page"] - 1) * values["page_size"]
+        selected = list(records[offset : offset + values["page_size"] + 1])
         return Response(
             StockResultSerializer(
                 {
-                    "results": _query(workspace),
+                    "results": selected[: values["page_size"]],
+                    "page": values["page"],
+                    "page_size": values["page_size"],
+                    "count": count,
+                    "has_more": len(selected) > values["page_size"],
                     "can_manage": context_has_permission(workspace.member, PermissionKey.INVOICES_EDIT),
                     "vendors": _choices(workspace.member.tenant, "vendor"),
                     "clients": _choices(workspace.member.tenant, "client"),
@@ -199,6 +236,12 @@ class StockItemListCreateView(APIView):
 class StockItemDetailView(APIView):
     def _record(self, workspace, item_id: UUID) -> StockItem:  # type: ignore[no-untyped-def]
         return get_object_or_404(_query(workspace), id=item_id)
+
+    @extend_schema(operation_id="stock_retrieve", responses={200: StockItemSerializer})
+    def get(self, request, item_id):  # type: ignore[no-untyped-def]
+        workspace = resolve_msp_workspace(request.user)
+        require_permission(request.user, PermissionKey.INVOICES_VIEW)
+        return Response(StockItemSerializer(self._record(workspace, item_id)).data)
 
     @extend_schema(request=StockItemUpdateSerializer, responses={200: StockItemSerializer})
     def patch(self, request, item_id):  # type: ignore[no-untyped-def]

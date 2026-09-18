@@ -38,10 +38,22 @@ export type StockItem = {
 }
 
 export type StockChoice = { id: string; name: string }
-export type StockResult = { results: StockItem[]; can_manage: boolean; vendors: StockChoice[]; clients: StockChoice[] }
+export type StockOrdering = 'name' | '-name' | 'quantity_on_hand' | '-quantity_on_hand' | 'updated_at' | '-updated_at'
+export type StockQuery = { q: string; ordering: StockOrdering; page: number; page_size: number }
+export type StockResult = {
+  results: StockItem[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+  can_manage: boolean
+  vendors: StockChoice[]
+  clients: StockChoice[]
+}
 
 export interface StockClient {
-  list(signal?: AbortSignal): Promise<StockResult>
+  list(query: StockQuery, signal?: AbortSignal): Promise<StockResult>
+  retrieve(itemId: string, signal?: AbortSignal): Promise<StockItem>
   create(values: object): Promise<StockItem>
   update(itemId: string, values: object): Promise<StockItem>
   archive(itemId: string): Promise<void>
@@ -81,7 +93,18 @@ async function mutate<T>(path: string, method: 'POST' | 'PATCH' | 'DELETE', body
 }
 
 export const browserStockClient: StockClient = {
-  list: async (signal) => parse(await fetch(base, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
+  list: async (query, signal) => {
+    const parameters = new URLSearchParams({
+      ordering: query.ordering,
+      page: String(query.page),
+      page_size: String(query.page_size),
+    })
+    if (query.q) parameters.set('q', query.q)
+    return parse(await fetch(`${base}?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  retrieve: async (itemId, signal) => parse(await fetch(`${base}/${encodeURIComponent(itemId)}`, {
+    credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+  })),
   create: (values) => mutate(base, 'POST', values),
   update: (itemId, values) => mutate(`${base}/${encodeURIComponent(itemId)}`, 'PATCH', values),
   archive: (itemId) => mutate(`${base}/${encodeURIComponent(itemId)}`, 'DELETE'),

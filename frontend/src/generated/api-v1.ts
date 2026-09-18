@@ -3884,7 +3884,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get: operations["workspaces_msp_stock_retrieve"];
+        readonly get: operations["stock_list"];
         readonly put?: never;
         readonly post: operations["workspaces_msp_stock_create"];
         readonly delete?: never;
@@ -3900,7 +3900,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["stock_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["workspaces_msp_stock_destroy"];
@@ -13973,6 +13973,10 @@ export interface components {
         };
         readonly StockResult: {
             readonly results: readonly components["schemas"]["StockItem"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
             readonly can_manage: boolean;
             readonly vendors: readonly {
                 readonly [key: string]: unknown;
@@ -25097,7 +25101,7 @@ export interface operations {
             };
         };
     };
-    readonly workspaces_msp_stock_retrieve: {
+    readonly stock_list: {
         readonly parameters: {
             readonly query?: never;
             readonly header?: never;
@@ -25134,6 +25138,29 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["StockItem"];
+                };
+            };
+        };
+    };
+    readonly stock_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly item_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

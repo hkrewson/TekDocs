@@ -13848,7 +13848,7 @@ paths:
                 format: uuid
   /api/v1/workspaces/msp/stock:
     get:
-      operationId: workspaces_msp_stock_retrieve
+      operationId: stock_list
       tags:
       - workspaces
       security:
@@ -13900,6 +13900,33 @@ paths:
                 type: string
                 format: uuid
   /api/v1/workspaces/msp/stock/{item_id}:
+    get:
+      operationId: stock_retrieve
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
     patch:
       operationId: workspaces_msp_stock_partial_update
       parameters:
@@ -44069,6 +44096,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StockItem'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
         vendors:
@@ -44084,6 +44119,10 @@ components:
       required:
       - can_manage
       - clients
+      - count
+      - has_more
+      - page
+      - page_size
       - results
       - vendors
     Subnet:

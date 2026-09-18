@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 const itemId = crypto.randomUUID()
 const clientId = crypto.randomUUID()
@@ -30,6 +31,23 @@ const stockItem = {
   updated_at: '2026-08-01T12:00:00Z',
 }
 
+async function mockStockShell(page: Page, baseURL: string | undefined, item = stockItem) {
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL! }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.invalid', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['invoices.view', 'invoices.edit'],
+  } }))
+  await page.route('**/api/v1/workspaces/msp/stock*', (route) => route.fulfill({ json: {
+    results: [item], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true,
+    vendors: [{ id: item.vendor_id, name: item.vendor_name }],
+    clients: [{ id: clientId, name: 'Example Client' }],
+  } }))
+}
+
 test('MSP stock records purchasing details, client use, and exact invoice pricing', async ({ page, baseURL }) => {
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
@@ -40,7 +58,7 @@ test('MSP stock records purchasing details, client use, and exact invoice pricin
     role: 'owner',
     permissions: ['invoices.view', 'invoices.edit'],
   } }))
-  await page.route('**/api/v1/workspaces/msp/stock', async (route) => {
+  await page.route('**/api/v1/workspaces/msp/stock*', async (route) => {
     if (route.request().method() === 'POST') {
       const body = await route.request().postDataJSON() as Record<string, string>
       expect(body).toMatchObject({ name: 'Patch cable', cost_per_unit: '2.125000', client_price_per_unit: '4.2500' })
@@ -49,6 +67,10 @@ test('MSP stock records purchasing details, client use, and exact invoice pricin
     }
     await route.fulfill({ json: {
       results: [stockItem],
+      page: 1,
+      page_size: 25,
+      count: 1,
+      has_more: false,
       can_manage: true,
       vendors: [{ id: stockItem.vendor_id, name: stockItem.vendor_name }],
       clients: [{ id: clientId, name: 'Example Client' }],
@@ -72,6 +94,7 @@ test('MSP stock records purchasing details, client use, and exact invoice pricin
   await page.goto('/stock')
   await expect(page.getByRole('heading', { name: 'Stock', exact: true })).toBeVisible()
   await expect(page.getByRole('group', { name: 'Stock items' })).toContainText('0.145430')
+  await page.getByRole('button', { name: 'Cat6 bulk cable' }).click()
   await expect(page.getByText('ORDER-1001')).toHaveAttribute('href', /ORDER-1001$/)
 
   await page.getByRole('button', { name: 'Adjust stock' }).click()
@@ -83,6 +106,8 @@ test('MSP stock records purchasing details, client use, and exact invoice pricin
   await page.getByRole('button', { name: 'Save change' }).click()
   await expect(page.getByRole('group', { name: 'Stock history' })).toContainText('Example Client')
 
+  await page.keyboard.press('Escape')
+  await expect(page).toHaveURL('/stock')
   await page.getByRole('button', { name: 'New item' }).click()
   await page.getByLabel('Item name').fill('Patch cable')
   await page.getByLabel('Unit', { exact: true }).fill('each')
@@ -92,3 +117,37 @@ test('MSP stock records purchasing details, client use, and exact invoice pricin
   await expect(page.getByRole('heading', { name: 'Patch cable' })).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`stock collection and drawer fit at ${width}px`, async ({ page, baseURL }) => {
+    await page.setViewportSize({ width, height: 600 })
+    const longItem = {
+      ...stockItem,
+      name: `Cat6 bulk cable ${'plenum-rated '.repeat(12)}`.trim(),
+      vendor_part_number: `PART-${'1000-'.repeat(20)}`,
+      description: `Riser-rated solid copper cable ${'for structured cabling installations '.repeat(8)}`.trim(),
+    }
+    await mockStockShell(page, baseURL, longItem)
+    await page.goto('/stock')
+
+    await expect(page.getByRole('heading', { name: 'Stock', exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await page.locator('tbody .collection-name').click()
+    const drawer = page.getByRole('dialog')
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByRole('heading', { level: 2 })).toBeFocused()
+    await expect(drawer.getByText('Stock history')).toBeVisible()
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+
+    await drawer.getByRole('button', { name: 'Edit' }).click()
+    await drawer.getByLabel('Item name').fill('Changed cable name')
+    await page.keyboard.press('Escape')
+    await expect(drawer.getByRole('alertdialog', { name: 'Unsaved changes' })).toBeVisible()
+    await drawer.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(drawer.getByLabel('Item name')).toHaveValue('Changed cable name')
+
+    if (width === 390) {
+      expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+    }
+  })
+}

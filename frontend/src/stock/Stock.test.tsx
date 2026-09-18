@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { Stock } from './Stock'
 import type { StockClient, StockItem } from './api'
@@ -15,15 +16,21 @@ const item: StockItem = {
 
 function stockClient(overrides: Partial<StockClient> = {}): StockClient {
   return {
-    list: vi.fn().mockResolvedValue({ results: [item], can_manage: true, vendors: [{ id: 'vendor-1', name: 'Cable Supplier' }], clients: [{ id: 'client-1', name: 'Client Site' }] }),
+    list: vi.fn().mockResolvedValue({ results: [item], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, vendors: [{ id: 'vendor-1', name: 'Cable Supplier' }], clients: [{ id: 'client-1', name: 'Client Site' }] }),
+    retrieve: vi.fn().mockResolvedValue(item),
     create: vi.fn().mockResolvedValue(item), update: vi.fn().mockResolvedValue(item), archive: vi.fn().mockResolvedValue(undefined), move: vi.fn().mockResolvedValue({ ...item, quantity_on_hand: '875.000' }), ...overrides,
   }
 }
 
+function renderStock(client = stockClient(), initialEntry = '/stock') {
+  return render(<MemoryRouter initialEntries={[initialEntry]}><Stock client={client} /></MemoryRouter>)
+}
+
 describe('Stock', () => {
   it('shows exact stock and supplier provenance', async () => {
-    render(<Stock client={stockClient()} />)
+    renderStock()
     expect(await screen.findByRole('heading', { name: 'Stock' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cat6 bulk cable' }))
     expect(screen.getAllByText('1000.000 foot').length).toBeGreaterThan(0)
     expect(screen.getAllByText('USD 0.145430').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: /ORDER-1001/ })).toHaveAttribute('href', item.order_url)
@@ -31,7 +38,8 @@ describe('Stock', () => {
 
   it('records client use with a negative quantity and previews the result', async () => {
     const move = vi.fn().mockResolvedValue({ ...item, quantity_on_hand: '875.000' })
-    render(<Stock client={stockClient({ move })} />)
+    renderStock(stockClient({ move }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Cat6 bulk cable' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Adjust stock' }))
     fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'used' } })
     fireEvent.change(screen.getByLabelText('Quantity (foot)'), { target: { value: '125' } })
@@ -42,11 +50,34 @@ describe('Stock', () => {
   })
 
   it('uses plain grouped fields when creating an item', async () => {
-    render(<Stock client={stockClient()} />)
+    renderStock()
     fireEvent.click(await screen.findByRole('button', { name: 'New item' }))
     expect(screen.getByRole('group', { name: 'Item' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Quantity and pricing' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Latest order' })).toBeInTheDocument()
     expect(screen.getByLabelText('Cost per unit')).toHaveAttribute('step', '0.000001')
+  })
+
+  it('does not expose creation through a direct URL without manage permission', async () => {
+    renderStock(stockClient({
+      list: vi.fn().mockResolvedValue({ results: [item], page: 1, page_size: 25, count: 1, has_more: false, can_manage: false, vendors: [], clients: [] }),
+    }), '/stock?stock=new')
+    expect(await screen.findByRole('alert')).toHaveTextContent('You do not have permission to manage stock.')
+    expect(screen.queryByLabelText('Item name')).not.toBeInTheDocument()
+  })
+
+  it('loads an off-page record from the URL and protects unfinished edits', async () => {
+    const retrieve = vi.fn().mockResolvedValue(item)
+    renderStock(stockClient({
+      list: vi.fn().mockResolvedValue({ results: [], page: 2, page_size: 25, count: 26, has_more: false, can_manage: true, vendors: [], clients: [] }),
+      retrieve,
+    }), '/stock?stock=stock-1&stock_page=2')
+    expect(await screen.findByRole('heading', { name: 'Cat6 bulk cable' })).toBeInTheDocument()
+    expect(retrieve).toHaveBeenCalledWith('stock-1', expect.any(AbortSignal))
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Changed cable' } })
+    fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Unsaved changes')
+    expect(screen.getByLabelText('Item name')).toHaveValue('Changed cable')
   })
 })

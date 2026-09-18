@@ -252,6 +252,35 @@ def test_stock_rejects_wrong_organization_classification(owner_client, installat
 
 
 @pytest.mark.django_db
+def test_stock_collection_is_bounded_searchable_and_directly_addressable(owner_client, installation):
+    vendor = organization(installation, "Bounded Cable Supplier", "vendor")
+    first_payload = item_payload(vendor)
+    first_payload["name"] = "Alpha cable"
+    first_payload["vendor_part_number"] = "ALPHA-100"
+    second_payload = item_payload(vendor)
+    second_payload["name"] = "Beta patch lead"
+    second_payload["vendor_part_number"] = "BETA-200"
+    first = owner_client.post(reverse("msp-stock-list-create"), first_payload, content_type="application/json")
+    second = owner_client.post(reverse("msp-stock-list-create"), second_payload, content_type="application/json")
+    assert first.status_code == second.status_code == 201
+
+    page = owner_client.get(reverse("msp-stock-list-create"), {"ordering": "-name", "page_size": 1})
+    assert page.status_code == 200
+    assert page.json()["count"] == 2
+    assert page.json()["has_more"] is True
+    assert page.json()["results"][0]["name"] == "Beta patch lead"
+
+    searched = owner_client.get(reverse("msp-stock-list-create"), {"q": "ALPHA-100"})
+    assert searched.status_code == 200
+    assert [record["name"] for record in searched.json()["results"]] == ["Alpha cable"]
+
+    detail = owner_client.get(reverse("msp-stock-detail", kwargs={"item_id": first.json()["id"]}))
+    assert detail.status_code == 200
+    assert detail.json()["name"] == "Alpha cable"
+    assert owner_client.get(reverse("msp-stock-list-create"), {"unexpected": "value"}).status_code == 400
+
+
+@pytest.mark.django_db
 def test_stock_item_from_another_tenant_is_not_addressable(owner_client, installation):
     other_tenant = Tenant.objects.create(name="Other MSP", slug="other-msp")
     foreign_item = StockItem.objects.create(
@@ -273,12 +302,13 @@ def test_stock_item_from_another_tenant_is_not_addressable(owner_client, install
         {"name": "Cross-tenant rewrite"},
         content_type="application/json",
     )
+    viewed = owner_client.get(reverse("msp-stock-detail", kwargs={"item_id": foreign_item.id}))
     moved = owner_client.post(
         reverse("msp-stock-movement-create", kwargs={"item_id": foreign_item.id}),
         {"movement_type": "received", "quantity_change": "1.000"},
         content_type="application/json",
     )
-    assert changed.status_code == 404
+    assert viewed.status_code == changed.status_code == 404
     assert moved.status_code == 404
     foreign_item.refresh_from_db()
     assert foreign_item.name == "Other tenant cable"

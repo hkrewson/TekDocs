@@ -17,6 +17,14 @@ describe('documentation placement API client', () => {
     )
   })
 
+  it('sends scoped library search, page and destination exclusion parameters', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [], count: 0 }), { status: 200 })))
+    await browserDocumentsClient.listTemplateLibrary({ organizationId: 'client/id' }, undefined, 'router & switch', 3)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/client%2Fid/documents/template-library?q=router+%26+switch&page=3&page_size=25')
+    await browserDocumentsClient.searchBlockLibrary({}, 'network', undefined, 2, 'destination-id')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/documents/block-library?q=network&page_size=20&page=2&exclude_document=destination-id')
+  })
+
   it('requests bounded revision-history pages', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 3, page_size: 50, has_more: false }), { status: 200 }))
     await browserDocumentsClient.listRevisions({ organizationId: 'org' }, 'doc', 3)

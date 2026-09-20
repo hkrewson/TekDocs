@@ -1811,3 +1811,75 @@ stabilization and repeated 581-test frontend workflow also exits 0.
 Remaining network surfaces, technician walkthroughs and broader Phase 3/pre-1.0
 acceptance remain open. Existing application and demo data were preserved. No push,
 production deployment, release/version change or Wiki publication occurred.
+
+## 2026-09-20 — Template and reusable-content workflows
+
+Phase 5 under #60, version 0.8.46. Client Documentation now has a dedicated shared
+template library with server-backed search/pagination and a focused guarded draft.
+Section previews and copy/live/pinned choices are explicit. Reusable-block search
+is paged, excludes destination blocks before counting, loads on demand, and
+distinguishes loading, empty and read-error states. Template updates expose added,
+changed, removed and conflicting sections; selected behavior survives failed writes.
+Successful application refreshes the document. Truncated reuse reports are disclosed.
+
+Verified so far: the complete Docker `make test-documentation-validation` target
+exits 0 (one existing skip); all 54 focused component/API-client tests pass. The
+18-case six-width Chromium/Firefox/WebKit matrix passes with accessibility checks,
+protected drafts, denied writes, content previews, pagination and rollout conflicts.
+Manual screenshot review covered 320px and 1440px. The 320px browser reproduction
+exposed a grid minimum-content overflow; bounded grid tracks and wrapping update
+headings fix it without hiding overflow. Existing large Markdown previews were
+bounded inside template review. Evidence: /tmp/tekdocs-template-backend.log,
+/tmp/tekdocs-template-components.log, /tmp/tekdocs-template-browser-final.log and
+artifacts/template-library-{320,1440}.png.
+
+The production build initially exceeded the eager shell budget by 49 compressed
+bytes. The document client now loads with Documentation/Files/Integrations, reducing
+the shell to 129065 bytes against the unchanged 131072-byte ceiling. The first live
+journey reproduced a stale pre-focused-workspace test step: reloading already opens
+the document, so selecting its old library row times out. The journey now verifies
+the restored identity directly and uses explicit Documents returns before creating
+or importing another record. This preserves the content/retention assertions.
+Final main and live gates remain in progress. No schema, version, push, publication
+or production deployment changes are included.
+
+Final `make check` passes: 601 frontend tests in 117 files, lint/types, API agreement,
+backend lint/types, migration drift, production build and unchanged bundle budgets.
+The final shell is 129070 compressed bytes. Focused template-library contract
+assertions also pass in Docker, checking complete section metadata and the
+non-primary block's identity. Type/lint checks pass after live-journey additions.
+The rebuilt local instance reports ready for database and diagram renderer at
+localhost:3200, version 0.8.46. The maintained nested Wiki checkout passes all 37
+page/link checks; its existing unrelated edits were preserved. Live end-to-end
+verification is still running.
+
+The extended live journey then reproduced a genuine restricted-role failure at
+`template-rollouts/apply` (HTTP 500). A focused transactional Django test under
+`django_runtime_role` reproduced `DocumentTemplateEnrollment.DoesNotExist` in the
+joined `SELECT FOR UPDATE`: locking the joined shared MSP document subjects it to
+write visibility even though the operation changes only the client enrollment.
+Narrowing the lock with `of=("self",)` resolves the runtime-role failure without
+changing RLS policies or grants. All three copy/live/pinned runtime variants pass;
+exact block identity, pinned revision and stale-enrollment rejection assertions
+are included. Evidence: /tmp/tekdocs-template-runtime-reproduction.log and
+/tmp/tekdocs-template-runtime-fixed.log. Full main, documentation and live gates
+are rerunning after this production fix.
+
+Final closeout — verified: all three final gates exit 0 after the runtime fix.
+`make check` includes 601 frontend tests in 117 files and the unchanged build
+budgets. `make test-documentation-validation` completes the full Docker database
+suite with one existing skip. `make test-e2e-live` completes the real browser journey
+and independent database checks, including exact template/client ownership, four
+placements, two pinned revisions, an independent primary block, the applied
+enrollment and exactly one rollout audit event. Evidence:
+/tmp/tekdocs-template-check-complete.log,
+/tmp/tekdocs-template-backend-complete.log and
+/tmp/tekdocs-template-live-complete.log. The 18-case browser matrix remains passing.
+Local readiness confirms database and diagram renderer ready, version 0.8.46;
+the maintained Wiki passes 37-page/link validation.
+
+Blocked: none for this bounded checkpoint. Inferred: the automated workflow is
+ready for technician review; human acceptance and the remaining Phase 5 scope
+are not claimed. Existing application data and unrelated Wiki edits are preserved.
+Wiki updates remain local. No push, publication, production deployment or version
+change occurred. Ownership and review workflows are the next planned slice.

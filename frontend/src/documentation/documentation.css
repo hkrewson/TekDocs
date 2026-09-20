@@ -101,3 +101,38 @@
     grid-column: 1 / -1;
   }
 }
+
+.document-library-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.document-library-tabs button { padding: 10px 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.document-library-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: currentColor; }
+.template-section-choices { list-style: none; padding: 0; }
+.client-template-library .template-section-choices > li { display: grid; gap: 12px; padding-block: 16px; border-bottom: 1px solid var(--border); }
+.template-section-choices > li, .reuse-results > li > div { min-width: 0; overflow-wrap: anywhere; }
+.template-section-choices details { min-width: 0; }
+.block-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; font: inherit; }
+.template-draft input, .template-section-choices select, .block-library input { max-width: 100%; min-width: 0; }
+.template-rollout .template-section-choices > li { padding-block: 12px; border-bottom: 1px solid var(--border); }
+@media (max-width: 640px) {
+  .client-template-library > ul > li, .reuse-results > li { flex-wrap: wrap; gap: 12px; }
+  .client-template-library .section-heading { align-items: flex-start; flex-wrap: wrap; }
+}
+
+.document-workspace { grid-template-columns: minmax(0, 1fr); }
+.document-workspace > *, .template-rollout .section-heading > * { min-width: 0; }
+.client-template-library > h2 { margin: 0 0 16px; font-size: 16px; }
+.client-template-library .template-draft { padding: 0; border: 0; background: transparent; gap: 16px; }
+.template-draft p, .template-draft h3, .template-rollout p, .template-rollout h3 { margin: 0; }
+.template-draft .section-heading { margin-bottom: 0; }
+.template-section-choices { margin: 0; }
+.template-section-choices .markdown-preview { min-height: 0; max-height: 240px; overflow: auto; padding: 12px; margin-top: 8px; }
+.template-section-choices .markdown-preview > :first-child { margin-top: 0; }
+.template-section-choices .markdown-preview > :last-child { margin-bottom: 0; }
+.client-template-library label, .template-section-choices label, .block-library label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.client-template-library input, .template-section-choices select, .block-library input { width: 100%; min-height: 38px; padding: 7px 9px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.template-section-choices select { max-width: 360px; }
+.template-section-choices summary, .block-library summary { cursor: pointer; padding-block: 6px; }
+.template-rollout .section-heading { flex-wrap: wrap; align-items: flex-start; }
+.template-rollout { overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .document-detail-fields { grid-template-columns: minmax(0, 1fr); }
+}

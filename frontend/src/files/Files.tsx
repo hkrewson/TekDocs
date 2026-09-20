@@ -1,3 +1,4 @@
+import { browserDocumentsClient } from '../documentation/api'
 import { useEffect, useMemo, useState } from 'react'
 import { Download, ExternalLink, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
@@ -43,7 +44,7 @@ function documentPath(workspace: WorkspaceContext | null, documentId: string) {
   return `${base}?document=${encodeURIComponent(documentId)}`
 }
 
-export function Files({ workspace, client }: { workspace: WorkspaceContext | null; client: DocumentsClient }) {
+export function Files({ workspace, client = browserDocumentsClient }: { workspace: WorkspaceContext | null; client?: DocumentsClient }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   const [documents, setDocuments] = useState<DocumentRecord[] | null>(null)

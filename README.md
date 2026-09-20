@@ -16,7 +16,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 - Markdown-first documentation with visual editing, raw Markdown, secure preview, and revision history
 - Versioned procedure, troubleshooting, reference, system-overview, and change-runbook topics with publication preflight
 - Workspace-governed hierarchical taxonomies, exact legacy-tag migration, and searchable controlled terms
-- Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references
+- Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references; client template and reusable-block libraries provide paged search, section previews, protected creation drafts, and explicit template-update conflict review
 - Permission-aware field and content keys with exact-revision export and publication snapshots
 - Immutable STATIC publications with signed manifests and retained PDF artifacts
 - People, sites, locations, custom fields, and typed entity relationships

@@ -2138,6 +2138,21 @@ def test_client_block_library_requires_explicit_msp_opt_in_and_never_exposes_sib
     assert "Never disclose" not in library.content.decode()
     assert "Sibling secret" not in library.content.decode()
 
+    first_page = owner_client.get(library_url, {"page_size": 1, "exclude_document": destination["id"]}).json()
+    assert first_page["count"] == 2
+    assert first_page["has_more"] is True
+    second_page = owner_client.get(
+        library_url, {"page_size": 1, "page": 2, "exclude_document": destination["id"]}
+    ).json()
+    assert second_page["page"] == 2
+    assert second_page["has_more"] is False
+    assert first_page["results"][0]["id"] != second_page["results"][0]["id"]
+    searched = owner_client.get(library_url, {"q": "Printers belong", "page_size": 1}).json()
+    assert [item["id"] for item in searched["results"]] == [public_secondary["block_id"]]
+    assert owner_client.get(library_url, {"page": 0}).status_code == 400
+    assert owner_client.get(library_url, {"page_size": 51}).status_code == 400
+    assert owner_client.get(library_url, {"unknown": "value"}).status_code == 400
+
     placement_url = reverse(
         "organization-document-placement-list-create",
         kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": destination["id"]},
@@ -2181,9 +2196,10 @@ def test_client_block_library_requires_explicit_msp_opt_in_and_never_exposes_sib
     )
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("rollout_mode", ["copy", "live", "pinned"])
 def test_versioned_client_template_rollout_preserves_copy_and_updates_only_explicit_safe_changes(
-    owner_client, installation
+    owner_client, installation, django_runtime_role, rollout_mode
 ):
     acme = organization(installation.tenant, "Acme Template")
     beta = organization(installation.tenant, "Beta Template")
@@ -2214,6 +2230,9 @@ def test_versioned_client_template_rollout_preserves_copy_and_updates_only_expli
     )
     assert library.status_code == 200
     assert [record["id"] for record in library.json()["results"]] == [template["id"]]
+    assert len(library.json()["results"][0]["placements"]) == 2
+    assert library.json()["results"][0]["placements"][1]["is_primary"] is False
+    assert library.json()["results"][0]["placements"][1]["block_name"] == "Printer rationale"
 
     created = owner_client.post(
         reverse("organization-document-template-instantiate", kwargs={"organization_entity_id": acme.entity_id}),
@@ -2258,15 +2277,16 @@ def test_versioned_client_template_rollout_preserves_copy_and_updates_only_expli
     assert preview.json()["changed"][0]["mode"] == "live"
     assert preview.json()["conflicts"] == []
 
-    applied = owner_client.post(
-        reverse("organization-document-template-rollout-apply", kwargs={"organization_entity_id": acme.entity_id}),
-        {
-            "enrollment_id": str(enrollment.id),
-            "expected_applied_revision_id": preview.json()["applied_revision_id"],
-            "placement_rules": {added["block_id"]: "copy"},
-        },
-        content_type="application/json",
-    )
+    with django_runtime_role():
+        applied = owner_client.post(
+            reverse("organization-document-template-rollout-apply", kwargs={"organization_entity_id": acme.entity_id}),
+            {
+                "enrollment_id": str(enrollment.id),
+                "expected_applied_revision_id": preview.json()["applied_revision_id"],
+                "placement_rules": {added["block_id"]: rollout_mode},
+            },
+            content_type="application/json",
+        )
     assert applied.status_code == 200
     enrollment.refresh_from_db()
     assert enrollment.applied_revision_id == uuid.UUID(applied.json()["applied_revision_id"])
@@ -2277,6 +2297,24 @@ def test_versioned_client_template_rollout_preserves_copy_and_updates_only_expli
         )
     ).json()
     assert destination["placement_count"] == 3
+    final_placement = destination["placements"][2]
+    if rollout_mode == "copy":
+        assert final_placement["block_id"] != added["block_id"]
+    else:
+        assert final_placement["block_id"] == added["block_id"]
+        assert final_placement["resolution_mode"] == rollout_mode
+    if rollout_mode == "pinned":
+        assert final_placement["pinned_revision_id"] == added["resolved_revision_id"]
+    with django_runtime_role():
+        stale = owner_client.post(
+            reverse("organization-document-template-rollout-apply", kwargs={"organization_entity_id": acme.entity_id}),
+            {
+                "enrollment_id": str(enrollment.id),
+                "expected_applied_revision_id": preview.json()["applied_revision_id"],
+            },
+            content_type="application/json",
+        )
+    assert stale.status_code == 409
     assert "Printers and media devices belong on IoT." in destination["resolved_markdown"]
     assert (
         owner_client.post(
@@ -3266,3 +3304,45 @@ def test_client_document_restructure_respects_scoped_authorization(owner_client,
         kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": acme_document["id"]},
     )
     assert editor_client.get(cross_client_route).status_code == 403
+
+
+def test_template_library_search_and_pages_cover_only_shared_msp_templates(owner_client, installation):
+    acme = organization(installation.tenant, "Library pagination client")
+    url = reverse("organization-document-template-library", kwargs={"organization_entity_id": acme.entity_id})
+    records = []
+    for title in ("Alpha template", "Beta template", "Zulu template"):
+        response = owner_client.post(
+            reverse("msp-document-list-create"),
+            {
+                "title": title,
+                "markdown": "Template body",
+                "is_template": True,
+                "library_visible": True,
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+        records.append(response.json())
+    owner_client.post(
+        reverse("msp-document-list-create"),
+        {
+            "title": "Private template",
+            "markdown": "Not in the library",
+            "is_template": True,
+        },
+        content_type="application/json",
+    )
+    page = owner_client.get(url, {"page_size": 1, "page": 2}).json()
+    assert page["count"] == 3
+    assert page["page"] == 2
+    assert page["has_more"] is True
+    assert [item["id"] for item in page["results"]] == [records[1]["id"]]
+    search = owner_client.get(url, {"q": "Zulu", "page_size": 1, "page": 99}).json()
+    assert search["page"] == 1
+    assert search["count"] == 1
+    assert [item["id"] for item in search["results"]] == [records[2]["id"]]
+    empty = owner_client.get(url, {"q": "Private"}).json()
+    assert empty["results"] == []
+    assert empty["count"] == 0
+    for query in ({"page": 0}, {"page_size": 101}, {"unknown": "value"}):
+        assert owner_client.get(url, query).status_code == 400

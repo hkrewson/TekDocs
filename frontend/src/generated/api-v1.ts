@@ -7913,6 +7913,9 @@ export interface components {
         readonly BlockLibraryResult: {
             readonly results: readonly components["schemas"]["BlockLibraryItem"][];
             readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
         };
         readonly BlockRevision: {
             /** Format: uuid */
@@ -14215,6 +14218,13 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        readonly TemplateLibraryResult: {
+            readonly results: readonly components["schemas"]["Document"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+        };
         readonly TopicSchema: {
             /**
              * @description * `unstructured` - Unstructured
@@ -17146,7 +17156,12 @@ export interface operations {
     };
     readonly document_blocks_msp_library: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly exclude_document?: string;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -29322,7 +29337,12 @@ export interface operations {
     };
     readonly document_blocks_organization_library: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly exclude_document?: string;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -29545,7 +29565,11 @@ export interface operations {
     };
     readonly document_templates_organization_library: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -29561,7 +29585,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["DocumentResult"];
+                    readonly "application/json": components["schemas"]["TemplateLibraryResult"];
                 };
             };
         };

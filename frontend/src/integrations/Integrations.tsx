@@ -1,3 +1,4 @@
+import { browserDocumentsClient } from '../documentation/api'
 import { useEffect, useState } from 'react'
 import { Download, Play, Plus, RefreshCw } from 'lucide-react'
 import { translate } from '../i18n/localization'
@@ -26,8 +27,8 @@ const EMPTY_CONNECTION: IntegrationConnectionDraft = {
   provider: 'netbox', name: '', base_url: '', credentials: {}, sync_interval_minutes: 60,
 }
 
-export function Integrations({ workspace, client: webhookClient, documentsClient, providerClient = browserIntegrationsClient, importsClient }: {
-  workspace: WorkspaceContext; client: WebhooksClient; documentsClient: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient
+export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, importsClient }: {
+  workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient
 }) {
   const client = {
     ...webhookClient,

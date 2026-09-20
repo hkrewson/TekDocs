@@ -3283,6 +3283,31 @@ paths:
   /api/v1/documents/block-library:
     get:
       operationId: document_blocks_msp_library
+      parameters:
+      - in: query
+        name: exclude_document
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 20
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - documents
       security:
@@ -20034,12 +20059,36 @@ paths:
     get:
       operationId: document_blocks_organization_library
       parameters:
+      - in: query
+        name: exclude_document
+        schema:
+          type: string
+          format: uuid
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 20
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - workspaces
       security:
@@ -20365,6 +20414,25 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - workspaces
       security:
@@ -20375,7 +20443,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DocumentResult'
+                $ref: '#/components/schemas/TemplateLibraryResult'
           description: ''
           headers:
             X-Request-ID:
@@ -30193,8 +30261,17 @@ components:
             $ref: '#/components/schemas/BlockLibraryItem'
         count:
           type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
       required:
       - count
+      - has_more
+      - page
+      - page_size
       - results
     BlockRevision:
       type: object
@@ -44873,6 +44950,27 @@ components:
       - id
       - label
       - version
+    TemplateLibraryResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     TopicSchema:
       type: object
       properties:

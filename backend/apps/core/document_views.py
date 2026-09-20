@@ -141,6 +141,8 @@ from .serializers import (
     ReuseImpactSerializer,
     RevisionConflictSerializer,
     SharedBlockUpdateSerializer,
+    TemplateLibraryQuerySerializer,
+    TemplateLibraryResultSerializer,
     TopicSchemaCatalogSerializer,
 )
 from .taxonomies import document_tag_labels, document_term_records
@@ -596,13 +598,31 @@ def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Res
     )
 
 
-def _template_library(workspace: ResolvedWorkspace) -> Response:
-    records = list(
-        documents_for_scope(DataScope.tenant(workspace.member.tenant))
-        .filter(is_template=True, library_visible=True)
-        .order_by("entity__display_name", "entity_id")[:200]
+def _template_library(workspace: ResolvedWorkspace, request: Request) -> Response:
+    query = TemplateLibraryQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    values = query.validated_data
+    queryset = documents_for_scope(DataScope.tenant(workspace.member.tenant)).filter(
+        is_template=True, library_visible=True
     )
-    return Response(DocumentResultSerializer({"results": records, "count": len(records)}).data)
+    if values["q"]:
+        queryset = queryset.filter(entity__display_name__icontains=values["q"])
+    count = queryset.count()
+    page_size = values["page_size"]
+    page = min(values["page"], max(1, (count + page_size - 1) // page_size))
+    start = (page - 1) * page_size
+    records = list(queryset.order_by("entity__display_name", "entity_id")[start : start + page_size])
+    return Response(
+        TemplateLibraryResultSerializer(
+            {
+                "results": records,
+                "count": count,
+                "page": page,
+                "page_size": page_size,
+                "has_more": start + page_size < count,
+            }
+        ).data
+    )
 
 
 def _template_enrollment(workspace: ResolvedWorkspace, enrollment_id: UUID) -> DocumentTemplateEnrollment:
@@ -1278,8 +1298,24 @@ def _block_library(workspace: ResolvedWorkspace, request: Request) -> Response:
             | Q(source_document__entity__display_name__icontains=values["q"])
             | Q(current_revision__markdown__icontains=values["q"])
         )
-    records = list(queryset.order_by("entity__display_name", "entity_id")[: values["page_size"]])
-    return Response(BlockLibraryResultSerializer({"results": records, "count": len(records)}).data)
+    if values.get("exclude_document"):
+        queryset = queryset.exclude(source_document__entity_id=values["exclude_document"])
+    count = queryset.count()
+    page_size = values["page_size"]
+    page = min(values["page"], max(1, (count + page_size - 1) // page_size))
+    start = (page - 1) * page_size
+    records = list(queryset.order_by("entity__display_name", "entity_id")[start : start + page_size])
+    return Response(
+        BlockLibraryResultSerializer(
+            {
+                "results": records,
+                "count": count,
+                "page": page,
+                "page_size": page_size,
+                "has_more": start + page_size < count,
+            }
+        ).data
+    )
 
 
 def _add_placement(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
@@ -1757,7 +1793,11 @@ class MSPDocumentMentionSearchView(APIView):
 
 
 class MSPDocumentBlockLibraryView(APIView):
-    @extend_schema(operation_id="document_blocks_msp_library", responses={200: BlockLibraryResultSerializer})
+    @extend_schema(
+        operation_id="document_blocks_msp_library",
+        parameters=[BlockLibraryQuerySerializer],
+        responses={200: BlockLibraryResultSerializer},
+    )
     def get(self, request):  # type: ignore[no-untyped-def]
         return _block_library(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
 
@@ -1892,9 +1932,15 @@ class OrganizationFileBackedDocumentCreateView(APIView):
 
 
 class OrganizationDocumentTemplateLibraryView(APIView):
-    @extend_schema(operation_id="document_templates_organization_library", responses={200: DocumentResultSerializer})
+    @extend_schema(
+        operation_id="document_templates_organization_library",
+        parameters=[TemplateLibraryQuerySerializer],
+        responses={200: TemplateLibraryResultSerializer},
+    )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
-        return _template_library(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW))
+        return _template_library(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        )
 
 
 class OrganizationDocumentTemplateRolloutPreviewView(APIView):
@@ -2298,7 +2344,11 @@ class OrganizationDocumentMentionSearchView(APIView):
 
 
 class OrganizationDocumentBlockLibraryView(APIView):
-    @extend_schema(operation_id="document_blocks_organization_library", responses={200: BlockLibraryResultSerializer})
+    @extend_schema(
+        operation_id="document_blocks_organization_library",
+        parameters=[BlockLibraryQuerySerializer],
+        responses={200: BlockLibraryResultSerializer},
+    )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _block_library(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request

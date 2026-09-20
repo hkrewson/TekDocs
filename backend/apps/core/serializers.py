@@ -861,9 +861,17 @@ class DocumentPlacementUpdateSerializer(serializers.Serializer):
         return attrs
 
 
-class BlockLibraryQuerySerializer(serializers.Serializer):
+class BlockLibraryQuerySerializer(StrictQuerySerializer):
     q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
     page_size = serializers.IntegerField(min_value=1, max_value=50, required=False, default=20)
+    page = serializers.IntegerField(min_value=1, required=False, default=1)
+    exclude_document = serializers.UUIDField(required=False)
+
+
+class TemplateLibraryQuerySerializer(StrictQuerySerializer):
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    page = serializers.IntegerField(min_value=1, required=False, default=1)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
 
 class BlockLibraryItemSerializer(serializers.Serializer):
@@ -885,6 +893,9 @@ class BlockLibraryItemSerializer(serializers.Serializer):
 class BlockLibraryResultSerializer(serializers.Serializer):
     results = BlockLibraryItemSerializer(many=True)
     count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
 
 
 class SharedBlockUpdateSerializer(serializers.Serializer):
@@ -1348,6 +1359,12 @@ class RevisionConflictSerializer(serializers.Serializer):
 class DocumentResultSerializer(serializers.Serializer):
     results = DocumentSerializer(many=True)
     count = serializers.IntegerField()
+
+
+class TemplateLibraryResultSerializer(DocumentResultSerializer):
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
 
 
 class DocumentOperationsWriteSerializer(serializers.Serializer):

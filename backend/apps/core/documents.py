@@ -965,7 +965,7 @@ def apply_template_rollout(
     placement_rules: dict[str, str] | None = None,
 ) -> dict[str, object]:
     locked = (
-        DocumentTemplateEnrollment.objects.select_for_update()
+        DocumentTemplateEnrollment.objects.select_for_update(of=("self",))
         .select_related("source_template", "destination_document", "applied_revision")
         .get(pk=enrollment.pk)
     )

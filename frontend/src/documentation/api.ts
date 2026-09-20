@@ -290,7 +290,7 @@ export type BlockLibraryItem = {
   owner_kind: 'msp' | 'organization'
   owner_organization_id: string | null
 }
-export type BlockLibraryResult = { results: BlockLibraryItem[]; count: number }
+export type BlockLibraryResult = { results: BlockLibraryItem[]; count: number; page?: number; page_size?: number; has_more?: boolean }
 export type TemplatePlacementMode = 'copy' | 'live' | 'pinned'
 export type TemplateRolloutItem = {
   source_block_id: string
@@ -349,8 +349,8 @@ export interface DocumentsClient {
   updateSharedBlock(scope: DocumentScope, id: string, placementId: string, markdown: string, baseRevisionId: string): Promise<DocumentRecord>
   detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
-  searchBlockLibrary(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<BlockLibraryResult>
-  listTemplateLibrary(scope: DocumentScope, signal?: AbortSignal): Promise<DocumentResult>
+  searchBlockLibrary(scope: DocumentScope, query: string, signal?: AbortSignal, page?: number, excludeDocument?: string): Promise<BlockLibraryResult>
+  listTemplateLibrary(scope: DocumentScope, signal?: AbortSignal, query?: string, page?: number): Promise<DocumentResult>
   instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory, placementRules?: Record<string, TemplatePlacementMode>): Promise<DocumentRecord>
   previewTemplateRollout(scope: DocumentScope, enrollmentId: string): Promise<TemplateRollout>
   applyTemplateRollout(scope: DocumentScope, enrollmentId: string, expectedRevisionId: string, placementRules?: Record<string, TemplatePlacementMode>): Promise<TemplateRollout>
@@ -587,15 +587,16 @@ export const browserDocumentsClient: DocumentsClient = {
   async searchMentionEntities(scope, query, signal) {
     return parse<EntityMentionResult>(await fetch(`${collectionPath(scope)}/mention-entities?q=${encodeURIComponent(query)}&page_size=20`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
-  async searchBlockLibrary(scope, query, signal) {
-    const parameters = new URLSearchParams({ q: query, page_size: '20' })
+  async searchBlockLibrary(scope, query, signal, page = 1, excludeDocument) {
+    const parameters = new URLSearchParams({ q: query, page_size: '20', page: String(page) })
+    if (excludeDocument) parameters.set('exclude_document', excludeDocument)
     return parse<BlockLibraryResult>(await fetch(`${collectionPath(scope)}/block-library?${parameters}`, {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
     }))
   },
-  async listTemplateLibrary(scope, signal) {
+  async listTemplateLibrary(scope, signal, query = '', page = 1) {
     if (!scope.organizationId) return { results: [], count: 0 }
-    return parse<DocumentResult>(await fetch(`${collectionPath(scope)}/template-library`, {
+    return parse<DocumentResult>(await fetch(`${collectionPath(scope)}/template-library?${new URLSearchParams({ q: query, page: String(page), page_size: '25' })}`, {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
     }))
   },

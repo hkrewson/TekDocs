@@ -1,4 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
+import { render as testingRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
@@ -10,6 +12,8 @@ import { Documentation } from './Documentation'
 import { RevisionConflictError } from './api'
 import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClient } from './api'
 import type { WorkspaceClient } from '../workspaces/api'
+
+function render(ui: ReactElement) { return testingRender(<ApplicationRouter>{ui}</ApplicationRouter>) }
 
 const primaryPlacement = { id: 'placement-1', parent_id: null, block_id: 'block-1', block_name: 'Firewall standard — content', block_kind: 'rich_text' as const, position: 0, depth: 0, resolution_mode: 'live' as const, audience_profile: 'shared' as const, pinned_revision_id: null, resolved_revision_id: 'revision-1', resolved_revision_number: 1, resolved_checksum: 'abc123', resolved_markdown: '# Firewall', resolved_html: '<h1>Firewall</h1>', is_primary: true }
 const document: DocumentRecord = { id: 'doc-1', title: 'Firewall standard', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'policy', is_template: false, library_visible: false, template_enrollment_id: null, template_applied_revision_id: null, template_source_id: null, collection: 'Security standards', tags: ['firewall'], owner_id: null, owner_name: null, review_due_on: null, review_state: 'unreviewed', review_requested_by_id: null, review_requested_by_name: null, review_requested_at: null, reviewer_id: null, reviewer_name: null, review_decided_at: null, last_reviewed_by_id: null, last_reviewed_by_name: null, last_reviewed_at: null, review_note: '', health_status: 'unowned', attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, markdown: '# Firewall', block_id: 'block-1', current_revision_id: 'revision-1', revision_number: 1, checksum: 'abc123', resolved_markdown: '# Firewall\n', placements: [primaryPlacement], placement_count: 1, created_at: '2026-08-09T00:00:00Z', updated_at: '2026-08-09T00:00:00Z' }
@@ -613,6 +617,7 @@ it('creates a client document from a published template with per-block behavior'
   }
   documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [template], count: 1 })
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
   await user.click(await screen.findByRole('button', { name: 'Use template' }))
   await user.selectOptions(screen.getByLabelText('Printer rationale'), 'live')
   await user.click(screen.getByRole('button', { name: 'Create document' }))
@@ -887,4 +892,92 @@ it('shows the blast radius of a bound record and finds bindings across the works
   await waitFor(() => expect(browseKeyBindings).toHaveBeenCalledWith({}, 'Edge', expect.anything()))
   const browser = within(await screen.findByRole('list', { name: 'Bindings across this workspace' }))
   expect(browser.getByText('Edge firewall')).toBeInTheDocument()
+})
+
+it('preserves a template draft after a denied write and guards leaving the library', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, instantiateTemplate } = clients()
+  documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [{ ...sourceDocument, is_template: true }], count: 1 })
+  instantiateTemplate.mockRejectedValue(new Error('Forbidden'))
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+  await user.click(await screen.findByRole('button', { name: 'Use template' }))
+  const title = screen.getByLabelText('Document title')
+  await user.clear(title)
+  await user.type(title, 'Preserved draft')
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Your choices are preserved')
+  expect(title).toHaveValue('Preserved draft')
+  expect(instantiateTemplate).toHaveBeenCalledTimes(1)
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(title).toHaveValue('Preserved draft')
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  expect(screen.queryByLabelText('Document title')).not.toBeInTheDocument()
+  expect(instantiateTemplate).toHaveBeenCalledTimes(1)
+})
+
+it('searches the whole template library, pages results and recovers from a read failure', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const library = vi.fn().mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue({ results: [{ ...sourceDocument, is_template: true }], count: 26, page: 1, page_size: 25, has_more: true })
+  documents.listTemplateLibrary = library
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+  await user.click(await screen.findByRole('button', { name: 'Retry' }))
+  await user.click(await screen.findByRole('button', { name: 'Next' }))
+  await waitFor(() => expect(library).toHaveBeenLastCalledWith({ organizationId: 'org-1' }, expect.any(AbortSignal), '', 2))
+  await user.type(screen.getByLabelText('Search templates'), 'off-page')
+  await waitFor(() => expect(library).toHaveBeenLastCalledWith({ organizationId: 'org-1' }, expect.any(AbortSignal), 'off-page', 1))
+})
+
+it('shows rollout conflicts and prevents applying copied-content changes', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const applyRollout = vi.fn()
+  documents.applyTemplateRollout = applyRollout
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, template_enrollment_id: 'enrollment-1' }], count: 1 })
+  documents.previewTemplateRollout = vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'r1', current_revision: 1, available_revision: 2, up_to_date: false, added: [], changed: [{ source_block_id: 'b1', name: 'Client introduction', mode: 'copy' }], removed: [], conflicts: [{ source_block_id: 'b1', name: 'Client introduction', reason: 'Copied client content is never overwritten automatically.' }] })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Check template updates' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Copied client content is never overwritten automatically.')
+  expect(screen.getByRole('button', { name: 'Apply update' })).toBeDisabled()
+  expect(applyRollout).not.toHaveBeenCalled()
+})
+
+it('preserves selected rollout behavior after failure without retrying the mutation', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const applyRollout = vi.fn()
+  documents.applyTemplateRollout = applyRollout
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, template_enrollment_id: 'enrollment-1' }], count: 1 })
+  documents.previewTemplateRollout = vi.fn().mockResolvedValue({ enrollment_id: 'enrollment-1', applied_revision_id: 'r1', current_revision: 1, available_revision: 2, up_to_date: false, added: [{ source_block_id: 'b1', name: 'New guidance' }], changed: [], removed: [], conflicts: [] })
+  applyRollout.mockRejectedValue(new Error('Enrollment changed. Refresh the preview.'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Check template updates' }))
+  await user.selectOptions(await screen.findByLabelText('New guidance'), 'pinned')
+  await user.click(screen.getByRole('button', { name: 'Apply update' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Enrollment changed')
+  expect(screen.getByLabelText('New guidance')).toHaveValue('pinned')
+  expect(applyRollout).toHaveBeenCalledExactlyOnceWith({}, 'enrollment-1', 'r1', { b1: 'pinned' })
+})
+
+it('keeps failed block searches distinct from empty results and excludes the destination', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, searchBlockLibrary } = clients()
+  searchBlockLibrary.mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue({ results: [], count: 0 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(searchBlockLibrary).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'Existing content' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reusable content could not be loaded')
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByText('No reusable content matches this search.')).toBeVisible()
+  expect(searchBlockLibrary).toHaveBeenLastCalledWith({}, '', expect.any(AbortSignal), 1, 'doc-1')
 })

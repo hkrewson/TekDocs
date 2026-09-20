@@ -445,6 +445,21 @@ assert imported_document.category == "general"
 assert imported_document.is_template is False
 assert imported_document.placements.filter(parent__isnull=True).count() == 2
 assert resolve_document(imported_document).markdown == "# Imported runbook\n\nCanonical UTF-8 Markdown.\n"
+from apps.core.models import DocumentTemplateEnrollment
+library_source = Document.objects.get(entity__display_name="Live library template")
+library_copy = Document.objects.get(entity__display_name="Live library client document")
+assert library_source.organization is None
+assert library_source.is_template and library_source.library_visible
+assert library_copy.organization == organization
+assert not library_copy.is_template
+assert library_copy.placements.count() == 4
+assert library_copy.placements.filter(resolution_mode="pinned").count() == 2
+assert library_copy.placements.get(parent__isnull=True, position=0).block_id != library_source.placements.get(parent__isnull=True, position=0).block_id
+library_enrollment = DocumentTemplateEnrollment.objects.get(destination_document=library_copy)
+assert library_enrollment.source_template == library_source
+assert library_enrollment.last_applied_at is not None
+assert "New reviewed template section." in resolve_document(library_copy).markdown
+assert AuditEvent.objects.filter(action="document.template_rollout_applied", entity_id=library_copy.entity_id).count() == 1
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
 shared_block = shared_document.placements.get(parent__isnull=True, position=0).block

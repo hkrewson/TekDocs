@@ -90,9 +90,13 @@
   {
     "route": "/documentation",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "planning/responsive-layouts/document-workspace.md",
+      "planning/responsive-layouts/template-and-block-workflows.md",
+      "frontend/e2e/document-libraries.spec.ts"
+    ],
+    "states": "Document library and focused reader plus templates/reusable content checkpoint. Broader Phase 5 states and technician acceptance remain open."
   },
   {
     "route": "/domains",
@@ -345,9 +349,13 @@
   {
     "route": "/workspaces/organizations/:organizationId/documentation",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "planning/responsive-layouts/document-workspace.md",
+      "planning/responsive-layouts/template-and-block-workflows.md",
+      "frontend/e2e/document-libraries.spec.ts"
+    ],
+    "states": "Document library and focused reader plus templates/reusable content checkpoint. Broader Phase 5 states and technician acceptance remain open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/domains",

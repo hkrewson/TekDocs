@@ -11,7 +11,7 @@ vi.mock('../editor/EditorSpike', () => ({
 import { Documentation } from './Documentation'
 import { RevisionConflictError } from './api'
 import type { DocumentInput, DocumentRecord, DocumentUpdateInput, DocumentsClient } from './api'
-import type { WorkspaceClient } from '../workspaces/api'
+import type { WorkspaceClient, WorkspaceContext } from '../workspaces/api'
 
 function render(ui: ReactElement) { return testingRender(<ApplicationRouter>{ui}</ApplicationRouter>) }
 
@@ -267,7 +267,7 @@ it('searches governed terms by alias and permits explicitly allowed client-local
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
 
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
   await user.type(await screen.findByLabelText('Find a term'), 'azure')
   expect(screen.getByText('Entra ID')).toBeVisible()
   expect(screen.queryByText('Intune')).not.toBeInTheDocument()
@@ -327,7 +327,7 @@ it('organizes document health and sends an assigned review request', async () =>
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
 
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
   await user.selectOptions(await screen.findByLabelText('Owner'), 'reviewer-1')
   await user.clear(screen.getByLabelText('Review due'))
   await user.type(screen.getByLabelText('Review due'), '2026-09-30')
@@ -980,4 +980,145 @@ it('keeps failed block searches distinct from empty results and excludes the des
   await user.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText('No reusable content matches this search.')).toBeVisible()
   expect(searchBlockLibrary).toHaveBeenLastCalledWith({}, '', expect.any(AbortSignal), 1, 'doc-1')
+})
+
+it('loads operations on demand and retries unavailable governed tags before allowing edits', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const listTaxonomies = vi.fn().mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue({ results: [], count: 0 })
+  const operationsChoices = vi.fn().mockResolvedValue([{ id: 'reviewer-1', display_name: 'Alex Rivera', can_approve: true }])
+  documents.listTaxonomies = listTaxonomies
+  documents.operationsChoices = operationsChoices
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(operationsChoices).not.toHaveBeenCalled()
+  expect(listTaxonomies).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Owners, reviewers or tags could not be loaded')
+  expect(screen.queryByLabelText('Tags')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Save ownership and organization' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByLabelText('Owner')).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Ownership and review' })).toHaveFocus()
+})
+
+it('preserves denied ownership edits and guards panel changes until explicit discard', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, updateOperations } = clients()
+  updateOperations.mockRejectedValue(new Error('Permission denied.'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  await user.selectOptions(await screen.findByLabelText('Owner'), 'reviewer-1')
+  await user.click(screen.getByRole('button', { name: 'Save ownership and organization' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Permission denied. Your unsaved choices are preserved.')
+  expect(screen.getByLabelText('Owner')).toHaveValue('reviewer-1')
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByLabelText('Owner')).toHaveValue('reviewer-1')
+  await user.click(screen.getByRole('button', { name: 'Back to document' }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  expect(screen.queryByLabelText('Owner')).not.toBeInTheDocument()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Ownership and review' })).toHaveFocus())
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  expect(await screen.findByLabelText('Owner')).toHaveValue('')
+  expect(updateOperations).toHaveBeenCalledTimes(1)
+})
+
+it('retains a denied request and separate unsaved owner through a successful review request', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, requestReview } = clients()
+  requestReview.mockRejectedValueOnce(new Error('Reviewer no longer eligible.'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  await user.selectOptions(await screen.findByLabelText('Owner'), 'reviewer-1')
+  await user.selectOptions(screen.getByLabelText('Reviewer'), 'reviewer-1')
+  await user.type(screen.getByLabelText('Review note'), 'Check access instructions')
+  await user.click(screen.getByRole('button', { name: 'Send for review' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Reviewer no longer eligible.')
+  expect(screen.getByLabelText('Review note')).toHaveValue('Check access instructions')
+  await user.click(screen.getByRole('button', { name: 'Send for review' }))
+  expect(await screen.findByRole('status')).toHaveTextContent('Review requested.')
+  expect(screen.getByLabelText('Owner')).toHaveValue('reviewer-1')
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  expect(await screen.findByRole('button', { name: 'Keep editing' })).toBeVisible()
+})
+
+it('retains denied decision notes and displays a saved decision without a dirty draft', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const pending = { ...document, review_state: 'pending' as const, reviewer_id: 'reviewer-1', reviewer_name: 'Alex Rivera', review_requested_at: '2026-09-20T12:00:00Z', review_requested_by_name: 'Morgan Lee', review_note: 'Please review' }
+  documents.list = vi.fn().mockResolvedValue({ results: [pending], count: 1 })
+  const decideReview = vi.fn().mockRejectedValueOnce(new Error('Assigned to another person.')).mockResolvedValue({ ...pending, review_state: 'changes_requested', review_decided_at: '2026-09-20T13:00:00Z', review_note: 'Update recovery steps' })
+  documents.decideReview = decideReview
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  await user.selectOptions(await screen.findByLabelText('Decision'), 'changes_requested')
+  await user.type(screen.getByLabelText('Decision note'), 'Update recovery steps')
+  await user.click(screen.getByRole('button', { name: 'Record decision' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Assigned to another person.')
+  expect(screen.getByLabelText('Decision')).toHaveValue('changes_requested')
+  expect(screen.getByLabelText('Decision note')).toHaveValue('Update recovery steps')
+  await user.click(screen.getByRole('button', { name: 'Record decision' }))
+  expect(await screen.findByRole('status')).toHaveTextContent('Changes requested.')
+  expect(screen.getByText('Update recovery steps')).toBeVisible()
+  expect(screen.queryByLabelText('Decision note')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Back to document' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(decideReview).toHaveBeenLastCalledWith({}, 'doc-1', 'changes_requested', 'Update recovery steps')
+})
+
+it('prevents duplicate saves and departure while ownership is being saved', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, updateOperations } = clients()
+  let finish!: (record: DocumentRecord) => void
+  updateOperations.mockImplementation(() => new Promise<DocumentRecord>((resolve) => { finish = resolve }))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Ownership and review' }))
+  await user.selectOptions(await screen.findByLabelText('Owner'), 'reviewer-1')
+  await user.dblClick(screen.getByRole('button', { name: 'Save ownership and organization' }))
+  expect(updateOperations).toHaveBeenCalledTimes(1)
+  expect(screen.getByLabelText('Owner')).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Back to document' }))
+  expect(await screen.findByRole('button', { name: 'Discard changes' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  finish({ ...document, owner_id: 'reviewer-1', owner_name: 'Alex Rivera' })
+  expect(await screen.findByRole('status')).toHaveTextContent('Ownership and content organization saved.')
+  await user.click(screen.getByRole('button', { name: 'Back to document' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('retries an interrupted deep-link load when workspace context refreshes', async () => {
+  const { documents, workspaces } = clients()
+  documents.list = vi.fn().mockResolvedValue({ results: [], count: 30 })
+  let finish!: (record: DocumentRecord) => void
+  const get = vi.fn().mockImplementationOnce(() => new Promise<DocumentRecord>((resolve) => { finish = resolve })).mockResolvedValue(document)
+  documents.get = get
+  const workspace: WorkspaceContext = { kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }
+  const view = render(<Documentation workspace={workspace} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" />)
+  await waitFor(() => expect(get).toHaveBeenCalledTimes(1))
+  view.rerender(<ApplicationRouter><Documentation workspace={{ ...workspace }} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+  finish(document)
+  expect(await screen.findByRole('heading', { name: 'Firewall' })).toBeVisible()
+  expect(get).toHaveBeenCalledTimes(2)
+})
+
+it('does not overwrite newly edited settings when an explicit selection reaches the router', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  let finish!: (result: { results: DocumentRecord[]; count: number }) => void
+  const list = vi.fn().mockResolvedValueOnce({ results: [document], count: 1 }).mockImplementationOnce(() => new Promise<{ results: DocumentRecord[]; count: number }>((resolve) => { finish = resolve }))
+  documents.list = list
+  const view = render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId={null} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  view.rerender(<ApplicationRouter><Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+  await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.click(screen.getByRole('checkbox', { name: 'Make reusable content findable in client documents' }))
+  finish({ results: [document], count: 1 })
+  await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
+  expect(screen.getByRole('checkbox', { name: 'Make reusable content findable in client documents' })).toBeChecked()
 })

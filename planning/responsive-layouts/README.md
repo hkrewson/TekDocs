@@ -97,3 +97,5 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [DNS record transfer between zones](dns-record-transfer.md)
 
 - [Circuit register, service-detail drawers and bounded provider/contract choices](circuit-register.md)
+
+- [Document ownership and review](ownership-and-review.md)

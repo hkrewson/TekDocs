@@ -460,6 +460,18 @@ assert library_enrollment.source_template == library_source
 assert library_enrollment.last_applied_at is not None
 assert "New reviewed template section." in resolve_document(library_copy).markdown
 assert AuditEvent.objects.filter(action="document.template_rollout_applied", entity_id=library_copy.entity_id).count() == 1
+assert library_copy.owner.display_name == "Live Workspace Owner"
+assert library_copy.review_due_on.isoformat() == "2027-12-31"
+assert library_copy.collection == "Live reviewed runbooks"
+assert library_copy.review_state == "approved"
+assert library_copy.reviewer_id == library_copy.owner_id == library_copy.last_reviewed_by_id
+assert library_copy.review_requested_at is not None and library_copy.review_decided_at is not None
+assert library_copy.last_reviewed_at is not None
+assert library_copy.review_note == "Live recovery guidance approved."
+assert AuditEvent.objects.filter(action="document.operations_updated", entity_id=library_copy.entity_id).count() == 1
+assert AuditEvent.objects.filter(action="document.review_requested", entity_id=library_copy.entity_id).count() == 2
+assert AuditEvent.objects.filter(action="document.review_changes_requested", entity_id=library_copy.entity_id).count() == 1
+assert AuditEvent.objects.filter(action="document.review_approved", entity_id=library_copy.entity_id).count() == 1
 shared_document = Document.objects.get(entity__display_name="Live shared response")
 assert shared_document.organization is None
 shared_block = shared_document.placements.get(parent__isnull=True, position=0).block

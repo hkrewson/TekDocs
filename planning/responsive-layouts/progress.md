@@ -1883,3 +1883,57 @@ ready for technician review; human acceptance and the remaining Phase 5 scope
 are not claimed. Existing application data and unrelated Wiki edits are preserved.
 Wiki updates remain local. No push, publication, production deployment or version
 change occurred. Ownership and review workflows are the next planned slice.
+
+## 2026-09-20 — Focused document ownership and review
+
+Phase 5 under #60, version 0.8.46. Owner, due date, collection, governed/free-form
+tags, review requests and decisions now have a focused Ownership and review view.
+People/taxonomies load on demand with explicit retry, failed writes retain drafts,
+and the shared guard protects unfinished work and prevents in-flight departure.
+The summary shows saved review context and last approval. Existing API, policy,
+Markdown, schema and version contracts are unchanged.
+
+Reproduced and fixed: retry/discard focus loss; a sticky toolbar obscuring a form
+target; raw document history bypassing the draft guard on native Back; an interrupted
+deep-link load being recorded as opened too early; and a late list response reopening
+an explicit selection and overwriting freshly edited settings. Both loading races
+have focused component reproductions. Evidence:
+/tmp/tekdocs-operations-deeplink-repro.log,
+/tmp/tekdocs-operations-deeplink-fixed.log,
+/tmp/tekdocs-operations-selection-repro.log and
+/tmp/tekdocs-operations-selection-fixed.log. Browser dropdown/textarea queries now
+match roles and exact accessible names; their wrapped-label query failures were
+checked against the accessible tree before changing selectors.
+
+Verified: all 47 document component tests, lint and types pass. The complete Docker
+`make test-documentation-validation` gate passes with one existing skip. All 42
+six-width and Back/reload Chromium/Firefox/WebKit cases pass in the repository's
+pinned Playwright container. Host Firefox shutdown hung after passing assertions;
+container execution completed cleanly. Manual screenshots at 320px and 1440px were
+reviewed. The final `make test-e2e-live` browser journey and independent database
+assertions pass: exact owner, due date, collection, reviewer, latest note, review
+and approval timestamps, two requests, one changes-requested event and one approval
+remain after reload. Existing template/placement retention checks also pass.
+Evidence: /tmp/tekdocs-operations-backend.log,
+/tmp/tekdocs-operations-browser-closeout.log,
+/tmp/tekdocs-operations-live-closeout.log and
+artifacts/document-operations-{320,1440}.png.
+
+Final `make check` exits 0 with all 608 frontend tests in 117 files, lint/types,
+API/schema agreement, migration drift checks, the production build and unchanged
+bundle budgets (shell 129087 <= 131072 compressed bytes). One prior run failed an
+existing circuit-screen test; its eight tests and the full gate passed on rerun
+without circuit source or test changes. Evidence:
+/tmp/tekdocs-operations-check-final-pass.log and
+/tmp/tekdocs-operations-circuit-recheck.log. Local readiness
+reports the database and diagram renderer ready at localhost:3200, version 0.8.46.
+The maintained Wiki passes all 37 page/link checks; existing unrelated edits are
+preserved and Wiki changes remain local.
+
+Blocked: none for this bounded checkpoint. Inferred: this bounded workflow is ready for
+technician review; human acceptance and completion of broader Phase 5 are not
+claimed. Static publication/export and managed files remain next; full document-wide
+draft protection and the older content-health queue/document-link picker remain
+open. Review decisions retain the existing current-document contract rather than
+freezing approval to a revision. No push, Wiki publication, production deployment,
+version change or application-data removal occurred.

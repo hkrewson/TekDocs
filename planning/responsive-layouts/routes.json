@@ -94,9 +94,11 @@
     "evidence": [
       "planning/responsive-layouts/document-workspace.md",
       "planning/responsive-layouts/template-and-block-workflows.md",
-      "frontend/e2e/document-libraries.spec.ts"
+      "frontend/e2e/document-libraries.spec.ts",
+      "planning/responsive-layouts/ownership-and-review.md",
+      "frontend/e2e/document-operations.spec.ts"
     ],
-    "states": "Document library and focused reader plus templates/reusable content checkpoint. Broader Phase 5 states and technician acceptance remain open."
+    "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."
   },
   {
     "route": "/domains",
@@ -353,9 +355,11 @@
     "evidence": [
       "planning/responsive-layouts/document-workspace.md",
       "planning/responsive-layouts/template-and-block-workflows.md",
-      "frontend/e2e/document-libraries.spec.ts"
+      "frontend/e2e/document-libraries.spec.ts",
+      "planning/responsive-layouts/ownership-and-review.md",
+      "frontend/e2e/document-operations.spec.ts"
     ],
-    "states": "Document library and focused reader plus templates/reusable content checkpoint. Broader Phase 5 states and technician acceptance remain open."
+    "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/domains",

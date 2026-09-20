@@ -136,3 +136,21 @@
 @media (max-width: 640px) {
   .document-detail-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+.document-operations { min-width: 0; }
+.document-operations .section-heading { flex-wrap: wrap; }
+.document-operations h2:focus { outline: 2px solid var(--accent-strong); outline-offset: 4px; }
+.document-operations-fields, .document-operations .document-review-form { display: grid; min-width: 0; margin: 0; padding: 16px 0; gap: 12px; border: 0; border-top: 1px solid var(--border); }
+.document-operations legend { padding: 0 8px 0 0; font-weight: 600; }
+.document-operations .document-review-form > label { display: grid; gap: 6px; }
+.document-operations input:not([type=checkbox]), .document-operations select, .document-operations textarea { width: 100%; min-width: 0; max-width: 100%; }
+.document-operations .document-review-form select, .document-operations textarea { min-height: 38px; padding: 8px; color: var(--text); background: var(--canvas); border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
+.document-operations textarea { min-height: 90px; resize: vertical; }
+.document-operations .document-review-form > button { justify-self: start; }
+.document-review-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 0; }
+.document-review-summary dt { color: var(--muted); font-size: 12px; }
+.document-review-summary dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.document-review-note { white-space: pre-wrap; }
+@media (max-width: 600px) { .document-review-summary { grid-template-columns: minmax(0, 1fr); } }
+
+.document-reader-header.operations-open { position: static; }

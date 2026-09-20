@@ -1937,3 +1937,56 @@ draft protection and the older content-health queue/document-link picker remain
 open. Review decisions retain the existing current-document contract rather than
 freezing approval to a revision. No push, Wiki publication, production deployment,
 version change or application-data removal occurred.
+
+## 2026-09-20 — Publication draft and preflight safety
+
+Scope: bounded Phase 5 publication safety checkpoint, with existing editable
+export contract verification. Added a focused publication setup view, shared
+navigation protection for publication and lifecycle decision drafts, frozen
+inputs during writes, and a retry action that preserves the current draft.
+Preflight responses now carry a request identity so superseded checks cannot
+replace the latest audience result. Existing signed snapshots, immutable
+artifacts, approval/withdrawal policy and API/schema contracts are unchanged.
+
+Reproduced before fixing: cancelling a populated publication form silently lost
+its reason; an older successful MSP preflight resolved after a blocked client
+check and incorrectly enabled Publish. The regression asserts both the disabled
+button and the retained blocker after resolving the stale request. Evidence:
+/tmp/tekdocs-publication-repro.log and
+/tmp/tekdocs-publication-race-repro.log. An initial test used the document-check
+summary wording instead of the publication form wording; it was corrected against
+the rendered form before the race reproduction. A deferred heading focus also
+interrupted fast typing during implementation; commit-time focus fixed it without
+weakening reason assertions.
+
+Verified: all 18 six-width Chromium/Firefox/WebKit cases pass in the pinned Docker
+browser runner, including native Back, keep/discard, focus restoration, export
+format links, accessibility and horizontal overflow. Screenshots at 320px and
+1440px were visually reviewed. Evidence:
+/tmp/tekdocs-publication-browser.log and
+artifacts/document-publication-{320,1440}.png. The maintained Wiki passes its
+37-page check and unrelated local Wiki edits are preserved.
+
+Verified: `make check` exits 0 with all 612 frontend tests in 117 files (including
+51 document component tests), lint, types, migration drift and API agreement,
+production build and unchanged bundle budgets. Shell compressed size is 129082
+bytes against 131072. `make test-e2e-live` exits 0: its real browser journey now
+also cancels a publication draft, keeps editing, and verifies the exact reason
+before publishing. Existing independent-approver, withdrawal, retained PDF,
+editable Markdown/ZIP and database fixture assertions pass. Evidence:
+/tmp/tekdocs-publication-check.log and /tmp/tekdocs-publication-live.log.
+
+Inferred: the bounded publication safety workflow is ready for technician review;
+human acceptance and full Phase 5 completion are not claimed. Remaining work is
+the publication viewer/export layout and managed-file/PDF workflows, plus the
+previously recorded document-wide draft and older queue/picker work. Preflight is
+advisory and does not reserve a revision; the unchanged server revalidates a
+publication. Drafts are in-memory only. No schema/API changes, production
+deployment, push, Wiki publication, version bump or application-data removal.
+
+Final gate: `make test-publication-control` exits 0. All selected backend
+publication, custom-role, IDOR, RLS and migration-retention checks pass with one
+existing skip; its required frontend rerun also passes all 612 tests and coverage
+thresholds. Evidence: /tmp/tekdocs-publication-gate.log. Blocked: none for this
+bounded checkpoint. Local readiness confirms the database and renderer ready at
+localhost:3200, version 0.8.46. No remaining validation failures.

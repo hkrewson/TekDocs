@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
-import { render as testingRender, screen, waitFor, within } from '@testing-library/react'
+import { act, render as testingRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
@@ -1121,4 +1121,84 @@ it('does not overwrite newly edited settings when an explicit selection reaches 
   finish({ results: [document], count: 1 })
   await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
   expect(screen.getByRole('checkbox', { name: 'Make reusable content findable in client documents' })).toBeChecked()
+})
+
+it('ignores an older successful audience check after the current audience is blocked', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, preflight } = clients()
+  const report = { version: 'tekdocs-preflight/v1', scope: 'document', scope_id: 'doc-1', composition_digest: 'a'.repeat(64), audience: 'msp_internal', valid: true, counts: { blocker: 0, warning: 0, info: 0 }, findings: [] }
+  let resolveOlder!: (value: typeof report) => void
+  preflight.mockImplementationOnce(() => new Promise((resolve) => { resolveOlder = resolve }))
+  preflight.mockResolvedValueOnce({ ...report, audience: 'client_visible', valid: false, counts: { blocker: 1, warning: 0, info: 0 } })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByRole('textbox', { name: 'Why are you publishing this?' }), 'Client release')
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Who can see it?' }), 'client_visible')
+  expect(await screen.findByText('1 issue must be fixed before publishing.')).toBeVisible()
+  await act(async () => { resolveOlder(report); await Promise.resolve() })
+  expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
+  expect(screen.getByText('1 issue must be fixed before publishing.')).toBeVisible()
+})
+
+it('protects publication drafts on cancel and retries failed checks without clearing inputs', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, preflight } = clients()
+  preflight.mockRejectedValueOnce(new Error('Unavailable'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByRole('textbox', { name: 'Why are you publishing this?' }), 'Keep this reason')
+  await user.click(screen.getByRole('button', { name: 'Cancel publication' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByRole('textbox', { name: 'Why are you publishing this?' })).toHaveValue('Keep this reason')
+  await user.click(screen.getByRole('button', { name: 'Retry publication check' }))
+  expect(await screen.findByRole('button', { name: 'Publish' })).toBeEnabled()
+  await user.click(screen.getByRole('button', { name: 'Cancel publication' }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  expect(screen.queryByRole('textbox', { name: 'Why are you publishing this?' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Publish document' })).toBeVisible()
+})
+
+it('preserves a denied withdrawal reason and guards switching to a correction', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, withdrawPublication } = clients()
+  withdrawPublication.mockRejectedValueOnce(new Error('Decision denied'))
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByRole('textbox', { name: 'Why are you publishing this?' }), 'Approved release')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
+  await user.click(await screen.findByRole('button', { name: 'Withdraw publication' }))
+  await user.type(screen.getByRole('textbox', { name: 'Decision reason' }), 'Superseded instructions')
+  await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Decision denied')
+  expect(screen.getByRole('textbox', { name: 'Decision reason' })).toHaveValue('Superseded instructions')
+  await user.click(screen.getByRole('button', { name: 'Publish correction' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByRole('textbox', { name: 'Decision reason' })).toHaveValue('Superseded instructions')
+  await user.click(screen.getByRole('button', { name: 'Withdraw' }))
+  expect(await screen.findByText('Published version withdrawn. Authorized MSP staff can still view it.')).toBeVisible()
+  expect(screen.queryByRole('textbox', { name: 'Decision reason' })).not.toBeInTheDocument()
+})
+
+it('freezes publication inputs during submission and preserves the draft after denial', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publish } = clients()
+  let rejectPublication!: (error: Error) => void
+  publish.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectPublication = reject }))
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByRole('textbox', { name: 'Why are you publishing this?' }), 'Retain on failure')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
+  expect(screen.getByRole('textbox', { name: 'Why are you publishing this?' })).toBeDisabled()
+  expect(screen.getByRole('combobox', { name: 'Who can see it?' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Cancel publication' })).toBeDisabled()
+  await act(async () => { rejectPublication(new Error('Publication denied')); await Promise.resolve() })
+  expect(await screen.findByRole('alert')).toHaveTextContent('Publication denied')
+  expect(screen.getByRole('textbox', { name: 'Why are you publishing this?' })).toHaveValue('Retain on failure')
+  expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled()
 })

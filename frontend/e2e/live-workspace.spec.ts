@@ -1295,6 +1295,9 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   await page.getByRole('button', { name: 'Publish document' }).click()
   await page.getByLabel('Why are you publishing this?').fill('Live publication regression')
+  await page.getByRole('button', { name: 'Cancel publication' }).click()
+  await page.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(page.getByRole('textbox', { name: 'Why are you publishing this?' })).toHaveValue('Live publication regression')
   await page.getByLabel('Who can see it?').selectOption('client_visible')
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Publish', exact: true }).click()

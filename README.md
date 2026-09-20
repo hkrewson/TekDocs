@@ -18,7 +18,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 - Workspace-governed hierarchical taxonomies, exact legacy-tag migration, and searchable controlled terms
 - Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references; client template and reusable-block libraries provide paged search, section previews, protected creation drafts, and explicit template-update conflict review
 - Permission-aware field and content keys with exact-revision export and publication snapshots
-- Immutable STATIC publications with signed manifests and retained PDF artifacts
+- Immutable STATIC publications with signed manifests and retained PDF artifacts; protected publication/decision drafts and retryable audience checks ignore superseded responses
 - People, sites, locations, custom fields, and typed entity relationships
 - Permission-aware workspace search across documentation content and operational identifiers
 - Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history

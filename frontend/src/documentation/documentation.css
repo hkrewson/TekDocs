@@ -154,3 +154,22 @@
 @media (max-width: 600px) { .document-review-summary { grid-template-columns: minmax(0, 1fr); } }
 
 .document-reader-header.operations-open { position: static; }
+
+.publication-section-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; padding-block: 12px; border-block: 1px solid var(--border); }
+.publication-section-nav [aria-pressed="true"] { border-color: var(--text); font-weight: 600; }
+.publication-verification { display: flex; align-items: center; gap: 8px; }
+.publication-verification svg { flex: none; }
+.publication-content { min-width: 0; overflow-wrap: anywhere; }
+.document-export-panel fieldset { min-width: 0; }
+.document-export-panel .checkbox-field { align-items: flex-start; }
+.document-export-panel .checkbox-field span, .publication-artifacts li { min-width: 0; overflow-wrap: anywhere; }
+.document-export-panel .checkbox-field input { flex: none; }
+.document-export-panel .checkbox-field small { display: block; }
+.static-publication > .document-edit-heading { flex-direction: row; align-items: flex-start; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0 0 16px; background: transparent; }
+.static-publication > .document-edit-heading > div { min-width: 0; overflow-wrap: anywhere; }
+.static-publication > .document-edit-heading > button { flex: none; }
+.static-publication > .publication-lifecycle { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
+.static-publication .publication-section-nav { margin: 4px 0 12px; }
+.document-export-panel .checkbox-field { display: flex; gap: 8px; padding: 8px 0; }
+.document-export-panel fieldset { border: 1px solid var(--border); }
+.document-export-panel a.primary-button { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }

@@ -1990,3 +1990,67 @@ existing skip; its required frontend rerun also passes all 612 tests and coverag
 thresholds. Evidence: /tmp/tekdocs-publication-gate.log. Blocked: none for this
 bounded checkpoint. Local readiness confirms the database and renderer ready at
 localhost:3200, version 0.8.46. No remaining validation failures.
+
+## 2026-09-20 — Retained publication sections and focused exports
+
+Scope: Phase 5 retained viewer and editable export layout. Added Content,
+Downloads and History sections with common status/audience/verification and
+lifecycle controls. Decision drafts survive section changes. Editable exports
+now replace the reader while open, retain explicit file choices between visits,
+and restore focus to Export. Primary versions/attachments have readable rows,
+a selected count and empty states. No API, schema, permission or dependency change.
+
+Reproduced before fixing: resolving a publication read after closing its viewer
+reopened it; removing a selected attachment left its identifier in the ZIP URL.
+New component regressions fail on those exact outcomes before the fixes and pass
+afterwards. Evidence: /tmp/tekdocs-publication-layout-repro.log,
+/tmp/tekdocs-export-removal-repro.log and
+/tmp/tekdocs-publication-layout-components-final.log. Read failures now provide
+safe retry, outstanding read identities are invalidated on close/open/unmount,
+and successfully removed attachments are cleared from export selection.
+
+Visual review prompted a second layout pass: detailed reason/retention/availability
+moved into History so mobile users reach reading/download controls sooner; the
+publication heading, ZIP action and file rows were tightened using existing tokens.
+The 54 document component tests, lint and type checks pass. Initial full
+`make check` passed all 615 tests in 117 files and the production build with
+unchanged bundle limits; final gate results follow below.
+
+Verified: all 36 final six-width Chromium/Firefox/WebKit cases pass in the pinned
+Docker browser image, including read retry, section browsing, denied approval,
+correction cancellation/focus, protected withdrawal, retained links, explicit ZIP
+selection, removal from ZIP selection, accessibility and page overflow. The 320px
+and 1440px viewer/export screenshots were reviewed after the mobile layout pass.
+Evidence: /tmp/tekdocs-publication-layout-browser-closeout.log and
+artifacts/{publication-viewer,document-exports}-{320,1440}.png.
+
+The first real-stack run withdrew the publication successfully, then failed an
+old test assumption that Publication history was always rendered. The exact
+retained withdrawn-event assertion was preserved and an explicit History action
+was added to match the new section layout. Evidence:
+/tmp/tekdocs-publication-layout-live.log; final rerun results follow below.
+
+Verified: `make test-file-export-stabilization` exits 0, including backend document,
+attachment, API-token, IDOR and RLS checks with one existing skip, and all 615
+frontend tests in 117 files with coverage thresholds. Evidence:
+/tmp/tekdocs-publication-layout-gate.log. Wiki validation passes all 37 pages;
+existing unrelated local Wiki changes remain preserved.
+
+Inferred: this bounded viewer/export workflow is ready for technician review.
+Phase 5 and human acceptance remain open. Managed-file/PDF migration is next;
+publication deep links/section history, full document-wide draft protection and
+the older health queue/link picker retain their separately recorded scope.
+Native downloads keep the existing browser/server error behavior. No external
+push, Wiki publication, deployment, version bump or removal of existing application data.
+
+Verified: the final `make test-e2e-live` exits 0 with the updated History navigation
+and unchanged exact withdrawal-event assertion. Real approval/withdrawal, portal
+removal, retained PDF/signature, editable Markdown/ZIP and independent PostgreSQL
+fixture assertions pass. Evidence: /tmp/tekdocs-publication-layout-live-final.log.
+
+Final `make check` exits 0 with all 615 tests in 117 files, lint/types, API/schema
+agreement, migration drift checks, production build and unchanged bundle budgets
+(shell 129083 <= 131072 compressed bytes). Evidence:
+/tmp/tekdocs-publication-layout-check-final.log. Local readiness reports database
+and renderer ready at localhost:3200, version 0.8.46. Blocked: none for this
+checkpoint. No remaining validation failures.

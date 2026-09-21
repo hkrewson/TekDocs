@@ -101,9 +101,11 @@
       "planning/responsive-layouts/managed-files-and-pdf.md",
       "planning/responsive-layouts/document-draft-protection.md",
       "planning/responsive-layouts/document-health-and-links.md",
-      "frontend/e2e/document-operations.spec.ts"
+      "frontend/e2e/document-operations.spec.ts",
+      "planning/responsive-layouts/document-direct-links-and-history.md",
+      "frontend/e2e/document-direct-links.spec.ts"
     ],
-    "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."
+    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open."
   },
   {
     "route": "/domains",
@@ -367,9 +369,11 @@
       "planning/responsive-layouts/managed-files-and-pdf.md",
       "planning/responsive-layouts/document-draft-protection.md",
       "planning/responsive-layouts/document-health-and-links.md",
-      "frontend/e2e/document-operations.spec.ts"
+      "frontend/e2e/document-operations.spec.ts",
+      "planning/responsive-layouts/document-direct-links-and-history.md",
+      "frontend/e2e/document-direct-links.spec.ts"
     ],
-    "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."
+    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/domains",

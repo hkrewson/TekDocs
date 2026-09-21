@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
 import { CollectionPagination } from '../CollectionPagination'
@@ -15,7 +15,7 @@ import { browserDocumentsClient, RevisionConflictError } from './api'
 import type { DocumentKeyBinding, DocumentKeyReport, WorkspaceKeyBinding } from './api'
 import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, DocumentCategory, DocumentFilters, DocumentHealthStatus, DocumentInput, DocumentPlacement, DocumentPreflight, DocumentPublication, DocumentRecord, DocumentRemoteObservation, DocumentRemoteSource, DocumentRestructurePreview, DocumentTopicType, DocumentsClient, EntityMentionOption, PlacementAudienceProfile, PublicationAudience, PublicationRetention, ReuseImpact, TemplatePlacementMode, TemplateRollout, TopicSchema } from './api'
 import { PublicationViewer } from './PublicationViewer'
-import type { PublicationView } from './PublicationViewer'
+import type { PublicationSection, PublicationView } from './PublicationViewer'
 import { DocumentFiles } from './DocumentFiles'
 import { DocumentLinkPicker } from './DocumentLinkPicker'
 import { DocumentExports } from './DocumentExports'
@@ -54,6 +54,16 @@ const blockKinds: { value: BlockKind; label: string; description: string }[] = [
 ]
 
 type DocumentPanel = 'operations' | 'details' | 'files' | 'reuse' | 'history' | 'share' | 'relationships' | 'remote' | 'restructure' | 'export' | 'keys' | null
+type DocumentDirectView = Extract<DocumentPanel, 'operations' | 'details' | 'files' | 'history' | 'export' | 'keys'>
+const documentDirectViews = new Set<DocumentDirectView>(['operations', 'details', 'files', 'history', 'export', 'keys'])
+
+function directDocumentView(value: string | null): DocumentDirectView | null {
+  return value && documentDirectViews.has(value as DocumentDirectView) ? value as DocumentDirectView : null
+}
+
+function publicationSection(value: string | null): PublicationSection {
+  return value === 'downloads' || value === 'history' ? value : 'content'
+}
 const contentPresets: { label: string; kind: BlockKind; markdown: string; icon: typeof Type }[] = [
   { label: 'Text', kind: 'rich_text', markdown: '', icon: Type },
   { label: 'Heading', kind: 'heading', markdown: '## ', icon: Heading },
@@ -78,9 +88,17 @@ function placementAudienceLabel(profile: PlacementAudienceProfile): string {
 export function Documentation({ workspace, client = browserDocumentsClient, workspaceClient = browserWorkspaceClient, relationshipsClient, initialDocumentId }: { workspace: WorkspaceContext | null; client?: DocumentsClient; workspaceClient?: WorkspaceClient; relationshipsClient?: RelationshipsClient; initialDocumentId?: string | null }) {
   const attemptNavigation = useNavigationGuard()
   const navigate = useNavigate()
+  const location = useLocation()
   const initialParameters = useMemo(() => new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search), [])
+  const routeParameters = useMemo(() => new URLSearchParams(location.search), [location.search])
   const urlManaged = initialDocumentId !== undefined
   const requestedDocumentId = initialDocumentId ?? null
+  const requestedPublicationId = urlManaged ? routeParameters.get('publication') : null
+  const requestedDocumentView = urlManaged ? directDocumentView(routeParameters.get('document_view')) : null
+  const requestedHistoryPageValue = Number(routeParameters.get('document_history_page'))
+  const requestedHistoryPage = Number.isInteger(requestedHistoryPageValue) && requestedHistoryPageValue > 0 ? requestedHistoryPageValue : 1
+  const requestedRevisionId = urlManaged ? routeParameters.get('document_revision') : null
+  const requestedPublicationSection = publicationSection(urlManaged ? routeParameters.get('publication_section') : null)
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
   const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; count: number; page: number; pageSize: number; hasMore: boolean; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
@@ -166,6 +184,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [mentionOptions, setMentionOptions] = useState<EntityMentionOption[]>([])
   const [editorGeneration, setEditorGeneration] = useState(0)
   const [publicationView, setPublicationView] = useState<PublicationView | null>(null)
+  const [activePublicationSection, setActivePublicationSection] = useState<PublicationSection>(() => publicationSection(initialParameters.get('publication_section')))
   const [publicationForm, setPublicationForm] = useState<{ source: DocumentRecord; reason: string; audience: PublicationAudience; retention: PublicationRetention; reviewOn: string; initialAudience: PublicationAudience; supersedesId: string | null } | null>(null)
   const [publicationControl, setPublicationControl] = useState<{ action: 'approve' | 'withdraw'; reason: string } | null>(null)
   const [publicationPreflight, setPublicationPreflight] = useState<{ phase: 'loading' | 'ready' | 'error'; report?: DocumentPreflight } | null>(null)
@@ -185,6 +204,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setPublicationPreflight(null)
   }
   const publicationDirty = Boolean(publicationForm && (publicationForm.reason || publicationForm.audience !== publicationForm.initialAudience || publicationForm.retention !== 'permanent' || publicationForm.reviewOn)) || Boolean(publicationControl?.reason)
+  const visiblePublicationSection = urlManaged && !publicationDirty ? requestedPublicationSection : activePublicationSection
   const attemptPublicationClose = useUnsavedChanges(publicationDirty, Boolean(saving && (publicationForm || publicationControl)), discardPublicationDraft, Boolean(publicationForm || publicationControl))
   const cancelPublication = () => attemptPublicationClose(() => {
     discardPublicationDraft()
@@ -244,6 +264,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const insertionMenu = useRef<HTMLDivElement>(null)
   const restoreInsertionPosition = useRef<number | null>(null)
   const openedDeepLink = useRef<string | null>(null)
+  const openedRevision = useRef<string | null>(null)
+  const pendingDocumentView = useRef<{ value: DocumentDirectView | null } | null>(null)
 
   useEffect(() => {
     if (inserterOpen) insertionMenu.current?.querySelector<HTMLButtonElement>('.document-insert-types button')?.focus()
@@ -265,7 +287,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         if (controller.signal.aborted) return
         setLoaded({ key: scopeKey, results: result.results, count: result.count, page: result.page ?? documentPage, pageSize: result.page_size ?? 25, hasMore: result.has_more ?? false, collections: result.collections ?? [], tags: result.tags ?? [], health: result.health ?? [] })
         setPhase('ready')
-        const deepLinkKey = requestedDocumentId ? `${scopeKey}:${requestedDocumentId}` : null
+        const deepLinkKey = requestedDocumentId ? `${scopeKey}:${requestedDocumentId}:${requestedPublicationId ?? ''}` : null
         let deepLinked = requestedDocumentId ? result.results.find((item) => item.id === requestedDocumentId) : null
         if (requestedDocumentId && deepLinkKey && openedDeepLink.current !== deepLinkKey) {
           if (!deepLinked) {
@@ -285,6 +307,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
           setTopicType(deepLinked.topic_type ?? 'unstructured')
           setIsTemplate(deepLinked.is_template)
           setLibraryVisible(deepLinked.library_visible)
+          if (!requestedPublicationId) setPublicationView(null)
           if (deepLinked.primary_file?.media_type === 'application/pdf') {
             setViewedPdf({ filename: deepLinked.primary_file.filename, url: client.attachmentDownloadUrl(scope, deepLinked.id, deepLinked.primary_file.id) })
           }
@@ -293,7 +316,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       })
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
-  }, [categoryFilter, client, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, requestedDocumentId, revision, scope, scopeKey, tagFilter, templateFilter])
+  }, [categoryFilter, client, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, requestedDocumentId, requestedPublicationId, revision, scope, scopeKey, tagFilter, templateFilter])
 
   useEffect(() => {
     if (!urlManaged) return
@@ -374,30 +397,80 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   const results = loaded?.key === scopeKey ? loaded.results : []
   const visiblePhase = loaded?.key === scopeKey ? phase : 'loading'
+  const clearDocumentDetailParameters = (parameters: URLSearchParams) => {
+    for (const key of ['document_view', 'document_history_page', 'document_revision', 'publication', 'publication_section']) parameters.delete(key)
+  }
   const updateDocumentLocation = (documentId: string | null, mode: 'push' | 'replace' = 'push') => {
     if (!urlManaged) return
+    pendingDocumentView.current = { value: null }
     // Explicit selection already supplies the record; a list refresh must not reopen stale metadata.
-    openedDeepLink.current = documentId ? `${scopeKey}:${documentId}` : null
+    openedDeepLink.current = documentId ? `${scopeKey}:${documentId}:` : null
     const parameters = new URLSearchParams(window.location.search)
+    clearDocumentDetailParameters(parameters)
     if (documentId) parameters.set('document', documentId)
     else parameters.delete('document')
     const destination = `${window.location.pathname}${parameters.size ? `?${parameters}` : ''}${window.location.hash}`
     // Commit local save/close state first so completed editors release their navigation guard.
     window.requestAnimationFrame(() => { void navigate(destination, { replace: mode === 'replace' }) })
   }
-  const resetRevisionUi = () => { setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setRolloutRules({}); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setAddressableTypes([]); setBindingQuery(''); setBindingMatches([]); setPlacementAudience('shared'); setAudiencePreview('all'); setDocumentCheck(null); setRemoteSourceOpen(false); setRemoteSource(null); setRemoteSourceDraft({ url: '', source_kind: 'auto', enabled: true, check_interval_minutes: 1440 }); setRemoteObservations([]) }
+  const updateDocumentViewLocation = (view: DocumentDirectView | null, options: { page?: number; revisionId?: string | null } = {}, mode: 'push' | 'replace' = 'push', defer = true) => {
+    if (!urlManaged || !selected || selected === 'new') return
+    pendingDocumentView.current = { value: view }
+    const parameters = new URLSearchParams(window.location.search)
+    parameters.set('document', selected.id)
+    parameters.delete('publication')
+    parameters.delete('publication_section')
+    if (view) parameters.set('document_view', view)
+    else parameters.delete('document_view')
+    if (view === 'history' && (options.page ?? 1) > 1) parameters.set('document_history_page', String(options.page))
+    else parameters.delete('document_history_page')
+    if (view === 'history' && options.revisionId) parameters.set('document_revision', options.revisionId)
+    else parameters.delete('document_revision')
+    const destination = `${window.location.pathname}?${parameters}${window.location.hash}`
+    if (defer) window.requestAnimationFrame(() => { void navigate(destination, { replace: mode === 'replace' }) })
+    else void navigate(destination, { replace: mode === 'replace' })
+  }
+  const updatePublicationLocation = (documentId: string, publicationId: string, section: PublicationSection, mode: 'push' | 'replace' = 'push') => {
+    if (!urlManaged) return
+    pendingDocumentView.current = { value: null }
+    openedDeepLink.current = `${scopeKey}:${documentId}:${publicationId}`
+    const parameters = new URLSearchParams(window.location.search)
+    clearDocumentDetailParameters(parameters)
+    parameters.set('document', documentId)
+    parameters.set('publication', publicationId)
+    if (section === 'content') parameters.delete('publication_section')
+    else parameters.set('publication_section', section)
+    const destination = `${window.location.pathname}?${parameters}${window.location.hash}`
+    window.requestAnimationFrame(() => { void navigate(destination, { replace: mode === 'replace' }) })
+  }
+  const resetRevisionUi = () => { openedRevision.current = null; setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setRolloutRules({}); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setAddressableTypes([]); setBindingQuery(''); setBindingMatches([]); setPlacementAudience('shared'); setAudiencePreview('all'); setDocumentCheck(null); setRemoteSourceOpen(false); setRemoteSource(null); setRemoteSourceDraft({ url: '', source_kind: 'auto', enabled: true, check_interval_minutes: 1440 }); setRemoteObservations([]) }
   const open = (document: DocumentRecord) => { publicationRead.current += 1; updateDocumentLocation(document.id); resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setTopicType(document.topic_type ?? 'unstructured'); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setMessage(null); setError(null); setShareQuery(''); setPlacementMode('live'); setPlacementAudience('shared'); setAudiencePreview('all'); setExportAttachmentIds([]); if (document.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) }) }
   const create = () => { publicationRead.current += 1; resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected('new'); setNewDocumentMode('write'); setNewPrimaryFile(null); setTitle(''); setMarkdown(''); setCategory('general'); setTopicType('unstructured'); setIsTemplate(false); setLibraryVisible(false); setMessage(null); setError(null) }
   const close = () => attemptNavigation(() => { publicationRead.current += 1; updateDocumentLocation(null, 'replace'); resetRevisionUi(); setSelected(null); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setShareQuery(''); setShareOptions([]); if (publicationView) window.requestAnimationFrame(() => publicationButtons.current[publicationView.publicationId]?.focus()) })
-  const openPublication = async (document: Pick<DocumentRecord, 'id'>, publication: Pick<DocumentPublication, 'id'>) => {
+  const openPublication = async (document: Pick<DocumentRecord, 'id'>, publication: Pick<DocumentPublication, 'id'>, updateLocation = true, section: PublicationSection = 'content') => {
     const request = ++publicationRead.current
     const identity = { sourceId: document.id, publicationId: publication.id }
-    resetRevisionUi(); setSelected(null); setPublicationForm(null); setPublicationControl(null); setPublicationView({ ...identity, phase: 'loading' }); setError(null); setMessage(null)
+    if (updateLocation) updatePublicationLocation(document.id, publication.id, section)
+    resetRevisionUi(); setActivePublicationSection(section); setSelected(null); setPublicationForm(null); setPublicationControl(null); setPublicationView({ ...identity, phase: 'loading' }); setError(null); setMessage(null)
     try {
       const record = await client.getPublication(scope, document.id, publication.id)
       if (request === publicationRead.current) setPublicationView({ ...identity, phase: 'ready', record })
     } catch { if (request === publicationRead.current) setPublicationView({ ...identity, phase: 'error' }) }
   }
+  const changePublicationSection = (section: PublicationSection) => {
+    if (!publicationView) return
+    setActivePublicationSection(section)
+    if (!publicationDirty) updatePublicationLocation(publicationView.sourceId, publicationView.publicationId, section)
+  }
+
+  useEffect(() => {
+    if (!requestedPublicationId || !requestedDocumentId || !selected || selected === 'new' || selected.id !== requestedDocumentId) return
+    if (publicationView?.sourceId === requestedDocumentId && publicationView.publicationId === requestedPublicationId) return
+    const frame = window.requestAnimationFrame(() => { void openPublication(selected, { id: requestedPublicationId }, false, requestedPublicationSection) })
+    return () => window.cancelAnimationFrame(frame)
+    // openPublication intentionally remains outside the dependency list; this effect is keyed by URL identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publicationView, requestedDocumentId, requestedPublicationId, requestedPublicationSection, selected])
   const save = async (skipImpactReview = false) => {
     if (!selected || !title.trim()) return
     setSaving(true); setError(null)
@@ -448,9 +521,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     try { await client.addReference(selected.id, organization.id); setMessage(`Reference added to ${organization.name}.`); setShareQuery(''); setShareOptions([]) }
     catch (shareError) { setError(errorMessage(shareError)) } finally { setSaving(false) }
   }
-  const loadHistory = async (document = selected, page = 1) => {
+  const loadHistory = async (document = selected, page = 1, updateLocation = true) => {
     if (!document || document === 'new') return
-    setHistoryOpen(true); setHistoryPhase('loading'); setViewedRevision(null)
+    if (updateLocation) updateDocumentViewLocation('history', { page })
+    openedRevision.current = null
+    setHistoryOpen(true); setHistoryPhase('loading'); setViewedRevision(null); setError(null)
     try {
       const result = await client.listRevisions(scope, document.id, page)
       setHistory(result.results); setHistoryPage(result.page); setHistoryCount(result.count); setHistoryHasMore(result.has_more); setHistoryPhase('ready')
@@ -459,6 +534,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
   const inspectRevision = async (revisionRecord: BlockRevision) => {
     if (!selected || selected === 'new') return
+    openedRevision.current = `${selected.id}:${revisionRecord.id}`
+    updateDocumentViewLocation('history', { page: historyPage, revisionId: revisionRecord.id })
     try { setViewedRevision(await client.getRevision(scope, selected.id, revisionRecord.id)) }
     catch (historyError) { setError(errorMessage(historyError)) }
   }
@@ -474,6 +551,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
   const previewRestructure = async () => {
     if (!selected || selected === 'new') return
+    updateDocumentViewLocation(null)
     setActivePanel('restructure'); setRestructurePhase('loading'); setRestructurePreview(null); setError(null)
     try { setRestructurePreview(await client.previewRestructure(scope, selected.id)); setRestructurePhase('ready') }
     catch (previewError) { setRestructurePhase('error'); setError(errorMessage(previewError)) }
@@ -508,6 +586,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     } catch (blockError) { setError(errorMessage(blockError)) } finally { setSaving(false) }
   }
   const openInserter = (position: number | null) => {
+    if (activePanel && documentDirectViews.has(activePanel as DocumentDirectView)) updateDocumentViewLocation(null)
     setNewBlockPosition(position); setNewBlockOpen(false); setInserterOpen(true); setActivePanel(null)
     setNewBlockKind('rich_text'); setNewBlockName(''); setNewBlockMarkdown(''); setNewBlockLibraryVisible(false); setPlacementAudience('shared')
   }
@@ -638,6 +717,42 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     ])
     setKeyBindings([...bindings.results]); setKeyReport(report); setAddressableTypes([...bindings.addressable_entity_types])
   }
+
+  useEffect(() => {
+    if (!urlManaged || !selected || selected === 'new' || selected.id !== requestedDocumentId || requestedPublicationId) return
+    if (pendingDocumentView.current) {
+      if (pendingDocumentView.current.value === requestedDocumentView) pendingDocumentView.current = null
+      else return
+    }
+    if (!requestedDocumentView && !(activePanel && documentDirectViews.has(activePanel as DocumentDirectView))) return
+    if (activePanel && !documentDirectViews.has(activePanel as DocumentDirectView)) return
+    const frame = window.requestAnimationFrame(() => {
+      if (activePanel !== requestedDocumentView) setActivePanel(requestedDocumentView)
+      if (requestedDocumentView === 'history' && (historyPhase === 'idle' || (historyPhase !== 'loading' && historyPage !== requestedHistoryPage))) {
+        void loadHistory(selected, requestedHistoryPage, false)
+      }
+      if (requestedDocumentView === 'keys' && !keyReport) void loadKeys()
+    })
+    return () => window.cancelAnimationFrame(frame)
+    // loadHistory and loadKeys read the selected document captured by this URL synchronization.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePanel, historyPage, historyPhase, keyReport, requestedDocumentId, requestedDocumentView, requestedHistoryPage, requestedPublicationId, selected, urlManaged])
+
+  useEffect(() => {
+    if (!urlManaged || !selected || selected === 'new' || activePanel !== 'history' || historyPhase !== 'ready') return
+    if (!requestedRevisionId) {
+      openedRevision.current = null
+      if (!viewedRevision) return
+      const frame = window.requestAnimationFrame(() => setViewedRevision(null))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    const identity = `${selected.id}:${requestedRevisionId}`
+    if (openedRevision.current === identity || viewedRevision?.id === requestedRevisionId) return
+    openedRevision.current = identity
+    client.getRevision(scope, selected.id, requestedRevisionId)
+      .then((record) => { if (openedRevision.current === identity) setViewedRevision(record) })
+      .catch((historyError) => { if (openedRevision.current === identity) setError(errorMessage(historyError)) })
+  }, [activePanel, client, historyPhase, requestedRevisionId, scope, selected, urlManaged, viewedRevision])
   // The server enforces this grammar and refuses anything else. Checking it here means
   // a capitalised word is answered as you type instead of by a failed request.
   const bindingNameValid = /^[a-z][a-z0-9_]{0,39}$/.test(bindingName)
@@ -717,6 +832,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   }
   const openRemoteSource = async () => {
     if (!selected || selected === 'new') return
+    updateDocumentViewLocation(null)
     setSaving(true); setError(null)
     try {
       const [source, observations] = await Promise.all([client.getRemoteSource(scope, selected.id), client.listRemoteObservations(scope, selected.id).catch(() => ({ results: [], count: 0 }))])
@@ -803,6 +919,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   }
   const beginPublication = (source: DocumentRecord, supersedes: DocumentPublication | null = null) => {
+    if (activePanel && documentDirectViews.has(activePanel as DocumentDirectView)) updateDocumentViewLocation(null)
     setPublicationControl(null)
     const audience = supersedes?.audience ?? 'msp_internal'
     setPublicationForm({ source, reason: '', audience, initialAudience: audience, retention: 'permanent', reviewOn: '', supersedesId: supersedes?.id ?? null })
@@ -848,6 +965,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       })
       const sourceId = publicationForm.source.id
       setLoaded((current) => current ? { ...current, results: current.results.map((document) => document.id === sourceId ? { ...document, publications: [publication, ...document.publications], publication_count: document.publication_count + 1 } : document) } : current)
+      updatePublicationLocation(sourceId, publication.id, 'content', 'replace')
+      setActivePublicationSection('content')
       setSelected(null); setPublicationForm(null)
       setPublicationView({ sourceId, publicationId: publication.id, phase: 'ready', record: publication })
       setMessage(publication.lifecycle_state === 'pending_approval' ? translate('documentation.publicationSubmitted') : publication.supersedes_id ? translate('documentation.correctionPublished') : translate('documentation.publicationCreated'))
@@ -867,6 +986,22 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       setMessage(publicationControl.action === 'approve' ? translate('documentation.publicationApproved') : translate('documentation.publicationWithdrawn'))
     } catch (controlError) { setError(errorMessage(controlError)) } finally { setSaving(false) }
   }
+  const openDocumentView = (view: DocumentDirectView) => {
+    const next = activePanel === view ? null : view
+    if (urlManaged) {
+      if (activePanel && !documentDirectViews.has(activePanel as DocumentDirectView)) setActivePanel(null)
+      updateDocumentViewLocation(next)
+      return
+    }
+    setActivePanel(next)
+    if (next === 'history') void loadHistory(selected, 1, false)
+    if (next === 'keys') void loadKeys()
+  }
+  const closeDocumentView = (focus?: () => void, defer = true) => {
+    setActivePanel(null)
+    updateDocumentViewLocation(null, {}, 'push', defer)
+    if (focus) window.requestAnimationFrame(focus)
+  }
 
   const insertionPoint = (position: number) => {
     const isCurrent = newBlockPosition === position
@@ -875,7 +1010,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       {isCurrent && inserterOpen && <div ref={insertionMenu} className="document-insert-menu" role="group" aria-label="Add content" onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); closeInsertion() } }}>
         <div className="document-insert-menu-heading"><strong>Add content</strong><button className="icon-button" type="button" aria-label="Close add content menu" onClick={closeInsertion}><X size={16} /></button></div>
         <div className="document-insert-types">{contentPresets.map((preset) => { const Icon = preset.icon; return <button key={preset.label} type="button" onClick={() => chooseContentPreset(preset)}><Icon size={17} /><span>{preset.label}</span></button> })}</div>
-        <div className="document-insert-secondary"><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Copy size={16} />{translate('documentation.existingContent')}</button><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('files') }}><Paperclip size={16} />{translate('documentation.file')}</button><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Link2 size={16} />{translate('documentation.tekdocsRecord')}</button></div>
+        <div className="document-insert-secondary"><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Copy size={16} />{translate('documentation.existingContent')}</button><button type="button" onClick={() => { setInserterOpen(false); openDocumentView('files') }}><Paperclip size={16} />{translate('documentation.file')}</button><button type="button" onClick={() => { setInserterOpen(false); setActivePanel('reuse') }}><Link2 size={16} />{translate('documentation.tekdocsRecord')}</button></div>
       </div>}
       {isCurrent && newBlockOpen && selected && selected !== 'new' && <div className="document-inline-editor">
         <div className="document-inline-editor-heading"><strong>{newBlockName || 'New content'}</strong><button className="icon-button" type="button" aria-label="Cancel adding content" onClick={closeInsertion}><X size={16} /></button></div>
@@ -963,7 +1098,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       {visiblePhase === 'ready' && loaded && <CollectionPagination label="documents" page={loaded.page} pageSize={loaded.pageSize} count={loaded.count} hasMore={loaded.hasMore} onPageChange={setDocumentPage} />}
     </section>}
     {workspace && indexMode === 'templates' && <TemplateLibrary key={scopeKey} urlManaged={urlManaged} scope={scope} workspaceName={workspace.name} client={client} onCreated={(document) => { open(document); setMessage(translate('documentation.templateDocumentCreated')); setRevision((value) => value + 1) }} />}</>}
-    {publicationView && !publicationForm && <PublicationViewer key={publicationView.publicationId} view={publicationView} scope={scope} client={client} onClose={close} onRetry={() => { void openPublication({ id: publicationView.sourceId }, { id: publicationView.publicationId }) }}>
+    {publicationView && !publicationForm && <PublicationViewer key={publicationView.publicationId} view={publicationView} scope={scope} client={client} section={visiblePublicationSection} onSectionChange={changePublicationSection} onClose={close} onRetry={() => { void openPublication({ id: publicationView.sourceId }, { id: publicationView.publicationId }, false, visiblePublicationSection) }}>
       {publicationView.record && <>
         <div className="document-actions">
           {['published', 'review_due', 'withdrawn'].includes(publicationView.record.lifecycle_state) && !publicationView.record.superseded_by_id && results.find((document) => document.id === publicationView.sourceId) && <button className="secondary-button" type="button" disabled={saving} ref={publicationTrigger} onClick={() => attemptNavigation(() => beginPublication(results.find((document) => document.id === publicationView.sourceId)!, publicationView.record))}><FileCheck2 size={15} />{translate('documentation.publishCorrection')}</button>}
@@ -996,14 +1131,14 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         <Suspense fallback={<section className="content-section" role="status">Loading editor…</section>}><Editor key={`new-${newDocumentMode}-${editorGeneration}`} initialMarkdown={markdown} title={title || 'Untitled document'} description="" organizationId={workspace?.id} onMarkdownChange={setMarkdown} /></Suspense>
         <div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim() || (newDocumentMode === 'file' && !newPrimaryFile)} onClick={() => { if (newDocumentMode === 'file') void createFileBackedDocument(); else void save() }}>{saving ? translate('documentation.creating') : translate('documentation.createDocument')}</button><button className="secondary-button" type="button" onClick={close}>{translate('common.cancel')}</button></div>
       </> : <>
-        <header className={activePanel === 'operations' || activePanel === 'export' || activePanel === 'files' ? 'document-reader-header operations-open' : 'document-reader-header'}><button className="document-library-return" type="button" onClick={close}><ArrowLeft size={17} aria-hidden="true" /><span>Documents</span></button><div className="document-reader-title"><strong>{selected.title}</strong><span>{categories.find((item) => item.value === selected.category)?.label ?? selected.category}{selected.is_template ? ' · Template' : ''}{selected.is_reference ? ' · MSP reference' : ''}</span></div><div className="document-reader-actions">{client.updateOperations && <button ref={operationsTrigger} className={activePanel === 'operations' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-expanded={activePanel === 'operations'} onClick={() => attemptNavigation(() => setActivePanel(activePanel === 'operations' ? null : 'operations'))}><CalendarCheck2 size={15} aria-hidden="true" />{translate('documentation.ownershipAndReview')}</button>}<button className="secondary-button" type="button" ref={publicationTrigger} disabled={saving} onClick={() => attemptNavigation(() => beginPublication(selected))}><FileCheck2 size={15} />{translate('documentation.publishStatic')}</button><button ref={filesTrigger} aria-expanded={activePanel === 'files'} className={activePanel === 'files' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => setActivePanel(activePanel === 'files' ? null : 'files'))}><Paperclip size={15} />Files{selected.attachment_count > 0 ? ` (${selected.attachment_count})` : ''}</button><button className={activePanel === 'history' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => { setActivePanel(activePanel === 'history' ? null : 'history'); if (activePanel !== 'history') void loadHistory() })}><History size={15} />{translate('documentation.history')}</button><button className={activePanel === 'keys' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => { setActivePanel(activePanel === 'keys' ? null : 'keys'); if (activePanel !== 'keys') void loadKeys() })}><Key size={15} />{translate('documentation.keys')}{keyReport && keyReport.unresolved_count > 0 ? ` (${keyReport.unresolved_count})` : ''}</button><button ref={exportTrigger} aria-expanded={activePanel === 'export'} className={activePanel === 'export' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => setActivePanel(activePanel === 'export' ? null : 'export'))}><Download size={15} />{translate('documentation.export')}</button><button className={activePanel === 'details' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-label={translate('documentation.documentSettings')} aria-expanded={activePanel === 'details'} onClick={() => attemptNavigation(() => setActivePanel(activePanel === 'details' ? null : 'details'))}><Settings size={15} aria-hidden="true" /><span>{translate('documentation.documentSettings')}</span></button></div></header>
+        <header className={activePanel === 'operations' || activePanel === 'export' || activePanel === 'files' ? 'document-reader-header operations-open' : 'document-reader-header'}><button className="document-library-return" type="button" onClick={close}><ArrowLeft size={17} aria-hidden="true" /><span>Documents</span></button><div className="document-reader-title"><strong>{selected.title}</strong><span>{categories.find((item) => item.value === selected.category)?.label ?? selected.category}{selected.is_template ? ' · Template' : ''}{selected.is_reference ? ' · MSP reference' : ''}</span></div><div className="document-reader-actions">{client.updateOperations && <button ref={operationsTrigger} className={activePanel === 'operations' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-expanded={activePanel === 'operations'} onClick={() => attemptNavigation(() => openDocumentView('operations'))}><CalendarCheck2 size={15} aria-hidden="true" />{translate('documentation.ownershipAndReview')}</button>}<button className="secondary-button" type="button" ref={publicationTrigger} disabled={saving} onClick={() => attemptNavigation(() => beginPublication(selected))}><FileCheck2 size={15} />{translate('documentation.publishStatic')}</button><button ref={filesTrigger} aria-expanded={activePanel === 'files'} className={activePanel === 'files' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={(event) => { event.currentTarget.focus(); attemptNavigation(() => openDocumentView('files')) }}><Paperclip size={15} />Files{selected.attachment_count > 0 ? ` (${selected.attachment_count})` : ''}</button><button className={activePanel === 'history' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => openDocumentView('history'))}><History size={15} />{translate('documentation.history')}</button><button className={activePanel === 'keys' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => openDocumentView('keys'))}><Key size={15} />{translate('documentation.keys')}{keyReport && keyReport.unresolved_count > 0 ? ` (${keyReport.unresolved_count})` : ''}</button><button ref={exportTrigger} aria-expanded={activePanel === 'export'} className={activePanel === 'export' ? 'secondary-button selected' : 'secondary-button'} type="button" onClick={() => attemptNavigation(() => openDocumentView('export'))}><Download size={15} />{translate('documentation.export')}</button><button className={activePanel === 'details' ? 'secondary-button selected' : 'secondary-button'} type="button" aria-label={translate('documentation.documentSettings')} aria-expanded={activePanel === 'details'} onClick={() => attemptNavigation(() => openDocumentView('details'))}><Settings size={15} aria-hidden="true" /><span>{translate('documentation.documentSettings')}</span></button></div></header>
 
-        {activePanel === 'details' && <section ref={documentSettingsRef} tabIndex={-1} className="document-context-panel document-settings-panel" aria-labelledby="document-details-heading"><div className="section-heading"><h2 id="document-details-heading">{translate('documentation.documentSettings')}</h2><button className="icon-button" type="button" aria-label={translate('documentation.closeDocumentSettings')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><div className="document-detail-fields"><label>Title<input maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label>{!workspace && <label className="checkbox-field"><input type="checkbox" checked={libraryVisible} onChange={(event) => setLibraryVisible(event.target.checked)} />Make reusable content findable in client documents</label>}</div><div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim()} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save settings'}</button>{selected.is_template && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { void instantiateSelectedTemplate() })}><Copy size={15} />{translate('documentation.useTemplate')}</button>}{selected.template_enrollment_id && <button className="secondary-button" type="button" onClick={() => attemptRolloutClose(() => { void previewSelectedTemplateRollout() })}><History size={15} />{translate('documentation.checkTemplateUpdates')}</button>}{selected.placement_count === 1 && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { void previewRestructure() })}><List size={15} />{translate('documentation.reviewSectionConversion')}</button>}<button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { setActivePanel('remote'); void openRemoteSource() })}><Globe2 size={15} />{translate('documentation.remoteSource')}</button>{!workspace && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => setActivePanel('share'))}><Share2 size={15} />{translate('documentation.clientListings')}</button>}{relationshipsClient && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => setActivePanel('relationships'))}><Link2 size={15} />{translate('documentation.relatedRecords')}</button>}<button className="danger-button" type="button" disabled={saving} onClick={() => attemptNavigation(() => { void archive() })}><Archive size={15} />{translate('common.archive')}</button></div></section>}
-        {activePanel === 'operations' && <DocumentOperations key={`${scopeKey}:${selected.id}`} document={selected} scope={scope} client={client} onSaved={(record) => { setSelected(record); setRevision((value) => value + 1) }} onClose={() => { setActivePanel(null); window.requestAnimationFrame(() => operationsTrigger.current?.focus()) }} />}
+        {activePanel === 'details' && <section ref={documentSettingsRef} tabIndex={-1} className="document-context-panel document-settings-panel" aria-labelledby="document-details-heading"><div className="section-heading"><h2 id="document-details-heading">{translate('documentation.documentSettings')}</h2><button className="icon-button" type="button" aria-label={translate('documentation.closeDocumentSettings')} onClick={() => closeDocumentView()}><X size={16} /></button></div><div className="document-detail-fields"><label>Title<input maxLength={240} required value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>Category<select value={category} onChange={(event) => setCategory(event.target.value as DocumentCategory)}>{categories.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label><label className="checkbox-field"><input type="checkbox" checked={isTemplate} onChange={(event) => setIsTemplate(event.target.checked)} />Reusable template</label>{!workspace && <label className="checkbox-field"><input type="checkbox" checked={libraryVisible} onChange={(event) => setLibraryVisible(event.target.checked)} />Make reusable content findable in client documents</label>}</div><div className="document-actions"><button className="primary-button" type="button" disabled={saving || !title.trim()} onClick={() => { void save() }}>{saving ? 'Saving…' : 'Save settings'}</button>{selected.is_template && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { void instantiateSelectedTemplate() })}><Copy size={15} />{translate('documentation.useTemplate')}</button>}{selected.template_enrollment_id && <button className="secondary-button" type="button" onClick={() => attemptRolloutClose(() => { void previewSelectedTemplateRollout() })}><History size={15} />{translate('documentation.checkTemplateUpdates')}</button>}{selected.placement_count === 1 && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { void previewRestructure() })}><List size={15} />{translate('documentation.reviewSectionConversion')}</button>}<button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { setActivePanel('remote'); void openRemoteSource() })}><Globe2 size={15} />{translate('documentation.remoteSource')}</button>{!workspace && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { updateDocumentViewLocation(null); setActivePanel('share') })}><Share2 size={15} />{translate('documentation.clientListings')}</button>}{relationshipsClient && <button className="secondary-button" type="button" onClick={() => attemptNavigation(() => { updateDocumentViewLocation(null); setActivePanel('relationships') })}><Link2 size={15} />{translate('documentation.relatedRecords')}</button>}<button className="danger-button" type="button" disabled={saving} onClick={() => attemptNavigation(() => { void archive() })}><Archive size={15} />{translate('common.archive')}</button></div></section>}
+        {activePanel === 'operations' && <DocumentOperations key={`${scopeKey}:${selected.id}`} document={selected} scope={scope} client={client} onSaved={(record) => { setSelected(record); setRevision((value) => value + 1) }} onClose={() => closeDocumentView(() => operationsTrigger.current?.focus())} />}
 
 
-        {activePanel === 'export' && <DocumentExports document={selected} scope={scope} client={client} selectedIds={exportAttachmentIds} onToggle={toggleExportFile} onClose={() => { setActivePanel(null); window.requestAnimationFrame(() => exportTrigger.current?.focus()) }} />}
-        {activePanel === 'files' && <DocumentFiles document={selected} scope={scope} client={client} busy={saving} viewedPdf={viewedPdf} onViewPdf={setViewedPdf} onUpload={uploadAttachment} onReplace={replacePrimaryFile} onRemove={removeAttachment} onInsert={(id, name) => { insertAttachment(id, name); setActivePanel(null) }} onClose={() => attemptNavigation(() => { setActivePanel(null); window.requestAnimationFrame(() => filesTrigger.current?.focus()) })} />}
+        {activePanel === 'export' && <DocumentExports document={selected} scope={scope} client={client} selectedIds={exportAttachmentIds} onToggle={toggleExportFile} onClose={() => closeDocumentView(() => exportTrigger.current?.focus())} />}
+        {activePanel === 'files' && <DocumentFiles document={selected} scope={scope} client={client} busy={saving} viewedPdf={viewedPdf} onViewPdf={setViewedPdf} onUpload={uploadAttachment} onReplace={replacePrimaryFile} onRemove={removeAttachment} onInsert={(id, name) => { closeDocumentView(undefined, false); insertAttachment(id, name) }} onClose={() => attemptNavigation(() => closeDocumentView(() => filesTrigger.current?.focus()))} />}
         {activePanel !== 'operations' && activePanel !== 'export' && activePanel !== 'files' && <>
         {selected.primary_file && <section className="document-context-panel primary-document-file" aria-labelledby="primary-document-file-heading"><header className="section-heading"><div><strong id="primary-document-file-heading">{selected.primary_file.filename}</strong><span>Primary file · version {selected.primary_file.version_number} · {selected.primary_file.size.toLocaleString()} bytes</span></div><div><input ref={replacementFileInput} className="sr-only" aria-label={translate('documentation.replacementPrimaryFile')} disabled={saving} type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replacePrimaryFile(file) }} />{selected.primary_file.media_type === 'application/pdf' && !viewedPdf && <button ref={primaryPdfTrigger} className="secondary-button" type="button" onClick={() => setViewedPdf({ filename: selected.primary_file!.filename, url: client.attachmentDownloadUrl(scope, selected.id, selected.primary_file!.id) })}>{translate('documentation.viewPdf')}</button>}<a className="secondary-button" href={client.attachmentDownloadUrl(scope, selected.id, selected.primary_file.id)}><Download size={15} />Download</a><button className="secondary-button" type="button" disabled={saving} onClick={() => replacementFileInput.current?.click()}><RefreshCw size={15} />{translate('documentation.replaceFile')}</button></div></header>{viewedPdf && <Suspense fallback={<p role="status">Loading PDF viewer…</p>}><PdfViewer filename={viewedPdf.filename} url={viewedPdf.url} onClose={() => { setViewedPdf(null); window.requestAnimationFrame(() => primaryPdfTrigger.current?.focus()) }} /></Suspense>}</section>}
 
@@ -1034,7 +1169,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         {activePanel === 'keys' && <section className="document-context-panel document-keys" aria-labelledby="document-keys-heading">
           <div className="section-heading">
             <div><h2 id="document-keys-heading">{translate('documentation.keysPanel')}</h2></div>
-            <button className="icon-button" type="button" aria-label={translate('documentation.closeKeys')} onClick={() => setActivePanel(null)}><X size={16} /></button>
+            <button className="icon-button" type="button" aria-label={translate('documentation.closeKeys')} onClick={() => closeDocumentView()}><X size={16} /></button>
           </div>
           <div className="entity-mention-picker">
             <label><span>{translate('documentation.declareBinding')}</span><input type="text" value={bindingName} onChange={(event) => setBindingName(event.target.value.toLowerCase())} placeholder="subject" aria-label={translate('documentation.declareBinding')} aria-describedby="binding-name-rule" aria-invalid={bindingName.length > 0 && !bindingNameValid} /></label>
@@ -1070,7 +1205,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
         {activePanel === 'reuse' && <section className="document-context-panel" aria-labelledby="insert-existing-heading"><div className="section-heading"><div><h2 id="insert-existing-heading">{translate('documentation.insertExisting')}</h2><p>{translate('documentation.insertExistingHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.closeExisting')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><div className="reuse-resolution"><label>{translate('documentation.whenSourceChanges')}<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">{translate('documentation.useLatest')}</option><option value="pinned">{translate('documentation.keepThisVersion')}</option></select></label><label>{translate('documentation.audienceLabel')}<select value={placementAudience} onChange={(event) => setPlacementAudience(event.target.value as PlacementAudienceProfile)}><option value="shared">{translate('documentation.audienceShared')}</option><option value="msp_internal">{translate('documentation.audienceMspInternal')}</option><option value="client_visible">{translate('documentation.audienceClientVisible')}</option></select></label></div><BlockLibrary key={selected.id} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(block) => { void reuseLibraryBlock(block) }} /><DocumentLinkPicker key={`document-${selected.id}`} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(document) => { void addDocumentPlacement(document) }} /><div className="entity-mention-picker"><label><Search size={15} /><span>{translate('documentation.linkRecord')}</span><input type="search" placeholder={translate('documentation.searchRecords')} value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div></section>}
 
-        {activePanel === 'history' && <section className="document-context-panel revision-history" aria-labelledby="revision-history-heading"><div className="section-heading"><div><h2 id="revision-history-heading">Revision history</h2><p>{historyCount} retained revision{historyCount === 1 ? '' : 's'} · page {historyPage}</p></div><button className="icon-button" type="button" aria-label="Close revision history" onClick={() => setActivePanel(null)}><X size={16} /></button></div>{historyPhase === 'loading' && <p role="status">Loading revision history…</p>}{historyPhase === 'error' && <p role="alert">Revision history is unavailable.</p>}{historyPhase === 'ready' && <><div className="revision-history-body"><ol>{history.map((item) => <li key={item.id}><button type="button" onClick={() => { void inspectRevision(item) }}><strong>Revision {item.revision_number}</strong>{item.is_current && <span>Current</span>}<small>{item.created_by ?? 'System'} · {new Date(item.created_at).toLocaleString()}</small></button></li>)}</ol><div className="revision-diff">{viewedRevision ? <><h3>Revision {viewedRevision.revision_number}</h3><pre tabIndex={0}>{viewedRevision.diff_from_parent || 'No line changes.'}</pre></> : <p>Select a revision to inspect its changes.</p>}</div></div><nav className="history-pagination" aria-label="Revision history pages"><button className="secondary-button" type="button" disabled={historyPage === 1} onClick={() => { void loadHistory(selected, historyPage - 1) }}>{translate('documentation.newer')}</button><button className="secondary-button" type="button" disabled={!historyHasMore} onClick={() => { void loadHistory(selected, historyPage + 1) }}>{translate('documentation.older')}</button></nav></>}</section>}
+        {activePanel === 'history' && <section className="document-context-panel revision-history" aria-labelledby="revision-history-heading"><div className="section-heading"><div><h2 id="revision-history-heading">Revision history</h2><p>{historyCount} retained revision{historyCount === 1 ? '' : 's'} · page {historyPage}</p></div><button className="icon-button" type="button" aria-label="Close revision history" onClick={() => closeDocumentView()}><X size={16} /></button></div>{historyPhase === 'loading' && <p role="status">Loading revision history…</p>}{historyPhase === 'error' && <div role="alert"><p>Revision history is unavailable.</p><button className="secondary-button" type="button" onClick={() => { void loadHistory(selected, historyPage, false) }}>{translate('common.retry')}</button></div>}{historyPhase === 'ready' && <><div className="revision-history-body"><ol>{history.map((item) => <li key={item.id}><button type="button" onClick={() => { void inspectRevision(item) }}><strong>Revision {item.revision_number}</strong>{item.is_current && <span>Current</span>}<small>{item.created_by ?? 'System'} · {new Date(item.created_at).toLocaleString()}</small></button></li>)}</ol><div className="revision-diff">{viewedRevision ? <><h3>Revision {viewedRevision.revision_number}</h3><pre tabIndex={0}>{viewedRevision.diff_from_parent || 'No line changes.'}</pre></> : <p>Select a revision to inspect its changes.</p>}</div></div><nav className="history-pagination" aria-label="Revision history pages"><button className="secondary-button" type="button" disabled={historyPage === 1} onClick={() => { void loadHistory(selected, historyPage - 1) }}>{translate('documentation.newer')}</button><button className="secondary-button" type="button" disabled={!historyHasMore} onClick={() => { void loadHistory(selected, historyPage + 1) }}>{translate('documentation.older')}</button></nav></>}</section>}
 
         {activePanel === 'share' && !workspace && <section className="document-context-panel document-share" aria-labelledby="client-listings-heading"><div><Share2 size={16} /><span><strong id="client-listings-heading">{translate('documentation.clientListings')}</strong><small>{translate('documentation.shareClientsHelp')}</small></span><button className="icon-button" type="button" aria-label={translate('documentation.closeClientSharing')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><label><span className="sr-only">{translate('documentation.findClient')}</span><input type="search" placeholder={translate('documentation.findClient')} value={shareQuery} onChange={(event) => setShareQuery(event.target.value)} /></label>{shareOptions.length > 0 && <ul>{shareOptions.map((organization) => <li key={organization.id}><button type="button" disabled={saving} onClick={() => { void share(organization) }}>{organization.name}<ExternalLink size={14} /></button></li>)}</ul>}</section>}
         {activePanel === 'relationships' && relationshipsClient && <section className="document-context-panel"><div className="section-heading"><h2>{translate('documentation.relatedRecords')}</h2><button className="icon-button" type="button" aria-label={translate('documentation.closeRelatedRecords')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><DocumentRelationshipRail scope={scope} documentId={selected.id} client={relationshipsClient} /><RelationshipGraph scope={scope} family="document" rootId={selected.id} client={relationshipsClient} heading={translate('documentation.documentRelationships')} /></section>}

@@ -395,6 +395,34 @@ it('retrieves an authorized deep-linked document that is outside the first list 
   expect(getDocument).toHaveBeenCalledWith({}, 'doc-1', expect.any(AbortSignal))
 })
 
+it('restores a paged revision and its diff from a direct link', async () => {
+  const { documents, workspaces } = clients()
+  const revision = { id: 'revision-25', parent_id: 'revision-24', revision_number: 25, checksum: 'def456', created_by: 'Primary Owner', created_at: '2026-08-08T00:00:00Z', is_current: false }
+  const listRevisions = vi.fn().mockResolvedValue({ results: [revision], count: 75, page: 2, page_size: 50, has_more: false })
+  const getRevision = vi.fn().mockResolvedValue({ ...revision, markdown: '# Older firewall', diff_from_parent: '+# Older firewall' })
+  documents.listRevisions = listRevisions
+  documents.getRevision = getRevision
+
+  testingRender(<ApplicationRouter initialPath="/documentation?document=doc-1&document_view=history&document_history_page=2&document_revision=revision-25"><Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+
+  expect(await screen.findByRole('heading', { name: 'Revision history' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Revision 25' })).toBeVisible()
+  expect(screen.getByText('+# Older firewall')).toBeVisible()
+  expect(listRevisions).toHaveBeenCalledWith({}, 'doc-1', 2)
+  expect(getRevision).toHaveBeenCalledWith({}, 'doc-1', 'revision-25')
+})
+
+it('restores a retained publication history section from a direct link', async () => {
+  const { documents, workspaces, getPublication } = clients()
+
+  testingRender(<ApplicationRouter initialPath="/documentation?document=doc-1&publication=publication-1&publication_section=history"><Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+
+  const publicationHistory = await screen.findByRole('region', { name: 'Publication history' })
+  expect(publicationHistory).toBeVisible()
+  expect(within(publicationHistory).getByText('Approved for operations')).toBeVisible()
+  expect(getPublication).toHaveBeenCalledWith({}, 'doc-1', 'publication-1')
+})
+
 it('loads revision history and a selected diff', async () => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()
@@ -1187,7 +1215,7 @@ it('does not overwrite newly edited settings when an explicit selection reaches 
   view.rerender(<ApplicationRouter><Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
   await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
   await user.click(screen.getByRole('button', { name: 'Document settings' }))
-  await user.click(screen.getByRole('checkbox', { name: 'Make reusable content findable in client documents' }))
+  await user.click(await screen.findByRole('checkbox', { name: 'Make reusable content findable in client documents' }))
   finish({ results: [document], count: 1 })
   await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument())
   expect(screen.getByRole('checkbox', { name: 'Make reusable content findable in client documents' })).toBeChecked()

@@ -263,6 +263,7 @@ test('raw Markdown remains the editable canonical representation', async ({ page
   const markdownTab = page.getByRole('tab', { name: 'Markdown' })
   await markdownTab.click()
   await expect(markdownTab).toBeFocused()
+  await expect(markdownTab).toHaveAttribute('aria-selected', 'true')
   await markdownTab.press('ArrowRight')
   await expect(page.getByRole('tab', { name: 'Preview' })).toBeFocused()
   await expect(page.getByRole('tab', { name: 'Preview' })).toHaveAttribute('aria-selected', 'true')

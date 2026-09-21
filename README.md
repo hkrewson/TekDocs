@@ -13,7 +13,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 ## Capabilities
 
 - MSP, client, vendor, manufacturer, and partner workspaces
-- Markdown-first documentation with visual editing, raw Markdown, secure preview, and revision history; focused ownership and review controls provide protected drafts, explicit retry/error states, and saved review details
+- Markdown-first documentation with visual editing, raw Markdown, secure preview, and URL-restorable revision history; focused document tools and retained publication sections survive refresh and browser navigation while ownership/review controls protect unfinished work
 - Versioned procedure, troubleshooting, reference, system-overview, and change-runbook topics with publication preflight
 - Workspace-governed hierarchical taxonomies, exact legacy-tag migration, and searchable controlled terms
 - Live and pinned reusable blocks with backlinks, impact previews, detach behavior, and entity references; client template and reusable-block libraries provide paged search, section previews, protected creation drafts, and explicit template-update conflict review

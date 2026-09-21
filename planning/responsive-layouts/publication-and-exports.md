@@ -22,4 +22,4 @@ All 54 document component tests and all 36 six-width Chromium/Firefox/WebKit cas
 
 ## Remaining scope and limits
 
-Managed-file/PDF workflow migration and broader Phase 5 acceptance remain open. Publication section state remains local rather than adding new publication deep-link/history semantics. Native downloads retain the existing browser/server error behavior; this checkpoint does not introduce a background download manager. Full document-wide draft protection, the older health queue/link picker and technician acceptance remain separate work. No external publication or deployment is implied.
+Managed-file/PDF workflow migration and broader Phase 5 acceptance remained open at this checkpoint. Publication section deep links and history were completed later in [document-direct-links-and-history.md](document-direct-links-and-history.md). Native downloads retain the existing browser/server error behavior; this checkpoint does not introduce a background download manager. Document-wide draft protection, the health queue/link picker and technician acceptance were tracked as separate work. No external publication or deployment is implied.

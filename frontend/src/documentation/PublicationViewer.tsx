@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Download, ShieldCheck, X } from 'lucide-react'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
@@ -6,11 +6,11 @@ import { translate } from '../i18n/localization'
 import type { DocumentPublicationDetail, DocumentScope, DocumentsClient } from './api'
 
 export type PublicationView = { sourceId: string; publicationId: string; phase: 'loading' | 'ready' | 'error'; record?: DocumentPublicationDetail }
+export type PublicationSection = 'content' | 'downloads' | 'history'
 
-export function PublicationViewer({ view, scope, client, onClose, onRetry, children }: {
-  view: PublicationView; scope: DocumentScope; client: DocumentsClient; onClose: () => void; onRetry: () => void; children: ReactNode
+export function PublicationViewer({ view, scope, client, section, onSectionChange, onClose, onRetry, children }: {
+  view: PublicationView; scope: DocumentScope; client: DocumentsClient; section: PublicationSection; onSectionChange: (section: PublicationSection) => void; onClose: () => void; onRetry: () => void; children: ReactNode
 }) {
-  const [section, setSection] = useState<'content' | 'downloads' | 'history'>('content')
   const heading = useRef<HTMLHeadingElement>(null)
   useLayoutEffect(() => { heading.current?.focus() }, [view.phase])
   const record = view.record
@@ -27,7 +27,7 @@ export function PublicationViewer({ view, scope, client, onClose, onRetry, child
       <p className="publication-verification" role={record.verification.valid ? undefined : 'alert'}><ShieldCheck size={18} aria-hidden="true" />{record.verification.valid ? translate('documentation.signatureVerified') : translate('documentation.verificationFailed')}</p>
       {children}
       <div className="publication-section-nav" role="group" aria-label={translate('documentation.publicationSections')}>
-        {(['content', 'downloads', 'history'] as const).map((value) => <button key={value} className="secondary-button" type="button" aria-pressed={section === value} onClick={() => setSection(value)}>{translate(`documentation.publicationSection.${value}`)}</button>)}
+        {(['content', 'downloads', 'history'] as const).map((value) => <button key={value} className="secondary-button" type="button" aria-pressed={section === value} onClick={() => onSectionChange(value)}>{translate(`documentation.publicationSection.${value}`)}</button>)}
       </div>
       {section === 'content' && <section className="publication-content" aria-label={translate('documentation.publicationSection.content')}><SanitizedMarkdown html={record.sanitized_html} /></section>}
       {section === 'downloads' && <section aria-labelledby="publication-downloads-heading">

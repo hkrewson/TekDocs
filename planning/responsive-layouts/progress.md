@@ -2221,3 +2221,48 @@ Inferred: this bounded health/link workflow is ready for technician review.
 Blocked: none. Phase 5 remains open for direct-link/history acceptance and
 technician review. Existing unrelated Wiki edits remain preserved. No external
 push, Wiki publication, deployment, version bump or removal of application data.
+
+### 2026-09-20 — Document direct links and retained history
+
+Phase 5 under #60; version remains 0.8.46. Scope and acceptance are recorded in
+[document-direct-links-and-history.md](document-direct-links-and-history.md).
+Stable document panels, revision pages and comparisons, retained publications and
+publication sections now have URL state that survives reload and browser Back and
+Forward. History reads expose an explicit retry without dropping the selected
+document, and dirty publication decisions remain protected while changing sections.
+
+Verified reproductions: focused component cases failed before the fix because a
+revision comparison and retained publication History could not be restored from a
+direct URL. Evidence: /tmp/tekdocs-document-links-history-repro.log. All 62 focused
+Documentation cases pass after the change; the final Documentation plus editor
+keyboard run passes 67 cases in two files.
+
+The production-image browser matrix exercised 1,125 cases across Chromium,
+Firefox, WebKit and the mobile projects. All direct document/publication link cases
+passed at 320, 390, 768, 1024, 1280 and 1440px in all three desktop engines. One
+existing Markdown tab timing race remained after 1,121 passes and three expected
+skips; committing the selected mode before focus restoration then passed 30
+consecutive repetitions across all three engines. Evidence:
+/tmp/tekdocs-document-links-browser-final-3.log. Reviewed screenshots:
+artifacts/document-history-link-{320,1440}.png and
+artifacts/publication-history-link-{320,1440}.png.
+
+The real workspace journey exposed and fixed an ordering defect where closing the
+URL-backed Files panel after inserting a file reference could be blocked by the
+new draft itself. Final `make test-e2e-live` exits 0 in 3.4 minutes and verifies
+revision URL restoration, retained withdrawn-publication History, the Files
+insertion path and the independent database audit. Evidence:
+/tmp/tekdocs-document-links-live-final.log.
+
+Verified: final `make check` exits 0 with lint/types, API/schema agreement,
+migration checks, all 627 tests in 117 files, the 37-page Wiki contract, production
+build and bundle budgets (shell 129086 <= 131072 and shell style 24503 <= 24576
+compressed bytes). The documentation validation matrix exits 0 with one expected
+skip. Evidence: /tmp/tekdocs-document-links-check-final.log and
+/tmp/tekdocs-document-links-documentation-gate.log. Local readiness reports the
+database and document renderer ready at version 0.8.46.
+
+Inferred: this bounded direct-link/history workflow is ready for technician review.
+Blocked: none. Phase 5 now awaits technician acceptance. Existing unrelated Wiki
+edits remain preserved. No external push, Wiki publication, deployment, version
+bump or removal of application data.

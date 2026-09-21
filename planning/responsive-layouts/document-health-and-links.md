@@ -23,4 +23,4 @@ The Docker browser matrix covers Chromium, Firefox and WebKit at 320, 390, 768, 
 
 ## Remaining scope and limits
 
-Health remains derived from the existing ownership, review and due-date contract; this checkpoint does not change review policy or add a persisted queue. Document links retain existing live/pinned resolution and audience behavior. Remaining direct-link/history acceptance and technician review stay open for Phase 5. No external publication or deployment is implied.
+Health remains derived from the existing ownership, review and due-date contract; this checkpoint does not change review policy or add a persisted queue. Document links retain existing live/pinned resolution and audience behavior. Direct-link/history acceptance is recorded separately in [document-direct-links-and-history.md](document-direct-links-and-history.md); technician review remains open for Phase 5. No external publication or deployment is implied.

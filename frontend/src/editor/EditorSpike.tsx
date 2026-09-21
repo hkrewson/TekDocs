@@ -137,7 +137,6 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
     event.preventDefault()
     const nextMode = editorModes[nextIndex]
     requestedTabFocus.current = nextMode
-    tabRefs.current[nextMode]?.focus()
     selectMode(nextMode)
   }
 

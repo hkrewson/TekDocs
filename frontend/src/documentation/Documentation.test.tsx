@@ -719,6 +719,7 @@ it('imports Markdown and manages a private attachment link', async () => {
   await user.click(await screen.findByRole('button', { name: 'Insert here' }))
   expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Document Markdown' }).value).toContain('tekdocs://attachment/attachment-1')
   await user.click(screen.getByRole('button', { name: /Files \(1\)/ }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
   await user.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
   expect(archiveAttachment).toHaveBeenCalledWith({}, 'doc-imported', 'attachment-1')
 })
@@ -1297,4 +1298,78 @@ it('keeps the file workspace open during upload and supports retry after denial'
   expect(uploadAttachment).toHaveBeenCalledTimes(2)
   await user.click(screen.getByRole('button', { name: 'Close files' }))
   await waitFor(() => expect(screen.getByRole('button', { name: /Files \(1\)/ })).toHaveFocus())
+})
+
+it('protects a new document draft when returning to the library', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: 'New document' }))
+  await user.type(screen.getByLabelText('Document title'), 'Unfinished migration plan')
+  await user.type(screen.getByRole('textbox', { name: 'Document Markdown' }), 'Keep this draft')
+  await user.click(screen.getByRole('button', { name: 'Close document' }))
+
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByLabelText('Document title')).toHaveValue('Unfinished migration plan')
+  expect(screen.getByRole('textbox', { name: 'Document Markdown' })).toHaveValue('Keep this draft')
+
+  await user.click(screen.getByRole('button', { name: 'Close document' }))
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+})
+
+it('protects settings and inline content drafts before switching or cancelling', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.clear(screen.getByLabelText('Title'))
+  await user.type(screen.getByLabelText('Title'), 'Unfinished firewall title')
+  await user.click(screen.getByRole('button', { name: 'Files' }))
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByLabelText('Title')).toHaveValue('Unfinished firewall title')
+
+  await user.click(screen.getByRole('button', { name: 'Files' }))
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+  expect(await screen.findByRole('heading', { name: 'Files' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Close files' }))
+  await user.click(screen.getByRole('button', { name: 'Edit this content' }))
+  const editor = await screen.findByRole('textbox', { name: 'Document Markdown' })
+  await user.clear(editor)
+  await user.type(editor, '# Unfinished content')
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByRole('textbox', { name: 'Document Markdown' })).toHaveValue('# Unfinished content')
+})
+
+it('keeps departure blocked until a document save has a known result', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, updateDocument } = clients()
+  let resolveUpdate!: (record: Awaited<ReturnType<typeof updateDocument>>) => void
+  updateDocument.mockImplementationOnce(() => new Promise((resolve) => { resolveUpdate = resolve }))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Document settings' }))
+  await user.clear(screen.getByLabelText('Title'))
+  await user.type(screen.getByLabelText('Title'), 'Saved firewall title')
+  await user.click(screen.getByRole('button', { name: 'Save settings' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled()
+  await act(async () => {
+    resolveUpdate({ ...document, title: 'Saved firewall title', base_revision_id: 'revision-1', current_revision_id: 'revision-2', revision_number: 2 })
+    await Promise.resolve()
+  })
+  const continueButton = await screen.findByRole('button', { name: 'Continue' })
+  expect(continueButton).toBeEnabled()
+  await user.click(continueButton)
+  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
 })

@@ -181,6 +181,9 @@
 .document-files li small { display: block; margin-top: 4px; color: var(--muted); }
 .document-files li > div { display: flex; flex-wrap: wrap; gap: 8px; flex: none; }
 .document-files .pdf-viewer { min-width: 0; }
+.primary-document-file .section-heading { align-items: flex-start; flex-wrap: wrap; }
+.primary-document-file .section-heading > div { min-width: 0; }
+.primary-document-file .section-heading > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; }
 .pdf-viewer > header > div { min-width: 0; overflow-wrap: anywhere; }
 .pdf-viewer > header > button { flex: none; }
 .pdf-viewer form[role="search"] { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }

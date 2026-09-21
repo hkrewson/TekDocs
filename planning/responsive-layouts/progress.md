@@ -2115,3 +2115,57 @@ none. Phase 5 remains open; document-wide draft protection is next, followed by
 the older health queue/link picker and remaining direct-link/history acceptance.
 Existing unrelated Wiki edits remain preserved. No external push, Wiki publication,
 deployment, version bump or removal of existing application data.
+
+### 2026-09-20 — Document-wide draft protection
+
+Phase 5 under #60; version remains 0.8.46. Scope and acceptance are recorded in
+[document-draft-protection.md](document-draft-protection.md). New documents,
+document settings, inline edits, new sections, shared-edit review and monitored
+web-source settings now share one saved-record-aware draft boundary while the
+specialized publication, ownership/review, rollout and file guards remain intact.
+
+Verified reproductions: focused component cases failed before the fix when a new
+document was closed and when changed settings switched to Files; both actions
+dropped or hid work without a prompt. Evidence:
+/tmp/tekdocs-document-drafts-repro.log. The fixed component suite also covers
+inline Cancel, Keep editing retention, Discard restoration and a pending save that
+cannot be abandoned until its result is known. Final verification follows below.
+
+Verified: all 58 focused component tests pass. The complete Docker browser matrix
+passes 72 cases at 320, 390, 768, 1024, 1280 and 1440px across Chromium, Firefox
+and WebKit: 18 new draft-protection cases plus 54 publication, export and managed-
+file regressions. The new cases exercise settings, inline edits, new sections,
+web-source changes, browser Back, focus restoration, accessibility and strict page
+overflow checks. WebKit at 320px exposed a 7px Files-header overflow before the
+action row was allowed to wrap. Final evidence:
+/tmp/tekdocs-document-drafts-components.log,
+/tmp/tekdocs-document-drafts-browser-final.log,
+/tmp/tekdocs-document-drafts-webkit-fixed.log and
+/tmp/tekdocs-document-drafts-browser-closeout.log. Reviewed screenshots:
+artifacts/document-drafts-{320,1440}.png.
+
+Verified: `make check` exits 0 with lint/types, API/schema agreement, migration
+checks, all 623 tests in 117 files, the production build and bundle budgets (shell
+129068 <= 131072 and shell style 24505 <= 24576 compressed bytes). The full
+documentation validation gate exits 0 across document, attachment, rendering,
+permission, isolation and performance coverage with one existing skip. Evidence:
+/tmp/tekdocs-document-drafts-check.log and
+/tmp/tekdocs-document-drafts-gate.log.
+
+The first real-stack journey correctly blocked an Add content action while a
+settings save was still pending, exposing a stale test assertion that had reused
+the previous save message. The journey now waits for the actual settings response.
+Final `make test-e2e-live` exits 0 in 3.3 minutes: Keep editing retains the changed
+title, Discard restores the saved title before opening Files, and the existing
+browser-to-Django-to-PostgreSQL workspace journey remains green. Evidence:
+/tmp/tekdocs-document-drafts-live.log and
+/tmp/tekdocs-document-drafts-live-final.log.
+
+Final lint passes after the live synchronization correction. All 37 local Wiki
+pages and links validate, and local readiness reports the database and document
+renderer ready at version 0.8.46. Inferred: this bounded document-draft workflow
+is ready for technician review. Blocked: none. Phase 5 remains open; the older
+health queue/link picker is next, followed by remaining direct-link/history and
+technician acceptance. Existing unrelated Wiki edits remain preserved. No
+external push, Wiki publication, deployment, version bump or removal of existing
+application data.

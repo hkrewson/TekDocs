@@ -21,6 +21,8 @@ async function setup(page: Page, baseURL: string) {
   await page.route('**/api/v1/documents/topic-schemas', (r) => r.fulfill({ json: { topics: [] } }))
   await page.route(`**/api/v1/workspaces/organizations/${organizationId}/documents**`, async (route) => {
     const url = new URL(route.request().url())
+    if (url.pathname.endsWith('/remote-source/observations')) return route.fulfill({ json: { results: [], count: 0 } })
+    if (url.pathname.endsWith('/remote-source')) return route.fulfill({ json: null })
     if (url.pathname.endsWith('/attachments/attachment-1') && route.request().method() === 'DELETE') {
       current = { ...current, attachments: [], attachment_count: 0 }
       return route.fulfill({ status: 204, body: '' })
@@ -94,6 +96,68 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Export', exact: true }).click()
     await expect(exports.getByRole('link', { name: 'Download ZIP' })).toHaveAttribute('href', /export_format=bundle$/)
     await expect(exports.getByRole('status')).toHaveText('Files selected for ZIP: 0')
+  })
+}
+
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
+  test(`document-wide draft protection at ${width}px`, async ({ page, baseURL }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await setup(page, baseURL!)
+    await page.goto(`/workspaces/organizations/${organizationId}/documentation`)
+    await page.getByRole('button', { name: /^Network baseline Guide/ }).click()
+
+    await page.getByRole('button', { name: 'Document settings' }).click()
+    await page.getByLabel('Title').fill('Unfinished network title')
+    const filesButton = page.getByRole('button', { name: 'Files (1)', exact: true })
+    await filesButton.click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(page.getByLabel('Title')).toHaveValue('Unfinished network title')
+    await expect(filesButton).toBeFocused()
+    await filesButton.click()
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible()
+    await page.getByRole('button', { name: 'Close files' }).click()
+
+    await page.getByRole('button', { name: 'Edit this content' }).first().click()
+    await page.getByRole('tab', { name: 'Markdown' }).click()
+    await page.getByRole('textbox', { name: 'Markdown source' }).fill('# Unfinished content')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('# Unfinished content')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+
+    await page.getByRole('button', { name: 'Add content here' }).last().click()
+    await page.getByRole('button', { name: 'Text', exact: true }).click()
+    await page.getByRole('tab', { name: 'Markdown' }).click()
+    await page.getByRole('textbox', { name: 'Markdown source' }).fill('Unfinished new section')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(page.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('Unfinished new section')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+
+    await page.getByRole('button', { name: 'Document settings' }).click()
+    await page.getByRole('button', { name: 'Web source' }).click()
+    await page.getByLabel('Public document URL').fill('https://docs.example.invalid/unfinished')
+    await page.goBack()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Keep editing' })).toBeFocused()
+    expect((await new AxeBuilder({ page }).include('.unsaved-changes-dialog').analyze()).violations).toEqual([])
+    const overflow = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('body *')]
+      .filter((element) => element.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
+      .map((element) => ({ element: element.outerHTML.slice(0, 180), right: element.getBoundingClientRect().right })))
+    expect(overflow).toEqual([])
+    if (testInfo.project.name === 'chromium' && [320, 1440].includes(width)) await page.screenshot({ path: `../artifacts/document-drafts-${width}.png`, fullPage: true })
+    await dialog.getByRole('button', { name: 'Keep editing' }).click()
+    await expect(page.getByLabel('Public document URL')).toHaveValue('https://docs.example.invalid/unfinished')
+    await page.getByRole('button', { name: 'Close web source' }).click()
+    await page.getByRole('button', { name: 'Discard changes' }).click()
+    await expect(page.getByRole('button', { name: 'Document settings' })).toBeVisible()
   })
 }
 

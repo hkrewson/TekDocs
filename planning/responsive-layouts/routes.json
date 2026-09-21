@@ -99,6 +99,7 @@
       "planning/responsive-layouts/publication-safety.md",
       "planning/responsive-layouts/publication-and-exports.md",
       "planning/responsive-layouts/managed-files-and-pdf.md",
+      "planning/responsive-layouts/document-draft-protection.md",
       "frontend/e2e/document-operations.spec.ts"
     ],
     "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."
@@ -363,6 +364,7 @@
       "planning/responsive-layouts/publication-safety.md",
       "planning/responsive-layouts/publication-and-exports.md",
       "planning/responsive-layouts/managed-files-and-pdf.md",
+      "planning/responsive-layouts/document-draft-protection.md",
       "frontend/e2e/document-operations.spec.ts"
     ],
     "states": "Document library and focused reader plus templates/reusable content and ownership/review checkpoints. Broader Phase 5 states and technician acceptance remain open."

@@ -36,6 +36,7 @@ test('invoice status and accounting updates remain compact and accessible', asyn
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
     user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
     tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -47,13 +48,14 @@ test('invoice status and accounting updates remain compact and accessible', asyn
     organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
   } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
-  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [issuedInvoice], can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [issuedInvoice], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: issuedInvoice }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/events`, async (route) => {
     expect(await route.request().postDataJSON()).toMatchObject({ event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'invoice-44' })
     await route.fulfill({ json: { ...issuedInvoice, lifecycle_state: 'externally_synchronized', reconciliation_state: 'synchronized', lifecycle_events: [...issuedInvoice.lifecycle_events, { id: crypto.randomUUID(), event_type: 'accounting_synchronized', occurred_at: '2026-09-01T12:00:00Z', recorded_at: '2026-09-01T12:00:00Z', actor: 'Primary Owner', provider: 'ledger', external_id: 'invoice-44', amount: null, currency: '', related_invoice_id: null, note: '' }] } })
   })
 
-  await page.goto(`/workspaces/organizations/${clientId}/invoices`)
+  await page.goto(`/workspaces/organizations/${clientId}/invoices?invoice=${invoiceId}`)
   await expect(page.getByRole('heading', { name: 'INV-2026-000042' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Download for accounting' })).toHaveAttribute('href', new RegExp(`${invoiceId}/accounting-export$`))
   await expect(page.getByText('Not sent to accounting').first()).toBeVisible()
@@ -85,6 +87,7 @@ test('a stock line records its quantity for the client in one save', async ({ pa
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
     user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
     tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -103,9 +106,10 @@ test('a stock line records its quantity for the client in one save', async ({ pa
     expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, quantity: '125.500', tax_rate_id: null })
     await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable', quantity: '125.500', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
   })
-  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [draft], can_manage: true, can_issue: false } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: false } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}`, (route) => route.fulfill({ json: draft }))
 
-  await page.goto(`/workspaces/organizations/${clientId}/invoices`)
+  await page.goto(`/workspaces/organizations/${clientId}/invoices?invoice=${draftId}`)
   await page.getByRole('button', { name: 'Add item' }).click()
   await page.getByLabel('Source').selectOption(`stock_item:${stockId}`)
   await expect(page.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
@@ -121,6 +125,7 @@ for (const width of [1280, 390]) {
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
     user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
     tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -132,7 +137,8 @@ for (const width of [1280, 390]) {
     organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
   } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
-  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [issuedInvoice], can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [issuedInvoice], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: issuedInvoice }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/events`, async (route) => {
     expect(await route.request().postDataJSON()).toMatchObject({ event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'invoice-44' })
     await route.fulfill({ json: { ...issuedInvoice, lifecycle_state: 'externally_synchronized', reconciliation_state: 'synchronized', lifecycle_events: [...issuedInvoice.lifecycle_events, { id: crypto.randomUUID(), event_type: 'accounting_synchronized', occurred_at: '2026-09-01T12:00:00Z', recorded_at: '2026-09-01T12:00:00Z', actor: 'Primary Owner', provider: 'ledger', external_id: 'invoice-44', amount: null, currency: '', related_invoice_id: null, note: '' }] } })
@@ -178,6 +184,7 @@ for (const width of [1280, 390]) {
     await expect(page.getByText('Draft invoices are ready. Nothing has been issued or sent.')).toBeVisible()
     await page.getByRole('button', { name: /Open invoice for/ }).click()
     await expect(page.getByRole('heading', { name: 'Recurring invoices' })).toHaveCount(0)
+    await page.getByRole('link', { name: 'Back to invoices' }).click()
     await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
     await page.getByRole('button', { name: /Managed support/ }).click()
     await page.getByRole('button', { name: 'Stop future drafts' }).click()
@@ -206,6 +213,7 @@ for (const width of [1280, 390]) {
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
     user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
     tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -217,7 +225,8 @@ for (const width of [1280, 390]) {
     organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
   } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
-  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices`, (route) => route.fulfill({ json: { results: [issuedInvoice], can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [issuedInvoice], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: issuedInvoice }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/events`, async (route) => {
     expect(await route.request().postDataJSON()).toMatchObject({ event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'invoice-44' })
     await route.fulfill({ json: { ...issuedInvoice, lifecycle_state: 'externally_synchronized', reconciliation_state: 'synchronized', lifecycle_events: [...issuedInvoice.lifecycle_events, { id: crypto.randomUUID(), event_type: 'accounting_synchronized', occurred_at: '2026-09-01T12:00:00Z', recorded_at: '2026-09-01T12:00:00Z', actor: 'Primary Owner', provider: 'ledger', external_id: 'invoice-44', amount: null, currency: '', related_invoice_id: null, note: '' }] } })

@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .countries import COUNTRY_CHOICES
 from .invoicing import (
     InvoiceError,
@@ -239,6 +240,16 @@ class InvoiceSerializer(serializers.Serializer):
     last_event_at = serializers.SerializerMethodField()
     lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
 
+    def get_fields(self):  # type: ignore[no-untyped-def]
+        fields = super().get_fields()
+        if self.context.get("summary"):
+            for field in (
+                "notes", "lines", "content_digest", "signature_algorithm", "key_fingerprint",
+                "lifecycle_events",
+            ):
+                fields.pop(field, None)
+        return fields
+
     def to_representation(self, instance):  # type: ignore[no-untyped-def]
         rendered = super().to_representation(instance)
         if instance.state == "draft":
@@ -304,8 +315,33 @@ class InvoiceSerializer(serializers.Serializer):
 
 class InvoiceResultSerializer(serializers.Serializer):
     results = InvoiceSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     can_issue = serializers.BooleanField()
+
+
+INVOICE_ORDERING = {
+    "name": "number",
+    "state": "state",
+    "invoice_date": "invoice_date",
+    "due_date": "due_date",
+    "reference": "reference",
+    "total": "total_amount",
+}
+
+
+class InvoiceQuerySerializer(BoundedCollectionQuerySerializer):
+    summary = serializers.BooleanField(required=False, default=False, help_text="Omit invoice lines and history.")
+    state = serializers.ChoiceField(choices=InvoiceState.values, required=False)
+    ordering = serializers.ChoiceField(
+        choices=[key for field in INVOICE_ORDERING for key in (field, f"-{field}")],
+        required=False,
+        default="-invoice_date",
+    )
+    q = serializers.CharField(max_length=240, required=False, allow_blank=True, trim_whitespace=True, default="")
 
 
 class InvoiceIssueSettingsSerializer(StrictSerializer):
@@ -504,20 +540,47 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
 
 
 class InvoiceListCreateView(APIView):
-    @extend_schema(operation_id="organization_invoices_list", responses={200: InvoiceResultSerializer})
+    @extend_schema(
+        operation_id="organization_invoices_list",
+        parameters=[InvoiceQuerySerializer],
+        responses={200: InvoiceResultSerializer},
+    )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VIEW)
+        query = InvoiceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = invoices_for_scope(workspace.data_scope)
+        if values["q"]:
+            records = records.filter(
+                Q(number__icontains=values["q"])
+                | Q(reference__icontains=values["q"])
+                | Q(notes__icontains=values["q"])
+            )
+        if "state" in values:
+            records = records.filter(state=values["state"])
+        ordering = values["ordering"]
+        records = records.order_by(
+            ("-" if ordering.startswith("-") else "") + INVOICE_ORDERING[ordering.lstrip("-")],
+            "entity_id",
+        )
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
         return Response(
             InvoiceResultSerializer(
                 {
-                    "results": invoices_for_scope(workspace.data_scope),
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
                     "can_manage": context_has_permission(
                         workspace.member, PermissionKey.INVOICES_EDIT, organization=workspace.organization
                     ),
                     "can_issue": context_has_permission(
                         workspace.member, PermissionKey.INVOICES_ISSUE, organization=workspace.organization
                     ),
-                }
+                },
+                context={"summary": values["summary"]},
             ).data
         )
 

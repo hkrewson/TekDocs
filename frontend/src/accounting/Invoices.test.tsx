@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { Invoices } from './Invoices'
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { InvoiceClient, InvoiceDraft } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
 
@@ -54,7 +55,8 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     invoice_sequence_digits: 6, invoice_reset_period: 'never', country_choices: [{ value: 'US', label: 'United States' }],
   }
   return {
-    list: vi.fn().mockResolvedValue({ results: [draft], can_manage: true, can_issue: true }),
+    list: vi.fn().mockResolvedValue({ results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+    get: vi.fn().mockResolvedValue(draft),
     choices: vi.fn().mockResolvedValue({
       origins: [{ id: 'rate-1', origin_type: 'service_rate', name: 'Remote support', description: '', unit_amount: '90.00', currency: 'USD', quantity: '1.000' }],
       tax_rates: [],
@@ -77,10 +79,32 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
   }
 }
 
+function renderInvoice(client: InvoiceClient, path = '/workspaces/organizations/client-1/invoices?invoice=invoice-1') {
+  const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Invoices workspace={workspace} client={client} /></NavigationGuardProvider> }], { initialEntries: [path] })
+  return render(<RouterProvider router={router} />)
+}
+
 describe('Invoices', () => {
+  it('starts in the invoice collection and opens a focused URL-addressed record', async () => {
+    renderInvoice(invoiceClient(), '/workspaces/organizations/client-1/invoices')
+
+    expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Draft · Aug 29, 2026' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Aug 29, 2026' }))
+
+    expect(await screen.findByRole('heading', { name: 'Draft · Aug 29, 2026' })).toBeInTheDocument()
+  })
+
+  it('keeps an unavailable direct invoice bounded with a return to the collection', async () => {
+    renderInvoice(invoiceClient({ get: vi.fn().mockRejectedValue(new Error('Missing')) }), '/workspaces/organizations/client-1/invoices?invoice=missing')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Reload this page to try again.')
+    expect(screen.getByRole('link', { name: 'Back to invoices' })).toHaveAttribute('href', '/workspaces/organizations/client-1/invoices')
+  })
+
   it('keeps MSP settings out of the client workspace and links there when setup is incomplete', async () => {
     const client = invoiceClient({ issue: vi.fn().mockRejectedValue(new Error('Configure invoice issue settings first.')) })
-    render(<MemoryRouter><Invoices workspace={workspace} client={client} /></MemoryRouter>)
+    renderInvoice(client)
 
     expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Invoice settings' })).not.toBeInTheDocument()
@@ -92,7 +116,7 @@ describe('Invoices', () => {
   it('shows exact draft totals and creates a snapshotted origin line', async () => {
     const addLine = vi.fn().mockResolvedValue(draft)
     const client = invoiceClient({ addLine })
-    render(<Invoices workspace={workspace} client={client} />)
+    renderInvoice(client)
 
     expect(await screen.findByRole('heading', { name: 'Draft · Aug 29, 2026' })).toBeInTheDocument()
     expect(screen.getAllByText('USD 137.50')).toHaveLength(2)
@@ -119,7 +143,7 @@ describe('Invoices', () => {
         tax_rates: [],
       }),
     })
-    render(<Invoices workspace={workspace} client={client} />)
+    renderInvoice(client)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Add item' }))
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'stock_item:stock-1' } })
@@ -142,7 +166,7 @@ describe('Invoices', () => {
       list: vi.fn().mockResolvedValue({ results: [draft], can_manage: false, can_issue: false }),
       choices,
     })
-    render(<Invoices workspace={workspace} client={client} />)
+    renderInvoice(client)
 
     expect(await screen.findByText('Managed firewall')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
@@ -152,7 +176,7 @@ describe('Invoices', () => {
 
   it('issues a configured draft and replaces editing controls with signed proof', async () => {
     const issue = vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) })
-    render(<Invoices workspace={workspace} client={invoiceClient({ issue })} />)
+    renderInvoice(invoiceClient({ issue }))
 
     await screen.findByRole('button', { name: 'Issue invoice' })
     fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }))
@@ -168,7 +192,7 @@ describe('Invoices', () => {
 
   it('names the draft and consequence before deleting it', async () => {
     const remove = vi.fn().mockResolvedValue(undefined)
-    render(<Invoices workspace={workspace} client={invoiceClient({ remove })} />)
+    renderInvoice(invoiceClient({ remove }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Delete draft' }))
     const confirmation = screen.getByRole('alertdialog')
@@ -182,7 +206,7 @@ describe('Invoices', () => {
 
   it('retains the snapshotted tax when an existing line is edited', async () => {
     const updateLine = vi.fn().mockResolvedValue(draft)
-    render(<Invoices workspace={workspace} client={invoiceClient({ updateLine })} />)
+    renderInvoice(invoiceClient({ updateLine }))
 
     await screen.findByRole('heading', { name: 'Draft · Aug 29, 2026' })
     fireEvent.click(screen.getByRole('button', { name: 'Edit item Managed firewall' }))
@@ -204,10 +228,11 @@ describe('Invoices', () => {
     const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
     const delivered = { ...issued, delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }
     const deliver = vi.fn().mockResolvedValue(delivered)
-    render(<Invoices workspace={workspace} client={invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [issued], can_manage: true, can_issue: true }),
+    renderInvoice(invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+      get: vi.fn().mockResolvedValue(issued),
       deliver,
-    })} />)
+    }))
 
     expect(await screen.findByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/invoice.pdf')
     expect(screen.getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/invoice.csv')
@@ -223,10 +248,11 @@ describe('Invoices', () => {
     const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', lifecycle_state: 'issued' as const, reconciliation_state: 'unsynchronized' as const, paid_amount: '0.00', balance_amount: '137.50', lifecycle_events: [] }
     const synchronized = { ...issued, lifecycle_state: 'externally_synchronized' as const, reconciliation_state: 'synchronized' as const, lifecycle_events: [{ id: 'event-1', event_type: 'accounting_synchronized', occurred_at: '2026-08-29T14:00:00Z', recorded_at: '2026-08-29T14:00:00Z', actor: 'Invoice Owner', provider: 'ledger', external_id: 'evt-1', amount: null, currency: '', related_invoice_id: null, note: 'Invoice 44' }] }
     const recordEvent = vi.fn().mockResolvedValue(synchronized)
-    render(<Invoices workspace={workspace} client={invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [issued], can_manage: true, can_issue: true }),
+    renderInvoice(invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+      get: vi.fn().mockResolvedValue(issued),
       recordEvent,
-    })} />)
+    }))
 
     expect(await screen.findByRole('link', { name: 'Download for accounting' })).toHaveAttribute('href', '/invoice-accounting.json')
     fireEvent.click(screen.getAllByRole('button', { name: 'Update status' }).at(-1)!)
@@ -246,7 +272,7 @@ describe('Invoices', () => {
 
   it('shows a bounded error state when the workspace request fails', async () => {
     const client = invoiceClient({ list: vi.fn().mockRejectedValue(new Error('Denied')) })
-    render(<Invoices workspace={workspace} client={client} />)
+    renderInvoice(client)
     expect(await screen.findByRole('alert')).toHaveTextContent('Invoices could not be loaded.')
   })
 })

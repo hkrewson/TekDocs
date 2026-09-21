@@ -46,6 +46,25 @@ export type InvoiceDraft = {
   lifecycle_events?: InvoiceLifecycleEvent[]
 }
 
+export type InvoiceCollectionQuery = {
+  q: string
+  state?: 'draft' | 'issued'
+  ordering: 'name' | '-name' | 'state' | '-state' | 'invoice_date' | '-invoice_date' | 'due_date' | '-due_date' | 'reference' | '-reference' | 'total' | '-total'
+  page: number
+  page_size: number
+  summary: true
+}
+
+export type InvoiceCollectionResult = {
+  results: InvoiceDraft[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+  can_manage: boolean
+  can_issue: boolean
+}
+
 export type InvoiceLifecycleEvent = {
   id: string
   event_type: string
@@ -101,7 +120,8 @@ export type InvoiceIssueSettings = {
 }
 
 export interface InvoiceClient {
-  list(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: InvoiceDraft[]; can_manage: boolean; can_issue: boolean }>
+  list(workspace: WorkspaceContext, signal?: AbortSignal, query?: InvoiceCollectionQuery): Promise<InvoiceCollectionResult>
+  get(workspace: WorkspaceContext, invoiceId: string, signal?: AbortSignal): Promise<InvoiceDraft>
   choices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ origins: InvoiceOrigin[]; tax_rates: TaxRateChoice[] }>
   create(workspace: WorkspaceContext, values: object): Promise<InvoiceDraft>
   update(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
@@ -170,7 +190,12 @@ export async function mutate<T>(path: string, method: 'POST' | 'PUT' | 'PATCH' |
 }
 
 export const browserInvoiceClient: InvoiceClient = {
-  list: async (workspace, signal) => parse(await fetch(basePath(workspace), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
+  list: async (workspace, signal, query) => {
+    const params = query ? new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined).map(([key, value]) => [key, String(value)])) : null
+    const path = `${basePath(workspace)}${params?.size ? `?${params}` : ''}`
+    return parse(await fetch(path, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  get: (workspace, invoiceId, signal) => read(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}`, signal),
   choices: async (workspace, signal) => parse(await fetch(`${basePath(workspace)}/origin-choices`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   create: (workspace, values) => mutate(basePath(workspace), 'POST', values),
   update: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}`, 'PATCH', values),

@@ -2266,3 +2266,38 @@ Inferred: this bounded direct-link/history workflow is ready for technician revi
 Blocked: none. Phase 5 now awaits technician acceptance. Existing unrelated Wiki
 edits remain preserved. No external push, Wiki publication, deployment, version
 bump or removal of application data.
+
+### 2026-09-21 — Invoice collection and focused record workspace
+
+Phase 6 under #60; version remains 0.8.46. Scope and acceptance are recorded in
+[invoice-workspace.md](invoice-workspace.md). The client invoice route no longer
+automatically selects its first result. It now provides a server-bounded,
+searchable, filterable and orderable collection with personal columns and page
+size, plus URL-addressed focused records loaded independently from the current
+page. Draft, issuance, delivery, download, accounting and recurring actions remain
+available under their existing permissions and confirmations.
+
+Verified reproduction: the focused component case failed before the change because
+the first invoice detail appeared without a record URL. The complete component
+file passes all 11 cases after the change. The supported invoice backend target
+passes through invoice, stock, permission, IDOR, row-level isolation and migration
+coverage. OpenAPI generation and frontend API agreement, type checking and linting
+pass.
+
+The new production-image browser matrix passes 21 cases at 320, 390, 768, 1024,
+1280 and 1440px across Chromium, Firefox and WebKit, including accessibility,
+horizontal overflow, search, paging, direct records and explicit return. The
+existing Chromium invoice lifecycle, stock and recurring coverage passes after
+following the focused record's explicit return path.
+
+Verified: final `make check` exits 0 with lint/types, API/schema agreement,
+migration and policy checks, all 629 tests in 117 files, the 37-page Wiki
+contract, production build and bundle budgets (shell 129164 <= 131072 and shell
+style 24503 <= 24576 compressed bytes). Evidence:
+/tmp/tekdocs-invoice-workspace-check.log.
+
+Inferred: this bounded invoice workspace is ready for technician review. Blocked:
+none. Phase 6 remains open for MSP invoice settings, compliance/data-flow and
+integration workflows. Existing unrelated Wiki edits remain preserved. No
+external push, Wiki publication, deployment, version bump or removal of
+application data.

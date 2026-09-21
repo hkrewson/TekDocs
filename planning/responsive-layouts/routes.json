@@ -399,9 +399,13 @@
   {
     "route": "/workspaces/organizations/:organizationId/invoices",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/invoice-workspace.md",
+      "frontend/e2e/invoice-layout.spec.ts",
+      "frontend/e2e/invoices.spec.ts"
+    ],
+    "states": "Collection loading, error, empty, search, filter, ordering and paging; focused draft and issued records; direct unavailable records; draft editing, issuance, delivery, lifecycle updates and recurring navigation."
   },
   {
     "route": "/workspaces/organizations/:organizationId/licenses",

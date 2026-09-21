@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, FileCheck2, History, Mail, Pencil, Plus, Trash2 } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate } from '../i18n/localization'
 import type { MessageId } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
-import type { InvoiceClient, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
+import type { InvoiceClient, InvoiceCollectionQuery, InvoiceCollectionResult, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
+import { CollectionTable } from '../collections/CollectionTable'
+import { CollectionPagination } from '../CollectionPagination'
+import { ColumnChooser } from '../collections/ColumnChooser'
+import { browserCollectionPreferences, defaultPreferences } from '../collections/preferences'
+import type { CollectionPreferences } from '../collections/preferences'
+import { FilterMenu } from '../FilterMenu'
+import '../collections/collections.css'
 
 import { RecurringInvoices } from './RecurringInvoices'
 import { browserRecurringClient } from './recurringApi'
@@ -88,12 +95,24 @@ function summaryStatuses(record: InvoiceDraft) {
   return [...new Set(labels)].join(' · ')
 }
 
-export function Invoices({ workspace, client }: { workspace: WorkspaceContext; client: InvoiceClient }) {
+const invoiceColumns = ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'] as const
+const invoiceLabels = {
+  name: translate('accounting.invoice'), state: translate('accounting.status'), invoice_date: translate('accounting.invoiceDate'),
+  due_date: translate('accounting.dueDate'), reference: translate('accounting.reference'), total: translate('accounting.total'),
+}
+
+export function Invoices({ workspace, client, preferenceClient = browserCollectionPreferences }: { workspace: WorkspaceContext; client: InvoiceClient; preferenceClient?: typeof browserCollectionPreferences }) {
+  const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [showRecurring, setShowRecurring] = useState(false)
   const [records, setRecords] = useState<InvoiceDraft[]>([])
+  const [result, setResult] = useState<InvoiceCollectionResult | null>(null)
+  const [selectedRecord, setSelected] = useState<InvoiceDraft | null>(null)
+  const [unavailableId, setUnavailableId] = useState<string | null>(null)
+  const [preferences, setPreferences] = useState<CollectionPreferences>(() => defaultPreferences(invoiceColumns))
   const [origins, setOrigins] = useState<InvoiceOrigin[]>([])
   const [taxRates, setTaxRates] = useState<TaxRateChoice[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [canManage, setCanManage] = useState(false)
   const [canIssue, setCanIssue] = useState(false)
   const [needsSettings, setNeedsSettings] = useState(false)
@@ -107,15 +126,31 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
   const [error, setError] = useState<string | null>(null)
   const [deliveryRecipient, setDeliveryRecipient] = useState('')
   const [confirmation, setConfirmation] = useState<'delete' | 'issue' | null>(null)
+  const selectedId = params.get('invoice')
+  const selected = selectedRecord?.id === selectedId ? selectedRecord : null
+  const requestedPage = Number(params.get('page') ?? 1)
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
+  const pageSize = [25, 50, 100].includes(Number(params.get('page_size'))) ? Number(params.get('page_size')) : preferences?.page_size ?? 25
+  const queryText = JSON.stringify({ q: params.get('q') ?? '', page, page_size: pageSize, ordering: params.get('ordering') ?? '-invoice_date', summary: true, ...(params.get('state') ? { state: params.get('state') } : {}) })
+  const query = useMemo(() => JSON.parse(queryText) as InvoiceCollectionQuery, [queryText])
 
   useEffect(() => {
     const controller = new AbortController()
-    client.list(workspace, controller.signal)
+    preferenceClient.load(workspace, 'invoices', invoiceColumns, controller.signal)
+      .then((value) => { if (!controller.signal.aborted) setPreferences(value) })
+      .catch(() => { if (!controller.signal.aborted) setPreferences(defaultPreferences(invoiceColumns)) })
+    return () => controller.abort()
+  }, [workspace, preferenceClient])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    client.list(workspace, controller.signal, query)
       .then(async (result) => {
         const choices = result.can_manage
           ? await client.choices(workspace, controller.signal)
           : { origins: [], tax_rates: [] }
         setRecords(result.results)
+        setResult(result)
         setCanManage(result.can_manage)
         setCanIssue(result.can_issue)
         setOrigins(choices.origins)
@@ -124,18 +159,40 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
       })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client, workspace])
+  }, [client, workspace, query])
 
-  const selected = useMemo(
-    () => records.find((record) => record.id === selectedId) ?? records[0],
-    [records, selectedId],
-  )
+  useEffect(() => {
+    if (!selectedId) return
+    const controller = new AbortController()
+    client.get(workspace, selectedId, controller.signal)
+      .then((record) => { if (!controller.signal.aborted) { setSelected(record); setUnavailableId(null) } })
+      .catch(() => { if (!controller.signal.aborted) setUnavailableId(selectedId) })
+    return () => controller.abort()
+  }, [client, workspace, selectedId])
+
+  function browse(values: Record<string, string | null>) {
+    const next = new URLSearchParams(params)
+    for (const [name, value] of Object.entries(values)) {
+      if (value) next.set(name, value)
+      else next.delete(name)
+    }
+    if (!('page' in values)) next.delete('page')
+    setParams(next)
+  }
+
+  function invoiceHref(id?: string) {
+    const next = new URLSearchParams(params)
+    next.delete('invoice')
+    if (id) next.set('invoice', id)
+    return `${location.pathname}${next.size ? `?${next}` : ''}`
+  }
 
   function replace(record: InvoiceDraft) {
     setRecords((current) => current.some((item) => item.id === record.id)
       ? current.map((item) => item.id === record.id ? record : item)
       : [record, ...current])
-    setSelectedId(record.id)
+    setSelected(record)
+    if (selectedId !== record.id) void navigate(invoiceHref(record.id))
     setEditor('none')
     setEditingLineId(null)
     setConfirmation(null)
@@ -156,7 +213,8 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     try {
       await client.remove(workspace, selected.id)
       setRecords((current) => current.filter((record) => record.id !== selected.id))
-      setSelectedId(null)
+      setSelected(null)
+      void navigate(invoiceHref())
       setConfirmation(null)
     } catch {
       setError(translate('accounting.deleteFailed'))
@@ -191,27 +249,48 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
     if (!selected) return
     await perform(() => client.deliver(workspace, selected.id, deliveryRecipient), 'accounting.deliveryFailed')
   }
+  const collectionRows = records.map((record) => ({
+    ...record,
+    name: record.number || formatPlainDate(record.invoice_date),
+  }))
 
   return <>
     <header className="page-header">
       <div><h1>{translate('accounting.heading')}</h1></div>
       <div className="form-actions">
-        {canManage && <button type="button" className="secondary-button" aria-expanded={showRecurring} onClick={() => setShowRecurring(!showRecurring)}>{translate(showRecurring ? 'recurring.close' : 'recurring.title')}</button>}
+        {canManage && !selectedId && <button type="button" className="secondary-button" aria-expanded={showRecurring} onClick={() => setShowRecurring(!showRecurring)}>{translate(showRecurring ? 'recurring.close' : 'recurring.title')}</button>}
         {canManage && <button type="button" className="primary-button" aria-label={translate('accounting.newDraft')} onClick={() => { setDraft(emptyDraft()); setEditor('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('accounting.newDraft')}</span></button>}
       </div>
     </header>
     {showRecurring && <RecurringInvoices key={workspace.id} workspace={workspace} client={browserRecurringClient} openInvoice={async (id) => {
-      const result = await client.list(workspace)
-      if (!result.results.some((record) => record.id === id)) throw new Error('Invoice unavailable')
-      setRecords(result.results); setSelectedId(id); setShowRecurring(false)
+      await client.get(workspace, id)
+      setShowRecurring(false)
+      void navigate(invoiceHref(id))
     }} />}
     {error && <div className="form-message error" role="alert">{error}{needsSettings && <> <Link to="/invoices">{translate('accounting.openSettings')}</Link></>}</div>}
     {phase === 'loading' && <section className="content-section" role="status">{translate('accounting.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.unavailable')}</h2><p>{translate('accounting.loadFailed')}</p></section>}
-    {phase === 'ready' && <div className="inventory-layout">
-      <section className="content-section inventory-index">
-        {records.length === 0 ? <p className="empty-state">{translate('accounting.empty')}</p> : <ul className="inventory-list">{records.map((record) => <li key={record.id}><button type="button" className={selected?.id === record.id ? 'selected' : ''} onClick={() => { setSelectedId(record.id); setConfirmation(null) }}><strong>{record.number || formatPlainDate(record.invoice_date)}</strong><span>{record.state === 'draft' ? translate('accounting.draft') : summaryStatuses(record)} · {record.currency} {record.total}</span></button></li>)}</ul>}
-      </section>
+    {phase === 'ready' && !selectedId && <>
+      <div className="collection-toolbar">
+        <form key={query.q} className="collection-search" onSubmit={(event) => { event.preventDefault(); const value = new FormData(event.currentTarget).get('q'); browse({ q: typeof value === 'string' ? value : '' }) }}><input type="search" name="q" defaultValue={query.q} aria-label={translate('accounting.search')} /><button type="submit" className="secondary-button">{translate('accounting.searchAction')}</button></form>
+        <FilterMenu groups={[{ kind: 'choices', label: translate('accounting.status'), value: query.state ?? '', choices: [{ value: '', label: translate('collections.all') }, { value: 'draft', label: translate('accounting.draft') }, { value: 'issued', label: translate('accounting.issued') }], onChange: (state) => browse({ state: state || null }) }]} activeCount={Number(Boolean(query.state))} onClear={() => browse({ state: null })} />
+        <ColumnChooser preferences={preferences} labels={invoiceLabels} onSave={async (columns) => setPreferences(await preferenceClient.save(workspace, 'invoices', { columns, page_size: pageSize as 25 | 50 | 100 }))} onReset={async () => setPreferences(await preferenceClient.reset(workspace, 'invoices'))} />
+        <label className="collection-page-size">{translate('collections.pageSize')}<select value={pageSize} onChange={(event) => { const size = Number(event.target.value) as 25 | 50 | 100; browse({ page_size: String(size) }); void preferenceClient.save(workspace, 'invoices', { columns: preferences.columns, page_size: size }).then(setPreferences).catch(() => setError(translate('collections.preferenceFailed'))) }}>{[25, 50, 100].map((size) => <option key={size}>{size}</option>)}</select></label>
+      </div>
+      <div className="collection-active-filters">{query.state && <button type="button" className="row-action" onClick={() => browse({ state: null })}>{translate('accounting.status')}: {query.state} ×</button>}</div>
+      <label className="collection-mobile-order">{translate('accounting.ordering')}<select value={query.ordering} onChange={(event) => browse({ ordering: event.target.value })}>{invoiceColumns.flatMap((column) => [<option key={column} value={column}>{invoiceLabels[column]} ↑</option>, <option key={`-${column}`} value={`-${column}`}>{invoiceLabels[column]} ↓</option>])}</select></label>
+      <p>{translate('accounting.count', { count: result?.count ?? 0 })}</p>
+      {records.length === 0 ? <p className="empty-state">{translate('accounting.empty')}</p> : <CollectionTable label={translate('accounting.heading')} rows={collectionRows} selectable={false} selected={new Set()} onSelection={() => {}} ordering={query.ordering} onOrder={(ordering) => browse({ ordering })} columns={preferences.columns.map((column) => ({ id: column, label: invoiceLabels[column as keyof typeof invoiceLabels], render: (record: InvoiceDraft & { name: string }) => {
+        if (column === 'name') return <button type="button" className="collection-name" onClick={() => { setConfirmation(null); void navigate(invoiceHref(record.id)) }}>{record.number || formatPlainDate(record.invoice_date)}</button>
+        if (column === 'state') return record.state === 'draft' ? translate('accounting.draft') : summaryStatuses(record)
+        if (column === 'invoice_date' || column === 'due_date') return formatPlainDate(record[column])
+        if (column === 'total') return `${record.currency} ${record.total}`
+        return record.reference || translate('collections.missing')
+      } }))} />}
+      {result && <CollectionPagination label={translate('accounting.heading')} page={page} pageSize={pageSize} count={result.count} hasMore={result.has_more} onPageChange={(next) => browse({ page: String(next) })} />}
+    </>}
+    {phase === 'ready' && selectedId && <>
+      <Link to={invoiceHref()}>{translate('accounting.return')}</Link>
       <section className="content-section inventory-detail">
         {selected ? <>
           <div className="section-heading"><div><h2>{selected.number || `${translate('accounting.draft')} · ${formatPlainDate(selected.invoice_date)}`}</h2><p>{selected.reference || workspace.name}</p></div><span className="lifecycle-state">{translate(selected.state === 'draft' ? 'accounting.draft' : 'accounting.issued')}</span></div>
@@ -247,10 +326,10 @@ export function Invoices({ workspace, client }: { workspace: WorkspaceContext; c
             <div><dt>{translate('accounting.tax')}</dt><dd>{selected.currency} {selected.tax_total}</dd></div>
             <div><dt>{translate('accounting.total')}</dt><dd><strong>{selected.currency} {selected.total}</strong></dd></div>
           </dl>
-        </> : <p className="empty-state">{translate('accounting.choose')}</p>}
+        </> : unavailableId === selectedId ? <p role="alert">{translate('accounting.loadFailed')}</p> : <p role="status">{translate('accounting.loading')}</p>}
       </section>
-    </div>}
-    {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected.id, draft)) }} />}
+    </>}
+    {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected!.id, draft)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} adjustsExistingStock={Boolean(editingLineId && selected.lines.find((item) => item.id === editingLineId)?.origin_type === 'stock_item')} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedOrigin = origins.find((origin) => `${origin.origin_type}:${origin.id}` === line.originKey); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, ...(selectedOrigin?.origin_type === 'stock_item' ? { quantity: line.quantity } : {}), tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
     {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input autoFocus type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
     {editor === 'event' && selected && <InvoiceEventEditor value={eventValue} setValue={setEventValue} invoices={records.filter((item) => item.state === 'issued' && item.id !== selected.id)} currency={selected.currency} busy={busy} cancel={() => setEditor('none')} submit={() => { const payment = eventValue.event_type === 'payment_recorded' || eventValue.event_type === 'payment_reversed'; const provider = eventValue.event_type.startsWith('accounting_'); void perform(() => client.recordEvent(workspace, selected.id, { event_type: eventValue.event_type, occurred_at: new Date().toISOString(), amount: payment ? eventValue.amount : null, currency: payment ? selected.currency : '', provider: provider ? eventValue.provider : '', external_id: provider ? eventValue.external_id : '', idempotency_key: provider ? eventValue.idempotency_key : `tekdocs:invoice:${selected.id}:${eventValue.event_type}:${crypto.randomUUID()}`, related_invoice_id: eventValue.related_invoice_id || null, note: eventValue.note }), 'accounting.updateFailed') }} />}

@@ -72,6 +72,41 @@ def _runtime_connection():
 
 
 @pytest.mark.django_db
+def test_invoice_collection_is_bounded_searchable_and_uses_summary_rows(owner_client, installation):
+    client = organization(installation, "Collection Client", "client")
+    collection = reverse("organization-invoice-list-create", kwargs={"organization_entity_id": client.entity_id})
+    for reference, invoice_date in (("PO-ALPHA", "2026-08-29"), ("PO-BETA", "2026-08-30")):
+        response = owner_client.post(
+            collection,
+            {
+                "currency": "USD",
+                "invoice_date": invoice_date,
+                "due_date": "2026-09-30",
+                "reference": reference,
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    response = owner_client.get(
+        collection,
+        {"summary": "true", "q": "alpha", "state": "draft", "ordering": "invoice_date", "page_size": 1},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 1
+    assert payload["page_size"] == 1
+    assert payload["count"] == 1
+    assert payload["has_more"] is False
+    assert [record["reference"] for record in payload["results"]] == ["PO-ALPHA"]
+    assert "lines" not in payload["results"][0]
+    assert "lifecycle_events" not in payload["results"][0]
+
+    rejected = owner_client.get(collection, {"unknown": "value"})
+    assert rejected.status_code == 400
+
+
+@pytest.mark.django_db
 def test_priced_product_service_rate_and_all_origins_snapshot_into_one_currency(owner_client, installation):
     client = organization(installation, "Invoice Client", "client")
     sibling = organization(installation, "Sibling Client", "client")

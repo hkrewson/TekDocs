@@ -23000,12 +23000,83 @@ paths:
     get:
       operationId: organization_invoices_list
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - state
+          - -state
+          - invoice_date
+          - -invoice_date
+          - due_date
+          - -due_date
+          - reference
+          - -reference
+          - total
+          - -total
+          type: string
+          x-spec-enum-id: 95785ee1bff61a25
+          default: -invoice_date
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `state` - state
+          * `-state` - -state
+          * `invoice_date` - invoice_date
+          * `-invoice_date` - -invoice_date
+          * `due_date` - due_date
+          * `-due_date` - -due_date
+          * `reference` - reference
+          * `-reference` - -reference
+          * `total` - total
+          * `-total` - -total
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: state
+        schema:
+          enum:
+          - draft
+          - issued
+          type: string
+          x-spec-enum-id: 06aac5bc09af5f6e
+          minLength: 1
+        description: |-
+          * `draft` - draft
+          * `issued` - issued
+      - in: query
+        name: summary
+        schema:
+          type: boolean
+          default: false
+        description: Omit invoice lines and history.
       tags:
       - workspaces
       security:
@@ -38483,6 +38554,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Invoice'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
         can_manage:
           type: boolean
         can_issue:
@@ -38490,6 +38569,10 @@ components:
       required:
       - can_issue
       - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
       - results
     InvoiceWrite:
       type: object

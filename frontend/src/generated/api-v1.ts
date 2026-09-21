@@ -11264,6 +11264,10 @@ export interface components {
         };
         readonly InvoiceResult: {
             readonly results: readonly components["schemas"]["Invoice"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
             readonly can_manage: boolean;
             readonly can_issue: boolean;
         };
@@ -31321,7 +31325,33 @@ export interface operations {
     };
     readonly organization_invoices_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `state` - state
+                 *     * `-state` - -state
+                 *     * `invoice_date` - invoice_date
+                 *     * `-invoice_date` - -invoice_date
+                 *     * `due_date` - due_date
+                 *     * `-due_date` - -due_date
+                 *     * `reference` - reference
+                 *     * `-reference` - -reference
+                 *     * `total` - total
+                 *     * `-total` - -total
+                 */
+                readonly ordering?: "name" | "-name" | "state" | "-state" | "invoice_date" | "-invoice_date" | "due_date" | "-due_date" | "reference" | "-reference" | "total" | "-total";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `draft` - draft
+                 *     * `issued` - issued
+                 */
+                readonly state?: "draft" | "issued";
+                /** @description Omit invoice lines and history. */
+                readonly summary?: boolean;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

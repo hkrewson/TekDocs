@@ -115,6 +115,14 @@ COLLECTIONS = {
         ),
         ("name", "provider", "kind", "status", "renews_on", "ends_on"),
     ),
+    "invoices": CollectionDefinition(
+        PermissionKey.INVOICES_VIEW,
+        tuple(
+            (column, PermissionKey.INVOICES_VIEW)
+            for column in ("name", "state", "invoice_date", "due_date", "reference", "total")
+        ),
+        ("name", "state", "invoice_date", "due_date", "reference", "total"),
+    ),
     "assets": CollectionDefinition(
         PermissionKey.ASSETS_VIEW,
         tuple(

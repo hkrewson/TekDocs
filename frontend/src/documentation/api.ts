@@ -20,12 +20,13 @@ export type DocumentFilters = {
   template?: 'all' | 'documents' | 'templates'
   collection?: string
   tag?: string
-  health?: DocumentHealthStatus | ''
+  health?: DocumentHealthStatus | '' | 'attention'
   review_state?: DocumentReviewState | ''
   owner_id?: string
   ordering?: 'title' | '-title' | 'updated_at' | '-updated_at' | 'category' | '-category'
   page?: number
   page_size?: number
+  exclude_document?: string
 }
 export type PlacementResolutionMode = 'live' | 'pinned'
 export type PlacementAudienceProfile = 'shared' | 'msp_internal' | 'client_visible'
@@ -509,6 +510,7 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.ordering) query.set('ordering', filters.ordering)
     if (filters.page) query.set('page', String(filters.page))
     if (filters.page_size) query.set('page_size', String(filters.page_size))
+    if (filters.exclude_document) query.set('exclude_document', filters.exclude_document)
     const response = await fetch(`${collectionPath(scope)}/search${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
   },

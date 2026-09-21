@@ -23,6 +23,8 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/client%2Fid/documents/template-library?q=router+%26+switch&page=3&page_size=25')
     await browserDocumentsClient.searchBlockLibrary({}, 'network', undefined, 2, 'destination-id')
     expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/documents/block-library?q=network&page_size=20&page=2&exclude_document=destination-id')
+    await browserDocumentsClient.list({}, undefined, { q: 'recovery', health: 'attention', page: 2, page_size: 20, exclude_document: 'destination-id' })
+    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/v1/documents/search?q=recovery&health=attention&page=2&page_size=20&exclude_document=destination-id')
   })
 
   it('requests bounded revision-history pages', async () => {

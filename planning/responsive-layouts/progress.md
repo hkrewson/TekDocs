@@ -2169,3 +2169,55 @@ health queue/link picker is next, followed by remaining direct-link/history and
 technician acceptance. Existing unrelated Wiki edits remain preserved. No
 external push, Wiki publication, deployment, version bump or removal of existing
 application data.
+
+### 2026-09-20 — Complete health queue and document-link search
+
+Phase 5 under #60; version remains 0.8.46. Scope and acceptance are recorded in
+[document-health-and-links.md](document-health-and-links.md). Content health now
+uses a server-backed attention filter across the complete authorized collection,
+with accurate paging and URL state. Existing content now has a searchable,
+retryable document picker that excludes the destination document and preserves
+live/pinned, audience and position choices.
+
+Verified reproductions: the focused component cases failed before the fix because
+Content health only removed current records from the 25 documents already loaded
+and document linking could only select from that same page. Evidence:
+/tmp/tekdocs-health-link-repro.log. All 74 focused documentation and API tests now
+pass (/tmp/tekdocs-health-link-frontend-focused-final.log). The focused backend
+search cases and the complete nine-test document operations file pass, covering
+attention filtering, facets, pagination, exclusion and bounded query validation
+(/tmp/tekdocs-health-link-backend.log and
+/tmp/tekdocs-health-link-operations-backend.log).
+
+The first browser matrix found that document tags missed the required contrast by
+0.03 and that the icon-only 320/390px health action lacked an accessible name.
+Both product issues were fixed. All 18 final health/link cases pass at 320, 390,
+768, 1024, 1280 and 1440px across Chromium, Firefox and WebKit. The 54 publication,
+export, managed-file and draft-protection regressions also pass, for 72 browser
+cases total. Evidence: /tmp/tekdocs-health-link-browser-final.log,
+/tmp/tekdocs-health-link-browser-screenshots.log and
+/tmp/tekdocs-health-link-browser-closeout.log. Reviewed screenshots:
+artifacts/document-{health,link-picker}-{320,1440}.png.
+
+Verified: final `make check` exits 0 with lint/types, API/schema agreement,
+migration checks, all 625 tests in 117 files, the production build and bundle
+budgets (shell 129078 <= 131072 and shell style 24503 <= 24576 compressed bytes).
+An unrelated Stock component timing failure passed immediately in isolation; the
+complete final gate also passed. The documentation validation gate exits 0 across
+document, attachment, rendering, permission, isolation and performance coverage
+with one existing skip. Evidence: /tmp/tekdocs-health-link-check-closeout.log,
+/tmp/tekdocs-health-link-stock-recheck.log and
+/tmp/tekdocs-health-link-documentation-gate.log.
+
+The first live journey created the template-derived document successfully but read
+its URL before the document identifier arrived. The assertion now waits for that
+existing asynchronous navigation. Final `make test-e2e-live` exits 0 in 3.3 minutes:
+the real health queue and cross-page document picker pass within the complete
+browser-to-Django-to-PostgreSQL journey. Evidence:
+/tmp/tekdocs-health-link-live.log and
+/tmp/tekdocs-health-link-live-rerun.log.
+
+Inferred: this bounded health/link workflow is ready for technician review.
+Blocked: none. Phase 5 remains open for direct-link/history acceptance and
+technician review. Existing unrelated Wiki edits remain preserved. No external
+push, Wiki publication, deployment, version bump or removal of application data.

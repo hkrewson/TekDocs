@@ -209,6 +209,8 @@ def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) ->
         queryset = queryset.filter(review_state=values["review_state"])
     if values["owner_id"]:
         queryset = queryset.filter(owner_id=values["owner_id"])
+    if values.get("exclude_document"):
+        queryset = queryset.exclude(entity_id=values["exclude_document"])
     records = list(queryset.order_by("entity__display_name", "entity_id").distinct())
     if values["tag"]:
         tag = values["tag"].strip().casefold()
@@ -227,7 +229,9 @@ def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) ->
                 if (selected := assignment.term or assignment.local_term) is not None
             )
         ]
-    if values["health"]:
+    if values["health"] == "attention":
+        records = [record for record in records if record.health_status != "current"]
+    elif values["health"]:
         records = [record for record in records if record.health_status == values["health"]]
     return records
 
@@ -253,7 +257,8 @@ def _matching_excerpt(markdown: str, query: str) -> str:
 def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = DocumentListQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
-    selected = _filtered_documents(workspace, serializer.validated_data)
+    values = serializer.validated_data
+    selected = _filtered_documents(workspace, values)
     query = serializer.validated_data["q"]
     ranks: dict[UUID, int] = {}
     for record in selected:
@@ -289,7 +294,8 @@ def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
             )
     collection_counts = Counter(record.collection for record in selected if record.collection)
     tag_counts = Counter(tag for record in selected for tag in document_tag_labels(record))
-    health_counts = Counter(record.health_status for record in selected)
+    health_records = selected if not values["health"] else _filtered_documents(workspace, {**values, "health": ""})
+    health_counts = Counter(record.health_status for record in health_records)
     count = len(selected)
     page = serializer.validated_data["page"]
     page_size = serializer.validated_data["page_size"]
@@ -1416,7 +1422,11 @@ class MSPDocumentListCreateView(APIView):
 
 
 class MSPDocumentSearchView(APIView):
-    @extend_schema(operation_id="documents_msp_search", responses={200: DocumentSearchResultSerializer})
+    @extend_schema(
+        operation_id="documents_msp_search",
+        parameters=[DocumentListQuerySerializer],
+        responses={200: DocumentSearchResultSerializer},
+    )
     def get(self, request):  # type: ignore[no-untyped-def]
         return _search(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
 
@@ -1817,7 +1827,11 @@ class OrganizationDocumentListCreateView(APIView):
 
 
 class OrganizationDocumentSearchView(APIView):
-    @extend_schema(operation_id="documents_organization_search", responses={200: DocumentSearchResultSerializer})
+    @extend_schema(
+        operation_id="documents_organization_search",
+        parameters=[DocumentListQuerySerializer],
+        responses={200: DocumentSearchResultSerializer},
+    )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _search(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request)
 

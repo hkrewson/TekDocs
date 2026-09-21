@@ -3564,6 +3564,141 @@ paths:
   /api/v1/documents/search:
     get:
       operationId: documents_msp_search
+      parameters:
+      - in: query
+        name: category
+        schema:
+          enum:
+          - general
+          - policy
+          - procedure
+          - guide
+          - reference
+          - ''
+          type: string
+          x-spec-enum-id: 5c27c16eb333c7c1
+          default: ''
+        description: |-
+          * `general` - General
+          * `policy` - Policy
+          * `procedure` - Procedure
+          * `guide` - Guide
+          * `reference` - Reference
+      - in: query
+        name: collection
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: exclude_document
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: health
+        schema:
+          enum:
+          - ''
+          - attention
+          - current
+          - stale
+          - unreviewed
+          - unowned
+          - pending
+          - changes_requested
+          type: string
+          x-spec-enum-id: 5ce5f36a0b75124c
+          default: ''
+        description: "* `` - \n* `attention` - attention\n* `current` - current\n\
+          * `stale` - stale\n* `unreviewed` - unreviewed\n* `unowned` - unowned\n\
+          * `pending` - pending\n* `changes_requested` - changes_requested"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - title
+          - -title
+          - updated_at
+          - -updated_at
+          - category
+          - -category
+          type: string
+          x-spec-enum-id: a0754fff52833a39
+          default: title
+          minLength: 1
+        description: |-
+          * `title` - title
+          * `-title` - -title
+          * `updated_at` - updated_at
+          * `-updated_at` - -updated_at
+          * `category` - category
+          * `-category` - -category
+      - in: query
+        name: owner_id
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: review_state
+        schema:
+          enum:
+          - ''
+          - unreviewed
+          - pending
+          - approved
+          - changes_requested
+          type: string
+          x-spec-enum-id: aecb9936b1091ca0
+          default: ''
+        description: |-
+          * `` - All
+          * `unreviewed` - Unreviewed
+          * `pending` - Pending review
+          * `approved` - Approved
+          * `changes_requested` - Changes requested
+      - in: query
+        name: tag
+        schema:
+          type: string
+          default: ''
+          maxLength: 40
+      - in: query
+        name: template
+        schema:
+          enum:
+          - all
+          - documents
+          - templates
+          type: string
+          x-spec-enum-id: e68fa1a3191608f9
+          default: all
+          minLength: 1
+        description: |-
+          * `all` - all
+          * `documents` - documents
+          * `templates` - templates
       tags:
       - documents
       security:
@@ -20380,12 +20515,146 @@ paths:
     get:
       operationId: documents_organization_search
       parameters:
+      - in: query
+        name: category
+        schema:
+          enum:
+          - general
+          - policy
+          - procedure
+          - guide
+          - reference
+          - ''
+          type: string
+          x-spec-enum-id: 5c27c16eb333c7c1
+          default: ''
+        description: |-
+          * `general` - General
+          * `policy` - Policy
+          * `procedure` - Procedure
+          * `guide` - Guide
+          * `reference` - Reference
+      - in: query
+        name: collection
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: exclude_document
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: health
+        schema:
+          enum:
+          - ''
+          - attention
+          - current
+          - stale
+          - unreviewed
+          - unowned
+          - pending
+          - changes_requested
+          type: string
+          x-spec-enum-id: 5ce5f36a0b75124c
+          default: ''
+        description: "* `` - \n* `attention` - attention\n* `current` - current\n\
+          * `stale` - stale\n* `unreviewed` - unreviewed\n* `unowned` - unowned\n\
+          * `pending` - pending\n* `changes_requested` - changes_requested"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - title
+          - -title
+          - updated_at
+          - -updated_at
+          - category
+          - -category
+          type: string
+          x-spec-enum-id: a0754fff52833a39
+          default: title
+          minLength: 1
+        description: |-
+          * `title` - title
+          * `-title` - -title
+          * `updated_at` - updated_at
+          * `-updated_at` - -updated_at
+          * `category` - category
+          * `-category` - -category
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: owner_id
+        schema:
+          type: string
+          format: uuid
+          nullable: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: review_state
+        schema:
+          enum:
+          - ''
+          - unreviewed
+          - pending
+          - approved
+          - changes_requested
+          type: string
+          x-spec-enum-id: aecb9936b1091ca0
+          default: ''
+        description: |-
+          * `` - All
+          * `unreviewed` - Unreviewed
+          * `pending` - Pending review
+          * `approved` - Approved
+          * `changes_requested` - Changes requested
+      - in: query
+        name: tag
+        schema:
+          type: string
+          default: ''
+          maxLength: 40
+      - in: query
+        name: template
+        schema:
+          enum:
+          - all
+          - documents
+          - templates
+          type: string
+          x-spec-enum-id: e68fa1a3191608f9
+          default: all
+          minLength: 1
+        description: |-
+          * `all` - all
+          * `documents` - documents
+          * `templates` - templates
       tags:
       - workspaces
       security:

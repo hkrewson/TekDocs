@@ -113,9 +113,34 @@ def test_document_search_is_bounded_sorted_and_paginated(owner_client):
     assert second.json()["has_more"] is False
     assert [item["title"] for item in second.json()["results"]] == ["Runbook 01", "Runbook 00"]
 
+
+@pytest.mark.django_db
+def test_document_search_supports_attention_queue_and_destination_exclusion(owner_client, installation):
+    created = [create_document(owner_client, title=f"Health runbook {index:02d}") for index in range(27)]
+    current = Document.objects.get(entity_id=created[0]["id"])
+    current.owner = installation.owner
+    current.review_state = "approved"
+    current.review_due_on = timezone.localdate() + timedelta(days=30)
+    current.last_reviewed_at = timezone.now()
+    current.save(update_fields=("owner", "review_state", "review_due_on", "last_reviewed_at", "updated_at"))
+
+    attention = owner_client.get(reverse("msp-document-search"), {"health": "attention", "page_size": 25})
+
+    assert attention.status_code == 200
+    assert attention.json()["count"] == 26
+    assert attention.json()["has_more"] is True
+    assert all(item["health_status"] != "current" for item in attention.json()["results"])
+    assert {item["value"]: item["count"] for item in attention.json()["health"]} == {"current": 1, "unowned": 26}
+
+    excluded = owner_client.get(reverse("msp-document-search"), {"exclude_document": created[1]["id"]})
+
+    assert excluded.status_code == 200
+    assert excluded.json()["count"] == 26
+    assert created[1]["id"] not in {item["id"] for item in excluded.json()["results"]}
+
     unknown = owner_client.get(reverse("msp-document-search"), {"ordring": "title"})
     assert unknown.status_code == 400
-    assert unknown.json()["ordring"] == ["Unknown query parameter."]
+    assert unknown.json()["error"]["fields"]["ordring"] == ["Unknown query parameter."]
 
 
 @pytest.mark.django_db

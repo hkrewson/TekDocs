@@ -508,11 +508,12 @@ class DocumentListQuerySerializer(StrictQuerySerializer):
     collection = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
     tag = serializers.CharField(max_length=40, required=False, allow_blank=True, default="")
     health = serializers.ChoiceField(
-        choices=("", "current", "stale", "unreviewed", "unowned", "pending", "changes_requested"),
+        choices=("", "attention", "current", "stale", "unreviewed", "unowned", "pending", "changes_requested"),
         required=False,
         allow_blank=True,
         default="",
     )
+    exclude_document = serializers.UUIDField(required=False)
     review_state = serializers.ChoiceField(
         choices=(("", "All"), *DocumentReviewState.choices),
         required=False,

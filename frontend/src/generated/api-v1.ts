@@ -17349,7 +17349,57 @@ export interface operations {
     };
     readonly documents_msp_search: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `general` - General
+                 *     * `policy` - Policy
+                 *     * `procedure` - Procedure
+                 *     * `guide` - Guide
+                 *     * `reference` - Reference
+                 */
+                readonly category?: "general" | "policy" | "procedure" | "guide" | "reference" | "";
+                readonly collection?: string;
+                readonly exclude_document?: string;
+                /**
+                 * @description * `` -
+                 *     * `attention` - attention
+                 *     * `current` - current
+                 *     * `stale` - stale
+                 *     * `unreviewed` - unreviewed
+                 *     * `unowned` - unowned
+                 *     * `pending` - pending
+                 *     * `changes_requested` - changes_requested
+                 */
+                readonly health?: "" | "attention" | "current" | "stale" | "unreviewed" | "unowned" | "pending" | "changes_requested";
+                /**
+                 * @description * `title` - title
+                 *     * `-title` - -title
+                 *     * `updated_at` - updated_at
+                 *     * `-updated_at` - -updated_at
+                 *     * `category` - category
+                 *     * `-category` - -category
+                 */
+                readonly ordering?: "title" | "-title" | "updated_at" | "-updated_at" | "category" | "-category";
+                readonly owner_id?: string | null;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `` - All
+                 *     * `unreviewed` - Unreviewed
+                 *     * `pending` - Pending review
+                 *     * `approved` - Approved
+                 *     * `changes_requested` - Changes requested
+                 */
+                readonly review_state?: "" | "unreviewed" | "pending" | "approved" | "changes_requested";
+                readonly tag?: string;
+                /**
+                 * @description * `all` - all
+                 *     * `documents` - documents
+                 *     * `templates` - templates
+                 */
+                readonly template?: "all" | "documents" | "templates";
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -29542,7 +29592,57 @@ export interface operations {
     };
     readonly documents_organization_search: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `general` - General
+                 *     * `policy` - Policy
+                 *     * `procedure` - Procedure
+                 *     * `guide` - Guide
+                 *     * `reference` - Reference
+                 */
+                readonly category?: "general" | "policy" | "procedure" | "guide" | "reference" | "";
+                readonly collection?: string;
+                readonly exclude_document?: string;
+                /**
+                 * @description * `` -
+                 *     * `attention` - attention
+                 *     * `current` - current
+                 *     * `stale` - stale
+                 *     * `unreviewed` - unreviewed
+                 *     * `unowned` - unowned
+                 *     * `pending` - pending
+                 *     * `changes_requested` - changes_requested
+                 */
+                readonly health?: "" | "attention" | "current" | "stale" | "unreviewed" | "unowned" | "pending" | "changes_requested";
+                /**
+                 * @description * `title` - title
+                 *     * `-title` - -title
+                 *     * `updated_at` - updated_at
+                 *     * `-updated_at` - -updated_at
+                 *     * `category` - category
+                 *     * `-category` - -category
+                 */
+                readonly ordering?: "title" | "-title" | "updated_at" | "-updated_at" | "category" | "-category";
+                readonly owner_id?: string | null;
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                /**
+                 * @description * `` - All
+                 *     * `unreviewed` - Unreviewed
+                 *     * `pending` - Pending review
+                 *     * `approved` - Approved
+                 *     * `changes_requested` - Changes requested
+                 */
+                readonly review_state?: "" | "unreviewed" | "pending" | "approved" | "changes_requested";
+                readonly tag?: string;
+                /**
+                 * @description * `all` - all
+                 *     * `documents` - documents
+                 *     * `templates` - templates
+                 */
+                readonly template?: "all" | "documents" | "templates";
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

@@ -406,7 +406,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-title-list strong { font-size: 14px; }
 .document-title-list small { color: var(--muted); font-size: 11px; }
 .document-search-excerpt { max-width: 920px; color: var(--muted); font-size: 12px; line-height: 1.45; }
-.document-tag-list { color: var(--quiet); font-size: 11px; }
+.document-tag-list { color: var(--muted); font-size: 11px; }
 .document-title-list .static-publication-list { margin: -4px 0 8px 27px; padding: 0 0 0 13px; list-style: none; border-left: 1px solid var(--border); }
 .document-title-list .static-publication-list li { border: 0; }
 .document-title-list .static-publication-list button { padding: 7px 2px; }

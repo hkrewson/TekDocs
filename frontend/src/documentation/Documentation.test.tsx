@@ -340,6 +340,29 @@ it('organizes document health and sends an assigned review request', async () =>
   await waitFor(() => expect(requestReview).toHaveBeenCalledWith({}, 'doc-1', 'reviewer-1', 'Please confirm the firewall standard.'))
 })
 
+it('loads the complete content-health queue from the server', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const currentDocument = { ...document, id: 'doc-current', title: 'Current standard', health_status: 'current' as const }
+  const staleDocument = { ...sourceDocument, title: 'Off-page stale checklist', health_status: 'stale' as const }
+  const listDocuments = vi.fn((_scope, _signal, filters) => {
+    if ((filters as { health?: string } | undefined)?.health === 'attention') {
+      return Promise.resolve({ results: [staleDocument], count: 26, page: 1, page_size: 25, has_more: true, health: [{ value: 'stale', count: 26 }] })
+    }
+    return Promise.resolve({ results: [currentDocument], count: 51, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 51 }] })
+  })
+  documents.list = listDocuments
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: 'Content health' }))
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
+    {}, expect.any(AbortSignal), expect.objectContaining({ health: 'attention', page: 1, page_size: 25 }),
+  ))
+  expect(await screen.findByRole('button', { name: /Off-page stale checklist/ })).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Current standard/ })).not.toBeInTheDocument()
+  expect(within(screen.getByRole('navigation', { name: 'documents pages' })).getByText('1–25 of 26')).toBeVisible()
+})
+
 it('lists titles and persists an independently edited block', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, updateSharedBlock } = clients()
@@ -536,11 +559,42 @@ it('adds a visible document block live and can pin its resolved revision', async
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Add content here' }))
   await user.click(screen.getByRole('button', { name: 'Existing content' }))
-  await user.selectOptions(screen.getByLabelText('Link a document'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Insert document' }))
+  await user.click(await screen.findByRole('button', { name: 'Insert Shared checklist' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', { source_document_id: 'doc-source', resolution_mode: 'live', pinned_revision_id: null, position: 1, audience_profile: 'shared' }))
   await user.click(screen.getByRole('button', { name: 'Keep this version' }))
   expect(updatePlacement).toHaveBeenCalledWith({}, 'doc-1', 'placement-reused', { resolution_mode: 'pinned', pinned_revision_id: 'revision-source' })
+})
+
+it('searches the complete document collection before inserting a link', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, addPlacement } = clients()
+  const offPageDocument = { ...sourceDocument, id: 'doc-off-page', title: 'Off-page recovery plan', current_revision_id: 'revision-off-page' }
+  const listDocuments = vi.fn((_scope, _signal, filters) => {
+    if ((filters as { q?: string; exclude_document?: string } | undefined)?.q === 'recovery') {
+      return Promise.resolve({ results: [offPageDocument], count: 1, page: 1, page_size: 20, has_more: false })
+    }
+    return Promise.resolve({ results: [document], count: 51, page: 1, page_size: 25, has_more: true })
+  })
+  documents.list = listDocuments
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Add content here' }))
+  await user.click(screen.getByRole('button', { name: 'Existing content' }))
+  const picker = (await screen.findByRole('searchbox', { name: 'Find a document' })).closest<HTMLElement>('.document-link-picker')
+  expect(picker).not.toBeNull()
+  await user.click(await within(picker!).findByRole('button', { name: 'Next' }))
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
+    {}, expect.any(AbortSignal), expect.objectContaining({ exclude_document: 'doc-1', page: 2, page_size: 20 }),
+  ))
+  await user.type(within(picker!).getByRole('searchbox', { name: 'Find a document' }), 'recovery')
+  await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
+    {}, expect.any(AbortSignal), expect.objectContaining({ q: 'recovery', exclude_document: 'doc-1', page: 1, page_size: 20 }),
+  ))
+  await user.click(await screen.findByRole('button', { name: 'Insert Off-page recovery plan' }))
+  await waitFor(() => expect(addPlacement).toHaveBeenCalledWith({}, 'doc-1', {
+    source_document_id: 'doc-off-page', resolution_mode: 'live', pinned_revision_id: null, position: 1, audience_profile: 'shared',
+  }))
 })
 
 it('shows explicit placement audiences, previews each publication, and updates a profile', async () => {
@@ -695,8 +749,7 @@ it('reviews shared audiences and detaches a reused block', async () => {
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
   await user.click(screen.getByRole('button', { name: 'Add content here' }))
   await user.click(screen.getByRole('button', { name: 'Existing content' }))
-  await user.selectOptions(screen.getByLabelText('Link a document'), 'doc-source')
-  await user.click(screen.getByRole('button', { name: 'Insert document' }))
+  await user.click(await screen.findByRole('button', { name: 'Insert Shared checklist' }))
   await waitFor(() => expect(addPlacement).toHaveBeenCalled())
   await user.click(screen.getAllByRole('button', { name: 'Reuse and impact' })[1])
   expect(await screen.findByRole('heading', { name: 'Where this content is used' })).toBeVisible()

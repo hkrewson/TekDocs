@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, Link, RouterProvider } from 'react-router'
 import { expect, it, vi } from 'vitest'
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import { DataFlows } from './DataFlows'
 import type { DataFlow, DataFlowChoices, DataFlowClient, DataFlowRevision } from './dataFlowApi'
 
@@ -51,8 +53,17 @@ function client(overrides: Partial<DataFlowClient> = {}, records: DataFlow[] = [
   }
 }
 
+function setup(api: DataFlowClient) {
+  const router = createMemoryRouter([{
+    path: '*',
+    element: <NavigationGuardProvider><DataFlows workspace={null} client={api} /><Link to="/other">Other page</Link></NavigationGuardProvider>,
+  }], { initialEntries: ['/compliance?section=data-flows'] })
+  const result = render(<RouterProvider router={router} />)
+  return { ...result, router }
+}
+
 it('lists a flow with the parties it moves data between and its asserted protection', async () => {
-  render(<DataFlows workspace={null} client={client()} />)
+  setup(client())
 
   const table = await screen.findByRole('group', { name: 'Data flows' })
   expect(within(table).getByText('Billing export')).toBeVisible()
@@ -64,7 +75,7 @@ it('lists a flow with the parties it moves data between and its asserted protect
 
 it('never lets an unverified draft read as evidence', async () => {
   const drafted = flow({ current_revision: revision({ provenance: 'unverified_draft' }) })
-  render(<DataFlows workspace={null} client={client({}, [drafted])} />)
+  setup(client({}, [drafted]))
 
   // The distinction must survive greyscale and a screen reader, so the words carry it
   // rather than the pill colour.
@@ -74,7 +85,7 @@ it('never lets an unverified draft read as evidence', async () => {
 })
 
 it('states a recorded fact without the draft qualifier', async () => {
-  render(<DataFlows workspace={null} client={client()} />)
+  setup(client())
 
   const pill = await screen.findByText('Recorded fact')
   expect(pill).not.toHaveTextContent('not evidence')
@@ -83,7 +94,7 @@ it('states a recorded fact without the draft qualifier', async () => {
 it('declares a flow from the vocabulary the server served', async () => {
   const user = userEvent.setup()
   const api = client()
-  render(<DataFlows workspace={null} client={api} />)
+  setup(api)
   await user.click(await screen.findByRole('button', { name: 'Declare data flow' }))
 
   await user.type(screen.getByLabelText('Name'), 'Backup replication')
@@ -102,7 +113,7 @@ it('declares a flow from the vocabulary the server served', async () => {
 it('revises an existing flow from its current revision rather than a blank form', async () => {
   const user = userEvent.setup()
   const api = client()
-  render(<DataFlows workspace={null} client={api} />)
+  setup(api)
   await user.click(await screen.findByRole('button', { name: 'Edit' }))
 
   expect(screen.getByLabelText<HTMLInputElement>('Purpose').value).toBe('Settle patient billing.')
@@ -114,7 +125,7 @@ it('revises an existing flow from its current revision rather than a blank form'
 
 it('shows every retained revision with the provenance each one asserted', async () => {
   const user = userEvent.setup()
-  render(<DataFlows workspace={null} client={client()} />)
+  setup(client())
   await user.click(await screen.findByRole('button', { name: 'History' }))
 
   const history = await screen.findByRole('group', { name: 'Data flow revisions' })
@@ -123,7 +134,7 @@ it('shows every retained revision with the provenance each one asserted', async 
 })
 
 it('offers no authoring controls to a member who may only read', async () => {
-  render(<DataFlows workspace={null} client={client({}, [flow()], false)} />)
+  setup(client({}, [flow()], false))
 
   await screen.findByText('Billing export')
   expect(screen.queryByRole('button', { name: 'Declare data flow' })).not.toBeInTheDocument()
@@ -134,7 +145,7 @@ it('offers no authoring controls to a member who may only read', async () => {
 it('repeats the reason the server refused a flow', async () => {
   const user = userEvent.setup()
   const api = client({ create: vi.fn().mockRejectedValue(new Error('The selected source is unavailable in this workspace.')) })
-  render(<DataFlows workspace={null} client={api} />)
+  setup(api)
   await user.click(await screen.findByRole('button', { name: 'Declare data flow' }))
   await user.type(screen.getByLabelText('Name'), 'Rejected')
   await user.type(screen.getByLabelText('Purpose'), 'Rejected.')
@@ -145,11 +156,25 @@ it('repeats the reason the server refused a flow', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('The data flow wasn’t saved. Your entries are still here. Try again.')
 })
 
+it('protects an unfinished data-flow declaration during navigation', async () => {
+  const user = userEvent.setup()
+  const { router } = setup(client())
+  await user.click(await screen.findByRole('button', { name: 'Declare data flow' }))
+  await user.type(screen.getByLabelText('Name'), 'Draft flow')
+  await user.click(screen.getByRole('link', { name: 'Other page' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(router.state.location.pathname).toBe('/compliance')
+  expect(screen.getByLabelText('Name')).toHaveValue('Draft flow')
+  await user.click(screen.getByRole('link', { name: 'Other page' }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  await waitFor(() => expect(router.state.location.pathname).toBe('/other'))
+})
+
 it('stays out of the page entirely when the member may not read data flows', async () => {
   // Data flows carry their own permission inside the compliance area, so a refusal is
   // not a broken page — the section simply does not apply.
   const api = client({ list: vi.fn().mockRejectedValue(new Error('forbidden')) })
-  const { container } = render(<DataFlows workspace={null} client={api} />)
+  setup(api)
 
-  await waitFor(() => expect(container).toBeEmptyDOMElement())
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Data flows' })).not.toBeInTheDocument())
 })

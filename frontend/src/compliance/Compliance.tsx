@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearchParams } from 'react-router'
 import { translate} from '../i18n/localization'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { RecordSections } from '../records/RecordNavigation'
+import '../collections/collections.css'
 import { DataFlows } from './DataFlows'
 import type { DataFlowClient } from './dataFlowApi'
 import { History, Plus, Search, Trash2 } from "lucide-react";
@@ -255,6 +259,8 @@ export function Compliance({
   client: ComplianceClient;
   dataFlowClient?: DataFlowClient;
 }) {
+  const [params] = useSearchParams()
+  const location = useLocation()
   const [frameworks, setFrameworks] = useState<ComplianceFramework[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -282,6 +288,7 @@ export function Compliance({
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [reload, setReload] = useState(0);
   const [pageState, setPageState] = useState({
     pageSize: 50,
     count: 0,
@@ -292,6 +299,23 @@ export function Compliance({
   const [draft, setDraft] = useState<ComplianceCatalogDraft>(EMPTY_CATALOG);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestedSection = params.get('section')
+  const section = COMPLIANCE_SECTIONS.some((item) => item.id === requestedSection) ? requestedSection! : 'frameworks'
+  const dirty = Boolean(form || reviewingControl || evidenceFormOpen || riskFormOpen)
+  useUnsavedChanges(dirty, saving, () => {
+    setForm(null)
+    setReviewingControl(null)
+    setAssignmentDraft(EMPTY_ASSIGNMENT)
+    setEvidenceFormOpen(false)
+    setEvidenceDraft(EMPTY_EVIDENCE)
+    setExistingEvidenceId('')
+    setEvidenceAssignmentId('')
+    setEvidenceDecision('')
+    setRiskFormOpen(false)
+    setEditingRiskId(null)
+    setRiskDraft(EMPTY_RISK)
+    setError(null)
+  })
 
   useEffect(() => {
     const controller = new AbortController();
@@ -316,7 +340,7 @@ export function Compliance({
         if (!controller.signal.aborted) setPhase("error");
       });
     return () => controller.abort();
-  }, [client, page, query, workspace]);
+  }, [client, page, query, reload, workspace]);
 
   const selected = useMemo(
     () => frameworks.find((item) => item.id === selectedId) ?? null,
@@ -341,6 +365,7 @@ export function Compliance({
   }, [client, selectedId, workspace]);
 
   useEffect(() => {
+    if (section !== 'evidence') return
     const controller = new AbortController();
     client
       .evidence(workspace, controller.signal)
@@ -349,16 +374,18 @@ export function Compliance({
         if (!controller.signal.aborted) setError(translate('compliance.evidenceLoadFailed'));
       });
     return () => controller.abort();
-  }, [client, workspace]);
+  }, [client, section, workspace]);
   useEffect(() => {
+    if (section !== 'bundles') return
     const controller = new AbortController();
     client.bundles(workspace, controller.signal).then(setBundles).catch(() => {
       if (!controller.signal.aborted) setError(translate('compliance.bundleLoadFailed'));
     });
     return () => controller.abort();
-  }, [client, workspace]);
+  }, [client, section, workspace]);
 
   useEffect(() => {
+    if (section !== 'risks') return
     const controller = new AbortController();
     client.risks(workspace, controller.signal).then((result) => {
       setRisks(result.results);
@@ -368,7 +395,7 @@ export function Compliance({
       if (!controller.signal.aborted) setError(translate('compliance.riskLoadFailed'));
     });
     return () => controller.abort();
-  }, [client, workspace]);
+  }, [client, section, workspace]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -539,19 +566,24 @@ export function Compliance({
           <h1>{translate('compliance.heading')}</h1>
           <p>{translate('compliance.intro')}</p>
         </div>
-        {canManage && (
+        {canManage && section === 'frameworks' && (
           <button type="button" className="primary-button" aria-label={translate('compliance.newFramework')} title={translate('compliance.newFramework')} onClick={startNew}>
             <Plus size={16} aria-hidden="true" />
             <span className="button-label">{translate('compliance.newFramework')}</span>
           </button>
         )}
       </header>
+      <RecordSections current={section} sections={COMPLIANCE_SECTIONS.map((item) => ({
+        ...item,
+        label: translate(item.label),
+        href: item.id === 'frameworks' ? location.pathname : `${location.pathname}?section=${item.id}`,
+      }))} />
       {error && (
         <div className="form-message error" role="alert">
           {error}
         </div>
       )}
-      {form && (
+      {section === 'frameworks' && form && (
         <section
           className="form-overlay"
           role="dialog"
@@ -593,7 +625,7 @@ export function Compliance({
           </div>
         </section>
       )}
-      <div className="compliance-layout">
+      {section === 'frameworks' && <div className="compliance-layout">
         <section className="content-section compliance-index">
           <label className="credential-reference-search">
             <span>Search frameworks</span>
@@ -616,7 +648,8 @@ export function Compliance({
           )}
           {phase === "error" && (
             <p className="empty-state" role="alert">
-              Compliance frameworks are unavailable.
+              Compliance frameworks are unavailable.{' '}
+              <button type="button" onClick={() => { setPhase('loading'); setReload((current) => current + 1) }}>{translate('collections.retry')}</button>
             </p>
           )}
           {phase === "ready" && frameworks.length === 0 && (
@@ -925,8 +958,8 @@ export function Compliance({
             </p>
           )}
         </section>
-      </div>
-      <section className="content-section compliance-evidence" aria-labelledby="compliance-evidence-heading">
+      </div>}
+      {section === 'evidence' && <section className="content-section compliance-evidence" aria-labelledby="compliance-evidence-heading">
         <div className="section-heading">
           <div>
             <h2 id="compliance-evidence-heading">Evidence</h2>
@@ -972,8 +1005,8 @@ export function Compliance({
         {evidence.length === 0 ? <p className="empty-state">No evidence has been collected in this workspace.</p> : (
           <div className="network-table-wrap" role="group" aria-label={translate('compliance.evidenceTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Evidence</th><th>Source / window</th><th>Controls</th><th>Latest review</th></tr></thead><tbody>{evidence.map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.kind}</small></td><td>{item.source_url ? <a href={item.source_url} target="_blank" rel="noreferrer">Open source</a> : item.source_entity_name ?? "Recorded in TekDocs"}<small>{item.collection_start ?? "Open"} – {item.collection_end ?? "Open"}</small></td><td>{item.control_links.length ? item.control_links.map((link) => `r${link.control_revision}`).join(", ") : "Unlinked"}</td><td>{item.reviews[0] ? <><strong>{item.reviews[0].status}</strong><small>{item.reviews[0].decision}</small></> : "Not reviewed"}</td></tr>)}</tbody></table></div>
         )}
-      </section>
-      <section className="content-section compliance-risks" aria-labelledby="compliance-risks-heading">
+      </section>}
+      {section === 'risks' && <section className="content-section compliance-risks" aria-labelledby="compliance-risks-heading">
         <div className="section-heading">
           <div>
             <h2 id="compliance-risks-heading">Risk register</h2>
@@ -1004,12 +1037,20 @@ export function Compliance({
           <div className="form-actions wide-field"><button type="button" className="primary-button" disabled={saving || !riskDraft.title || !riskDraft.decision} onClick={() => { void saveRisk(); }}>{editingRiskId ? "Save review" : "Add risk"}</button><button type="button" className="secondary-button" onClick={() => setRiskFormOpen(false)}>{translate('common.cancel')}</button></div>
         </div>}
         {risks.length === 0 ? <p className="empty-state">No risks have been recorded in this workspace.</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.riskTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Risk</th><th>Score</th><th>Treatment</th><th>Owner / deadline</th><th>History</th></tr></thead><tbody>{risks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><small>{risk.control ?? "General workspace risk"}</small></td><td><strong>{risk.score} · {risk.reporting_band}</strong><small>L{risk.likelihood} × I{risk.impact}</small></td><td><strong>{risk.status}</strong><small>{risk.treatment}</small></td><td>{risk.owner ?? "Unassigned"}<small>{risk.due_date ?? "No deadline"}</small></td><td><button type="button" className="text-button" onClick={() => editRisk(risk)}>{translate('common.review')}</button><small>{risk.events.length} retained decision{risk.events.length === 1 ? "" : "s"}</small></td></tr>)}</tbody></table></div>}
-      </section>
-      <section className="content-section compliance-risks" aria-labelledby="compliance-bundles-heading">
+      </section>}
+      {section === 'bundles' && <section className="content-section compliance-risks" aria-labelledby="compliance-bundles-heading">
         <div className="section-heading"><div><h2 id="compliance-bundles-heading">{translate('compliance.bundlesHeading')}</h2><p>{translate('compliance.bundlesIntro')}</p></div>{canManage && <button type="button" className="secondary-button" disabled={saving} onClick={() => { void (async () => { setSaving(true); try { const created = await client.createBundle(workspace, { title: `Compliance evidence ${new Date().toLocaleDateString()}`, reason: "Point-in-time compliance review", audience: "msp_internal" }); setBundles((current) => [created, ...current]); } catch { setError(translate('compliance.bundleCreateFailed')); } finally { setSaving(false); } })(); }}>{translate('compliance.createBundle')}</button>}</div>
         {bundles.length === 0 ? <p className="empty-state">{translate('compliance.bundlesEmpty')}</p> : <div className="network-table-wrap" role="group" aria-label={translate('compliance.bundleTable')} tabIndex={0}><table className="network-table"><thead><tr><th>Bundle</th><th>Audience</th><th>Verification</th><th>Created</th></tr></thead><tbody>{bundles.map((bundle) => <tr key={bundle.id}><td><strong>{bundle.title}</strong><small>{bundle.reason}</small></td><td>{bundle.audience.replace("_", " ")}</td><td><strong>{bundle.verified ? "Verified" : "Verification failed"}</strong><small>{translate('compliance.verificationId')} {bundle.content_digest.slice(0, 12)}</small></td><td>{new Date(bundle.created_at).toLocaleString()}<small>{bundle.created_by}</small></td></tr>)}</tbody></table></div>}
-      </section>
-      <DataFlows workspace={workspace} client={dataFlowClient} />
+      </section>}
+      {section === 'data-flows' && <DataFlows workspace={workspace} client={dataFlowClient} />}
     </>
   );
 }
+
+const COMPLIANCE_SECTIONS = [
+  { id: 'frameworks', label: 'compliance.sections.frameworks' },
+  { id: 'evidence', label: 'compliance.sections.evidence' },
+  { id: 'risks', label: 'compliance.sections.risks' },
+  { id: 'bundles', label: 'compliance.sections.bundles' },
+  { id: 'data-flows', label: 'compliance.sections.dataFlows' },
+] as const

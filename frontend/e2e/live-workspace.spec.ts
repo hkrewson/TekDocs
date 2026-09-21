@@ -123,6 +123,7 @@ async function rehearseRecurringDraft(page: Page) {
   await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
   await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
 
+  await page.getByRole('link', { name: 'Back to invoices' }).click()
   await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
   await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
   await page.getByRole('button', { name: 'Stop future drafts' }).click()
@@ -153,7 +154,7 @@ async function rehearseRecurringDraft(page: Page) {
 }
 
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {
-  test.setTimeout(300_000)
+  test.setTimeout(420_000)
   page.setDefaultTimeout(15_000)
   const deploymentToken = process.env.TEKDOCS_E2E_BOOTSTRAP_TOKEN
   if (!deploymentToken) throw new Error('The isolated live test requires TEKDOCS_E2E_BOOTSTRAP_TOKEN.')
@@ -1418,6 +1419,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await controlReview.getByLabel('Decision').fill('Live monitoring control reviewed')
   await controlReview.getByRole('button', { name: 'Save review' }).click()
   await expect(page.getByText('applicable · implemented')).toBeVisible()
+  await page.getByRole('link', { name: 'Review bundles' }).click()
   await page.getByRole('button', { name: 'Create locked bundle' }).click()
   await expect(page.getByText('Verified', { exact: true })).toBeVisible()
 
@@ -1550,7 +1552,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await operations.getByRole('button', { name: 'Record decision' }).click()
   await expect(operations.getByRole('status')).toHaveText('Document approved.')
   await page.reload()
-  await page.getByRole('button', { name: 'Ownership and review' }).click()
+  await expect(page).toHaveURL(/document_view=operations/)
   await expect(operations.getByLabel('Review due')).toHaveValue('2027-12-31')
   await expect(operations.getByLabel('Collection', { exact: true })).toHaveValue('Live reviewed runbooks')
   await expect(operations.getByText('Live recovery guidance approved.', { exact: true })).toBeVisible()

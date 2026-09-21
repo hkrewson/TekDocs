@@ -62,9 +62,16 @@
   {
     "route": "/compliance",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/compliance-workspace.md",
+      "frontend/src/compliance/Compliance.test.tsx",
+      "frontend/src/compliance/DataFlows.test.tsx",
+      "frontend/e2e/compliance-layout.spec.ts",
+      "frontend/e2e/data-flows.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused Frameworks, Evidence, Risks, Review bundles and Data flows sections; direct section URLs; retryable framework loading; protected drafts; retained exact revisions and provenance; responsive, accessibility and permission coverage."
   },
   {
     "route": "/credentials",
@@ -334,9 +341,16 @@
   {
     "route": "/workspaces/organizations/:organizationId/compliance",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/compliance-workspace.md",
+      "frontend/src/compliance/Compliance.test.tsx",
+      "frontend/src/compliance/DataFlows.test.tsx",
+      "frontend/e2e/compliance-layout.spec.ts",
+      "frontend/e2e/data-flows.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused Frameworks, Evidence, Risks, Review bundles and Data flows sections; direct section URLs; retryable framework loading; protected drafts; retained exact revisions and provenance; responsive, accessibility and permission coverage."
   },
   {
     "route": "/workspaces/organizations/:organizationId/credentials",

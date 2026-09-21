@@ -76,7 +76,7 @@ test('a recorded flow and an unverified draft are told apart without relying on 
     page: 1, page_size: 50, count: 2, has_more: false, can_manage: true,
   } }))
 
-  await page.goto('/compliance')
+  await page.goto('/compliance?section=data-flows')
   await expect(page.getByRole('heading', { name: 'Data flows' })).toBeVisible()
 
   // The distinction has to survive the loss of colour entirely, because that is what a
@@ -107,7 +107,7 @@ test('the flow table and its authoring form are reachable and operable by keyboa
     return route.fulfill({ status: 201, json: { id: crypto.randomUUID(), name: 'Keyboard flow', revision_count: 1, current_revision: revision(), created_at: '2026-08-20T12:00:00Z', updated_at: '2026-08-20T12:00:00Z' } })
   })
 
-  await page.goto('/compliance')
+  await page.goto('/compliance?section=data-flows')
   const scrollRegion = page.getByRole('group', { name: 'Data flows' })
   await expect(scrollRegion).toBeVisible()
   // A scrollable region must be focusable, or a keyboard user cannot scroll it at all.
@@ -129,7 +129,7 @@ test('the flow table and its authoring form are reachable and operable by keyboa
 test('a member who may not read data flows sees no trace of the section', async ({ page }) => {
   await page.route(/\/compliance\/data-flows(\?|$)/, (route) => route.fulfill({ status: 403, json: { error: { code: 'permission_denied' } } }))
 
-  await page.goto('/compliance')
+  await page.goto('/compliance?section=data-flows')
   await expect(page.getByRole('heading', { name: 'Compliance' })).toBeVisible()
 
   // A refused section renders nothing rather than an error, because the refusal is a

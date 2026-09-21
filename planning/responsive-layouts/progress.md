@@ -15,7 +15,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
 | 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
-| 6 — Financial/compliance/integrations | In progress | Client invoice collection and MSP invoice settings complete; compliance/data-flow and integration workflows remain |
+| 6 — Financial/compliance/integrations | In progress | Invoice and compliance/data-flow workspaces complete; integration workflows remain |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
 
@@ -2326,3 +2326,35 @@ Inferred: this bounded invoice settings workspace is ready for technician review
 Blocked: none. Phase 6 remains open for compliance/data-flow and integration
 workflows. Existing unrelated Wiki edits remain preserved. No external push,
 Wiki publication, deployment, version bump or removal of application data.
+
+## Compliance and data-flow workspace checkpoint — 2026-09-21
+
+Phase 6 now includes the MSP and organization Compliance routes. The former page
+that displayed the framework catalog, evidence, risks, bundles and data flows at
+once is separated into five focused, URL-addressed sections with desktop links and
+a mobile section selector. Framework collection failures can be retried in place.
+Evidence, risk and bundle reads begin only when their section is opened.
+
+Framework/version, control-review, evidence, risk and data-flow drafts now use the
+shared navigation guard. Keep editing retains entries; Discard changes clears the
+active draft and continues. Existing exact-workspace authorization, immutable
+catalog/data-flow revisions, append-only decisions, bundle verification and the
+explicit “not evidence” treatment for unverified flows remain unchanged.
+
+Verified reproduction: the focused component case failed before the change because
+Evidence, Risks and Review bundles appeared alongside the selected framework. The
+19 focused component cases now pass. The production-image browser run passes 30
+cases across Chromium, Firefox and WebKit, including the six required widths,
+accessibility, horizontal overflow, keyboard operation, provenance text and
+permission refusal. The isolated real-workspace browser journey passes against
+PostgreSQL in 4.6 minutes, including the framework, control-review and locked-bundle
+path. The repository-wide gate passes all 636 frontend tests in 117 files, the
+37-page Wiki contract, API/schema and migration agreement, policy checks, the
+production build and compressed bundle budgets (shell 129176 <= 131072; shell
+style 24503 <= 24576). Evidence: `/tmp/tekdocs-compliance-check.log` and
+`/tmp/tekdocs-compliance-live.log`.
+
+Inferred: this bounded compliance and data-flow workspace is ready for technician
+review. Blocked: none. Phase 6 remains open for integration workflows. Existing
+unrelated Wiki edits remain preserved. No external push, Wiki publication,
+deployment, version bump or removal of application data.

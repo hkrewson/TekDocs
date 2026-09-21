@@ -6,6 +6,7 @@ import { browserDataFlowClient } from './dataFlowApi'
 import type { FormEvent } from 'react'
 import type { DataFlow, DataFlowChoice, DataFlowChoices, DataFlowClient, DataFlowDraft, DataFlowRevision } from './dataFlowApi'
 import type { WorkspaceContext } from '../workspaces/api'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 
 type Mode = 'read' | 'create' | 'edit'
 
@@ -77,6 +78,11 @@ export function DataFlows({ workspace, client = browserDataFlowClient }: { works
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [pageState, setPageState] = useState({ pageSize: 50, count: 0, hasMore: false })
+  useUnsavedChanges(mode !== 'read', busy, () => {
+    setMode('read')
+    setForm(blank)
+    setError(null)
+  })
 
   useEffect(() => {
     const controller = new AbortController()

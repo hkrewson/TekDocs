@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { ComplianceClient, ComplianceFramework } from './api'
 import { Compliance } from './Compliance'
 
@@ -75,10 +77,28 @@ function client(): ComplianceClient {
 }
 
 describe('Compliance', () => {
+  function setup(api: ComplianceClient, path = '/compliance') {
+    const router = createMemoryRouter([{
+      path: '*',
+      element: <NavigationGuardProvider><Compliance workspace={null} client={api} /></NavigationGuardProvider>,
+    }], { initialEntries: [path] })
+    render(<RouterProvider router={router} />)
+    return router
+  }
+
+  it('opens one focused compliance section instead of every workflow at once', async () => {
+    setup(client())
+
+    expect(await screen.findByRole('heading', { name: 'Security Baseline' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Evidence' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Risk register' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Review bundles' })).not.toBeInTheDocument()
+  })
+
   it('loads the MSP catalog and creates a new immutable version from stable control identities', async () => {
     const api = client()
     const user = userEvent.setup()
-    render(<Compliance workspace={null} client={api} />)
+    setup(api)
 
     expect(await screen.findByRole('heading', { name: 'Security Baseline' })).toBeInTheDocument()
     expect(screen.getByText('Asset inventory')).toBeInTheDocument()
@@ -97,7 +117,7 @@ describe('Compliance', () => {
   it('records an operational review against a stable control', async () => {
     const api = client()
     const user = userEvent.setup()
-    render(<Compliance workspace={null} client={api} />)
+    setup(api)
 
     await screen.findByRole('heading', { name: 'Security Baseline' })
     await user.click(screen.getByRole('button', { name: 'Review control' }))
@@ -123,16 +143,15 @@ describe('Compliance', () => {
         owner_id: null, owner: null, review_due_date: null, reviews: [],
       }], owner_choices: [],
     })
-    render(<Compliance workspace={null} client={api} />)
+    setup(api, '/compliance?section=evidence')
 
-    await screen.findByRole('heading', { name: 'Security Baseline' })
-    await user.click(screen.getByRole('button', { name: 'Add or link evidence' }))
+    await user.click(await screen.findByRole('button', { name: 'Add or link evidence' }))
     await user.type(screen.getByLabelText('Title'), 'Access review')
     await user.selectOptions(screen.getByLabelText('Kind'), 'url')
     await user.type(screen.getByLabelText('Source URL'), 'https://example.test/access-review')
     await user.type(screen.getByLabelText('Collection start'), '2026-07-01')
     await user.type(screen.getByLabelText('Collection end'), '2026-07-31')
-    await user.selectOptions(screen.getByLabelText('Link to control'), 'assignment-1')
+    await user.selectOptions(screen.getByLabelText('Link to control'), await screen.findByRole('option', { name: 'AC-1 — Asset inventory' }))
     await user.type(screen.getByLabelText('Collection decision'), 'Collected')
     await user.click(screen.getByRole('button', { name: 'Save evidence' }))
 
@@ -147,7 +166,7 @@ describe('Compliance', () => {
   it('records a scored risk treatment decision', async () => {
     const api = client()
     const user = userEvent.setup()
-    render(<Compliance workspace={null} client={api} />)
+    setup(api, '/compliance?section=risks')
 
     await screen.findByRole('heading', { name: 'Risk register' })
     await user.click(screen.getByRole('button', { name: 'Add risk' }))
@@ -180,7 +199,7 @@ describe('Compliance', () => {
       summary: { total: 1, overdue: 1, by_status: { open: 1 }, by_band: { critical: 1, high: 0 } },
     })
     vi.mocked(api.reviewRisk).mockResolvedValue({ ...risk, status: 'accepted', treatment: 'accept', accepted_by: 'Owner', accepted_at: '2026-08-12T01:00:00Z' })
-    render(<Compliance workspace={null} client={api} />)
+    setup(api, '/compliance?section=risks')
 
     expect(await screen.findByText('Legacy platform')).toBeInTheDocument()
     expect(screen.getByText('20 · critical')).toBeInTheDocument()
@@ -199,7 +218,7 @@ describe('Compliance', () => {
   it('creates and displays a verified immutable evidence bundle', async () => {
     const api = client()
     const user = userEvent.setup()
-    render(<Compliance workspace={null} client={api} />)
+    setup(api, '/compliance?section=bundles')
 
     await screen.findByRole('heading', { name: 'Review bundles' })
     await user.click(screen.getByRole('button', { name: 'Create locked bundle' }))
@@ -208,5 +227,34 @@ describe('Compliance', () => {
       reason: 'Point-in-time compliance review', audience: 'msp_internal',
     })))
     expect(await screen.findByText('Verified')).toBeInTheDocument()
+  })
+
+  it('keeps a draft while section navigation is canceled and discards it on confirmation', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    const router = setup(api, '/compliance?section=evidence')
+    await user.click(await screen.findByRole('button', { name: 'Add or link evidence' }))
+    await user.type(screen.getByLabelText('Title'), 'Draft evidence')
+    await user.click(screen.getByRole('link', { name: 'Risks' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(router.state.location.search).toBe('?section=evidence')
+    expect(screen.getByLabelText('Title')).toHaveValue('Draft evidence')
+    await user.click(screen.getByRole('link', { name: 'Risks' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?section=risks'))
+    expect(screen.getByRole('heading', { name: 'Risk register' })).toBeInTheDocument()
+  })
+
+  it('retries a failed framework collection without reloading the page', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    vi.mocked(api.list).mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValueOnce({
+      results: [framework], page: 1, page_size: 50, count: 1, has_more: false, can_manage: true,
+    })
+    setup(api)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Compliance frameworks are unavailable.')
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('heading', { name: 'Security Baseline' })).toBeInTheDocument()
+    expect(api.list).toHaveBeenCalledTimes(2)
   })
 })

@@ -1,9 +1,13 @@
 import { browserDocumentsClient } from '../documentation/api'
 import { useEffect, useState } from 'react'
 import { Download, Play, Plus, RefreshCw } from 'lucide-react'
+import { useLocation, useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
 
+import '../collections/collections.css'
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Imports } from './Imports'
@@ -22,7 +26,6 @@ import type {
 } from './providerApi'
 import { Webhooks } from './Webhooks'
 
-type Tab = 'connections' | 'imports' | 'reconciliation' | 'exports' | 'webhooks'
 const EMPTY_CONNECTION: IntegrationConnectionDraft = {
   provider: 'netbox', name: '', base_url: '', credentials: {}, sync_interval_minutes: 60,
 }
@@ -30,12 +33,15 @@ const EMPTY_CONNECTION: IntegrationConnectionDraft = {
 export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, importsClient }: {
   workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient
 }) {
+  const [params] = useSearchParams()
+  const location = useLocation()
   const client = {
     ...webhookClient,
     gitExportDownloadUrl: (selectedWorkspace: WorkspaceContext, bundle: GitExportBundle) =>
       providerClient.gitExportDownloadUrl(selectedWorkspace, bundle),
   }
-  const [tab, setTab] = useState<Tab>('connections')
+  const requestedSection = params.get('section')
+  const section = INTEGRATION_SECTIONS.some((item) => item.id === requestedSection) ? requestedSection! : 'connections'
   const [connections, setConnections] = useState<IntegrationConnection[]>([])
   const [providers, setProviders] = useState<IntegrationProvider[]>([])
   const [jobs, setJobs] = useState<IntegrationJob[]>([])
@@ -48,35 +54,57 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [selectedPublications, setSelectedPublications] = useState<string[]>([])
   const [draft, setDraft] = useState(EMPTY_CONNECTION)
   const [showForm, setShowForm] = useState(false)
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [loadState, setLoadState] = useState<{ section: string; value: 'loading' | 'ready' | 'error' }>({ section: 'connections', value: 'loading' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rotating, setRotating] = useState<{ connection: IntegrationConnection; credentials: Record<string, string> } | null>(null)
+  const [reload, setReload] = useState(0)
+  const phase = loadState.section === section ? loadState.value : 'loading'
+  const connectionDirty = showForm && JSON.stringify(draft) !== JSON.stringify(EMPTY_CONNECTION)
+  const rotationDirty = Boolean(rotating && Object.values(rotating.credentials).some(Boolean))
+  const exportDirty = selected.length > 0 || selectedPublications.length > 0
+  useUnsavedChanges(connectionDirty || rotationDirty || exportDirty, saving, () => {
+    setShowForm(false)
+    setDraft(EMPTY_CONNECTION)
+    setRotating(null)
+    setSelected([])
+    setSelectedPublications([])
+    setError(null)
+  })
 
   useEffect(() => {
+    if (!['connections', 'reconciliation', 'exports'].includes(section)) return
     const controller = new AbortController()
-    Promise.all([
-      providerClient.listProviders(workspace, controller.signal),
-      providerClient.listConnections(workspace, controller.signal),
-      providerClient.listJobs(workspace, controller.signal),
-      providerClient.listLogs(workspace, controller.signal),
-      providerClient.listObservations(workspace, controller.signal),
-      providerClient.listConflicts(workspace, controller.signal),
-      providerClient.listGitExports(workspace, controller.signal),
-      documentsClient.list({ organizationId: workspace.kind === 'organization' ? workspace.id : undefined }, controller.signal),
-    ]).then(([nextProviders, nextConnections, nextJobs, nextLogs, nextObservations, nextConflicts, nextExports, nextDocuments]) => {
-      setProviders(nextProviders)
-      setConnections(nextConnections)
-      setJobs(nextJobs?.results ?? [])
-      setLogs(nextLogs?.results ?? [])
-      setObservations(nextObservations?.results ?? [])
-      setConflicts(nextConflicts?.results ?? [])
-      setExports(nextExports)
-      setDocuments(nextDocuments.results.filter((item) => !item.is_template))
-      setPhase('ready')
-    }).catch(() => { if (!controller.signal.aborted) setPhase('error') })
+    const request = section === 'connections'
+      ? Promise.all([
+        providerClient.listProviders(workspace, controller.signal),
+        providerClient.listConnections(workspace, controller.signal),
+        providerClient.listJobs(workspace, controller.signal),
+        providerClient.listLogs(workspace, controller.signal),
+        providerClient.listObservations(workspace, controller.signal),
+        providerClient.listConflicts(workspace, controller.signal),
+      ]).then(([nextProviders, nextConnections, nextJobs, nextLogs, nextObservations, nextConflicts]) => {
+        setProviders(nextProviders)
+        setConnections(nextConnections)
+        setJobs(nextJobs?.results ?? [])
+        setLogs(nextLogs?.results ?? [])
+        setObservations(nextObservations?.results ?? [])
+        setConflicts(nextConflicts?.results ?? [])
+      })
+      : section === 'reconciliation'
+        ? providerClient.listConflicts(workspace, controller.signal).then((next) => setConflicts(next?.results ?? []))
+        : Promise.all([
+          providerClient.listGitExports(workspace, controller.signal),
+          documentsClient.list({ organizationId: workspace.kind === 'organization' ? workspace.id : undefined }, controller.signal),
+        ]).then(([nextExports, nextDocuments]) => {
+          setExports(nextExports)
+          setDocuments(nextDocuments.results.filter((item) => !item.is_template))
+        })
+    request.then(() => {
+      setLoadState({ section, value: 'ready' })
+    }).catch(() => { if (!controller.signal.aborted) setLoadState({ section, value: 'error' }) })
     return () => controller.abort()
-  }, [documentsClient, providerClient, workspace])
+  }, [documentsClient, providerClient, reload, section, workspace])
 
   async function createConnection() {
     setSaving(true); setError(null)
@@ -153,25 +181,35 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
 
   return <>
     <header className="page-header"><div><h1>Integrations</h1><p>{translate('integrations.intro', { workspace: workspace.name })}</p></div></header>
-    <nav className="mode-tabs catalog-tabs" aria-label="Integration sections">
-      {([['connections', 'Connections'], ['imports', 'Imports'], ['reconciliation', 'Reconciliation'], ['exports', 'Git exports'], ['webhooks', 'Webhooks']] as [Tab, string][]).map(([value, label]) => <button key={value} className={tab === value ? 'selected' : ''} type="button" onClick={() => setTab(value)}>{label}</button>)}
-    </nav>
+    <RecordSections current={section} sections={INTEGRATION_SECTIONS.map((item) => ({
+      ...item,
+      label: translate(item.label),
+      href: item.id === 'connections' ? location.pathname : `${location.pathname}?section=${item.id}`,
+    }))} />
     {error && <div className="form-message error" role="alert">{error}</div>}
-    {phase === 'loading' && tab !== 'imports' && <section className="content-section" role="status">Loading integration activity…</section>}
-    {phase === 'error' && tab !== 'imports' && <section className="content-section" role="alert"><h2>Integrations unavailable</h2><p>{translate('integrations.loadFailed')}</p></section>}
-    {phase === 'ready' && tab === 'connections' && <>
+    {phase === 'loading' && ['connections', 'reconciliation', 'exports'].includes(section) && <section className="content-section" role="status">Loading integration activity…</section>}
+    {phase === 'error' && ['connections', 'reconciliation', 'exports'].includes(section) && <section className="content-section" role="alert"><h2>Integrations unavailable</h2><p>{translate('integrations.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => { setLoadState({ section, value: 'loading' }); setReload((current) => current + 1) }}>{translate('collections.retry')}</button></section>}
+    {phase === 'ready' && section === 'connections' && <>
       <section className="content-section"><div className="section-heading"><div><h2>Connections</h2><p>{translate('integrations.connectionsHelp')}</p></div><button className="primary-button" type="button" onClick={() => setShowForm(true)}><Plus size={16} />{translate('integrations.newConnection')}</button></div>
         {connections.length === 0 ? <p className="empty-state">No systems are connected to this workspace.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.connectionTable')} tabIndex={0}><table><thead><tr><th>Name</th><th>System</th><th>Status</th><th>Last completed</th><th>Next update</th><th>Needs review</th><th>Actions</th></tr></thead><tbody>{connections.map((connection) => <tr key={connection.id}><td><strong>{connection.name}</strong><br /><small>{connection.provider_details.tenant_id ? `Tenant ${connection.provider_details.tenant_id}` : connection.base_url}</small></td><td>{providerFor(connection.provider)?.label ?? connection.provider} · read-only<br /><small>{connection.provider_details.permission_status === 'verified' ? translate('integrations.permissionsVerified') : connection.provider_details.permission_status === 'not_validated' ? translate('integrations.permissionsUnchecked') : `Every ${connection.sync_interval_minutes} min`} · {connection.reconciliation_counts.observations ?? 0} records</small></td><td>{connection.active ? connection.health_status : 'paused'}{connection.last_error_code && <><br /><code>{connection.last_error_code}</code></>}</td><td>{connection.last_successful_sync_at ? new Date(connection.last_successful_sync_at).toLocaleString() : 'Not yet'}</td><td>{new Date(connection.next_sync_at).toLocaleString()}{connection.rate_limit_reset_at && <><br /><small>Rate limit resets {new Date(connection.rate_limit_reset_at).toLocaleString()}</small></>}</td><td>{connection.reconciliation_counts.review_required ?? 0}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving || !connection.active} onClick={() => { void sync(connection) }}><Play size={14} />{translate('integrations.sync')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => { void toggle(connection) }}>{connection.active ? 'Pause' : 'Resume'}</button><button className="icon-button" type="button" disabled={saving} aria-label={`Replace the credential for ${connection.name}`} title={`Replace the credential for ${connection.name}`} onClick={() => beginRotate(connection)}><RefreshCw size={15} /></button></div></td></tr>)}</tbody></table></div>}
         {rotating && providerFor(rotating.connection.provider) && <div className="archive-confirmation" role="alertdialog" aria-labelledby="replace-credential-heading" aria-describedby="replace-credential-help"><div><strong id="replace-credential-heading">{translate('integrations.rotateHeading', { name: rotating.connection.name })}</strong><p id="replace-credential-help">{translate('integrations.rotateHelp')}</p><div className="form-grid">{providerFor(rotating.connection.provider)?.credential_fields.map((field) => <label key={field.key}><span>{field.label}</span><input type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={rotating.credentials[field.key] ?? ''} onChange={(event) => setRotating({ ...rotating, credentials: { ...rotating.credentials, [field.key]: event.target.value } })} /></label>)}</div></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving || Boolean(providerFor(rotating.connection.provider)?.credential_fields.some((field) => (rotating.credentials[field.key]?.length ?? 0) < field.minimum_length))} onClick={() => { void rotate(rotating.connection, rotating.credentials) }}>{translate('integrations.rotateAction')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setRotating(null)}>{translate('common.cancel')}</button></div></div>}
       </section>
-      {showForm && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="connection-form-heading"><form className="record-form integration-connection-form" onSubmit={(event) => { event.preventDefault(); void createConnection() }}><div className="section-heading"><h2 id="connection-form-heading">{translate('integrations.newConnection')}</h2></div><div className="form-grid"><label><span>Name</span><input autoFocus value={draft.name} maxLength={100} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label><label><span>Provider</span><select value={draft.provider} onChange={(event) => { const provider = providers.find((item) => item.key === event.target.value); setDraft({ ...draft, provider: event.target.value, base_url: provider?.default_base_url ?? '', credentials: {}, sync_interval_minutes: provider?.minimum_sync_interval_minutes ?? 60 }) }}>{providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>{selectedProvider?.base_url_editable && <label className="wide-field"><span>API base URL</span><input type="url" value={draft.base_url} placeholder="https://provider.example/api/" onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} /></label>}{selectedProvider?.credential_fields.map((field) => <label key={field.key} className={field.secret ? 'wide-field' : undefined}><span>{field.label}</span><input aria-label={field.label} type={field.input_type === 'password' ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={draft.credentials[field.key] ?? ''} onChange={(event) => setDraft({ ...draft, credentials: { ...draft.credentials, [field.key]: event.target.value } })} />{field.help_text && <small>{field.help_text}</small>}</label>)}{selectedProvider?.setup_help_url && <p className="wide-field form-help">{translate('integrations.providerSetupHelp')} <a href={selectedProvider.setup_help_url} target="_blank" rel="noreferrer">{translate('integrations.providerSetupGuidance', { provider: selectedProvider.label })}</a></p>}<label><span>Sync interval (minutes)</span><input type="number" min={selectedProvider?.minimum_sync_interval_minutes ?? 5} max={selectedProvider?.maximum_sync_interval_minutes ?? 10080} value={draft.sync_interval_minutes} onChange={(event) => setDraft({ ...draft, sync_interval_minutes: Number(event.target.value) })} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving || !draft.name || Boolean(selectedProvider?.base_url_editable && !draft.base_url) || Boolean(selectedProvider?.credential_fields.some((field) => (draft.credentials[field.key]?.length ?? 0) < field.minimum_length))}>{saving ? 'Saving…' : 'Save connection'}</button><button className="secondary-button" type="button" onClick={() => setShowForm(false)}>{translate('common.cancel')}</button></div></form></section>}
+      {showForm && <section className="content-section integration-connection-form" aria-labelledby="connection-form-heading"><form onSubmit={(event) => { event.preventDefault(); void createConnection() }}><div className="section-heading"><h2 id="connection-form-heading">{translate('integrations.newConnection')}</h2></div><div className="form-grid"><label><span>Name</span><input autoFocus value={draft.name} maxLength={100} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label><label><span>Provider</span><select value={draft.provider} onChange={(event) => { const provider = providers.find((item) => item.key === event.target.value); setDraft({ ...draft, provider: event.target.value, base_url: provider?.default_base_url ?? '', credentials: {}, sync_interval_minutes: provider?.minimum_sync_interval_minutes ?? 60 }) }}>{providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>{selectedProvider?.base_url_editable && <label className="wide-field"><span>API base URL</span><input type="url" value={draft.base_url} placeholder="https://provider.example/api/" onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} /></label>}{selectedProvider?.credential_fields.map((field) => <label key={field.key} className={field.secret ? 'wide-field' : undefined}><span>{field.label}</span><input aria-label={field.label} type={field.input_type === 'password' ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={draft.credentials[field.key] ?? ''} onChange={(event) => setDraft({ ...draft, credentials: { ...draft.credentials, [field.key]: event.target.value } })} />{field.help_text && <small>{field.help_text}</small>}</label>)}{selectedProvider?.setup_help_url && <p className="wide-field form-help">{translate('integrations.providerSetupHelp')} <a href={selectedProvider.setup_help_url} target="_blank" rel="noreferrer">{translate('integrations.providerSetupGuidance', { provider: selectedProvider.label })}</a></p>}<label><span>Sync interval (minutes)</span><input type="number" min={selectedProvider?.minimum_sync_interval_minutes ?? 5} max={selectedProvider?.maximum_sync_interval_minutes ?? 10080} value={draft.sync_interval_minutes} onChange={(event) => setDraft({ ...draft, sync_interval_minutes: Number(event.target.value) })} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving || !draft.name || Boolean(selectedProvider?.base_url_editable && !draft.base_url) || Boolean(selectedProvider?.credential_fields.some((field) => (draft.credentials[field.key]?.length ?? 0) < field.minimum_length))}>{saving ? 'Saving…' : 'Save connection'}</button><button className="secondary-button" type="button" onClick={() => setShowForm(false)}>{translate('common.cancel')}</button></div></form></section>}
       <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.recentUpdates')}</h2><p>{translate('integrations.recentUpdatesHelp')}</p></div></div>{jobs.length === 0 ? <p className="empty-state">No updates have run.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.syncJobTable')} tabIndex={0}><table><thead><tr><th>Started</th><th>Connection</th><th>Started by</th><th>Status</th><th>Attempts</th><th>Result</th><th>Actions</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}><td>{new Date(job.created_at).toLocaleString()}</td><td>{job.connection_name}</td><td>{job.trigger}</td><td>{job.state.replace('_', ' ')}</td><td>{job.attempts}</td><td>{job.last_error_code || `${job.result_counts.observations ?? 0} records found`}</td><td>{(job.state === 'pending' || job.state === 'processing') ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void cancelJob(job) }}>{translate('common.cancel')}</button> : '—'}</td></tr>)}</tbody></table></div>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.sourceRecords')}</h2><p>{translate('integrations.sourceRecordsHelp')}</p></div></div>{observations.length === 0 ? <p className="empty-state">No records have been found.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Type</th><th>Source record</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th></tr></thead><tbody>{observations.map((observation) => { const conflict = conflicts.find((item) => item.connection_id === observation.connection_id && item.remote_type === observation.remote_type && item.remote_id === observation.remote_id && item.status === 'open'); return <tr key={observation.id}><td>{observation.connection_name}</td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td></tr> })}</tbody></table></div>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>Operational log</h2><p>Thirty-day structured events contain allowlisted codes and numeric metrics—not provider messages or response bodies.</p></div></div>{logs.length === 0 ? <p className="empty-state">No provider events have been recorded.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.logTable')} tabIndex={0}><table><thead><tr><th>Time</th><th>Connection</th><th>Level</th><th>Code</th><th>Metrics</th></tr></thead><tbody>{logs.map((event) => <tr key={event.id}><td>{new Date(event.occurred_at).toLocaleString()}</td><td>{event.connection_name}</td><td>{event.level}</td><td><code>{event.code}</code></td><td>{Object.entries(event.metrics).map(([key, value]) => `${key}: ${value}`).join(', ') || '—'}</td></tr>)}</tbody></table></div>}</section>
     </>}
-    {tab === 'imports' && <Imports workspace={workspace} client={importsClient} />}
-    {phase === 'ready' && tab === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>{conflicts.filter((item) => item.status === 'open').length === 0 ? <p className="empty-state">{translate('integrations.noDifferences')}</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Source record</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Decision</th></tr></thead><tbody>{conflicts.filter((item) => item.status === 'open').map((conflict) => <tr key={conflict.id}><td>{conflict.connection_name}</td><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr>)}</tbody></table></div>}</section>}
-    {phase === 'ready' && tab === 'exports' && <><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div><button className="primary-button" type="button" disabled={saving || (selected.length === 0 && selectedPublications.length === 0)} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button></div>{documents.length === 0 ? <p className="empty-state">No documents are available in this workspace.</p> : <><h3>Editable documents</h3><div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>{documents.some((document) => document.publications.length > 0) && <><h3>Published copies</h3><div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div></>}</>}</section><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>{exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}><table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table></div>}</section></>}
-    {tab === 'webhooks' && <Webhooks workspace={workspace} client={client} embedded />}
+    {section === 'imports' && <Imports workspace={workspace} client={importsClient} />}
+    {phase === 'ready' && section === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>{conflicts.filter((item) => item.status === 'open').length === 0 ? <p className="empty-state">{translate('integrations.noDifferences')}</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Source record</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Decision</th></tr></thead><tbody>{conflicts.filter((item) => item.status === 'open').map((conflict) => <tr key={conflict.id}><td>{conflict.connection_name}</td><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr>)}</tbody></table></div>}</section>}
+    {phase === 'ready' && section === 'exports' && <><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div><button className="primary-button" type="button" disabled={saving || (selected.length === 0 && selectedPublications.length === 0)} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button></div>{documents.length === 0 ? <p className="empty-state">No documents are available in this workspace.</p> : <><h3>Editable documents</h3><div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>{documents.some((document) => document.publications.length > 0) && <><h3>Published copies</h3><div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div></>}</>}</section><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>{exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}><table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table></div>}</section></>}
+    {section === 'webhooks' && <Webhooks workspace={workspace} client={client} embedded />}
   </>
 }
+
+const INTEGRATION_SECTIONS = [
+  { id: 'connections', label: 'integrations.sections.connections' },
+  { id: 'imports', label: 'integrations.sections.imports' },
+  { id: 'reconciliation', label: 'integrations.sections.reconciliation' },
+  { id: 'exports', label: 'integrations.sections.exports' },
+  { id: 'webhooks', label: 'integrations.sections.webhooks' },
+] as const

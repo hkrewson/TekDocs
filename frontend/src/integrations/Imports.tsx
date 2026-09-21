@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Download, Upload } from 'lucide-react'
 
 import { formatDateTime, translate } from '../i18n/localization'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import type { WorkspaceContext } from '../workspaces/api'
 import {
   browserImportsClient,
@@ -69,7 +70,15 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmingApply, setConfirmingApply] = useState(false)
+  const [reload, setReload] = useState(0)
   const fileInput = useRef<HTMLInputElement>(null)
+  useUnsavedChanges(Boolean(file) || Object.keys(matches).length > 0, saving, () => {
+    setFile(null)
+    setMatches({})
+    setConfirmingApply(false)
+    setError(null)
+    if (fileInput.current) fileInput.current.value = ''
+  })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -78,7 +87,7 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
       setPhase('ready')
     }).catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client, workspace])
+  }, [client, reload, workspace])
 
   useEffect(() => {
     if (!selected) return
@@ -140,7 +149,7 @@ export function Imports({ workspace, client = browserImportsClient }: { workspac
     <section className="content-section" aria-labelledby="import-history-title" aria-busy={phase === 'loading'}>
       <div className="section-heading"><div><h2 id="import-history-title">{translate('imports.historyTitle')}</h2><p>{translate('imports.historyHelp')}</p></div></div>
       {phase === 'loading' && <p className="empty-state" role="status">{translate('imports.loading')}</p>}
-      {phase === 'error' && <p className="empty-state" role="alert">{translate('imports.loadFailed')}</p>}
+      {phase === 'error' && <p className="empty-state" role="alert">{translate('imports.loadFailed')} <button type="button" onClick={() => { setPhase('loading'); setReload((current) => current + 1) }}>{translate('collections.retry')}</button></p>}
       {phase === 'ready' && batches.length === 0 && <p className="empty-state">{translate('imports.empty')}</p>}
       {phase === 'ready' && batches.length > 0 && <div className="table-scroll" role="group" aria-label={translate('imports.historyTable')} tabIndex={0}><table><thead><tr><th>{translate('imports.file')}</th><th>{translate('imports.source')}</th><th>{translate('imports.created')}</th><th>{translate('imports.state')}</th><th>{translate('imports.summary')}</th><th>{translate('imports.action')}</th></tr></thead><tbody>{batches.map((batch) => <tr key={batch.id} className={selected?.id === batch.id ? 'selected-row' : undefined}><td>{batch.source_filename}</td><td>{SOURCE_LABELS[batch.source_format]}</td><td>{formatDateTime(batch.created_at)}</td><td>{STATE_LABELS[batch.state]}</td><td>{resultSummary(batch)}</td><td><button className="secondary-button" type="button" onClick={() => { setSelected(batch); setMatches({}); setConfirmingApply(false) }}>{translate('imports.review')}</button></td></tr>)}</tbody></table></div>}
     </section>

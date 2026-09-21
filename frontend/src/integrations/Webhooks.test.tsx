@@ -1,7 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, Link, RouterProvider } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Webhooks } from './Webhooks'
@@ -20,9 +22,18 @@ function mockClient(): WebhooksClient {
   }
 }
 
+function setup(client: WebhooksClient) {
+  const router = createMemoryRouter([{
+    path: '*',
+    element: <NavigationGuardProvider><Webhooks workspace={workspace} client={client} /><Link to="/other">Other page</Link></NavigationGuardProvider>,
+  }], { initialEntries: ['/integrations?section=webhooks'] })
+  render(<RouterProvider router={router} />)
+  return router
+}
+
 describe('Webhooks', () => {
   it('shows organization-scoped endpoint metadata without a stored secret', async () => {
-    render(<Webhooks workspace={workspace} client={mockClient()} />)
+    setup(mockClient())
     expect(await screen.findByText('PSA')).toBeInTheDocument()
     expect(screen.getByText('https://hooks.example.com/tekdocs')).toBeInTheDocument()
     expect(screen.queryByText(/signing secret now/i)).not.toBeInTheDocument()
@@ -34,7 +45,7 @@ describe('Webhooks', () => {
     const client: WebhooksClient = { ...mockClient(), createEndpoint }
     createEndpoint.mockResolvedValue({ id: 'endpoint-2', direction: 'inbound', name: 'Inbound monitor', url: '', inbound_path: '/api/v1/webhooks/inbound/endpoint-2', topics: ['integration.ping'], secret_prefix: 'tdwhsec_once', secret_generation: 1, active: true, created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z', signing_secret: 'tdwhsec_one-time-secret' })
     const user = userEvent.setup()
-    render(<Webhooks workspace={workspace} client={client} />)
+    setup(client)
     await screen.findByText('PSA')
     await user.click(screen.getByRole('button', { name: /new endpoint/i }))
     await user.type(screen.getByLabelText('Name'), 'Inbound monitor')
@@ -44,12 +55,29 @@ describe('Webhooks', () => {
     expect(await screen.findByText('tdwhsec_one-time-secret')).toBeInTheDocument()
   })
 
+  it('protects a one-time signing secret until it is acknowledged or discarded', async () => {
+    const createEndpoint = vi.fn().mockResolvedValue({ id: 'endpoint-2', direction: 'inbound', name: 'Inbound monitor', url: '', inbound_path: '/api/v1/webhooks/inbound/endpoint-2', topics: ['integration.ping'], secret_prefix: 'tdwhsec_once', secret_generation: 1, active: true, created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z', signing_secret: 'tdwhsec_one-time-secret' })
+    const user = userEvent.setup()
+    const router = setup({ ...mockClient(), createEndpoint })
+    await user.click(await screen.findByRole('button', { name: /new endpoint/i }))
+    await user.type(screen.getByLabelText('Name'), 'Inbound monitor')
+    await user.selectOptions(screen.getByLabelText('Direction'), 'inbound')
+    await user.click(screen.getByRole('button', { name: /create endpoint/i }))
+    await screen.findByText('tdwhsec_one-time-secret')
+    await user.click(screen.getByRole('link', { name: 'Other page' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByText('tdwhsec_one-time-secret')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'Other page' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/other'))
+  })
+
   it('deactivates an endpoint and filters delivery inspection', async () => {
     const setActive = vi.fn().mockResolvedValue({ id: 'endpoint-1', direction: 'outbound', name: 'PSA', url: 'https://hooks.example.com/tekdocs', inbound_path: null, topics: ['document_publication.available'], secret_prefix: 'tdwhsec_sample', secret_generation: 1, active: false, created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z' })
     const listDeliveries = vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false })
     const client: WebhooksClient = { ...mockClient(), setActive, listDeliveries }
     const user = userEvent.setup()
-    render(<Webhooks workspace={workspace} client={client} />)
+    setup(client)
     await user.click(await screen.findByRole('button', { name: 'Deactivate' }))
     await waitFor(() => expect(setActive).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'endpoint-1' }), false))
     expect(await screen.findByText('Inactive')).toBeInTheDocument()
@@ -62,7 +90,7 @@ describe('Webhooks', () => {
   it('explains the impact before replacing a signing secret', async () => {
     const rotate = vi.fn().mockResolvedValue({ id: 'endpoint-1', direction: 'outbound', name: 'PSA', url: 'https://hooks.example.com/tekdocs', inbound_path: null, topics: ['document_publication.available'], secret_prefix: 'tdwhsec_new', secret_generation: 2, active: true, created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T01:00:00Z', signing_secret: 'tdwhsec_replacement' })
     const user = userEvent.setup()
-    render(<Webhooks workspace={workspace} client={{ ...mockClient(), rotate }} />)
+    setup({ ...mockClient(), rotate })
 
     await user.click(await screen.findByRole('button', { name: 'Replace the signing secret for PSA' }))
     const confirmation = screen.getByRole('alertdialog')

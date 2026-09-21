@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, Link, RouterProvider } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { WorkspaceContext } from '../workspaces/api'
 import { Imports } from './Imports'
 import type { ImportBatch, ImportsClient } from './importsApi'
@@ -31,11 +33,20 @@ function importsClient(): ImportsClient {
   }
 }
 
+function setup(client: ImportsClient) {
+  const router = createMemoryRouter([{
+    path: '*',
+    element: <NavigationGuardProvider><Imports workspace={workspace} client={client} /><Link to="/other">Other page</Link></NavigationGuardProvider>,
+  }], { initialEntries: ['/integrations?section=imports'] })
+  render(<RouterProvider router={router} />)
+  return router
+}
+
 describe('Imports', () => {
   it('previews without applying and requires a separate apply decision', async () => {
     const client = importsClient()
     const user = userEvent.setup()
-    render(<Imports workspace={workspace} client={client} />)
+    setup(client)
 
     expect(await screen.findByText(/No import has been previewed/i)).toBeInTheDocument()
     const file = new File(['external_key,name\nsite-1,Main office\n'], 'sites.csv', { type: 'text/csv' })
@@ -62,7 +73,7 @@ describe('Imports', () => {
       page: 1, page_size: 100, count: 1, has_more: false,
     })
     const user = userEvent.setup()
-    render(<Imports workspace={workspace} client={client} />)
+    setup(client)
 
     await user.click(await screen.findByRole('button', { name: 'Review' }))
     const apply = await screen.findByRole('button', { name: 'Apply import' })
@@ -72,5 +83,19 @@ describe('Imports', () => {
     await user.click(apply)
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Apply import' }))
     await waitFor(() => expect(client.apply).toHaveBeenCalledWith(workspace, batch, { 'row-2': 'entity-2' }))
+  })
+
+  it('protects a selected upload while leaving the import workflow', async () => {
+    const user = userEvent.setup()
+    const router = setup(importsClient())
+    await screen.findByText(/No import has been previewed/i)
+    const file = new File(['external_key,name\nsite-1,Main office\n'], 'sites.csv', { type: 'text/csv' })
+    await user.upload(screen.getByLabelText('File'), file)
+    await user.click(screen.getByRole('link', { name: 'Other page' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByLabelText<HTMLInputElement>('File').files?.[0]).toBe(file)
+    await user.click(screen.getByRole('link', { name: 'Other page' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await waitFor(() => expect(router.state.location.pathname).toBe('/other'))
   })
 })

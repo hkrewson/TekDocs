@@ -17,7 +17,7 @@ Delivery is organized around complete user-facing areas. Related routes are audi
 3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts, the simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers with associated subnet navigation, Racks and Devices core record drawers with parent-scoped interface editing and IP/MAC assignment migrated; DNS zone/record drawers, focused editing, history and record transfers verified against PostgreSQL and the live browser; circuit register/service-detail editing and handoff browsing verified as a bounded checkpoint; remaining network object surfaces and acceptance open.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: accepted; the grouped Organizations/People/Sites milestone and connected Stock/Vendors/Products/Licenses milestone pass their responsive and real-stack acceptance.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: in progress; document library/reader, template/reusable-content, ownership/review, retained publication sections, focused editable exports, managed-file/PDF controls, document-wide draft protection, content-health queue, document-link picker and direct-link/history restoration implemented; technician acceptance remains open.
-6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: in progress; invoice workspaces and focused compliance/data-flow workspace complete.
+6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: implemented; invoice, compliance/data-flow and focused integration workspaces complete; technician acceptance remains open.
 7. **Shell and remaining surfaces** — Search, overviews, reminders, activity, notifications, recycle bin, metadata, account/access/setup/help/system status and client portal. Status: pending.
 8. **Release acceptance** — Route/state completion, technician walkthroughs, production image and release gates. Status: pending.
 
@@ -65,6 +65,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Invoice settings workspace](invoice-settings-workspace.md)
 
 - [Compliance and data-flow workspace](compliance-workspace.md)
+
+- [Integration workspace](integration-workspace.md)
 
 - [Refresh routing and public addresses](frontend-routing.md)
 

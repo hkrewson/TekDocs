@@ -1423,6 +1423,17 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Create locked bundle' }).click()
   await expect(page.getByText('Verified', { exact: true })).toBeVisible()
 
+  await page.goto(`/workspaces/organizations/${clientId}/integrations?section=webhooks`)
+  await page.getByRole('button', { name: 'New endpoint' }).click()
+  await page.getByLabel('Name').fill('Live inbound monitor')
+  await page.getByLabel('Direction').selectOption('inbound')
+  await page.getByRole('button', { name: 'Create endpoint' }).click()
+  await expect(page.getByRole('heading', { name: 'Copy this signing secret now' })).toBeVisible()
+  await expect(page.locator('.webhook-secret code')).toContainText('tdwhsec_')
+  await page.getByRole('button', { name: 'I saved it' }).click()
+  await page.reload()
+  await expect(page.getByText('Live inbound monitor', { exact: true })).toBeVisible()
+
   await page.goto(`/workspaces/organizations/${clientId}/domains`)
   await page.getByRole('button', { name: 'Add domain' }).click()
   await page.getByLabel('Domain name').fill('live-acme.example')

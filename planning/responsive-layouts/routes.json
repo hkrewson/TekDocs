@@ -131,9 +131,16 @@
   {
     "route": "/integrations",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/integration-workspace.md",
+      "frontend/src/integrations/Integrations.test.tsx",
+      "frontend/src/integrations/Imports.test.tsx",
+      "frontend/src/integrations/Webhooks.test.tsx",
+      "frontend/e2e/integrations-layout.spec.ts",
+      "frontend/e2e/shell.spec.ts"
+    ],
+    "states": "Focused Connections, Imports, Reconciliation, Git exports and Webhooks sections; direct section URLs; scoped and retryable loading; protected drafts and one-time secrets; retained provider, import and reconciliation safety; responsive and accessibility coverage."
   },
   {
     "route": "/invoices",
@@ -410,9 +417,16 @@
   {
     "route": "/workspaces/organizations/:organizationId/integrations",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/integration-workspace.md",
+      "frontend/src/integrations/Integrations.test.tsx",
+      "frontend/src/integrations/Imports.test.tsx",
+      "frontend/src/integrations/Webhooks.test.tsx",
+      "frontend/e2e/integrations-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused Connections, Imports, Reconciliation, Git exports and Webhooks sections; direct section URLs; scoped and retryable loading; protected drafts and one-time secrets; retained provider, import and reconciliation safety; responsive, accessibility and real-workspace coverage."
   },
   {
     "route": "/workspaces/organizations/:organizationId/invoices",

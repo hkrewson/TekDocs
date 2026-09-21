@@ -1,9 +1,11 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Integrations } from './Integrations'
@@ -49,7 +51,28 @@ function documentsClient(): DocumentsClient {
   return { list: vi.fn().mockResolvedValue({ results: [runbook], count: 1 }) } as unknown as DocumentsClient
 }
 
+function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations') {
+  const router = createMemoryRouter([{
+    path: '*',
+    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} /></NavigationGuardProvider>,
+  }], { initialEntries: [path] })
+  render(<RouterProvider router={router} />)
+  return router
+}
+
 describe('Integrations', () => {
+  it('exposes each integration workflow as a durable link and loads only the active section', async () => {
+    const provider = providerClient()
+    const documents = documentsClient()
+
+    setup(provider, documents)
+
+    expect(await screen.findByRole('link', { name: 'Connections' })).toHaveAttribute('href', '/workspaces/organizations/client-1/integrations')
+    expect(screen.getByRole('link', { name: 'Imports' })).toHaveAttribute('href', '/workspaces/organizations/client-1/integrations?section=imports')
+    expect(documents.list).not.toHaveBeenCalled()
+    expect(provider.listGitExports).not.toHaveBeenCalled()
+  })
+
   it('loads the exact workspace and creates a selected sanitized export', async () => {
     const provider = providerClient()
     vi.mocked(provider.createGitExport).mockResolvedValue({
@@ -59,18 +82,39 @@ describe('Integrations', () => {
     const documents = documentsClient()
     const user = userEvent.setup()
 
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} />)
+    setup(provider, documents)
 
     expect(await screen.findByText(/No systems are connected/i)).toBeInTheDocument()
     expect(provider.listConnections).toHaveBeenCalledWith(workspace, expect.any(AbortSignal))
-    expect(documents.list).toHaveBeenCalledWith({ organizationId: 'client-1' }, expect.any(AbortSignal))
+    expect(documents.list).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Git exports' }))
-    await user.click(screen.getByRole('checkbox', { name: /Switch replacement runbook/i }))
+    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    await waitFor(() => expect(documents.list).toHaveBeenCalledWith({ organizationId: 'client-1' }, expect.any(AbortSignal)))
+    await user.click(await screen.findByRole('checkbox', { name: /Switch replacement runbook/i }))
     await user.click(screen.getByRole('button', { name: 'Create bundle' }))
 
     await waitFor(() => expect(provider.createGitExport).toHaveBeenCalledWith(workspace, ['document-1'], []))
     expect(await screen.findByText('1 KiB')).toBeInTheDocument()
+  })
+
+  it('protects a connection draft during section navigation and retries a failed collection', async () => {
+    const provider = providerClient()
+    const availableProviders = await providerClient().listProviders(workspace, new AbortController().signal)
+    vi.mocked(provider.listProviders).mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValueOnce(availableProviders)
+    const user = userEvent.setup()
+    const router = setup(provider)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Integrations could not be loaded.')
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    await user.click(await screen.findByRole('button', { name: 'New connection' }))
+    await user.type(screen.getByLabelText('Name'), 'Draft connection')
+    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(router.state.location.search).toBe('')
+    expect(screen.getByLabelText('Name')).toHaveValue('Draft connection')
+    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?section=imports'))
   })
 
   it('manages provider state and records an explicit reconciliation decision', async () => {
@@ -114,7 +158,7 @@ describe('Integrations', () => {
     vi.mocked(provider.resolveConflict).mockResolvedValue({ ...conflict, status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
     const user = userEvent.setup()
 
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
 
     await user.click(await screen.findByRole('button', { name: 'Sync' }))
     await waitFor(() => expect(provider.startSync).toHaveBeenCalledWith(workspace, connection))
@@ -131,7 +175,7 @@ describe('Integrations', () => {
       workspace, expect.objectContaining({ id: connection.id }), { api_token: 'replacement-token' },
     ))
 
-    await user.click(screen.getByRole('button', { name: 'Reconciliation' }))
+    await user.click(screen.getByRole('link', { name: 'Reconciliation' }))
     await user.click(screen.getByRole('button', { name: 'Acknowledge change' }))
     await waitFor(() => expect(provider.resolveConflict).toHaveBeenCalledWith(workspace, conflict, 'accept_remote'))
     expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
@@ -148,7 +192,7 @@ describe('Integrations', () => {
     })
     const user = userEvent.setup()
 
-    const { container } = render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.type(screen.getByLabelText('Name'), 'Client NetBox')
     await user.type(screen.getByLabelText('API base URL'), 'https://netbox.example.com/api/')
@@ -161,7 +205,7 @@ describe('Integrations', () => {
       provider: 'netbox', name: 'Client NetBox', base_url: 'https://netbox.example.com/api/',
       credentials: { api_token: 'one-time-token' }, sync_interval_minutes: 30,
     }))
-    expect(container.querySelector('input[type="password"]')).not.toBeInTheDocument()
+    expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument()
   })
 
   it('uses provider-defined Microsoft fields and never asks for an editable Graph URL', async () => {
@@ -174,7 +218,7 @@ describe('Integrations', () => {
       reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
     })
     const user = userEvent.setup()
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
 
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.selectOptions(screen.getByLabelText('Provider'), 'microsoft_graph')
@@ -202,7 +246,7 @@ describe('Integrations', () => {
       reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
     })
     const user = userEvent.setup()
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
 
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.selectOptions(screen.getByLabelText('Provider'), 'halopsa')
@@ -231,7 +275,7 @@ describe('Integrations', () => {
       reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
     })
     const user = userEvent.setup()
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
 
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.selectOptions(screen.getByLabelText('Provider'), 'ninjaone')
@@ -262,7 +306,7 @@ describe('Integrations', () => {
     })
     vi.mocked(provider.listConflicts).mockResolvedValue({ results: [{ id: 'conflict-3', connection_id: 'ninja', connection_name: 'NinjaOne', local_entity_id: 'asset-3', local_entity_name: 'Candidate laptop', remote_type: 'device', remote_id: '3', difference: 'changed', status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null }], page: 1, page_size: 50, count: 1, has_more: false })
 
-    render(<Integrations workspace={workspace} client={webhookClient} documentsClient={documentsClient()} providerClient={provider} />)
+    setup(provider)
 
     expect(await screen.findByText('Observed only')).toBeInTheDocument()
     expect(screen.getByText('Linked observation')).toBeInTheDocument()

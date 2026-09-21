@@ -15,7 +15,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
 | 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
-| 6 — Financial/compliance/integrations | In progress | Invoice and compliance/data-flow workspaces complete; integration workflows remain |
+| 6 — Financial/compliance/integrations | Implemented; acceptance open | Invoice, compliance/data-flow and integration workspaces complete; technician acceptance remains |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
 
@@ -2358,3 +2358,42 @@ Inferred: this bounded compliance and data-flow workspace is ready for technicia
 review. Blocked: none. Phase 6 remains open for integration workflows. Existing
 unrelated Wiki edits remain preserved. No external push, Wiki publication,
 deployment, version bump or removal of application data.
+
+## Integration workspace checkpoint — 2026-09-21
+
+Phase 6 now includes the MSP and organization Integrations routes. Connections,
+Imports, Reconciliation, Git exports and Webhooks are focused, URL-addressed
+sections with desktop links and a mobile selector. Each section loads only its own
+data, and provider, reconciliation and export collection failures can be retried
+in place. The connection editor is inline so section navigation remains reachable
+while a draft is active.
+
+Connection and credential drafts, import uploads and match decisions, export
+selections, webhook drafts and unacknowledged one-time secrets now use the shared
+navigation guard. Keep editing retains the work; Discard changes clears it and
+continues. Existing exact-workspace authorization, read-only provider boundaries,
+preview-before-apply imports, explicit reconciliation decisions and secret
+handling remain unchanged.
+
+Verified reproduction: the focused component case failed before the change because
+section controls were transient buttons and the default Connections view eagerly
+loaded Git-export documents. The 17 focused component cases now pass. The first
+browser run exposed the modal connection editor blocking desktop section links;
+the inline editor correction then passed all 84 integration-matrix and shell cases
+at the six required widths across Chromium, Firefox and WebKit, including draft
+retention, accessibility and horizontal overflow.
+
+The exact webhook, provider, integration-stabilization and integration-validation
+backend targets pass with permission, IDOR, row-level isolation and migration
+coverage. The isolated real-workspace journey passes against PostgreSQL in 3.4
+minutes, including one-time webhook secret issuance, acknowledgement and retained
+endpoint state. The repository-wide gate passes all 640 frontend tests in 117
+files, the 37-page Wiki contract, API/schema and migration agreement, policy
+checks, the production build and compressed bundle budgets (shell 129173 <=
+131072; shell style 24503 <= 24576). Evidence:
+`/tmp/tekdocs-integrations-check.log`, `/tmp/tekdocs-integrations-backend.log`,
+`/tmp/tekdocs-integrations-browser.log` and `/tmp/tekdocs-integrations-live.log`.
+
+Inferred: Phase 6 implementation is ready for technician acceptance. Blocked:
+none. Existing unrelated Wiki edits remain preserved. No external push, Wiki
+publication, deployment, version bump or removal of application data.

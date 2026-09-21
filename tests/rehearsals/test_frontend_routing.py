@@ -69,6 +69,24 @@ class FrontendRoutingTests(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertNotEqual(body, index.encode())
 
+    def test_pdf_worker_has_module_mime_type_and_preserves_asset_headers(self):
+        assets = subprocess.check_output([
+            'docker', 'exec', self.container, 'ls', '/usr/share/nginx/html/assets',
+        ], text=True).splitlines()
+        workers = [name for name in assets if name.startswith('pdf.worker.') and name.endswith('.mjs')]
+        self.assertEqual(len(workers), 1)
+        stylesheet = next(name for name in assets if name.endswith('.css'))
+        for name, mime in ((workers[0], 'javascript'), (stylesheet, 'text/css')):
+            with self.subTest(asset=name):
+                status, headers, body = self.request('/assets/' + name)
+                self.assertEqual(status, 200)
+                self.assertIn(mime, headers['Content-Type'])
+                self.assertIn('max-age=31536000', headers['Cache-Control'])
+                self.assertEqual(headers['X-Content-Type-Options'], 'nosniff')
+                self.assertIn('Content-Security-Policy', headers)
+                self.assertTrue(body)
+        self.assertEqual(self.request('/assets/nonexistent-pdf-worker.mjs')[0], 404)
+
     def test_nginx_directory_redirect_is_relative(self):
         subprocess.run(['docker', 'exec', self.container, 'mkdir', '-p',
                         '/usr/share/nginx/html/routing-probe'], check=True)

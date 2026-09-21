@@ -2054,3 +2054,64 @@ agreement, migration drift checks, production build and unchanged bundle budgets
 /tmp/tekdocs-publication-layout-check-final.log. Local readiness reports database
 and renderer ready at localhost:3200, version 0.8.46. Blocked: none for this
 checkpoint. No remaining validation failures.
+
+
+### 2026-09-20 — Focused managed files and reliable PDF viewing
+
+Phase 5 under #60; version remains 0.8.46. Scope and acceptance are recorded in
+[managed-files-and-pdf.md](managed-files-and-pdf.md). Files now provides a focused
+primary-version/attachment workspace. Safe retry, pending-write navigation
+protection, visible file-reference insertion, PDF session reset, render/search
+cancellation and keyboard focus are covered by this checkpoint.
+
+Verified reproductions: the component tests failed before fixes for stale PDF
+page/search state and invisible insertion from the ordinary Files toolbar.
+Evidence: /tmp/tekdocs-files-pdf-repro.log and
+/tmp/tekdocs-files-insert-repro.log. All 61 focused component tests subsequently
+pass (/tmp/tekdocs-files-components.log). The pending-write test initially
+expected a hidden discard action, but the shared guard correctly disables it;
+the corrected test asserts that departure is disabled and retry remains usable.
+
+The first Docker browser matrix passed all 36 publication/export regressions but
+failed PDF loading. A diagnostic run confirmed that Nginx served the .mjs worker
+as application/octet-stream, rejected by the browser's strict module MIME check
+(/tmp/tekdocs-files-diagnostic.log). The server now retains standard MIME types
+and adds JavaScript for .mjs. All four isolated Nginx routing tests pass, including
+worker/CSS types, security headers, year-long hashed-asset caching and missing
+worker 404 behavior (/tmp/tekdocs-files-routing.log).
+
+The next browser pass reproduced a keyboard-accessibility failure in the PDF
+scroll region (/tmp/tekdocs-files-browser-fixed.log). The canvas container is now
+focusable and labelled; the browser scenario explicitly focuses it before Escape.
+Final validation results follow below.
+
+
+Verified: all 18 managed-file/PDF cases pass at 320, 390, 768, 1024, 1280 and
+1440px across Chromium, Firefox and WebKit, with real PDF.js rendering, denied
+reads/writes, same-file retry, replacement history, removal, focus, accessibility
+and no page overflow. The 36 publication/export regression cases also pass.
+Evidence: /tmp/tekdocs-files-browser-final.log and /tmp/tekdocs-files-browser.log.
+The 320px and 1440px screenshots were reviewed:
+artifacts/document-files-{320,1440}.png.
+
+Verified: `make check` exits 0, including lint/types, API/schema agreement,
+migration checks, all 620 tests in 117 files, production build and unchanged
+bundle budgets (shell 129079 <= 131072 compressed bytes). Final lint and Docker
+build also pass after making the canvas keyboard focusable. Evidence:
+/tmp/tekdocs-files-check.log, /tmp/tekdocs-files-lint-final.log and
+/tmp/tekdocs-files-up-accessible.log.
+
+Verified: `make test-file-export-stabilization` exits 0, including document,
+attachment-security, API-token, IDOR and RLS checks plus all 620 frontend tests
+with coverage thresholds (/tmp/tekdocs-files-gate.log). `make test-e2e-live`
+exits 0: the real browser/Django/PostgreSQL journey replaces a primary file inside
+the focused Files view, retains both versions, returns focus, inserts an attachment,
+and verifies publication/download behavior and independent database assertions
+(/tmp/tekdocs-files-live.log). All 37 local Wiki pages validate. Local readiness
+reports database and renderer ready at version 0.8.46.
+
+Inferred: this bounded file/PDF workflow is ready for technician review. Blocked:
+none. Phase 5 remains open; document-wide draft protection is next, followed by
+the older health queue/link picker and remaining direct-link/history acceptance.
+Existing unrelated Wiki edits remain preserved. No external push, Wiki publication,
+deployment, version bump or removal of existing application data.

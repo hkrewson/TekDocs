@@ -735,6 +735,8 @@ it('offers inline viewing only for clean PDF files', async () => {
   await user.click(screen.getByRole('button', { name: /Files/ }))
   expect(screen.getByRole('button', { name: 'View PDF' })).toBeVisible()
   expect(screen.getAllByRole('button', { name: 'Insert here' })).toHaveLength(2)
+  await user.click(screen.getAllByRole('button', { name: 'Insert here' })[0])
+  expect(await screen.findByRole('textbox', { name: 'Document Markdown' })).toHaveValue('[setup.pdf](tekdocs://attachment/pdf-attachment)')
 })
 
 it('publishes and opens a verified locked version', async () => {
@@ -1270,4 +1272,29 @@ it('keeps lifecycle decision drafts while browsing publication sections', async 
   await user.click(screen.getByRole('button', { name: 'Close published version' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(screen.getByRole('textbox', { name: 'Decision reason' })).toHaveValue('Keep the reason across sections')
+})
+
+it('keeps the file workspace open during upload and supports retry after denial', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, uploadAttachment } = clients()
+  let rejectUpload!: (error: Error) => void
+  uploadAttachment.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectUpload = reject }))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: /Files/ }))
+  const file = new File(['notes'], 'notes.txt', { type: 'text/plain' })
+  await user.upload(screen.getByLabelText('Attachment'), file)
+  expect(screen.getByRole('button', { name: 'Close files' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Discard changes' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  await act(async () => { rejectUpload(new Error('Upload denied')); await Promise.resolve() })
+  expect(await screen.findByRole('alert')).toHaveTextContent('Upload denied')
+  expect(screen.getByRole('heading', { name: 'Files' })).toBeVisible()
+  await user.upload(screen.getByLabelText('Attachment'), file)
+  expect(await screen.findByRole('link', { name: /notes.txt/ })).toBeVisible()
+  expect(uploadAttachment).toHaveBeenCalledTimes(2)
+  await user.click(screen.getByRole('button', { name: 'Close files' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: /Files \(1\)/ })).toHaveFocus())
 })

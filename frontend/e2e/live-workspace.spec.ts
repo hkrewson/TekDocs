@@ -1131,16 +1131,19 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByRole('heading', { name: 'Local notes' })).toBeVisible()
   await expect(page.getByText('Client-specific context.', { exact: true })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Download' })).toBeVisible()
+  await page.getByRole('button', { name: /Files/ }).click()
+  await expect(page.getByRole('heading', { name: 'Local notes' })).toHaveCount(0)
   await page.getByLabel('Replacement primary file').setInputFiles({
     name: 'vendor-source-v2.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from('retained source version two\n'),
   })
   await expect(successStatus(page)).toHaveText('vendor-source-v2.txt saved as primary file version 2.')
-  await page.getByRole('button', { name: /Files/ }).click()
   await expect(page.getByRole('heading', { name: 'Main file versions' })).toBeVisible()
   await expect(page.getByText('Version 1 · 28 bytes')).toBeVisible()
   await expect(page.getByText('Version 2 · Current · 28 bytes')).toBeVisible()
+  await page.getByRole('button', { name: 'Close files' }).click()
+  await expect(page.getByRole('button', { name: 'Files', exact: true })).toBeFocused()
 
   await page.getByRole('button', { name: 'Documents', exact: true }).click()
   await page.getByRole('button', { name: 'New document' }).click()

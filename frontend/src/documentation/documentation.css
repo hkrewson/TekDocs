@@ -173,3 +173,16 @@
 .document-export-panel .checkbox-field { display: flex; gap: 8px; padding: 8px 0; }
 .document-export-panel fieldset { border: 1px solid var(--border); }
 .document-export-panel a.primary-button { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+
+.document-files { min-width: 0; }
+.document-files ul { list-style: none; padding: 0; }
+.document-files li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 12px; border-bottom: 1px solid var(--border); }
+.document-files li > a, .document-files li > span { min-width: 0; overflow-wrap: anywhere; }
+.document-files li small { display: block; margin-top: 4px; color: var(--muted); }
+.document-files li > div { display: flex; flex-wrap: wrap; gap: 8px; flex: none; }
+.document-files .pdf-viewer { min-width: 0; }
+.pdf-viewer > header > div { min-width: 0; overflow-wrap: anywhere; }
+.pdf-viewer > header > button { flex: none; }
+.pdf-viewer form[role="search"] { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.pdf-viewer input[type="search"] { min-width: 0; max-width: 100%; }
+@media (max-width: 600px) { .document-files li { align-items: flex-start; flex-direction: column; } }

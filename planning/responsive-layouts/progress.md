@@ -15,7 +15,7 @@ The Assets summary collection and typed browser API client are implemented under
 | 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
 | 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
-| 6 — Financial/compliance/integrations | Pending | All planned migrations |
+| 6 — Financial/compliance/integrations | In progress | Client invoice collection and MSP invoice settings complete; compliance/data-flow and integration workflows remain |
 | 7 — Shell/remaining surfaces | Pending | All planned migrations |
 | 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
 
@@ -2301,3 +2301,28 @@ none. Phase 6 remains open for MSP invoice settings, compliance/data-flow and
 integration workflows. Existing unrelated Wiki edits remain preserved. No
 external push, Wiki publication, deployment, version bump or removal of
 application data.
+
+## MSP invoice settings workspace checkpoint — 2026-09-21
+
+Phase 6 now includes the MSP invoice settings route. The former long form is
+separated into focused Business details, Invoice defaults and Invoice numbering
+sections with stable URLs, desktop navigation and a mobile section selector.
+Unsaved edits are protected across section and page navigation, failed reads can
+be retried in place, failed saves retain the draft, and recent-authentication
+confirmation continues without losing work. Readiness issues remain visible in
+every section.
+
+Verified reproduction: the focused component case failed before the change
+because all three settings groups competed on the page. The six-case component
+suite now passes, covering focus, URL sections, dirty navigation, load retry,
+failed-save retention and password confirmation. The production-image browser
+matrix passes 21 cases at 320, 390, 768, 1024, 1280 and 1440px across Chromium,
+Firefox and WebKit, including accessibility and horizontal-overflow checks.
+The repository-wide gate passes all 632 frontend tests in 117 files, API/schema
+and migration agreement, policy checks, the 37-page Wiki contract, production
+build and bundle budgets. Evidence: `/tmp/tekdocs-invoice-settings-check.log`.
+
+Inferred: this bounded invoice settings workspace is ready for technician review.
+Blocked: none. Phase 6 remains open for compliance/data-flow and integration
+workflows. Existing unrelated Wiki edits remain preserved. No external push,
+Wiki publication, deployment, version bump or removal of application data.

@@ -131,9 +131,13 @@
   {
     "route": "/invoices",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/invoice-settings-workspace.md",
+      "frontend/src/accounting/InvoiceSettings.test.tsx",
+      "frontend/e2e/invoice-settings-layout.spec.ts"
+    ],
+    "states": "Focused business, defaults and numbering sections; direct section URLs; retryable load; readiness; retained failed saves and recent-authentication confirmation; protected dirty navigation; responsive and accessibility coverage."
   },
   {
     "route": "/licenses",

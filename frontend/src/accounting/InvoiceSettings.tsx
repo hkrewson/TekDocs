@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useLocation, useSearchParams } from 'react-router'
 import type { AuthClient } from '../auth/api'
 import { translate } from '../i18n/localization'
 import type { MessageId } from '../i18n/localization'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { RecordSections } from '../records/RecordNavigation'
+import '../collections/collections.css'
 import { InvoiceRequestError } from './api'
 import type { InvoiceClient, InvoiceDateComponent, InvoiceIssueSettings } from './api'
 
@@ -10,30 +14,38 @@ type SettingsClient = Pick<InvoiceClient, 'issueSettings' | 'saveIssueSettings'>
 type ReauthenticationClient = Pick<AuthClient, 'reauthenticate'>
 
 export function InvoiceSettings({ client, authClient }: { client: SettingsClient; authClient: ReauthenticationClient }) {
+  const [params] = useSearchParams()
+  const location = useLocation()
   const [value, setValue] = useState<InvoiceIssueSettings | null>(null)
+  const [baseline, setBaseline] = useState<InvoiceIssueSettings | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<'none' | 'saved' | 'error'>('none')
   const [errorMessage, setErrorMessage] = useState('')
   const [reauthenticationRequired, setReauthenticationRequired] = useState(false)
   const [password, setPassword] = useState('')
+  const requestedSection = params.get('section')
+  const section = SETTINGS_SECTIONS.some((item) => item.id === requestedSection) ? requestedSection! : 'business'
+  const dirty = Boolean(value && baseline && JSON.stringify(settingsPayload(value)) !== JSON.stringify(settingsPayload(baseline)))
+  useUnsavedChanges(dirty, busy, () => {
+    setValue(baseline)
+    setMessage('none')
+    setErrorMessage('')
+    setReauthenticationRequired(false)
+    setPassword('')
+  })
 
   useEffect(() => {
     const controller = new AbortController()
     client.issueSettings(controller.signal)
-      .then((settings) => { setValue(settings); setPhase('ready') })
+      .then((settings) => { setValue(settings); setBaseline(settings); setPhase('ready') })
       .catch(() => { if (!controller.signal.aborted) setPhase('error') })
     return () => controller.abort()
-  }, [client])
+  }, [client, reload])
 
   function currentPayload() {
-    if (!value) return null
-    const payload: Record<string, unknown> = { ...value }
-    delete payload.configured
-    delete payload.issue_ready
-    delete payload.readiness_issues
-    delete payload.country_choices
-    return payload
+    return value ? settingsPayload(value) : null
   }
 
   async function saveSettings() {
@@ -43,7 +55,9 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
     setMessage('none')
     setErrorMessage('')
     try {
-      setValue(await client.saveIssueSettings(payload))
+      const saved = await client.saveIssueSettings(payload)
+      setValue(saved)
+      setBaseline(saved)
       setReauthenticationRequired(false)
       setMessage('saved')
     } catch (saveError) {
@@ -86,7 +100,8 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
   return <>
     <header className="page-header"><div><h1>{translate('accounting.issueSettings')}</h1><p>{translate('accounting.settingsScope')}</p></div></header>
     {phase === 'loading' && <section className="content-section" role="status">{translate('accounting.settingsLoading')}</section>}
-    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.settingsUnavailable')}</h2><p>{translate('accounting.settingsLoadFailed')}</p></section>}
+    {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('accounting.settingsUnavailable')}</h2><p>{translate('accounting.settingsLoadFailed')}</p><button type="button" className="secondary-button" onClick={() => { setPhase('loading'); setReload((current) => current + 1) }}>{translate('collections.retry')}</button></section>}
+    {phase === 'ready' && <RecordSections current={section} sections={SETTINGS_SECTIONS.map((item) => ({ ...item, label: translate(item.label), href: item.id === 'business' ? location.pathname : `${location.pathname}?section=${item.id}` }))} />}
     {phase === 'ready' && reauthenticationRequired && <form className="content-section invoice-reauth-form" onSubmit={(event) => { void confirmPassword(event) }}>
       <div><h2>{translate('accounting.confirmSave')}</h2><p>{translate('accounting.confirmSaveHelp')}</p></div>
       <label><span>{translate('accounting.currentPassword')}</span><input autoFocus required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
@@ -98,7 +113,7 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
       {message === 'error' && !reauthenticationRequired && <div className="form-message error" role="alert">{errorMessage || translate('accounting.settingsFailed')}</div>}
       {!value.issue_ready && value.readiness_issues.length > 0 && <div className="form-message" role="status"><strong>{translate('accounting.settingsIncomplete')}</strong><ul>{value.readiness_issues.map((issue) => <li key={issue}>{issue}</li>)}</ul></div>}
       <div className="form-grid">
-        <fieldset className="record-form-section wide-field"><legend>{translate('accounting.businessDetails')}</legend><div className="form-grid">
+        {section === 'business' && <fieldset className="record-form-section wide-field"><legend>{translate('accounting.businessDetails')}</legend><div className="form-grid">
           <Field autoFocus label={translate('accounting.legalName')} value={value.legal_name} onChange={(legal_name) => setValue({ ...value, legal_name })} />
           <Field label={translate('accounting.billingEmail')} type="email" value={value.billing_email} onChange={(billing_email) => setValue({ ...value, billing_email })} />
           <Field label={translate('accounting.phone')} value={value.phone} required={false} onChange={(phone) => setValue({ ...value, phone })} />
@@ -112,15 +127,15 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
             <option value="">{translate('accounting.selectCountry')}</option>
             {value.country_choices.map((country) => <option key={country.value} value={country.value}>{country.label} — {country.value}</option>)}
           </select></label>
-        </div></fieldset>
-        <fieldset className="record-form-section wide-field"><legend>{translate('accounting.invoiceDefaults')}</legend><div className="form-grid">
-          <Field label={translate('accounting.defaultCurrency')} value={value.default_currency} onChange={(default_currency) => setValue({ ...value, default_currency: default_currency.toUpperCase() })} />
+        </div></fieldset>}
+        {section === 'defaults' && <fieldset className="record-form-section wide-field"><legend>{translate('accounting.invoiceDefaults')}</legend><div className="form-grid">
+          <Field autoFocus label={translate('accounting.defaultCurrency')} value={value.default_currency} onChange={(default_currency) => setValue({ ...value, default_currency: default_currency.toUpperCase() })} />
           <Field label={translate('accounting.paymentTerms')} type="number" value={String(value.payment_terms_days)} onChange={(payment_terms_days) => setValue({ ...value, payment_terms_days: Number(payment_terms_days) })} />
-        </div></fieldset>
-        <fieldset className="record-form-section wide-field numbering-settings"><legend>{translate('accounting.invoiceNumbering')}</legend>
+        </div></fieldset>}
+        {section === 'numbering' && <fieldset className="record-form-section wide-field numbering-settings"><legend>{translate('accounting.invoiceNumbering')}</legend>
           <p className="field-help">{translate('accounting.numberingHelp')}</p>
           <div className="form-grid">
-            <Field label={translate('accounting.invoicePrefix')} value={value.invoice_prefix} onChange={(invoice_prefix) => setValue({ ...value, invoice_prefix: invoice_prefix.toUpperCase() })} />
+            <Field autoFocus label={translate('accounting.invoicePrefix')} value={value.invoice_prefix} onChange={(invoice_prefix) => setValue({ ...value, invoice_prefix: invoice_prefix.toUpperCase() })} />
             <SelectField label={translate('accounting.dateComponent')} value={value.invoice_date_component} options={DATE_OPTIONS} onChange={(invoice_date_component) => setValue({ ...value, invoice_date_component: invoice_date_component as InvoiceDateComponent })} />
             <SelectField label={translate('accounting.separator')} value={value.invoice_separator} options={SEPARATOR_OPTIONS} onChange={(invoice_separator) => setValue({ ...value, invoice_separator: invoice_separator as InvoiceIssueSettings['invoice_separator'] })} />
             <SelectField label={translate('accounting.sequenceDigits')} value={String(value.invoice_sequence_digits)} options={DIGIT_OPTIONS} onChange={(invoice_sequence_digits) => setValue({ ...value, invoice_sequence_digits: Number(invoice_sequence_digits) })} />
@@ -132,11 +147,26 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
             <div className="invoice-number-preview"><span>{translate('accounting.numberPreview')}</span><strong>{invoiceNumberPreview(value)}</strong></div>
           </div>
           <p className="field-help">{translate('accounting.numberingHistoryHelp')}</p>
-        </fieldset>
+        </fieldset>}
       </div>
       <div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.saving') : translate('accounting.saveSettings')}</button></div>
     </form>}
   </>
+}
+
+const SETTINGS_SECTIONS = [
+  { id: 'business', label: 'accounting.businessDetails' },
+  { id: 'defaults', label: 'accounting.invoiceDefaults' },
+  { id: 'numbering', label: 'accounting.invoiceNumbering' },
+] as const
+
+function settingsPayload(settings: InvoiceIssueSettings): Record<string, unknown> {
+  const payload: Record<string, unknown> = { ...settings }
+  delete payload.configured
+  delete payload.issue_ready
+  delete payload.readiness_issues
+  delete payload.country_choices
+  return payload
 }
 
 function Field({ label, value, onChange, type = 'text', required = true, autoFocus = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; autoFocus?: boolean }) {

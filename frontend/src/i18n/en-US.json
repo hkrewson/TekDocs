@@ -1234,7 +1234,7 @@
   "accounting.openSettings": "Open invoice settings",
   "accounting.settingsLoading": "Loading invoice settings…",
   "accounting.settingsUnavailable": "Couldn't load invoice settings.",
-  "accounting.settingsLoadFailed": "Reload this page to try again.",
+  "accounting.settingsLoadFailed": "Try loading the settings again.",
   "accounting.settingsSaved": "Invoice settings saved.",
   "accounting.businessDetails": "Your business details",
   "accounting.invoiceDefaults": "Invoice defaults",

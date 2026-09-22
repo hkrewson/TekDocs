@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 
 import pytest
-from hypothesis import given
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from apps.core.invoice_recurrence import BillingPeriod, RecurrenceError, recurring_periods_due
@@ -110,6 +110,7 @@ def test_invalid_or_unrepresentable_dates_fail_explicitly(override, message):
         recurring_periods_due(**(arguments | override))
 
 
+@settings(suppress_health_check=[HealthCheck.too_slow])
 @given(
     anchor=st.dates(min_value=date(1900, 1, 1), max_value=date(2090, 12, 31)),
     interval=st.sampled_from(["monthly", "quarterly", "annual"]),

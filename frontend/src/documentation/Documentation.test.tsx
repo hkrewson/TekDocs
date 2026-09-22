@@ -840,6 +840,23 @@ it('publishes and opens a verified locked version', async () => {
   expect(screen.queryByRole('textbox', { name: 'Document Markdown' })).not.toBeInTheDocument()
 })
 
+it('releases the saved publication draft before updating and closing its direct URL', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  testingRender(<ApplicationRouter initialPath="/documentation?document=doc-1"><Documentation workspace={null} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+
+  await user.click(await screen.findByRole('button', { name: 'Publish document' }))
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Approved for operations')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
+  expect(await screen.findByText('Signature verified')).toBeVisible()
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument())
+
+  await user.click(screen.getByRole('button', { name: 'Close published version' }))
+  await waitFor(() => expect(screen.getByRole('button', { name: /Published ·/ })).toBeVisible())
+  expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument()
+})
+
 it('shows pending client publication audiences and records an approval decision', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, publication } = clients()

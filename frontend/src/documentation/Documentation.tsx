@@ -400,6 +400,14 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const clearDocumentDetailParameters = (parameters: URLSearchParams) => {
     for (const key of ['document_view', 'document_history_page', 'document_revision', 'publication', 'publication_section']) parameters.delete(key)
   }
+  const navigateAfterGuardsRelease = (destination: string, mode: 'push' | 'replace') => {
+    // Child editors release their shared navigation guard from a layout effect.
+    // Give that parent update a full render before changing the URL; otherwise a
+    // completed save can race the old dirty guard and show a discard prompt.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      void navigate(destination, { replace: mode === 'replace' })
+    }))
+  }
   const updateDocumentLocation = (documentId: string | null, mode: 'push' | 'replace' = 'push') => {
     if (!urlManaged) return
     pendingDocumentView.current = { value: null }
@@ -410,8 +418,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     if (documentId) parameters.set('document', documentId)
     else parameters.delete('document')
     const destination = `${window.location.pathname}${parameters.size ? `?${parameters}` : ''}${window.location.hash}`
-    // Commit local save/close state first so completed editors release their navigation guard.
-    window.requestAnimationFrame(() => { void navigate(destination, { replace: mode === 'replace' }) })
+    navigateAfterGuardsRelease(destination, mode)
   }
   const updateDocumentViewLocation = (view: DocumentDirectView | null, options: { page?: number; revisionId?: string | null } = {}, mode: 'push' | 'replace' = 'push', defer = true) => {
     if (!urlManaged || !selected || selected === 'new') return
@@ -441,7 +448,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     if (section === 'content') parameters.delete('publication_section')
     else parameters.set('publication_section', section)
     const destination = `${window.location.pathname}?${parameters}${window.location.hash}`
-    window.requestAnimationFrame(() => { void navigate(destination, { replace: mode === 'replace' }) })
+    navigateAfterGuardsRelease(destination, mode)
   }
   const resetRevisionUi = () => { openedRevision.current = null; setHistoryOpen(false); setHistory([]); setHistoryPhase('idle'); setViewedRevision(null); setViewedPdf(null); setConflict(null); setReuseReview(null); setApprovedRevisionId(null); setMentionQuery(''); setMentionOptions([]); setEditingBlock(null); setNewBlockOpen(false); setInserterOpen(false); setActivePanel(null); setNewBlockMarkdown(''); setNewBlockName(''); setNewBlockPosition(null); setNewBlockLibraryVisible(false); setRolloutRules({}); setTemplateRollout(null); setRestructurePreview(null); setRestructurePhase('idle'); setExportAttachmentIds([]); setKeyBindings([]); setKeyReport(null); setBindingName(''); setAddressableTypes([]); setBindingQuery(''); setBindingMatches([]); setPlacementAudience('shared'); setAudiencePreview('all'); setDocumentCheck(null); setRemoteSourceOpen(false); setRemoteSource(null); setRemoteSourceDraft({ url: '', source_kind: 'auto', enabled: true, check_interval_minutes: 1440 }); setRemoteObservations([]) }
   const open = (document: DocumentRecord) => { publicationRead.current += 1; updateDocumentLocation(document.id); resetRevisionUi(); setPublicationView(null); setPublicationForm(null); setPublicationControl(null); setSelected(document); setTitle(document.title); setMarkdown(document.markdown); setCategory(document.category); setTopicType(document.topic_type ?? 'unstructured'); setIsTemplate(document.is_template); setLibraryVisible(document.library_visible); setMessage(null); setError(null); setShareQuery(''); setPlacementMode('live'); setPlacementAudience('shared'); setAudiencePreview('all'); setExportAttachmentIds([]); if (document.primary_file?.media_type === 'application/pdf') setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) }) }

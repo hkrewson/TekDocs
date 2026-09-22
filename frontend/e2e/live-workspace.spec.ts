@@ -388,6 +388,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
   await expect(successStatus(page)).toHaveText('Published version sent for approval. A different authorized user must approve client portal access.')
   await expect(page.getByText('Signature verified', { exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Close published version' }).click()
   await staffPage.goto(vendorHref.replace(/\/overview$/, '/documentation'))
   await staffPage.locator('.static-publication-list').getByRole('button', { name: /Live EdgeSwitch installation guide/ }).click()

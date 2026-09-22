@@ -13,6 +13,7 @@ import { browserCollectionPreferences, defaultPreferences } from '../collections
 import type { CollectionPreferences } from '../collections/preferences'
 import { FilterMenu } from '../FilterMenu'
 import '../collections/collections.css'
+import './invoices.css'
 
 import { RecurringInvoices } from './RecurringInvoices'
 import { browserRecurringClient } from './recurringApi'
@@ -294,7 +295,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
       <section className="content-section inventory-detail">
         {selected ? <>
           <div className="section-heading"><div><h2>{selected.number || `${translate('accounting.draft')} · ${formatPlainDate(selected.invoice_date)}`}</h2><p>{selected.reference || workspace.name}</p></div><span className="lifecycle-state">{translate(selected.state === 'draft' ? 'accounting.draft' : 'accounting.issued')}</span></div>
-          <dl className="inventory-provenance">
+          <dl className="invoice-metadata">
             <div><dt>{translate('accounting.invoiceDate')}</dt><dd>{formatPlainDate(selected.invoice_date)}</dd></div>
             <div><dt>{translate('accounting.dueDate')}</dt><dd>{formatPlainDate(selected.due_date)}</dd></div>
             <div><dt>{translate('accounting.currency')}</dt><dd>{selected.currency}</dd></div>
@@ -312,7 +313,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
             {canIssue && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
           </div>}
           {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate((selected.delivery_count ?? 1) === 1 ? 'accounting.deliveredProof' : 'accounting.deliveredProofPlural', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
-          {selected.state === 'issued' && <dl className="inventory-provenance">
+          {selected.state === 'issued' && <dl className="invoice-metadata">
             <div><dt>{translate('accounting.lifecycle')}</dt><dd>{lifecycleLabel(selected.lifecycle_state ?? 'issued')}</dd></div>
             <div><dt>{translate('accounting.reconciliation')}</dt><dd>{reconciliationLabel(selected.reconciliation_state ?? 'unsynchronized')}</dd></div>
             <div><dt>{translate('accounting.paid')}</dt><dd>{selected.currency} {selected.paid_amount ?? '0.00'}</dd></div>
@@ -320,8 +321,8 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
           </dl>}
           {selected.state === 'issued' && (selected.lifecycle_events?.length ?? 0) > 0 && <section aria-labelledby="invoice-history-heading"><div className="section-heading"><h3 id="invoice-history-heading">{translate('accounting.history')}</h3></div><ol className="invoice-event-list">{[...(selected.lifecycle_events ?? [])].reverse().map((item) => <li key={item.id}><div><strong>{eventLabel(item.event_type)}</strong><span>{formatPlainDate(item.occurred_at.slice(0, 10))}{item.actor ? ` · ${item.actor}` : ''}</span></div><span>{item.amount ? `${item.currency} ${item.amount}` : item.provider || item.note}</span></li>)}</ol></section>}
           <div className="section-heading"><h3>{translate('accounting.lines')}</h3>{canManage && selected.state === 'draft' && <button type="button" className="secondary-button" onClick={() => beginLine()}><Plus size={15} />{translate('accounting.addLine')}</button>}</div>
-          {selected.lines.length === 0 ? <p className="empty-state">{translate('accounting.noLines')}</p> : <ul className="inventory-list">{selected.lines.map((item) => <li key={item.id}><div><strong>{item.description}</strong><span>{item.quantity} × {item.currency} {item.unit_amount}{item.tax_rate_name ? ` · ${item.tax_rate_name}` : ''}</span></div><div><strong>{item.currency} {item.total}</strong>{canManage && selected.state === 'draft' && <div className="form-actions"><button type="button" className="text-button" aria-label={translate('accounting.editLine', { description: item.description })} onClick={() => beginLine(item)}>{translate('common.edit')}</button><button type="button" className="text-button" aria-label={translate('accounting.deleteLine', { description: item.description })} onClick={() => { void perform(() => client.removeLine(workspace, selected.id, item.id)) }}>{translate('common.remove')}</button></div>}</div></li>)}</ul>}
-          <dl className="inventory-provenance">
+          {selected.lines.length === 0 ? <p className="empty-state">{translate('accounting.noLines')}</p> : <ul className="invoice-line-list">{selected.lines.map((item) => <li key={item.id}><div className="invoice-line-description"><strong>{item.description}</strong><span>{item.quantity} × {item.currency} {item.unit_amount}{item.tax_rate_name ? ` · ${item.tax_rate_name}` : ''}</span></div><strong className="invoice-line-total">{item.currency} {item.total}</strong>{canManage && selected.state === 'draft' && <div className="invoice-line-actions"><button type="button" className="text-button" aria-label={translate('accounting.editLine', { description: item.description })} onClick={() => beginLine(item)}>{translate('common.edit')}</button><button type="button" className="text-button" aria-label={translate('accounting.deleteLine', { description: item.description })} onClick={() => { void perform(() => client.removeLine(workspace, selected.id, item.id)) }}>{translate('common.remove')}</button></div>}</li>)}</ul>}
+          <dl className="invoice-totals">
             <div><dt>{translate('accounting.subtotal')}</dt><dd>{selected.currency} {selected.subtotal}</dd></div>
             <div><dt>{translate('accounting.tax')}</dt><dd>{selected.currency} {selected.tax_total}</dd></div>
             <div><dt>{translate('accounting.total')}</dt><dd><strong>{selected.currency} {selected.total}</strong></dd></div>

@@ -4,15 +4,20 @@ import type { Page } from '@playwright/test'
 
 const clientId = 'invoice-layout-client'
 const columns = ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total']
+const invoiceLines = [
+  { id: 'line-1', position: 1, description: 'Managed network service', quantity: '24.000', unit_amount: '70.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '1680.00', tax: '0.00', total: '1680.00', origin_type: '', origin_id: null },
+  { id: 'line-2', position: 2, description: 'USW Power Adapter', quantity: '1.000', unit_amount: '97.44', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '97.44', tax: '0.00', total: '97.44', origin_type: '', origin_id: null },
+  { id: 'line-3', position: 3, description: 'TP-Link TL-SG116 16 Port Gigabit Switch', quantity: '1.000', unit_amount: '64.19', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '64.19', tax: '0.00', total: '64.19', origin_type: '', origin_id: null },
+]
 const invoices = Array.from({ length: 61 }, (_, index) => ({
   id: `invoice-${index + 1}`,
   state: index % 2 ? 'issued' : 'draft',
   number: index % 2 ? `INV-${String(index + 1).padStart(6, '0')}` : undefined,
   currency: 'USD', invoice_date: '2026-08-29', due_date: '2026-09-28',
-  reference: `PO-${String(index + 1).padStart(3, '0')}`, notes: '', subtotal: '125.00', tax_total: '0.00', total: '125.00',
-  lines: [{ id: `line-${index + 1}`, position: 1, description: 'Managed service', quantity: '1.000', unit_amount: '125.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '125.00', tax: '0.00', total: '125.00', origin_type: '', origin_id: null }],
+  reference: `PO-${String(index + 1).padStart(3, '0')}`, notes: '', subtotal: '1841.63', tax_total: '0.00', total: '1841.63',
+  lines: invoiceLines,
   created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z',
-  lifecycle_state: 'issued', reconciliation_state: 'unsynchronized', paid_amount: '0.00', balance_amount: '125.00', lifecycle_events: [],
+  lifecycle_state: 'issued', reconciliation_state: 'unsynchronized', paid_amount: '0.00', balance_amount: '1841.63', lifecycle_events: [],
 }))
 
 async function fixtures(page: Page) {
@@ -51,6 +56,18 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page).toHaveURL(/invoice=invoice-1/)
     await expect(page.getByRole('heading', { name: 'Draft · Aug 29, 2026' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Back to invoices' })).toBeVisible()
+    const lineRows = page.locator('.invoice-line-list > li')
+    await expect(lineRows).toHaveCount(3)
+    const firstLine = lineRows.first()
+    expect(await firstLine.evaluate((row) => {
+      const description = row.querySelector<HTMLElement>('.invoice-line-description')!.getBoundingClientRect()
+      const total = row.querySelector<HTMLElement>('.invoice-line-total')!.getBoundingClientRect()
+      const actions = row.querySelector<HTMLElement>('.invoice-line-actions')!.getBoundingClientRect()
+      const buttons = [...row.querySelectorAll<HTMLElement>('button')]
+      return innerWidth >= 768
+        ? description.left < total.left && total.left < actions.left && Math.abs((description.top + description.bottom) / 2 - (total.top + total.bottom) / 2) < 4 && buttons.every((button) => button.offsetWidth < 100)
+        : total.right <= innerWidth && actions.top >= description.bottom && buttons.every((button) => button.offsetWidth < 100)
+    })).toBe(true)
     expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('link', { name: 'Back to invoices' }).click()

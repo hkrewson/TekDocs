@@ -1,0 +1,69 @@
+.invoice-metadata {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 0 0 20px;
+  padding: 14px 0;
+  border-block: 1px solid var(--border);
+}
+
+.invoice-metadata div { min-width: 0; }
+.invoice-metadata dt { color: var(--muted); font-size: 11px; font-weight: 600; }
+.invoice-metadata dd { margin: 3px 0 0; overflow-wrap: anywhere; font-size: 13px; }
+
+.invoice-line-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.invoice-line-list li {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content auto;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--border);
+}
+
+.invoice-line-description { min-width: 0; display: grid; gap: 3px; }
+.invoice-line-description strong { overflow-wrap: anywhere; font-size: 14px; }
+.invoice-line-description span { color: var(--muted); font-size: 12px; }
+.invoice-line-total { white-space: nowrap; font-size: 14px; font-variant-numeric: tabular-nums; }
+.invoice-line-actions { display: flex; align-items: center; gap: 12px; }
+.invoice-line-actions .text-button {
+  width: auto;
+  min-height: 32px;
+  padding: 4px 2px;
+  color: var(--accent-strong);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.invoice-line-actions .text-button:hover { text-decoration: underline; }
+
+.invoice-totals {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 8px;
+  margin: 20px 0 0 auto;
+  padding: 14px 2px 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.invoice-totals div { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 24px; }
+.invoice-totals dt { color: var(--muted); font-size: 12px; }
+.invoice-totals dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.invoice-totals div:last-child { padding-top: 8px; border-top: 1px solid var(--border); }
+.invoice-totals div:last-child dt, .invoice-totals div:last-child dd { color: var(--text); font-size: 15px; font-weight: 650; }
+
+@media (max-width: 640px) {
+  .invoice-metadata { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-inline: 2px; }
+  .invoice-line-list li { grid-template-columns: minmax(0, 1fr) max-content; align-items: start; }
+  .invoice-line-actions { grid-column: 1 / -1; }
+  .invoice-totals { width: 100%; }
+}

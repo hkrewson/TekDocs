@@ -39,14 +39,32 @@ case "$shard" in
       "$matrix_file::test_every_unsafe_route_rejects_a_session_without_csrf" \
       "$matrix_file::test_every_cataloged_privileged_mutation_method_requires_mfa"
     ;;
-  remaining)
-    remaining_files=$(find "$repository_root/backend/apps" -path '*/tests/test_*.py' -type f \
+  accounts)
+    set -- apps/accounts/tests
+    ;;
+  core)
+    core_files=$(find "$repository_root/backend/apps/core/tests" -name 'test_*.py' -type f \
+      ! -name 'test_migration_stabilization.py' \
       ! -name 'test_permission_idor_matrix.py' -print | sort | sed "s|$repository_root/backend/||")
     # The five large matrix functions run in the other shards. Selecting the
     # remainder by exclusion automatically includes any new matrix test.
     # shellcheck disable=SC2086
-    set -- $remaining_files "$matrix_file" -k \
+    set -- $core_files "$matrix_file" -k \
       "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
+    ;;
+  migration-foundation)
+    set -- \
+      apps/core/tests/test_migration_stabilization.py::test_billing_foundation_upgrades_from_document_operations \
+      apps/core/tests/test_migration_stabilization.py::test_invoice_issue_upgrades_an_exact_prior_draft_without_allocating_a_number \
+      apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply
+    ;;
+  migration-isolation)
+    set -- apps/core/tests/test_migration_stabilization.py::test_latest_isolation_migration_reverses_and_reapplies_without_data_loss
+    ;;
+  migration-guards)
+    set -- \
+      apps/core/tests/test_migration_stabilization.py::test_the_newest_guard_migration_reverses_and_reapplies_without_losing_retained_evidence \
+      apps/core/tests/test_migration_stabilization.py::test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_evidence
     ;;
   runtime)
     set -- \
@@ -64,7 +82,7 @@ case "$shard" in
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|remaining|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac

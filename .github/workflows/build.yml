@@ -41,7 +41,7 @@ jobs:
           {
             echo "## TekDocs validation path"
             echo
-            echo "1. Static checks, browser journeys, the focused runtime/RLS gate, and four isolated PostgreSQL shards start in parallel."
+            echo "1. Static checks, browser journeys, the focused runtime/RLS gate, and eight named PostgreSQL shards start in parallel."
             echo "2. PostgreSQL shard coverage is merged and enforced after every shard passes."
             echo "3. Browser and authorization failures are reported without waiting for the complete backend suite."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
@@ -202,10 +202,11 @@ jobs:
     name: PostgreSQL shard (${{ matrix.shard }})
     needs: prepare
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [route-access, route-methods, route-session, remaining]
+        shard: [route-access, route-methods, route-session, accounts, core, migration-foundation, migration-isolation, migration-guards]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run isolated PostgreSQL shard

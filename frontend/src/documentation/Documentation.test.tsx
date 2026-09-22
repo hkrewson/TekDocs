@@ -853,7 +853,7 @@ it('releases the saved publication draft before updating and closing its direct 
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument())
 
   await user.click(screen.getByRole('button', { name: 'Close published version' }))
-  await waitFor(() => expect(screen.getByRole('button', { name: /Published ·/ })).toBeVisible())
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Close published version' })).not.toBeInTheDocument())
   expect(screen.queryByRole('dialog', { name: 'Unsaved changes' })).not.toBeInTheDocument()
 })
 

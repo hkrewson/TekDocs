@@ -1678,4 +1678,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .portal-document-list button { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
   .taxonomy-table-row, .taxonomy-migration-row { grid-template-columns: 1fr; gap: 4px; padding: 13px 0; }
   .taxonomy-table-row.header, .taxonomy-migration-row.header { display: none; }
+
+  /* iOS zooms the visual viewport when a focused form control is smaller than
+     16px. Keep phone controls at the native reading size so the shell does not
+     appear scaled or become wider after editing. */
+  #root :is(input, select, textarea, [contenteditable]) { font-size: 16px; }
+
+  .main-content { padding: var(--space-4) 0 calc(var(--space-5) * 2); }
+  .main-content > .page-header { padding-inline: var(--space-4); }
+  .main-content > .content-section { border-inline: 0; border-radius: 0; }
+
+  .auth-page { padding: 0; }
+  .auth-panel { min-height: 100dvh; border: 0; }
 }

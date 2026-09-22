@@ -145,6 +145,14 @@
   .document-detail-fields { grid-template-columns: minmax(0, 1fr); }
 }
 
+@media (max-width: 360px) {
+  .audience-preview {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
 .document-operations { min-width: 0; }
 .document-operations .section-heading { flex-wrap: wrap; }
 .document-operations h2:focus { outline: 2px solid var(--accent-strong); outline-offset: 4px; }

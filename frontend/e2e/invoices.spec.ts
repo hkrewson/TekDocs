@@ -70,6 +70,50 @@ test('invoice status and accounting updates remain compact and accessible', asyn
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
+test('expired authentication can be confirmed and invoice issue resumes', async ({ page, baseURL }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const draft = { ...issuedInvoice, state: 'draft', number: undefined, issued_at: undefined, content_digest: undefined, signature_algorithm: undefined, key_fingerprint: undefined, lifecycle_events: [] }
+  let issueAttempts = 0
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/_allauth/browser/v1/auth/reauthenticate', async (route) => {
+    expect(await route.request().postDataJSON()).toEqual({ password: 'current-password' })
+    await route.fulfill({ json: { data: { reauthenticated: true } } })
+  })
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['invoices.view', 'invoices.edit', 'invoices.issue'],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: clientId, name: 'Example Client', classifications: ['client'], capabilities: ['overview', 'invoices'],
+    organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/issue`, async (route) => {
+    issueAttempts += 1
+    await route.fulfill(issueAttempts === 1
+      ? { status: 403, json: { error: { code: 'recent_authentication_required', detail: 'Recent password or MFA reauthentication is required.' } } }
+      : { json: issuedInvoice })
+  })
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: draft }))
+
+  await page.goto(`/workspaces/organizations/${clientId}/invoices?invoice=${invoiceId}`)
+  await page.getByRole('button', { name: 'Issue invoice' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Issue invoice' }).click()
+  await expect(page.getByRole('heading', { name: 'Confirm invoice issue' })).toBeVisible()
+  await page.getByLabel('Current password').fill('current-password')
+  await page.getByRole('button', { name: 'Confirm and issue' }).click()
+  await expect(page.getByRole('heading', { name: 'INV-2026-000042' })).toBeVisible()
+  expect(issueAttempts).toBe(2)
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
 test('a stock line records its quantity for the client in one save', async ({ page, baseURL }) => {
   const draftId = crypto.randomUUID()
   const stockId = crypto.randomUUID()

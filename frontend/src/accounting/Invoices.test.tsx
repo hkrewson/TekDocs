@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { Invoices } from './Invoices'
 import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
+import { InvoiceRequestError } from './api'
 import type { InvoiceClient, InvoiceDraft } from './api'
 import type { WorkspaceContext } from '../workspaces/api'
 
@@ -79,8 +80,8 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
   }
 }
 
-function renderInvoice(client: InvoiceClient, path = '/workspaces/organizations/client-1/invoices?invoice=invoice-1') {
-  const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Invoices workspace={workspace} client={client} /></NavigationGuardProvider> }], { initialEntries: [path] })
+function renderInvoice(client: InvoiceClient, path = '/workspaces/organizations/client-1/invoices?invoice=invoice-1', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }) {
+  const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Invoices workspace={workspace} client={client} authClient={authClient} /></NavigationGuardProvider> }], { initialEntries: [path] })
   return render(<RouterProvider router={router} />)
 }
 
@@ -188,6 +189,25 @@ describe('Invoices', () => {
     expect(issue).toHaveBeenCalledWith(workspace, 'invoice-1')
     expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument()
     expect(screen.getByText(/verification ID/)).toBeInTheDocument()
+  })
+
+  it('confirms the password and retries issuance when recent authentication expired', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
+    const issue = vi.fn()
+      .mockRejectedValueOnce(new InvoiceRequestError('Recent password or MFA reauthentication is required.', 403, 'recent_authentication_required'))
+      .mockResolvedValueOnce(issued)
+    const reauthenticate = vi.fn().mockResolvedValue(undefined)
+    renderInvoice(invoiceClient({ issue }), undefined, { reauthenticate })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm invoice issue' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'current-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and issue' }))
+
+    await waitFor(() => expect(reauthenticate).toHaveBeenCalledWith('current-password'))
+    await waitFor(() => expect(issue).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('heading', { name: 'INV-000001' })).toBeInTheDocument()
   })
 
   it('names the draft and consequence before deleting it', async () => {

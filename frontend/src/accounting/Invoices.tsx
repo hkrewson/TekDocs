@@ -4,7 +4,10 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate } from '../i18n/localization'
 import type { MessageId } from '../i18n/localization'
+import { browserAuthClient } from '../auth/api'
+import type { AuthClient } from '../auth/api'
 import type { WorkspaceContext } from '../workspaces/api'
+import { InvoiceRequestError } from './api'
 import type { InvoiceClient, InvoiceCollectionQuery, InvoiceCollectionResult, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
 import { CollectionTable } from '../collections/CollectionTable'
 import { CollectionPagination } from '../CollectionPagination'
@@ -102,7 +105,7 @@ const invoiceLabels = {
   due_date: translate('accounting.dueDate'), reference: translate('accounting.reference'), total: translate('accounting.total'),
 }
 
-export function Invoices({ workspace, client, preferenceClient = browserCollectionPreferences }: { workspace: WorkspaceContext; client: InvoiceClient; preferenceClient?: typeof browserCollectionPreferences }) {
+export function Invoices({ workspace, client, preferenceClient = browserCollectionPreferences, authClient = browserAuthClient }: { workspace: WorkspaceContext; client: InvoiceClient; preferenceClient?: typeof browserCollectionPreferences; authClient?: Pick<AuthClient, 'reauthenticate'> }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -127,6 +130,8 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
   const [error, setError] = useState<string | null>(null)
   const [deliveryRecipient, setDeliveryRecipient] = useState('')
   const [confirmation, setConfirmation] = useState<'delete' | 'issue' | null>(null)
+  const [reauthenticationRequired, setReauthenticationRequired] = useState(false)
+  const [password, setPassword] = useState('')
   const selectedId = params.get('invoice')
   const selected = selectedRecord?.id === selectedId ? selectedRecord : null
   const requestedPage = Number(params.get('page') ?? 1)
@@ -236,13 +241,34 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
     try { replace(await client.issue(workspace, selected.id)) }
     catch (caught) {
       const message = caught instanceof Error ? caught.message : translate('accounting.changeFailed')
-      if (message.toLowerCase().includes('configure')) {
+      if (caught instanceof InvoiceRequestError && caught.code === 'recent_authentication_required') {
+        setConfirmation(null)
+        setReauthenticationRequired(true)
+      } else if (message.toLowerCase().includes('configure')) {
         setNeedsSettings(true)
         setError(translate('accounting.settingsRequired'))
       } else {
         setError(translate('accounting.issueFailed'))
       }
     } finally { setBusy(false) }
+  }
+
+  async function confirmIssuePassword(event: FormEvent) {
+    event.preventDefault()
+    const submittedPassword = password
+    setPassword('')
+    setBusy(true)
+    setError(null)
+    try {
+      await authClient.reauthenticate(submittedPassword)
+    } catch {
+      setError(translate('accounting.issueReauthenticationFailed'))
+      setBusy(false)
+      return
+    }
+    setReauthenticationRequired(false)
+    setBusy(false)
+    await issueSelected()
   }
 
   async function deliverSelected(event: FormEvent) {
@@ -302,8 +328,13 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
             <div><dt>{translate('accounting.reference')}</dt><dd>{selected.reference || '—'}</dd></div>
           </dl>
           {selected.notes && <p>{selected.notes}</p>}
-          {selected.state === 'draft' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setConfirmation(null); setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation('delete')}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button></>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => setConfirmation('issue')}><FileCheck2 size={15} />{translate('accounting.issue')}</button>}</div>}
+          {selected.state === 'draft' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setConfirmation(null); setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation('delete')}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button></>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => { setReauthenticationRequired(false); setConfirmation('issue') }}><FileCheck2 size={15} />{translate('accounting.issue')}</button>}</div>}
           {selected.state === 'draft' && confirmation && <div className="archive-confirmation" role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHeading' : 'accounting.deleteDraftConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHelp' : 'accounting.deleteDraftConfirmHelp')}</p></div><div className="form-actions"><button type="button" className={confirmation === 'delete' ? 'danger-button' : 'primary-button'} disabled={busy} onClick={() => { void (confirmation === 'issue' ? issueSelected() : removeDraft()) }}>{busy ? translate(confirmation === 'issue' ? 'accounting.issuing' : 'accounting.deleting') : translate(confirmation === 'issue' ? 'accounting.issue' : 'accounting.deleteDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
+          {selected.state === 'draft' && reauthenticationRequired && <form className="invoice-reauth-form invoice-issue-reauth" onSubmit={(event) => { void confirmIssuePassword(event) }}>
+            <div><h3>{translate('accounting.confirmIssue')}</h3><p>{translate('accounting.confirmIssueHelp')}</p></div>
+            <label><span>{translate('accounting.currentPassword')}</span><input autoFocus required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            <button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.confirming') : translate('accounting.confirmAndIssue')}</button>
+          </form>}
           {selected.state === 'issued' && selected.issued_at && <p className="workspace-area-note">{translate(selected.key_fingerprint ? 'accounting.issuedProofVerified' : 'accounting.issuedProof', { date: formatPlainDate(selected.issued_at.slice(0, 10)), fingerprint: selected.key_fingerprint?.slice(0, 12) ?? '' })}</p>}
           {selected.state === 'issued' && <div className="form-actions">
             <a className="secondary-button" href={client.pdfUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a>

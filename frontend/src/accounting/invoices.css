@@ -46,6 +46,13 @@
 }
 .invoice-line-actions .text-button:hover { text-decoration: underline; }
 
+.invoice-issue-reauth {
+  margin-top: 16px;
+  padding: 14px 0;
+  border-block: 1px solid var(--border);
+}
+.invoice-issue-reauth h3 { margin: 0 0 4px; font-size: 15px; }
+
 .invoice-totals {
   width: min(360px, 100%);
   display: grid;

@@ -205,7 +205,7 @@ def test_unified_search_rejects_unbounded_queries_and_requires_workspace_access(
     url = organization_search_url(client_org)
 
     assert owner_client.get(url, {"q": "x"}).status_code == 400
-    assert owner_client.get(url, {"q": "valid", "page_size": 26}).status_code == 400
+    assert owner_client.get(url, {"q": "valid", "page_size": 101}).status_code == 400
     assert owner_client.get(url, {"q": "valid", "result_type": "secret"}).status_code == 400
     assert client.get(url, {"q": "valid"}).status_code == 403
 
@@ -231,6 +231,27 @@ def test_unified_search_handles_unicode_and_keeps_pagination_stable(owner_client
     assert first["count"] == 3
     assert first["has_more"] is True
     assert {item["id"] for item in first["results"]}.isdisjoint({item["id"] for item in second["results"]})
+
+
+@pytest.mark.django_db
+def test_unified_search_supports_shared_large_page_sizes(owner_client, installation):
+    client_org = organization(installation, "Large Search Client")
+    for index in range(26):
+        create_document(
+            tenant=installation.tenant,
+            organization=client_org,
+            actor_id=installation.owner.id,
+            title=f"Runbook match {index:02d}",
+            markdown="Shared large-page search result.",
+        )
+
+    response = owner_client.get(organization_search_url(client_org), {"q": "runbook", "page_size": 50})
+
+    assert response.status_code == 200
+    assert response.json()["page_size"] == 50
+    assert response.json()["count"] == 26
+    assert len(response.json()["results"]) == 26
+    assert response.json()["has_more"] is False
 
 
 @pytest.mark.django_db

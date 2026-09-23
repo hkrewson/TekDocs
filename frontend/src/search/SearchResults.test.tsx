@@ -12,8 +12,8 @@ const firstPage: WorkspaceSearchResult = {
   ],
   facets: [{ value: 'document', label: 'Documents', count: 1 }, { value: 'certificate', label: 'Certificates', count: 1 }],
   page: 1,
-  page_size: 15,
-  count: 17,
+  page_size: 25,
+  count: 27,
   has_more: true,
   truncated: false,
 }
@@ -24,14 +24,14 @@ describe('SearchResults', () => {
     const client = { search } as WorkspaceSearchClient
     render(<MemoryRouter initialEntries={['/search?q=firewall']}><SearchResults workspace={null} client={client} /></MemoryRouter>)
 
-    expect(await screen.findByText('17 records found.')).toBeInTheDocument()
+    expect(await screen.findByText('27 records found.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
     expect(screen.getByRole('link', { name: /mail.example.com/ })).toHaveAttribute('href', '/certificates?q=mail.example.com')
     expect(screen.getByText('Allow the management subnet.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Filters$/ }))
     fireEvent.click(screen.getByText('Result type', { exact: true }))
     expect(screen.getByRole('radio', { name: 'Documents (1)' })).toBeInTheDocument()
-    expect(search).toHaveBeenCalledWith({}, 'firewall', '', 1, expect.any(AbortSignal))
+    expect(search).toHaveBeenCalledWith({}, 'firewall', '', 1, 25, expect.any(AbortSignal))
   })
 
   it('applies a result type and moves through pages without changing the query', async () => {
@@ -39,13 +39,16 @@ describe('SearchResults', () => {
     const client = { search } as WorkspaceSearchClient
     render(<MemoryRouter initialEntries={['/search?q=firewall']}><SearchResults workspace={null} client={client} /></MemoryRouter>)
 
-    await screen.findByText('17 records found.')
+    await screen.findByText('27 records found.')
     fireEvent.click(screen.getByRole('button', { name: /^Filters$/ }))
     fireEvent.click(screen.getByText('Result type', { exact: true }))
     fireEvent.click(screen.getByRole('radio', { name: 'Documents (1)' }))
-    await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 1, expect.any(AbortSignal)))
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 1, 25, expect.any(AbortSignal)))
+    expect(screen.getByRole('button', { name: /Result type: Document/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
-    await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 2, expect.any(AbortSignal)))
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 2, 25, expect.any(AbortSignal)))
+    fireEvent.change(screen.getByLabelText('Rows per page'), { target: { value: '50' } })
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith({}, 'firewall', 'document', 1, 50, expect.any(AbortSignal)))
   })
 
   it('does not submit a one-character query to the server', () => {
@@ -67,5 +70,16 @@ describe('SearchResults', () => {
 
     expect(await screen.findByRole('link', { name: /#1042 Printer queue unavailable/ })).toHaveAttribute('target', '_blank')
     expect(screen.getByRole('link', { name: /#1042 Printer queue unavailable/ })).toHaveAttribute('href', 'https://support.example.com/tickets?id=1042')
+  })
+
+  it('retries a failed search without changing its collection state', async () => {
+    const search = vi.fn().mockRejectedValueOnce(new Error('Search is temporarily unavailable.')).mockResolvedValue(firstPage)
+    render(<MemoryRouter initialEntries={['/search?q=firewall&page_size=50']}><SearchResults workspace={null} client={{ search }} /></MemoryRouter>)
+
+    expect(await screen.findByText('Search is temporarily unavailable.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('27 records found.')).toBeInTheDocument()
+    expect(search).toHaveBeenLastCalledWith({}, 'firewall', '', 1, 50, expect.any(AbortSignal))
   })
 })

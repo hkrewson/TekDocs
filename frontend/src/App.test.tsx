@@ -121,8 +121,9 @@ describe('application shell', () => {
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
     expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
-    expect(screen.getByRole('table', { name: 'Available areas' })).toHaveTextContent('Documentation')
-    expect(screen.getByText('TekDocs 0.8.46')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Client organizations/ })).toHaveAttribute('href', '/organizations')
+    expect(screen.getByRole('link', { name: /Search/ })).toHaveAttribute('href', '/search')
   })
 
   it('does not advertise excluded capabilities through deep links', () => {

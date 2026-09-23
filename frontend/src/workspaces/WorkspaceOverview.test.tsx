@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { WorkspaceOverview } from './WorkspaceOverview'
@@ -62,4 +62,18 @@ it('shows a scoped stale Halo ticket with a provider deep link', async () => {
   expect(await screen.findByText('#1042 Printer queue unavailable')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: /Open in HaloPSA/i })).toHaveAttribute('href', 'https://support.example.com/tickets?id=1042')
   expect(screen.getByText(/Stale/i)).toBeInTheDocument()
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
+})
+
+it('recovers a failed ticket summary without disturbing the organization overview', async () => {
+  const haloWorkspace: WorkspaceContext = { ...workspace, capabilities: [...workspace.capabilities, 'integrations'] }
+  const listHaloTickets = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue([])
+  render(<MemoryRouter><WorkspaceOverview workspace={haloWorkspace} relationshipsClient={relationshipsClient} integrationsClient={{ listHaloTickets } as unknown as IntegrationsClient} /></MemoryRouter>)
+
+  expect(await screen.findByText(/ticket references could not be loaded/i)).toBeInTheDocument()
+  expect(screen.getByText('Acme Dental Associates, LLC')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+
+  expect(await screen.findByText(/No mapped HaloPSA tickets/i)).toBeInTheDocument()
+  expect(listHaloTickets).toHaveBeenCalledTimes(2)
 })

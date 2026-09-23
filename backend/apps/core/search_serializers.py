@@ -25,7 +25,9 @@ class UnifiedWorkspaceSearchQuerySerializer(serializers.Serializer):
     q = serializers.CharField(min_length=2, max_length=80, trim_whitespace=True)
     result_type = serializers.ChoiceField(choices=SEARCH_RESULT_TYPES, required=False, allow_blank=True, default="")
     page = serializers.IntegerField(min_value=1, max_value=100, required=False, default=1)
-    page_size = serializers.IntegerField(min_value=1, max_value=25, required=False, default=15)
+    # Keep the legacy default and small explicit sizes compatible while allowing
+    # the responsive application to request its shared 25/50/100 page sizes.
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=15)
 
 
 class UnifiedWorkspaceSearchHitSerializer(serializers.Serializer):

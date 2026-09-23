@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Search } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
+import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
 
 import { formatInstantDate, translate } from '../i18n/localization'
@@ -23,13 +24,18 @@ const resultTypeSingularLabelIds: Record<WorkspaceSearchResultType, MessageId> =
   external_ticket: 'search.typeSingle.externalTicket',
 }
 
-function resultKey(query: string, resultType: string, page: number) {
-  return `${query}\u0000${resultType}\u0000${page}`
+function resultKey(query: string, resultType: string, page: number, pageSize: number, revision: number) {
+  return `${query}\u0000${resultType}\u0000${page}\u0000${pageSize}\u0000${revision}`
 }
 
 function pageFrom(value: string | null) {
   const page = Number(value ?? '1')
   return Number.isInteger(page) && page > 0 ? page : 1
+}
+
+function pageSizeFrom(value: string | null): 25 | 50 | 100 {
+  const pageSize = Number(value)
+  return pageSize === 50 || pageSize === 100 ? pageSize : 25
 }
 
 function searchResultType(value: string | null): WorkspaceSearchResultType | '' {
@@ -54,18 +60,20 @@ export function SearchResults({ workspace, client }: {
   const query = searchParams.get('q')?.trim() ?? ''
   const resultType = searchResultType(searchParams.get('type'))
   const page = pageFrom(searchParams.get('page'))
+  const pageSize = pageSizeFrom(searchParams.get('page_size'))
+  const [revision, setRevision] = useState(0)
   const [draft, setDraft] = useState(query)
   const [loaded, setLoaded] = useState<{ key: string; result: WorkspaceSearchResult } | null>(null)
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null)
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
-  const key = resultKey(query, resultType, page)
+  const key = resultKey(query, resultType, page, pageSize, revision)
   const visible = loaded?.key === key ? loaded.result : null
   const error = failure?.key === key ? failure.message : null
 
   useEffect(() => {
     if (query.length < 2) return
     const controller = new AbortController()
-    client.search(scope, query, resultType, page, controller.signal)
+    client.search(scope, query, resultType, page, pageSize, controller.signal)
       .then((result) => {
         if (!controller.signal.aborted) {
           setLoaded({ key, result })
@@ -78,13 +86,14 @@ export function SearchResults({ workspace, client }: {
         }
       })
     return () => controller.abort()
-  }, [client, key, page, query, resultType, scope])
+  }, [client, key, page, pageSize, query, resultType, scope])
 
-  function updateParameters(nextQuery: string, nextType: WorkspaceSearchResultType | '', nextPage = 1) {
+  function updateParameters(nextQuery: string, nextType: WorkspaceSearchResultType | '', nextPage = 1, nextPageSize = pageSize) {
     const next = new URLSearchParams()
     if (nextQuery.trim()) next.set('q', nextQuery.trim())
     if (nextType) next.set('type', nextType)
     if (nextPage > 1) next.set('page', String(nextPage))
+    if (nextPageSize !== 25) next.set('page_size', String(nextPageSize))
     setSearchParams(next)
   }
 
@@ -94,9 +103,6 @@ export function SearchResults({ workspace, client }: {
   }
 
   const facetCounts = new Map(visible?.facets.map((facet) => [facet.value, facet.count]) ?? [])
-  const firstResult = visible ? (visible.page - 1) * visible.page_size + 1 : 0
-  const lastResult = visible ? firstResult + visible.results.length - 1 : 0
-
   return <>
     <header className="page-header"><div><h1>{translate('search.heading')}</h1><p>{translate('search.intro')}</p></div></header>
     <section className="content-section" aria-labelledby="search-results-heading">
@@ -113,9 +119,12 @@ export function SearchResults({ workspace, client }: {
           ...workspaceSearchResultTypes.map((value) => ({ value, label: facetCounts.has(value) ? translate('search.typeCount', { label: translate(resultTypeLabelIds[value]), count: facetCounts.get(value) ?? 0 }) : translate(resultTypeLabelIds[value]) })),
         ],
         onChange: (value) => updateParameters(query, searchResultType(value)),
-      }]} activeCount={resultType ? 1 : 0} onClear={() => updateParameters(query, '')} menuLabel={translate('search.filters')} /></div>
+      }]} activeCount={resultType ? 1 : 0} onClear={() => updateParameters(query, '')} menuLabel={translate('search.filters')} />
+        <label className="collection-page-size">{translate('collections.pageSize')}<select value={pageSize} onChange={(event) => updateParameters(query, resultType, 1, Number(event.target.value) as 25 | 50 | 100)}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label>
+      </div>
+      {resultType && <div className="collection-active-filters"><button type="button" className="row-action" onClick={() => updateParameters(query, '')}>{translate('search.resultType')}: {translate(resultTypeSingularLabelIds[resultType])} ×</button></div>}
       <div className="section-heading search-results-heading"><div><h2 id="search-results-heading">{query ? translate('search.resultsFor', { query }) : translate('search.results')}</h2>{query && visible && <p>{visible.truncated ? translate('search.countLimited', { count: visible.count }) : translate('search.count', { count: visible.count })}</p>}</div></div>
-      {error && <p className="form-error" role="alert">{error}</p>}
+      {error && <div role="alert"><p className="form-error">{error}</p><button className="secondary-button" type="button" onClick={() => setRevision((value) => value + 1)}>{translate('common.retry')}</button></div>}
       {query.length < 2
         ? <p className="empty-state">{translate('search.minimum')}</p>
         : visible === null && !error
@@ -142,11 +151,7 @@ export function SearchResults({ workspace, client }: {
                   </Link>}
                 </li>)}
               </ul>
-              <nav className="collection-pagination" aria-label={translate('search.resultPages')}>
-                <button type="button" className="secondary-button" disabled={page === 1} onClick={() => updateParameters(query, resultType, page - 1)}>{translate('pagination.previous')}</button>
-                <span>{translate('pagination.range', { first: firstResult, last: lastResult, count: visible?.count ?? 0 })}</span>
-                <button type="button" className="secondary-button" disabled={!visible?.has_more} onClick={() => updateParameters(query, resultType, page + 1)}>{translate('pagination.next')}</button>
-              </nav>
+              {visible && <CollectionPagination label={translate('search.results')} page={page} pageSize={pageSize} count={visible.count} hasMore={visible.has_more} onPageChange={(nextPage) => updateParameters(query, resultType, nextPage)} />}
             </>}
     </section>
   </>

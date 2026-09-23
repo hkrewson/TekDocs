@@ -2510,3 +2510,38 @@ Phase 7 remains in progress. Search, overview, notifications, recycle bin,
 metadata, account/access/setup/help/status and client-portal surfaces remain open.
 Version stays 0.8.46. Production deployment, external push and Wiki publication
 remain separate.
+
+## Phase 7 Search and overviews checkpoint — 2026-09-23
+
+Search now follows the shared bounded collection contract. MSP and organization
+queries default to 25 results and offer URL-addressed 25/50/100 paging alongside
+the existing result-type filter. The active type is visible and removable outside
+the filter menu. Failed reads can be retried without clearing collection state,
+and results retain their direct application or provider links. The additive API
+ceiling is 100 while the legacy 15-result default and smaller explicit sizes stay
+compatible.
+
+The MSP Overview no longer duplicates the complete sidebar as a capability status
+table. It offers short entry points for clients, Search, Reminders and Activity.
+Organization Overview keeps its profile and relationship workflow while replacing
+the wide HaloPSA table with a compact observation feed and an explicit read retry.
+Long identity and ticket values use the ordinary page scroll without horizontal
+table overflow. See [search-and-overviews.md](search-and-overviews.md) for the
+contract and compatibility boundaries.
+
+Verification covers the eight-case PostgreSQL search target and 647 frontend
+tests in 118 files, including the focused component and API coverage. All 18
+maintained-browser cases pass at 320, 390, 768, 1024, 1280 and 1440 CSS pixels
+across Chromium, Firefox and WebKit, including axe, overflow, paging, page-size
+and URL restoration coverage. The isolated real browser-to-Django-to-PostgreSQL
+journey passes in 3.5 minutes and verifies both overview levels plus direct and
+reloaded organization Search state. The final repository gate also covers backend
+and documentation checks, schema/generated contract drift, the production build
+and compressed budgets. Evidence: the focused command results recorded with this
+checkpoint, `/tmp/tekdocs-search-overview-browser.log` and
+`/tmp/tekdocs-search-overview-check.log`.
+
+Phase 7 remains in progress. Notifications, recycle bin, metadata,
+account/access/setup/help/status and client-portal surfaces remain open. Version
+stays 0.8.46. Production deployment, external push and Wiki publication remain
+separate.

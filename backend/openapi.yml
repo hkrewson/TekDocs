@@ -6303,7 +6303,7 @@ paths:
         name: page_size
         schema:
           type: integer
-          maximum: 25
+          maximum: 100
           minimum: 1
           default: 15
       - in: query
@@ -29244,7 +29244,7 @@ paths:
         name: page_size
         schema:
           type: integer
-          maximum: 25
+          maximum: 100
           minimum: 1
           default: 15
       - in: query

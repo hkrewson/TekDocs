@@ -58,6 +58,7 @@ export interface WorkspaceSearchClient {
     query: string,
     resultType: WorkspaceSearchResultType | '',
     page: number,
+    pageSize: 25 | 50 | 100,
     signal?: AbortSignal,
   ): Promise<WorkspaceSearchResult>
 }
@@ -80,8 +81,8 @@ function searchError(response: Response) {
 }
 
 export const browserWorkspaceSearchClient: WorkspaceSearchClient = {
-  async search(scope, query, resultType, page, signal) {
-    const parameters = new URLSearchParams({ q: query, page: String(page), page_size: '15' })
+  async search(scope, query, resultType, page, pageSize, signal) {
+    const parameters = new URLSearchParams({ q: query, page: String(page), page_size: String(pageSize) })
     if (resultType) parameters.set('result_type', resultType)
     const response = await fetch(`${searchPath(scope)}?${parameters}`, {
       credentials: 'same-origin',

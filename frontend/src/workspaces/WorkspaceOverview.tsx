@@ -20,15 +20,16 @@ export function WorkspaceOverview({ workspace, relationshipsClient, integrations
   const showHaloTickets = workspace.kind === 'organization' && workspace.classifications.includes('client') && workspace.capabilities.includes('integrations')
   const [tickets, setTickets] = useState<HaloTicketSummary[] | null>(showHaloTickets ? null : [])
   const [ticketError, setTicketError] = useState(false)
+  const [ticketRevision, setTicketRevision] = useState(0)
 
   useEffect(() => {
     if (!showHaloTickets) return
     const controller = new AbortController()
     integrationsClient.listHaloTickets(workspace, controller.signal)
-      .then((results) => { if (!controller.signal.aborted) setTickets(results) })
+      .then((results) => { if (!controller.signal.aborted) { setTickets(results); setTicketError(false) } })
       .catch(() => { if (!controller.signal.aborted) { setTickets([]); setTicketError(true) } })
     return () => controller.abort()
-  }, [integrationsClient, showHaloTickets, workspace])
+  }, [integrationsClient, showHaloTickets, ticketRevision, workspace])
   return (
     <>
       <nav className="breadcrumbs" aria-label="Breadcrumb">
@@ -52,8 +53,8 @@ export function WorkspaceOverview({ workspace, relationshipsClient, integrations
       </section>
       {showHaloTickets && <section className="content-section" aria-labelledby="halo-tickets-heading">
         <div className="section-heading"><div><h2 id="halo-tickets-heading">{translate('workspace.haloTickets')}</h2><p>{translate('workspace.haloTicketsHelp')}</p></div></div>
-        {ticketError && <p className="form-error" role="alert">{translate('workspace.haloTicketsFailed')}</p>}
-        {tickets === null ? <p role="status">{translate('workspace.haloTicketsLoading')}</p> : tickets.length === 0 ? <p className="empty-state">{translate('workspace.haloTicketsEmpty')}</p> : <div className="table-scroll" role="group" aria-label={translate('workspace.haloTickets')} tabIndex={0}><table><thead><tr><th>{translate('workspace.haloTicket')}</th><th>{translate('workspace.haloTicketStatus')}</th><th>{translate('workspace.haloTicketOwner')}</th><th>{translate('workspace.haloTicketSource')}</th></tr></thead><tbody>{tickets.map((ticket) => <tr key={ticket.id}><td><strong>#{ticket.number} {ticket.title}</strong>{ticket.external_url && <a href={ticket.external_url} target="_blank" rel="noreferrer">{translate('workspace.openInHalo')}<ExternalLink size={13} aria-hidden="true" /></a>}</td><td>{[ticket.status, ticket.priority].filter(Boolean).join(' · ') || '—'}</td><td>{[ticket.assigned_team, ticket.assigned_agent].filter(Boolean).join(' · ') || '—'}</td><td>{ticket.stale ? translate('workspace.haloTicketStale', { date: ticket.source_last_synced_at ? formatInstantDate(ticket.source_last_synced_at) : translate('workspace.neverSynced') }) : formatInstantDate(ticket.source_updated_at)}</td></tr>)}</tbody></table></div>}
+        {ticketError && <div role="alert"><p className="form-error">{translate('workspace.haloTicketsFailed')}</p><button className="secondary-button" type="button" onClick={() => { setTickets(null); setTicketRevision((value) => value + 1) }}>{translate('common.retry')}</button></div>}
+        {!ticketError && (tickets === null ? <p role="status">{translate('workspace.haloTicketsLoading')}</p> : tickets.length === 0 ? <p className="empty-state">{translate('workspace.haloTicketsEmpty')}</p> : <ol className="plain-detail-list">{tickets.map((ticket) => <li key={ticket.id}><div><strong>#{ticket.number} {ticket.title}</strong><span>{[ticket.status, ticket.priority].filter(Boolean).join(' · ') || '—'} · {[ticket.assigned_team, ticket.assigned_agent].filter(Boolean).join(' · ') || translate('workspace.haloTicketUnassigned')}</span>{ticket.external_url && <a href={ticket.external_url} target="_blank" rel="noreferrer">{translate('workspace.openInHalo')}<ExternalLink size={13} aria-hidden="true" /></a>}</div><div><span>{ticket.stale ? translate('workspace.haloTicketStale', { date: ticket.source_last_synced_at ? formatInstantDate(ticket.source_last_synced_at) : translate('workspace.neverSynced') }) : translate('workspace.haloTicketUpdated', { date: formatInstantDate(ticket.source_updated_at) })}</span></div></li>)}</ol>)}
       </section>}
       <EntityRelationships organizationId={workspace.id} organizationName={workspace.name} client={relationshipsClient} />
     </>

@@ -208,9 +208,13 @@
   {
     "route": "/overview",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/search-and-overviews.md",
+      "frontend/e2e/search-overview-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused overview navigation or bounded Search with URL query/type/page/page-size state, explicit loading/empty/failure/retry coverage, responsive overflow and accessibility evidence."
   },
   {
     "route": "/people",
@@ -236,9 +240,13 @@
   {
     "route": "/search",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/search-and-overviews.md",
+      "frontend/e2e/search-overview-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused overview navigation or bounded Search with URL query/type/page/page-size state, explicit loading/empty/failure/retry coverage, responsive overflow and accessibility evidence."
   },
   {
     "route": "/services",
@@ -480,9 +488,13 @@
   {
     "route": "/workspaces/organizations/:organizationId/overview",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/search-and-overviews.md",
+      "frontend/e2e/search-overview-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused overview navigation or bounded Search with URL query/type/page/page-size state, explicit loading/empty/failure/retry coverage, responsive overflow and accessibility evidence."
   },
   {
     "route": "/workspaces/organizations/:organizationId/people",
@@ -508,9 +520,13 @@
   {
     "route": "/workspaces/organizations/:organizationId/search",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/search-and-overviews.md",
+      "frontend/e2e/search-overview-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Focused overview navigation or bounded Search with URL query/type/page/page-size state, explicit loading/empty/failure/retry coverage, responsive overflow and accessibility evidence."
   },
   {
     "route": "/workspaces/organizations/:organizationId/services",

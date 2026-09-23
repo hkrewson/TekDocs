@@ -1598,6 +1598,23 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.reload()
   await expect(page).toHaveURL(/q=reminder.created/)
   await expect(page.getByRole('listitem').filter({ hasText: 'Review live client documentation' })).toBeVisible()
+
+  // Search and the two overview routes retain focused, real-stack navigation.
+  await page.goto('/overview')
+  await expect(page.getByRole('heading', { name: 'Start here' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /Client organizations/ })).toBeVisible()
+  await expect(page.getByRole('table')).toHaveCount(0)
+
+  await page.goto(`/workspaces/organizations/${clientId}/overview`)
+  await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Organization profile' })).toBeVisible()
+
+  await page.goto(`/workspaces/organizations/${clientId}/search?q=Live%20library%20client%20document&page_size=50`)
+  await expect(page.getByRole('link', { name: /Live library client document/ })).toBeVisible()
+  await expect(page.getByLabel('Rows per page')).toHaveValue('50')
+  await page.reload()
+  await expect(page).toHaveURL(/page_size=50/)
+  await expect(page.getByRole('link', { name: /Live library client document/ })).toBeVisible()
   await portalContext.close()
   await staffContext.close()
 })

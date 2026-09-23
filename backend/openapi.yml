@@ -13865,6 +13865,76 @@ paths:
   /api/v1/workspaces/msp/reminders:
     get:
       operationId: msp_reminder_list
+      description: Returns the legacy reminder array unless paginated=true requests
+        the bounded collection shape.
+      parameters:
+      - in: query
+        name: domain
+        schema:
+          enum:
+          - compliance
+          - inventory
+          - domain
+          - documentation
+          - invoice
+          - ''
+          type: string
+          x-spec-enum-id: cfb03cf06da97481
+          default: ''
+        description: |-
+          * `compliance` - compliance
+          * `inventory` - inventory
+          * `domain` - domain
+          * `documentation` - documentation
+          * `invoice` - invoice
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - due_on
+          - -due_on
+          - title
+          - -title
+          type: string
+          x-spec-enum-id: b9fb140ddd2cc8c1
+          default: due_on
+          minLength: 1
+        description: |-
+          * `due_on` - due_on
+          * `-due_on` - -due_on
+          * `title` - title
+          * `-title` - -title
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - workspaces
       security:
@@ -13875,9 +13945,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Reminder'
+                $ref: '#/components/schemas/ReminderCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -28993,13 +29061,82 @@ paths:
   /api/v1/workspaces/organizations/{organization_entity_id}/reminders:
     get:
       operationId: organization_reminder_list
+      description: Returns the legacy reminder array unless paginated=true requests
+        the bounded collection shape.
       parameters:
+      - in: query
+        name: domain
+        schema:
+          enum:
+          - compliance
+          - inventory
+          - domain
+          - documentation
+          - invoice
+          - ''
+          type: string
+          x-spec-enum-id: cfb03cf06da97481
+          default: ''
+        description: |-
+          * `compliance` - compliance
+          * `inventory` - inventory
+          * `domain` - domain
+          * `documentation` - documentation
+          * `invoice` - invoice
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - due_on
+          - -due_on
+          - title
+          - -title
+          type: string
+          x-spec-enum-id: b9fb140ddd2cc8c1
+          default: due_on
+          minLength: 1
+        description: |-
+          * `due_on` - due_on
+          * `-due_on` - -due_on
+          * `title` - title
+          * `-title` - -title
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
       tags:
       - workspaces
       security:
@@ -29010,9 +29147,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Reminder'
+                $ref: '#/components/schemas/ReminderCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -43765,6 +43900,33 @@ components:
       - source
       - source_entity_id
       - title
+    ReminderCollectionResponse:
+      oneOf:
+      - type: array
+        items:
+          $ref: '#/components/schemas/Reminder'
+      - $ref: '#/components/schemas/ReminderResult'
+    ReminderResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reminder'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     ReminderWrite:
       type: object
       properties:

@@ -1569,6 +1569,35 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(operations.getByLabel('Collection', { exact: true })).toHaveValue('Live reviewed runbooks')
   await expect(operations.getByText('Live recovery guidance approved.', { exact: true })).toBeVisible()
   await expect(operations.getByText('Last approved', { exact: true })).toBeVisible()
+
+  // Reminders and activity use their focused shell layouts against the real
+  // workspace database, including refresh-safe URL filters.
+  await page.goto(`/workspaces/organizations/${clientId}/deadlines`)
+  await page.getByRole('button', { name: 'New reminder' }).click()
+  await page.getByLabel('Related record').fill('Live library client document')
+  await page.getByRole('button', { name: /Live library client document/ }).click()
+  await page.getByLabel('Title').fill('Review live client documentation')
+  await page.getByLabel('Due date').fill('2027-12-31')
+  await page.getByRole('button', { name: 'Create reminder' }).click()
+  await expect(page.getByText('Review live client documentation', { exact: true })).toBeVisible()
+  await expect(page).not.toHaveURL(/new=1/)
+  await page.reload()
+  await expect(page.getByText('Review live client documentation', { exact: true })).toBeVisible()
+  const persistedReminder = await page.request.get(
+    `/api/v1/workspaces/organizations/${clientId}/reminders?paginated=true&q=Review%20live%20client%20documentation&page=1&page_size=25`,
+  )
+  expect(persistedReminder.ok()).toBe(true)
+  const reminderCollection = await persistedReminder.json() as { count: number; results: Array<{ source_entity_id: string }> }
+  expect(reminderCollection.count).toBe(1)
+  expect(reminderCollection.results[0]?.source_entity_id).toBe(libraryClientId)
+
+  await page.goto(`/workspaces/organizations/${clientId}/activity?q=reminder.created`)
+  const reminderActivity = page.getByRole('listitem').filter({ hasText: 'Review live client documentation' })
+  await expect(reminderActivity.getByText('reminder created', { exact: true })).toBeVisible()
+  await expect(reminderActivity).toContainText('Review live client documentation')
+  await page.reload()
+  await expect(page).toHaveURL(/q=reminder.created/)
+  await expect(page.getByRole('listitem').filter({ hasText: 'Review live client documentation' })).toBeVisible()
   await portalContext.close()
   await staffContext.close()
 })

@@ -3820,6 +3820,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description Returns the legacy reminder array unless paginated=true requests the bounded collection shape. */
         readonly get: operations["msp_reminder_list"];
         readonly put?: never;
         readonly post: operations["msp_reminder_create"];
@@ -7390,6 +7391,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description Returns the legacy reminder array unless paginated=true requests the bounded collection shape. */
         readonly get: operations["organization_reminder_list"];
         readonly put?: never;
         readonly post: operations["organization_reminder_create"];
@@ -13567,6 +13569,14 @@ export interface components {
             readonly active: boolean;
             /** Format: date-time */
             readonly created_at: string;
+        };
+        readonly ReminderCollectionResponse: readonly components["schemas"]["Reminder"][] | components["schemas"]["ReminderResult"];
+        readonly ReminderResult: {
+            readonly results: readonly components["schemas"]["Reminder"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
         };
         readonly ReminderWrite: {
             /** Format: uuid */
@@ -25108,7 +25118,32 @@ export interface operations {
     };
     readonly msp_reminder_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `compliance` - compliance
+                 *     * `inventory` - inventory
+                 *     * `domain` - domain
+                 *     * `documentation` - documentation
+                 *     * `invoice` - invoice
+                 */
+                readonly domain?: "compliance" | "inventory" | "domain" | "documentation" | "invoice" | "";
+                /**
+                 * @description * `due_on` - due_on
+                 *     * `-due_on` - -due_on
+                 *     * `title` - title
+                 *     * `-title` - -title
+                 */
+                readonly ordering?: "due_on" | "-due_on" | "title" | "-title";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly paginated?: boolean;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -25122,7 +25157,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Reminder"][];
+                    readonly "application/json": components["schemas"]["ReminderCollectionResponse"];
                 };
             };
         };
@@ -35251,7 +35286,32 @@ export interface operations {
     };
     readonly organization_reminder_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `compliance` - compliance
+                 *     * `inventory` - inventory
+                 *     * `domain` - domain
+                 *     * `documentation` - documentation
+                 *     * `invoice` - invoice
+                 */
+                readonly domain?: "compliance" | "inventory" | "domain" | "documentation" | "invoice" | "";
+                /**
+                 * @description * `due_on` - due_on
+                 *     * `-due_on` - -due_on
+                 *     * `title` - title
+                 *     * `-title` - -title
+                 */
+                readonly ordering?: "due_on" | "-due_on" | "title" | "-title";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly paginated?: boolean;
+                readonly q?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -35267,7 +35327,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Reminder"][];
+                    readonly "application/json": components["schemas"]["ReminderCollectionResponse"];
                 };
             };
         };

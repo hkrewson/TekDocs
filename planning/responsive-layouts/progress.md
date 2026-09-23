@@ -2469,3 +2469,44 @@ The local 0.8.46 application is rebuilt and healthy at port 3200 with existing
 volumes retained. Blocked: none. Existing unrelated Wiki edits remain preserved.
 No production deployment, external push, Wiki publication, version bump, or
 application-data reset was performed.
+
+## Phase 7 Reminders and Activity checkpoint — 2026-09-23
+
+Phase 7 now has its first bounded implementation slice. Reminders uses a compact
+agenda with full-collection search, domain filters, stable ordering, 25/50/100
+row pages and URL state. Its creation form opens only on request, preserves failed
+or abandoned work through the shared navigation guard, and closes its transient
+URL after a successful save. The calendar export and existing permission model
+remain unchanged.
+
+Activity now uses a compact event stream instead of a wide audit table. Search,
+date bounds, page and page size are URL-addressable. Each row prioritizes action,
+record, time and actor; request IDs are shortened visually while the complete
+value remains available. Both surfaces keep one ordinary page scroll and provide
+explicit loading, retry and empty states.
+
+The reminder API adds an explicit paginated response with deterministic ties and
+bounded page sizes while preserving the legacy unpaginated array for existing
+callers. There is no database migration. OpenAPI and generated browser types are
+aligned. See [shell-operations.md](shell-operations.md) for the implementation
+contract and remaining Phase 7 scope.
+
+Verification passes the focused 10-case backend document-operations target, the
+three focused component/API cases, lint and type checking. All 24 maintained-
+browser cases pass at 320, 390, 768, 1024, 1280 and 1440 CSS pixels across
+Chromium, Firefox and WebKit, including axe, overflow, paging, dirty-draft and
+successful-save URL coverage. The isolated real browser-to-Django-to-PostgreSQL
+journey passes in 3.5 minutes, creating a reminder for a retained document,
+reloading it, independently verifying its source identity and finding its audit
+event after a filtered Activity refresh. The final repository gate passes all 644
+frontend tests in 117 files, backend and documentation checks, schema/generated
+contract drift, the production build and unchanged compressed budgets (shell
+130604 <= 131072; shell style 24575 <= 24576). Evidence:
+`/tmp/tekdocs-shell-operations-browser.log`,
+`/tmp/tekdocs-shell-operations-live.log` and
+`/tmp/tekdocs-shell-operations-check.log`.
+
+Phase 7 remains in progress. Search, overview, notifications, recycle bin,
+metadata, account/access/setup/help/status and client-portal surfaces remain open.
+Version stays 0.8.46. Production deployment, external push and Wiki publication
+remain separate.

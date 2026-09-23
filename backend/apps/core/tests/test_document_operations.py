@@ -208,6 +208,46 @@ def test_document_reminder_and_activity_are_exposed(owner_client, installation):
 
 
 @pytest.mark.django_db
+def test_reminder_collection_is_explicitly_paginated_searchable_and_stable(owner_client):
+    document = create_document(owner_client)
+    url = reverse("msp-reminder-list-create")
+    due = timezone.localdate() + timedelta(days=30)
+    for index in range(31):
+        response = owner_client.post(
+            url,
+            {
+                "source_entity_id": document["id"],
+                "domain": "documentation",
+                "kind": f"review_{index:02d}",
+                "title": f"Paged reminder {index:02d}",
+                "due_on": (due + timedelta(days=index)).isoformat(),
+                "lead_days": 7,
+                "recurrence": "none",
+            },
+            content_type="application/json",
+        )
+        assert response.status_code == 201
+
+    first = owner_client.get(url, {"paginated": "true", "q": "Paged reminder", "page_size": 25}).json()
+    second = owner_client.get(
+        url,
+        {"paginated": "true", "q": "Paged reminder", "page_size": 25, "page": 2},
+    ).json()
+    filtered = owner_client.get(
+        url,
+        {"paginated": "true", "q": "Paged reminder 30", "domain": "documentation"},
+    ).json()
+    legacy = owner_client.get(url).json()
+
+    assert first["count"] == 31 and len(first["results"]) == 25 and first["has_more"]
+    assert second["count"] == 31 and len(second["results"]) == 6 and not second["has_more"]
+    assert not {row["id"] for row in first["results"]} & {row["id"] for row in second["results"]}
+    assert [row["title"] for row in first["results"]] == [f"Paged reminder {index:02d}" for index in range(25)]
+    assert [row["title"] for row in filtered["results"]] == ["Paged reminder 30"]
+    assert isinstance(legacy, list) and len(legacy) == 31
+
+
+@pytest.mark.django_db
 def test_organization_activity_is_exactly_workspace_and_tenant_scoped(owner_client, installation):
     first_entity = Entity.objects.create_owned(
         tenant=installation.tenant,

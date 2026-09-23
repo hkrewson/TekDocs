@@ -19,6 +19,22 @@ export type ReminderRecord = {
 
 export type ReminderInput = Pick<ReminderRecord, 'source_entity_id' | 'domain' | 'kind' | 'title' | 'due_on' | 'lead_days' | 'recurrence'>
 
+export type ReminderQuery = {
+  q: string
+  domain: '' | ReminderRecord['domain']
+  ordering: 'due_on' | '-due_on' | 'title' | '-title'
+  page: number
+  page_size: 25 | 50 | 100
+}
+
+export type ReminderResult = {
+  results: ReminderRecord[]
+  count: number
+  page: number
+  page_size: number
+  has_more: boolean
+}
+
 export type ActivityRecord = {
   id: string
   action: string
@@ -42,6 +58,7 @@ export type ActivityResult = {
 
 export interface OperationsClient {
   reminders(scope: DocumentScope, signal?: AbortSignal): Promise<ReminderRecord[]>
+  reminderCollection(scope: DocumentScope, query: ReminderQuery, signal?: AbortSignal): Promise<ReminderResult>
   createReminder(scope: DocumentScope, input: ReminderInput): Promise<ReminderRecord>
   reminderCalendarUrl(scope: DocumentScope): string
   activity(scope: DocumentScope, filters: { entity_id?: string; handoff_id?: string; page_size?: number; q?: string; occurred_after?: string; occurred_before?: string; page?: number }, signal?: AbortSignal): Promise<ActivityResult>
@@ -71,6 +88,11 @@ async function csrfToken() {
 
 export const browserOperationsClient: OperationsClient = {
   reminders: (scope, signal) => parse<ReminderRecord[]>(fetch(`${workspacePath(scope)}/reminders`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }), 'Reminders could not be loaded.'),
+  reminderCollection(scope, values, signal) {
+    const query = new URLSearchParams({ paginated: 'true', q: values.q, ordering: values.ordering, page: String(values.page), page_size: String(values.page_size) })
+    if (values.domain) query.set('domain', values.domain)
+    return parse<ReminderResult>(fetch(`${workspacePath(scope)}/reminders?${query}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }), 'Reminders could not be loaded.')
+  },
   async createReminder(scope, input) {
     return parse<ReminderRecord>(fetch(`${workspacePath(scope)}/reminders`, {
       method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': await csrfToken() }, body: JSON.stringify(input),

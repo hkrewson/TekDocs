@@ -1,7 +1,8 @@
 from typing import Any
 
+from django.db.models import Q
 from django.http import HttpResponse
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, extend_schema_view
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -47,6 +48,31 @@ class ReminderSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
 
 
+class ReminderQuerySerializer(serializers.Serializer):
+    paginated = serializers.BooleanField(default=False)
+    q = serializers.CharField(max_length=120, required=False, allow_blank=True, default="")
+    domain = serializers.ChoiceField(
+        choices=("compliance", "inventory", "domain", "documentation", "invoice"),
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    ordering = serializers.ChoiceField(
+        choices=("due_on", "-due_on", "title", "-title"),
+        default="due_on",
+    )
+    page = serializers.IntegerField(min_value=1, default=1)
+    page_size = serializers.ChoiceField(choices=(25, 50, 100), default=25)
+
+
+class ReminderResultSerializer(serializers.Serializer):
+    results = ReminderSerializer(many=True)
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
 def _workspace(request: Any, organization_entity_id: Any = None) -> ResolvedWorkspace:
     return (
         resolve_organization_workspace(request.user, entity_id=organization_entity_id)
@@ -56,11 +82,46 @@ def _workspace(request: Any, organization_entity_id: Any = None) -> ResolvedWork
 
 
 class ReminderListCreateView(APIView):
-    @extend_schema(responses={200: ReminderSerializer(many=True)})
+    @extend_schema(
+        parameters=[ReminderQuerySerializer],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="ReminderCollectionResponse",
+                serializers=[ReminderSerializer(many=True), ReminderResultSerializer],
+                resource_type_field_name=None,
+                many=False,
+            )
+        },
+        description="Returns the legacy reminder array unless paginated=true requests the bounded collection shape.",
+    )
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id)
         require_permission(request.user, PermissionKey.DEADLINES_VIEW, organization=workspace.organization)
-        return Response(ReminderSerializer(reminders_for_scope(workspace).filter(active=True)[:500], many=True).data)
+        query = ReminderQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = reminders_for_scope(workspace).filter(active=True)
+        if not values["paginated"]:
+            return Response(ReminderSerializer(records[:500], many=True).data)
+        if values["q"]:
+            records = records.filter(
+                Q(title__icontains=values["q"]) | Q(source_entity__display_name__icontains=values["q"])
+            )
+        if values["domain"]:
+            records = records.filter(domain=values["domain"])
+        ordering = values["ordering"]
+        records = records.order_by(ordering, "entity_id")
+        count = records.count()
+        page_size = int(values["page_size"])
+        offset = (values["page"] - 1) * page_size
+        selected = list(records[offset : offset + page_size + 1])
+        return Response(ReminderResultSerializer({
+            "results": selected[:page_size],
+            "count": count,
+            "page": values["page"],
+            "page_size": page_size,
+            "has_more": len(selected) > page_size,
+        }).data)
 
     @extend_schema(request=ReminderWriteSerializer, responses={201: ReminderSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

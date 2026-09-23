@@ -54,6 +54,15 @@ def client_organization(installation, name="Issue Client"):  # type: ignore[no-u
         legal_name=f"{name}, LLC",
         website="https://example.invalid",
         classifications=["client"],
+        billing_contact_name="Morgan Lee",
+        billing_email="accounts@example.invalid",
+        billing_phone="512-555-0144",
+        billing_address_line_1="400 Congress Avenue",
+        billing_address_line_2="Suite 900",
+        billing_city="Austin",
+        billing_region="TX",
+        billing_postal_code="78701",
+        billing_country_code="US",
     )
     record.access_mode = "all_authorized"
     record.save(update_fields=("access_mode", "updated_at"))
@@ -157,11 +166,17 @@ def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, in
     assert payload["subtotal"] == "25.00"
     assert payload["total"] == "25.00"
     assert payload["lines"][0]["unit"] == "hour"
+    assert payload["bill_to"]["contact_name"] == "Morgan Lee"
+    assert payload["bill_to"]["address_line_1"] == "400 Congress Avenue"
     assert payload["signature_algorithm"] == "Ed25519"
     assert len(payload["content_digest"]) == 64
     assert len(payload["key_fingerprint"]) == 64
 
     issued = Invoice.objects.get(pk=invoice.pk)
+    organization.billing_contact_name = "Changed after issue"
+    organization.save(update_fields=("billing_contact_name", "updated_at"))
+    issued.refresh_from_db()
+    assert issued.customer_snapshot["contact_name"] == "Morgan Lee"
     assert artifact_bytes.startswith(b"%PDF-")
     assert artifact.size == artifact_size
     assert artifact.checksum == hashlib.sha256(artifact_bytes).hexdigest()

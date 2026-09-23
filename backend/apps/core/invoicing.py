@@ -413,6 +413,15 @@ def _customer_snapshot(invoice: Invoice) -> dict[str, object]:
         "display_name": invoice.organization.entity.display_name,
         "legal_name": invoice.organization.legal_name,
         "website": invoice.organization.website,
+        "contact_name": invoice.organization.billing_contact_name,
+        "billing_email": invoice.organization.billing_email,
+        "phone": invoice.organization.billing_phone,
+        "address_line_1": invoice.organization.billing_address_line_1,
+        "address_line_2": invoice.organization.billing_address_line_2,
+        "city": invoice.organization.billing_city,
+        "region": invoice.organization.billing_region,
+        "postal_code": invoice.organization.billing_postal_code,
+        "country_code": invoice.organization.billing_country_code,
     }
 
 

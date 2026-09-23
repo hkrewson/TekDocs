@@ -9,6 +9,7 @@ import type { AuthClient } from '../auth/api'
 import type { WorkspaceContext } from '../workspaces/api'
 import { InvoiceRequestError } from './api'
 import type { InvoiceClient, InvoiceCollectionQuery, InvoiceCollectionResult, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
+import { InvoiceBillTo } from './InvoiceBillTo'
 import { CollectionTable } from '../collections/CollectionTable'
 import { CollectionPagination } from '../CollectionPagination'
 import { ColumnChooser } from '../collections/ColumnChooser'
@@ -346,6 +347,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
             {canIssue && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
           </div>}
           {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate((selected.delivery_count ?? 1) === 1 ? 'accounting.deliveredProof' : 'accounting.deliveredProofPlural', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
+          {selected.state === 'issued' && selected.bill_to && <section aria-labelledby="invoice-bill-to-heading"><div className="section-heading"><h3 id="invoice-bill-to-heading">{translate('accounting.billTo')}</h3></div><InvoiceBillTo identity={selected.bill_to} /></section>}
           {selected.state === 'issued' && <dl className="invoice-metadata">
             <div><dt>{translate('accounting.lifecycle')}</dt><dd>{lifecycleLabel(selected.lifecycle_state ?? 'issued')}</dd></div>
             <div><dt>{translate('accounting.reconciliation')}</dt><dd>{reconciliationLabel(selected.reconciliation_state ?? 'unsynchronized')}</dd></div>

@@ -10841,6 +10841,9 @@ export interface components {
             /** Format: date-time */
             readonly last_event_at: string | null;
             readonly lifecycle_events: readonly components["schemas"]["InvoiceLifecycleEvent"][];
+            readonly bill_to: {
+                readonly [key: string]: string;
+            };
         };
         readonly InvoiceCountryChoice: {
             readonly value: string;
@@ -12027,6 +12030,16 @@ export interface components {
             readonly legal_name: string;
             /** Format: uri */
             readonly website: string;
+            readonly billing_contact_name: string;
+            /** Format: email */
+            readonly billing_email: string;
+            readonly billing_phone: string;
+            readonly billing_address_line_1: string;
+            readonly billing_address_line_2: string;
+            readonly billing_city: string;
+            readonly billing_region: string;
+            readonly billing_postal_code: string;
+            readonly billing_country_code: string;
             /**
              * @description * `all_authorized` - All authorized MSP staff
              *     * `assigned_only` - Assigned MSP staff only
@@ -12074,6 +12087,16 @@ export interface components {
             readonly legal_name?: string;
             /** Format: uri */
             readonly website?: string;
+            readonly billing_contact_name?: string;
+            /** Format: email */
+            readonly billing_email?: string;
+            readonly billing_phone?: string;
+            readonly billing_address_line_1?: string;
+            readonly billing_address_line_2?: string;
+            readonly billing_city?: string;
+            readonly billing_region?: string;
+            readonly billing_postal_code?: string;
+            readonly billing_country_code?: string;
             readonly classifications: readonly ("client" | "vendor" | "manufacturer" | "partner")[];
         };
         readonly OriginChoice: {
@@ -12681,6 +12704,16 @@ export interface components {
             readonly legal_name?: string;
             /** Format: uri */
             readonly website?: string;
+            readonly billing_contact_name?: string;
+            /** Format: email */
+            readonly billing_email?: string;
+            readonly billing_phone?: string;
+            readonly billing_address_line_1?: string;
+            readonly billing_address_line_2?: string;
+            readonly billing_city?: string;
+            readonly billing_region?: string;
+            readonly billing_postal_code?: string;
+            readonly billing_country_code?: string;
             readonly classifications?: readonly ("client" | "vendor" | "manufacturer" | "partner")[];
         };
         readonly PatchedPersonWrite: {

@@ -8,6 +8,7 @@ import { NotificationInbox } from '../notifications/NotificationInbox'
 import { browserPortalNotificationsClient } from '../notifications/api'
 import type { NotificationsClient, NotificationTarget } from '../notifications/api'
 import { portalClient, type PortalDocument, type PortalDocumentDetail, type PortalInvoice } from './api'
+import { InvoiceBillTo } from '../accounting/InvoiceBillTo'
 
 export function ClientPortal({ context, onSignOut, signingOut, signOutError, notificationsClient = browserPortalNotificationsClient }: {
   context: AuthenticatedContext
@@ -148,6 +149,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
           <header><h2>{selectedInvoice.number}</h2><p>{selectedInvoice.reference || translate('portal.invoiceReferenceFallback')}</p></header>
           <dl className="inventory-provenance"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{new Date(`${selectedInvoice.invoice_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{new Date(`${selectedInvoice.due_date}T00:00:00`).toLocaleDateString()}</dd></div><div><dt>{translate('accounting.lifecycle')}</dt><dd>{portalInvoiceState(selectedInvoice.lifecycle_state ?? 'issued')}</dd></div><div><dt>{translate('accounting.total')}</dt><dd><strong>{selectedInvoice.currency} {selectedInvoice.total}</strong></dd></div><div><dt>{translate('accounting.paid')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.paid_amount ?? '0.00'}</dd></div><div><dt>{translate('accounting.balance')}</dt><dd>{selectedInvoice.currency} {selectedInvoice.balance_amount ?? selectedInvoice.total}</dd></div></dl>
           {selectedInvoice.notes && <p>{selectedInvoice.notes}</p>}
+          {selectedInvoice.bill_to && <section aria-labelledby="portal-invoice-bill-to"><h3 id="portal-invoice-bill-to">{translate('accounting.billTo')}</h3><InvoiceBillTo identity={selectedInvoice.bill_to} /></section>}
           <section aria-labelledby="portal-invoice-lines"><h3 id="portal-invoice-lines">{translate('accounting.lines')}</h3><ul className="inventory-list">{selectedInvoice.lines.map((line) => <li key={line.id}><div><strong>{line.description}</strong><span>{line.quantity}{line.unit ? ` ${line.unit}` : ''} × {line.currency} {line.unit_amount}</span></div><strong>{line.currency} {line.total}</strong></li>)}</ul></section>
           <div className="form-actions"><a className="secondary-button" href={portalClient.invoicePdfUrl(selectedInvoice.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a><a className="secondary-button" href={portalClient.invoiceCsvUrl(selectedInvoice.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadCsv')}</a></div>
         </article> : selected ? <article className="content-section portal-document-detail">

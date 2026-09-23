@@ -2387,6 +2387,15 @@ class Organization(TimestampedModel):
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="organization_record")
     legal_name = models.CharField(max_length=240, blank=True)
     website = models.URLField(max_length=500, blank=True)
+    billing_contact_name = models.CharField(max_length=240, blank=True)
+    billing_email = models.EmailField(max_length=254, blank=True)
+    billing_phone = models.CharField(max_length=64, blank=True)
+    billing_address_line_1 = models.CharField(max_length=240, blank=True)
+    billing_address_line_2 = models.CharField(max_length=240, blank=True)
+    billing_city = models.CharField(max_length=120, blank=True)
+    billing_region = models.CharField(max_length=120, blank=True)
+    billing_postal_code = models.CharField(max_length=32, blank=True)
+    billing_country_code = models.CharField(max_length=2, blank=True)
     access_mode = models.CharField(
         max_length=32,
         choices=OrganizationAccessMode.choices,
@@ -2424,10 +2433,15 @@ class Organization(TimestampedModel):
                 )
 
     def clean(self) -> None:
+        from .countries import COUNTRY_CODES
+
         if self.entity_id and self.tenant_id != self.entity.tenant_id:
             raise ValidationError("Organization entity must belong to the organization tenant")
         if self.entity_id and self.entity.organization_id is not None:
             raise ValidationError("An organization anchor cannot itself be organization-scoped")
+        self.billing_country_code = self.billing_country_code.strip().upper()
+        if self.billing_country_code and self.billing_country_code not in COUNTRY_CODES:
+            raise ValidationError({"billing_country_code": "Choose a supported ISO country"})
 
 
 class OrganizationKind(models.TextChoices):

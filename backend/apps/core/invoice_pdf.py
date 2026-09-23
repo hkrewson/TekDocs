@@ -115,6 +115,10 @@ def render_invoice_pdf(
     issuer_phone = _text(issuer.get("phone"))
     issuer_tax = _text(issuer.get("tax_registration"))
     customer_name = _text(customer.get("legal_name") or customer.get("display_name"))
+    customer_contact = _text(customer.get("contact_name"))
+    customer_address = _address(customer)
+    customer_email = _text(customer.get("billing_email"))
+    customer_phone = _text(customer.get("phone"))
     customer_website = _text(customer.get("website"))
 
     story: list[Flowable] = []
@@ -185,7 +189,18 @@ def render_invoice_pdf(
     issuer_details = "<br/>".join(part for part in (issuer_address, issuer_email, issuer_phone) if part)
     if issuer_tax:
         issuer_details = "<br/>".join(part for part in (issuer_details, f"Tax ID: {issuer_tax}") if part)
-    customer_details = "<br/>".join(part for part in (f"<b>{customer_name}</b>", customer_website) if part)
+    customer_details = "<br/>".join(
+        part
+        for part in (
+            f"<b>{customer_name}</b>",
+            customer_contact,
+            customer_address,
+            customer_email,
+            customer_phone,
+            customer_website,
+        )
+        if part
+    )
     parties = Table(
         [
             [Paragraph("From", styles["InvoiceLabel"]), Paragraph("Bill to", styles["InvoiceLabel"])],

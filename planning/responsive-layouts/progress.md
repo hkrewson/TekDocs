@@ -2429,3 +2429,43 @@ document-browser.log`, `/tmp/tekdocs-invoice-document-upgrade.log` and
 The local 0.8.46 application is rebuilt and healthy at port 3200 with existing
 volumes retained. Blocked: none. Production deployment, Wiki publication and a
 version change remain separate.
+
+## Client billing identity checkpoint — 2026-09-23
+
+The organization record drawer now separates billing contact and postal identity
+from general organization details and from operational Sites. One focused billing
+editor retains failed input and participates in the shared dirty-navigation guard.
+Long billing values remain available in the full-height drawer without expanding
+the collection row or adding another page.
+
+New invoices snapshot this identity when issued. The retained PDF, MSP invoice
+record, and client portal detail show the same Bill to values; later organization
+changes affect future invoices only. Drafts do not claim a retained identity, and
+invoice collection summaries omit billing identity and line detail. Existing
+issued PDFs remain byte-for-byte immutable.
+
+The additive Organization fields remain on its existing tenant-owned row, so no
+new RLS classification is introduced. Migration 0151, OpenAPI, and generated
+browser types describe the same contract. See
+[client-billing-identity.md](client-billing-identity.md) for the final acceptance
+evidence and known document-quality follow-ups.
+
+The repository-wide gate passes all 644 frontend tests in 117 files, backend
+coverage, schema/migration agreement, documentation policy, production builds,
+and compressed bundle budgets (shell 129230 <= 131072; shell style 24575 <=
+24576). The supported invoice-delivery target passes 1,485 backend cases with one
+expected skip plus the same frontend suite. All 42 focused organization/invoice
+browser cases pass at 320, 390, 768, 1024, 1280, and 1440 CSS pixels across
+Chromium, Firefox, and WebKit, including accessibility and horizontal-overflow
+checks. A one-page retained PDF with long billing values was rendered and visually
+inspected. The general upgrade rehearsal passes from 0.1.3 to 0.8.46, and the
+isolated real browser-to-Django-to-PostgreSQL workspace journey passes in 3.4
+minutes. Evidence:
+`/tmp/tekdocs-client-billing-check.log`, `/tmp/tekdocs-client-billing-invoice.log`,
+`/tmp/tekdocs-client-billing-upgrade.log`, `/tmp/tekdocs-client-billing-live.log`,
+and `/tmp/tekdocs-client-billing-invoice.pdf`.
+
+The local 0.8.46 application is rebuilt and healthy at port 3200 with existing
+volumes retained. Blocked: none. Existing unrelated Wiki edits remain preserved.
+No production deployment, external push, Wiki publication, version bump, or
+application-data reset was performed.

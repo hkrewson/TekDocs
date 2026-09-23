@@ -45,7 +45,7 @@ class PortalInvoiceResultSerializer(serializers.Serializer):
 
     @extend_schema_field(InvoiceSerializer(many=True))
     def get_results(self, value):  # type: ignore[no-untyped-def]
-        return InvoiceSerializer(value["results"], many=True, context={"portal": True}).data
+        return InvoiceSerializer(value["results"], many=True, context={"portal": True, "summary": True}).data
 
 
 def _decode_portal_invoice_cursor(value: str | None, *, member):  # type: ignore[no-untyped-def]

@@ -15,6 +15,15 @@ const organization = {
   name: longOrganizationName,
   legal_name: `${longOrganizationName}, Incorporated`,
   website: 'https://lakeview.example.com/technology-and-clinical-services',
+  billing_contact_name: 'Alexandria Morgan-Santiago Kensington',
+  billing_email: 'regional-accounts-payable@lakeview.example.com',
+  billing_phone: '+1 555 010 0480',
+  billing_address_line_1: '1000 East Regional Medical Services Boulevard',
+  billing_address_line_2: 'Accounts Payable and Vendor Relations, Suite 810',
+  billing_city: 'Madison',
+  billing_region: 'Wisconsin',
+  billing_postal_code: '53703',
+  billing_country_code: 'US',
   access_mode: 'assigned_only',
   classifications: ['client', 'partner'],
   created_at: recordedAt,
@@ -105,6 +114,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: longOrganizationName, exact: true }).click()
     await expect(page.getByRole('heading', { name: longOrganizationName })).toBeVisible()
     await expect(page.getByText('Assigned staff only')).toBeVisible()
+    await expect(page.getByText('regional-accounts-payable@lakeview.example.com')).toBeVisible()
+    await expect(page.getByText('1000 East Regional Medical Services Boulevard')).toBeVisible()
     await expectViewportContained(page)
     if (width === 390) expect((await new AxeBuilder({ page }).include('dialog').analyze()).violations).toEqual([])
     await page.keyboard.press('Escape')

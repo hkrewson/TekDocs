@@ -67,6 +67,15 @@ def create_organization(
     legal_name: str,
     website: str,
     classifications: Iterable[OrganizationKind],
+    billing_contact_name: str = "",
+    billing_email: str = "",
+    billing_phone: str = "",
+    billing_address_line_1: str = "",
+    billing_address_line_2: str = "",
+    billing_city: str = "",
+    billing_region: str = "",
+    billing_postal_code: str = "",
+    billing_country_code: str = "",
 ) -> Organization:
     with system_rls_scope_if_postgresql(
         DataScope.tenant(tenant),
@@ -78,12 +87,23 @@ def create_organization(
             entity_type="organization",
             display_name=name,
         )
-        organization = Organization.objects.create(
+        organization = Organization(
             tenant=tenant,
             entity=entity,
             legal_name=legal_name,
             website=website,
+            billing_contact_name=billing_contact_name,
+            billing_email=billing_email,
+            billing_phone=billing_phone,
+            billing_address_line_1=billing_address_line_1,
+            billing_address_line_2=billing_address_line_2,
+            billing_city=billing_city,
+            billing_region=billing_region,
+            billing_postal_code=billing_postal_code,
+            billing_country_code=billing_country_code,
         )
+        organization.full_clean()
+        organization.save()
         # New organizations fail closed. Give an authorized MSP creator explicit
         # access so administrators do not create a workspace they cannot reopen.
         from apps.accounts.models import OrganizationAccessAssignment, TenantMembership
@@ -121,12 +141,40 @@ def update_organization(
     legal_name: str,
     website: str,
     classifications: Iterable[OrganizationKind],
+    billing_contact_name: str | None = None,
+    billing_email: str | None = None,
+    billing_phone: str | None = None,
+    billing_address_line_1: str | None = None,
+    billing_address_line_2: str | None = None,
+    billing_city: str | None = None,
+    billing_region: str | None = None,
+    billing_postal_code: str | None = None,
+    billing_country_code: str | None = None,
 ) -> Organization:
     organization.entity.display_name = name
     organization.entity.save(update_fields=("display_name", "updated_at"))
     organization.legal_name = legal_name
     organization.website = website
-    organization.save(update_fields=("legal_name", "website", "updated_at"))
+    billing_changes = {
+        "billing_contact_name": billing_contact_name,
+        "billing_email": billing_email,
+        "billing_phone": billing_phone,
+        "billing_address_line_1": billing_address_line_1,
+        "billing_address_line_2": billing_address_line_2,
+        "billing_city": billing_city,
+        "billing_region": billing_region,
+        "billing_postal_code": billing_postal_code,
+        "billing_country_code": billing_country_code,
+    }
+    for field, value in billing_changes.items():
+        if value is not None:
+            setattr(organization, field, value)
+    organization.full_clean()
+    organization.save(update_fields=(
+        "legal_name", "website", "billing_contact_name", "billing_email", "billing_phone",
+        "billing_address_line_1", "billing_address_line_2", "billing_city", "billing_region",
+        "billing_postal_code", "billing_country_code", "updated_at",
+    ))
     _replace_classifications(organization=organization, classifications=classifications)
     AuditEvent.objects.create(
         tenant=organization.tenant,

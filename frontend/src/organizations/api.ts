@@ -7,13 +7,22 @@ export type Organization = {
   name: string
   legal_name: string
   website: string
+  billing_contact_name: string
+  billing_email: string
+  billing_phone: string
+  billing_address_line_1: string
+  billing_address_line_2: string
+  billing_city: string
+  billing_region: string
+  billing_postal_code: string
+  billing_country_code: string
   access_mode: 'assigned_only' | 'all_authorized'
   classifications: OrganizationClassification[]
   created_at: string
   updated_at: string
 }
 
-export type OrganizationInput = Pick<Organization, 'name' | 'legal_name' | 'website' | 'classifications'>
+export type OrganizationInput = Pick<Organization, 'name' | 'legal_name' | 'website' | 'classifications' | 'billing_contact_name' | 'billing_email' | 'billing_phone' | 'billing_address_line_1' | 'billing_address_line_2' | 'billing_city' | 'billing_region' | 'billing_postal_code' | 'billing_country_code'>
 export type OrganizationOrdering = 'name' | '-name' | 'legal_name' | '-legal_name' | 'website' | '-website'
 export type OrganizationQuery = { q: string; classification: OrganizationClassification | ''; ordering: OrganizationOrdering; page: number; page_size: number }
 export type OrganizationResult = { results: Organization[]; page: number; page_size: number; count: number; has_more: boolean }

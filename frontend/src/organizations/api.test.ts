@@ -7,6 +7,7 @@ const input: OrganizationInput = {
   name: 'Acme Dental',
   legal_name: 'Acme Dental Associates, LLC',
   website: 'https://acme.example.com',
+  billing_contact_name: '', billing_email: '', billing_phone: '', billing_address_line_1: '', billing_address_line_2: '', billing_city: '', billing_region: '', billing_postal_code: '', billing_country_code: '',
   classifications: ['client', 'partner'],
 }
 

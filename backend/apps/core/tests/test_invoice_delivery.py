@@ -40,6 +40,13 @@ def invoice_delivery(db, tmp_path):
         legal_name="Delivery Client, LLC",
         website="",
         classifications=["client"],
+        billing_contact_name="Morgan Lee",
+        billing_email="accounts@delivery.example.invalid",
+        billing_address_line_1="400 Congress Avenue",
+        billing_city="Austin",
+        billing_region="TX",
+        billing_postal_code="78701",
+        billing_country_code="US",
     )
     sibling = create_organization(
         tenant=installation.tenant,
@@ -125,10 +132,14 @@ def test_portal_exposes_only_exact_client_issued_invoices_with_pdf_csv_parity(in
         assert listing.status_code == 200
         assert listing["Cache-Control"] == "private, no-store"
         assert [item["number"] for item in listing.json()["results"]] == [issued.number]
+        assert "bill_to" not in listing.json()["results"][0]
+        assert "lines" not in listing.json()["results"][0]
 
         detail = portal.get(reverse("client-portal-invoice-detail", kwargs={"invoice_entity_id": issued.entity_id}))
         assert detail.status_code == 200
         assert detail.json()["total"] == "25.00"
+        assert detail.json()["bill_to"]["contact_name"] == "Morgan Lee"
+        assert detail.json()["bill_to"]["billing_email"] == "accounts@delivery.example.invalid"
 
         pdf = portal.get(reverse("client-portal-invoice-pdf", kwargs={"invoice_entity_id": issued.entity_id}))
         assert pdf.status_code == 200

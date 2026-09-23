@@ -37620,8 +37620,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InvoiceLifecycleEvent'
+        bill_to:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
       required:
       - balance_amount
+      - bill_to
       - content_digest
       - created_at
       - currency
@@ -40406,6 +40412,25 @@ components:
         website:
           type: string
           format: uri
+        billing_contact_name:
+          type: string
+        billing_email:
+          type: string
+          format: email
+        billing_phone:
+          type: string
+        billing_address_line_1:
+          type: string
+        billing_address_line_2:
+          type: string
+        billing_city:
+          type: string
+        billing_region:
+          type: string
+        billing_postal_code:
+          type: string
+        billing_country_code:
+          type: string
         access_mode:
           enum:
           - all_authorized
@@ -40428,6 +40453,15 @@ components:
           format: date-time
       required:
       - access_mode
+      - billing_address_line_1
+      - billing_address_line_2
+      - billing_city
+      - billing_contact_name
+      - billing_country_code
+      - billing_email
+      - billing_phone
+      - billing_postal_code
+      - billing_region
       - classifications
       - created_at
       - id
@@ -40528,6 +40562,34 @@ components:
           type: string
           format: uri
           maxLength: 500
+        billing_contact_name:
+          type: string
+          maxLength: 240
+        billing_email:
+          type: string
+          format: email
+          maxLength: 254
+        billing_phone:
+          type: string
+          maxLength: 64
+        billing_address_line_1:
+          type: string
+          maxLength: 240
+        billing_address_line_2:
+          type: string
+          maxLength: 240
+        billing_city:
+          type: string
+          maxLength: 120
+        billing_region:
+          type: string
+          maxLength: 120
+        billing_postal_code:
+          type: string
+          maxLength: 32
+        billing_country_code:
+          type: string
+          maxLength: 2
         classifications:
           type: array
           items:
@@ -41709,6 +41771,34 @@ components:
           type: string
           format: uri
           maxLength: 500
+        billing_contact_name:
+          type: string
+          maxLength: 240
+        billing_email:
+          type: string
+          format: email
+          maxLength: 254
+        billing_phone:
+          type: string
+          maxLength: 64
+        billing_address_line_1:
+          type: string
+          maxLength: 240
+        billing_address_line_2:
+          type: string
+          maxLength: 240
+        billing_city:
+          type: string
+          maxLength: 120
+        billing_region:
+          type: string
+          maxLength: 120
+        billing_postal_code:
+          type: string
+          maxLength: 32
+        billing_country_code:
+          type: string
+          maxLength: 2
         classifications:
           type: array
           items:

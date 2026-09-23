@@ -53,6 +53,19 @@ class OrganizationWriteSerializer(serializers.Serializer):
     name = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
     legal_name = serializers.CharField(max_length=240, trim_whitespace=True, required=False, allow_blank=True)
     website = serializers.URLField(max_length=500, required=False, allow_blank=True)
+    billing_contact_name = serializers.CharField(max_length=240, trim_whitespace=True, required=False, allow_blank=True)
+    billing_email = serializers.EmailField(max_length=254, required=False, allow_blank=True)
+    billing_phone = serializers.CharField(max_length=64, trim_whitespace=True, required=False, allow_blank=True)
+    billing_address_line_1 = serializers.CharField(
+        max_length=240, trim_whitespace=True, required=False, allow_blank=True
+    )
+    billing_address_line_2 = serializers.CharField(
+        max_length=240, trim_whitespace=True, required=False, allow_blank=True
+    )
+    billing_city = serializers.CharField(max_length=120, trim_whitespace=True, required=False, allow_blank=True)
+    billing_region = serializers.CharField(max_length=120, trim_whitespace=True, required=False, allow_blank=True)
+    billing_postal_code = serializers.CharField(max_length=32, trim_whitespace=True, required=False, allow_blank=True)
+    billing_country_code = serializers.CharField(max_length=2, trim_whitespace=True, required=False, allow_blank=True)
     classifications = serializers.ListField(
         child=serializers.ChoiceField(choices=OrganizationKind.choices),
         min_length=1,
@@ -75,12 +88,29 @@ class OrganizationWriteSerializer(serializers.Serializer):
             raise serializers.ValidationError("Website must not contain embedded credentials.")
         return value
 
+    def validate_billing_country_code(self, value: str) -> str:
+        from .countries import COUNTRY_CODES
+
+        normalized = value.upper()
+        if normalized and normalized not in COUNTRY_CODES:
+            raise serializers.ValidationError("Choose a supported ISO country.")
+        return normalized
+
 
 class OrganizationSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     name = serializers.CharField(source="entity.display_name")
     legal_name = serializers.CharField()
     website = serializers.URLField()
+    billing_contact_name = serializers.CharField()
+    billing_email = serializers.EmailField()
+    billing_phone = serializers.CharField()
+    billing_address_line_1 = serializers.CharField()
+    billing_address_line_2 = serializers.CharField()
+    billing_city = serializers.CharField()
+    billing_region = serializers.CharField()
+    billing_postal_code = serializers.CharField()
+    billing_country_code = serializers.CharField()
     access_mode = serializers.ChoiceField(choices=OrganizationAccessMode.choices)
     classifications = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField()

@@ -3,13 +3,22 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { Organizations } from './Organizations'
-import type { Organization, OrganizationClient } from './api'
+import type { Organization, OrganizationClient, OrganizationInput } from './api'
 
 const acme: Organization = {
   id: '00000000-0000-4000-8000-000000000010',
   name: 'Acme Dental',
   legal_name: 'Acme Dental Associates, LLC',
   website: 'https://acme.example.com',
+  billing_contact_name: 'Morgan Lee',
+  billing_email: 'accounts@acme.example.com',
+  billing_phone: '512-555-0144',
+  billing_address_line_1: '400 Congress Avenue',
+  billing_address_line_2: 'Suite 900',
+  billing_city: 'Austin',
+  billing_region: 'TX',
+  billing_postal_code: '78701',
+  billing_country_code: 'US',
   access_mode: 'assigned_only',
   classifications: ['client', 'partner'],
   created_at: '2026-08-08T12:00:00Z',
@@ -76,9 +85,28 @@ describe('Organizations', () => {
       name: 'Acme Dental',
       legal_name: 'Acme Dental Associates, LLC',
       website: 'https://acme.example.com',
+      billing_contact_name: '', billing_email: '', billing_phone: '', billing_address_line_1: '', billing_address_line_2: '', billing_city: '', billing_region: '', billing_postal_code: '', billing_country_code: '',
       classifications: ['client', 'partner'],
     })
     expect(await screen.findByRole('status')).toHaveTextContent('Acme Dental was added.')
+  })
+
+  it('edits dedicated billing identity without changing general details', async () => {
+    const user = userEvent.setup()
+    const update = vi.fn().mockImplementation((_id: string, input: OrganizationInput) => Promise.resolve({ ...acme, ...input }))
+    renderOrganizations(client({ update }))
+
+    await user.click(await screen.findByRole('button', { name: 'Acme Dental' }))
+    const drawer = screen.getByRole('dialog', { name: 'Acme Dental' })
+    expect(within(drawer).getByText('accounts@acme.example.com')).toBeInTheDocument()
+    expect(within(drawer).getByText('400 Congress Avenue')).toBeInTheDocument()
+    await user.click(within(drawer).getByRole('button', { name: 'Edit billing' }))
+    await user.clear(within(drawer).getByLabelText(/Billing contact/))
+    await user.type(within(drawer).getByLabelText(/Billing contact/), 'Taylor Morgan')
+    await user.click(within(drawer).getByRole('button', { name: 'Save billing details' }))
+
+    expect(update).toHaveBeenCalledWith(acme.id, expect.objectContaining({ name: acme.name, billing_contact_name: 'Taylor Morgan', billing_country_code: 'US' }))
+    expect(await within(drawer).findByText('Taylor Morgan')).toBeInTheDocument()
   })
 
   it('updates and archives with an explicit confirmation', async () => {

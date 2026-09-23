@@ -9,6 +9,19 @@ const invoiceLines = [
   { id: 'line-2', position: 2, description: 'USW Power Adapter', quantity: '1.000', unit: 'each', unit_amount: '97.44', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '97.44', tax: '0.00', total: '97.44', origin_type: '', origin_id: null },
   { id: 'line-3', position: 3, description: 'TP-Link TL-SG116 16 Port Gigabit Switch', quantity: '1.000', unit: 'each', unit_amount: '64.19', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '64.19', tax: '0.00', total: '64.19', origin_type: '', origin_id: null },
 ]
+const billTo = {
+  name: 'Example Client, LLC',
+  contact_name: 'Accounts Payable',
+  email: 'billing@example.invalid',
+  phone: '+1 555 010 2026',
+  address_line_1: '1000 Very Long Client Services Boulevard',
+  address_line_2: 'Accounts Payable, Suite 240',
+  city: 'Minneapolis',
+  region: 'MN',
+  postal_code: '55401',
+  country_code: 'US',
+  website: '',
+}
 const invoices = Array.from({ length: 61 }, (_, index) => ({
   id: `invoice-${index + 1}`,
   state: index % 2 ? 'issued' : 'draft',
@@ -18,6 +31,7 @@ const invoices = Array.from({ length: 61 }, (_, index) => ({
   lines: invoiceLines,
   created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z',
   lifecycle_state: 'issued', reconciliation_state: 'unsynchronized', paid_amount: '0.00', balance_amount: '1841.63', lifecycle_events: [],
+  bill_to: index % 2 ? billTo : undefined,
 }))
 
 async function fixtures(page: Page) {
@@ -73,6 +87,12 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('link', { name: 'Back to invoices' }).click()
     await expect(page.getByText('61 invoices', { exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'INV-000002', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Bill to' })).toBeVisible()
+    await expect(page.getByText('Accounts Payable', { exact: true })).toBeVisible()
+    await expect(page.getByText('1000 Very Long Client Services Boulevard', { exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 }
 

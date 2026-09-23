@@ -45,6 +45,22 @@ export type InvoiceDraft = {
   balance_amount?: string
   last_event_at?: string | null
   lifecycle_events?: InvoiceLifecycleEvent[]
+  bill_to?: InvoiceBillingIdentity
+}
+
+export type InvoiceBillingIdentity = {
+  display_name?: string
+  legal_name?: string
+  contact_name?: string
+  billing_email?: string
+  phone?: string
+  address_line_1?: string
+  address_line_2?: string
+  city?: string
+  region?: string
+  postal_code?: string
+  country_code?: string
+  website?: string
 }
 
 export type InvoiceCollectionQuery = {

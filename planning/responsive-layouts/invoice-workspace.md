@@ -47,10 +47,12 @@ silently changing retained evidence. Payment instructions come from the MSP invo
 defaults and are included in the issuer snapshot. If they are blank, the PDF gives
 the due date and billing contact without inventing payment details.
 
-Client billing addresses remain deliberately absent because organizations do not
-yet have a dedicated billing-address/contact model; a site address is not assumed
-to be the billing address. Tax calculation and legal/tax policy are unchanged.
-Logo branding and tagged-PDF output remain explicit future document-quality work.
+Organizations now have a dedicated billing contact and postal identity; a site
+address is never assumed to be the billing address. New invoices retain this
+identity at issue time and show it in the PDF, MSP record, and client portal.
+Existing issued artifacts remain unchanged. Tax calculation and legal/tax policy
+are unchanged. Logo branding and tagged-PDF output remain explicit future
+document-quality work. See [client-billing-identity.md](client-billing-identity.md).
 
 The invoice layout matrix passes 21 cases across the three browser engines. The
 supported invoice backend target passes its invoice, stock, permission, IDOR,

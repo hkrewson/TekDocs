@@ -35,6 +35,15 @@ def organization_payload(**overrides):
         "name": "Acme Dental",
         "legal_name": "Acme Dental Associates, LLC",
         "website": "https://acme.example.com",
+        "billing_contact_name": "Morgan Lee",
+        "billing_email": "accounts@acme.example.com",
+        "billing_phone": "512-555-0144",
+        "billing_address_line_1": "400 Congress Avenue",
+        "billing_address_line_2": "Suite 900",
+        "billing_city": "Austin",
+        "billing_region": "TX",
+        "billing_postal_code": "78701",
+        "billing_country_code": "US",
         "classifications": ["client", "partner"],
         **overrides,
     }
@@ -51,6 +60,8 @@ def test_owner_can_create_list_read_update_and_archive_organization(owner_client
     assert created.status_code == 201
     assert created.json()["name"] == "Acme Dental"
     assert created.json()["classifications"] == ["client", "partner"]
+    assert created.json()["billing_contact_name"] == "Morgan Lee"
+    assert created.json()["billing_country_code"] == "US"
     entity_id = created.json()["id"]
     organization = Organization.objects.select_related("entity").get(entity_id=entity_id)
     assert organization.tenant_id == installation.tenant.id
@@ -150,6 +161,8 @@ def test_organization_collection_is_searchable_sorted_and_bounded(owner_client):
         (organization_payload(classifications=[]), "classifications"),
         (organization_payload(classifications=["client", "client"]), "classifications"),
         (organization_payload(classifications=["unknown"]), "classifications"),
+        (organization_payload(billing_email="not-an-email"), "billing_email"),
+        (organization_payload(billing_country_code="ZZ"), "billing_country_code"),
     ],
 )
 def test_organization_write_contract_rejects_invalid_input(owner_client, payload, field):

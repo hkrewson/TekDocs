@@ -242,13 +242,14 @@ class InvoiceSerializer(serializers.Serializer):
     balance_amount = serializers.SerializerMethodField()
     last_event_at = serializers.SerializerMethodField()
     lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
+    bill_to = serializers.SerializerMethodField()
 
     def get_fields(self):  # type: ignore[no-untyped-def]
         fields = super().get_fields()
         if self.context.get("summary"):
             for field in (
                 "notes", "lines", "content_digest", "signature_algorithm", "key_fingerprint",
-                "lifecycle_events",
+                "lifecycle_events", "bill_to",
             ):
                 fields.pop(field, None)
         return fields
@@ -270,12 +271,17 @@ class InvoiceSerializer(serializers.Serializer):
                 "balance_amount",
                 "last_event_at",
                 "lifecycle_events",
+                "bill_to",
             ):
                 rendered.pop(field, None)
         elif self.context.get("portal"):
             for field in ("lifecycle_events", "reconciliation_state", "last_event_at"):
                 rendered.pop(field, None)
         return rendered
+
+    @extend_schema_field(serializers.DictField(child=serializers.CharField(allow_blank=True)))
+    def get_bill_to(self, item):  # type: ignore[no-untyped-def]
+        return dict(item.customer_snapshot)
 
     def _lifecycle(self, item: Invoice) -> InvoiceLifecycle:
         return invoice_lifecycle(item)

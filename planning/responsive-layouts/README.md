@@ -64,6 +64,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 - [Invoice settings workspace](invoice-settings-workspace.md)
 
+- [Client billing identity and retained invoice snapshot](client-billing-identity.md)
+
 - [Compliance and data-flow workspace](compliance-workspace.md)
 
 - [Integration workspace](integration-workspace.md)

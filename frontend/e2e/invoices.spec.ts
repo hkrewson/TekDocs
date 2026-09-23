@@ -15,7 +15,7 @@ const issuedInvoice = {
   subtotal: '125.00',
   tax_total: '0.00',
   total: '125.00',
-  lines: [{ id: crypto.randomUUID(), position: 1, description: 'Managed service', quantity: '1.000', unit_amount: '125.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '125.00', tax: '0.00', total: '125.00', origin_type: '', origin_id: null }],
+  lines: [{ id: crypto.randomUUID(), position: 1, description: 'Managed service', quantity: '1.000', unit: 'each', unit_amount: '125.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '125.00', tax: '0.00', total: '125.00', origin_type: '', origin_id: null }],
   created_at: '2026-08-29T12:00:00Z',
   updated_at: '2026-08-29T12:00:00Z',
   issued_at: '2026-08-29T12:00:00Z',
@@ -147,8 +147,8 @@ test('a stock line records its quantity for the client in one save', async ({ pa
     tax_rates: [],
   } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}/lines`, async (route) => {
-    expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, quantity: '125.500', tax_rate_id: null })
-    await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable', quantity: '125.500', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
+    expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, quantity: '125.500', unit: 'foot', tax_rate_id: null })
+    await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable', quantity: '125.500', unit: 'foot', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
   })
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: false } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}`, (route) => route.fulfill({ json: draft }))
@@ -159,7 +159,7 @@ test('a stock line records its quantity for the client in one save', async ({ pa
   await expect(page.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
   await page.getByLabel('Quantity').fill('125.500')
   await page.getByRole('dialog').getByRole('button', { name: 'Save item' }).click()
-  await expect(page.getByText('125.500 × USD 0.30')).toBeVisible()
+  await expect(page.getByText('125.500 foot × USD 0.30')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 

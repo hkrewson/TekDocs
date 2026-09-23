@@ -72,6 +72,7 @@ def settings_payload(**overrides):  # type: ignore[no-untyped-def]
         "billing_email": "billing@example.invalid",
         "phone": "",
         "tax_registration": "",
+        "payment_instructions": "Pay by ACH and include the invoice number.",
         "default_currency": "USD",
         "payment_terms_days": 30,
         "invoice_prefix": "INV",
@@ -96,7 +97,12 @@ def draft_with_line(installation, organization, suffix=""):  # type: ignore[no-u
     create_line(
         invoice=invoice,
         actor_id=installation.owner.id,
-        values={"description": f"Managed service {suffix}".strip(), "quantity": "2.000", "unit_amount": "12.50"},
+        values={
+            "description": f"Managed service {suffix}".strip(),
+            "quantity": "2.000",
+            "unit": "hour",
+            "unit_amount": "12.50",
+        },
     )
     return invoice
 
@@ -124,6 +130,7 @@ def test_issue_requires_recent_session_and_complete_settings(owner_client, insta
     configured = owner_client.put(settings_url, settings_payload(), content_type="application/json")
     assert configured.status_code == 200
     assert configured.json()["issue_ready"] is True
+    assert configured.json()["payment_instructions"] == "Pay by ACH and include the invoice number."
 
 
 @pytest.mark.django_db
@@ -149,6 +156,7 @@ def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, in
     assert payload["number"] == "INV-000001"
     assert payload["subtotal"] == "25.00"
     assert payload["total"] == "25.00"
+    assert payload["lines"][0]["unit"] == "hour"
     assert payload["signature_algorithm"] == "Ed25519"
     assert len(payload["content_digest"]) == 64
     assert len(payload["key_fingerprint"]) == 64
@@ -157,6 +165,9 @@ def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, in
     assert artifact_bytes.startswith(b"%PDF-")
     assert artifact.size == artifact_size
     assert artifact.checksum == hashlib.sha256(artifact_bytes).hexdigest()
+    assert b"/Author (Issue MSP, LLC)" in artifact_bytes
+    assert b"/Creator (TekDocs)" in artifact_bytes
+    assert b"1999" not in artifact_bytes
     Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(issued.public_key)).verify(
         base64.urlsafe_b64decode(issued.signature), bytes.fromhex(issued.content_digest)
     )
@@ -252,14 +263,18 @@ def test_settings_offer_country_choices_and_validate_numbering_period(owner_clie
     result = owner_client.get(settings_url)
     assert result.status_code == 200
     assert {"value": "US", "label": "United States"} in result.json()["country_choices"]
-    assert owner_client.put(
-        settings_url, settings_payload(country_code="ZZ"), content_type="application/json"
-    ).status_code == 400
-    assert owner_client.put(
-        settings_url,
-        settings_payload(invoice_reset_period="monthly", invoice_date_component="year"),
-        content_type="application/json",
-    ).status_code == 400
+    assert (
+        owner_client.put(settings_url, settings_payload(country_code="ZZ"), content_type="application/json").status_code
+        == 400
+    )
+    assert (
+        owner_client.put(
+            settings_url,
+            settings_payload(invoice_reset_period="monthly", invoice_date_component="year"),
+            content_type="application/json",
+        ).status_code
+        == 400
+    )
 
 
 @pytest.mark.django_db

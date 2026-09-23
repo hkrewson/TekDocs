@@ -11118,6 +11118,8 @@ export interface components {
             readonly phone: string;
             /** @default  */
             readonly tax_registration: string;
+            /** @default  */
+            readonly payment_instructions: string;
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
@@ -11165,6 +11167,7 @@ export interface components {
             readonly billing_email: string;
             readonly phone: string;
             readonly tax_registration: string;
+            readonly payment_instructions: string;
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
@@ -11229,6 +11232,7 @@ export interface components {
             readonly description: string;
             /** Format: decimal */
             readonly quantity: string;
+            readonly unit: string;
             readonly unit_amount: string;
             readonly currency: string;
             readonly tax_rate_name: string;
@@ -11257,6 +11261,7 @@ export interface components {
             readonly description?: string;
             /** Format: decimal */
             readonly quantity?: string;
+            readonly unit?: string;
             /** Format: decimal */
             readonly unit_amount?: string;
             /** Format: uuid */
@@ -12465,6 +12470,7 @@ export interface components {
             readonly description?: string;
             /** Format: decimal */
             readonly quantity?: string;
+            readonly unit?: string;
             /** Format: decimal */
             readonly unit_amount?: string;
             readonly tax_rate_name?: string;

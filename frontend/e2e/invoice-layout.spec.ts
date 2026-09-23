@@ -5,9 +5,9 @@ import type { Page } from '@playwright/test'
 const clientId = 'invoice-layout-client'
 const columns = ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total']
 const invoiceLines = [
-  { id: 'line-1', position: 1, description: 'Managed network service', quantity: '24.000', unit_amount: '70.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '1680.00', tax: '0.00', total: '1680.00', origin_type: '', origin_id: null },
-  { id: 'line-2', position: 2, description: 'USW Power Adapter', quantity: '1.000', unit_amount: '97.44', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '97.44', tax: '0.00', total: '97.44', origin_type: '', origin_id: null },
-  { id: 'line-3', position: 3, description: 'TP-Link TL-SG116 16 Port Gigabit Switch', quantity: '1.000', unit_amount: '64.19', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '64.19', tax: '0.00', total: '64.19', origin_type: '', origin_id: null },
+  { id: 'line-1', position: 1, description: 'Managed network service', quantity: '24.000', unit: 'hour', unit_amount: '70.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '1680.00', tax: '0.00', total: '1680.00', origin_type: '', origin_id: null },
+  { id: 'line-2', position: 2, description: 'USW Power Adapter', quantity: '1.000', unit: 'each', unit_amount: '97.44', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '97.44', tax: '0.00', total: '97.44', origin_type: '', origin_id: null },
+  { id: 'line-3', position: 3, description: 'TP-Link TL-SG116 16 Port Gigabit Switch', quantity: '1.000', unit: 'each', unit_amount: '64.19', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '64.19', tax: '0.00', total: '64.19', origin_type: '', origin_id: null },
 ]
 const invoices = Array.from({ length: 61 }, (_, index) => ({
   id: `invoice-${index + 1}`,
@@ -58,6 +58,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole('link', { name: 'Back to invoices' })).toBeVisible()
     const lineRows = page.locator('.invoice-line-list > li')
     await expect(lineRows).toHaveCount(3)
+    await expect(lineRows.first()).toContainText('24.000 hour × USD 70.00')
     const firstLine = lineRows.first()
     expect(await firstLine.evaluate((row) => {
       const description = row.querySelector<HTMLElement>('.invoice-line-description')!.getBoundingClientRect()

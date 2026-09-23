@@ -19,6 +19,9 @@ authentication rules remain authoritative.
   authentication retains the draft and uses the existing password confirmation.
 - Readiness issues remain visible in every section, while successful saves replace
   the dirty baseline returned by the server.
+- Invoice defaults include optional payment instructions. They are installation
+  settings, protected by the existing invoice-settings permissions and recent
+  authentication, and are snapshotted into each newly issued invoice.
 - The workspace fits 320, 390, 768, 1024, 1280 and 1440px in Chromium, Firefox
   and WebKit with no horizontal page overflow or automated accessibility violations.
 

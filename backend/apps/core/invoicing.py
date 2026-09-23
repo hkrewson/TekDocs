@@ -164,6 +164,7 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
             "invoice_subtotal",
             "invoice_tax",
             "invoice_total",
+            "unit",
         ]
     )
     amounts = invoice_amounts(issued)
@@ -189,6 +190,7 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
                 render_amount(amounts.subtotal, issued.currency),
                 render_amount(amounts.tax_total, issued.currency),
                 render_amount(amounts.total, issued.currency),
+                _safe_csv_cell(line.unit),
             ]
         )
     return output.getvalue().encode("utf-8")
@@ -213,6 +215,7 @@ def invoice_accounting_export(invoice: Invoice) -> dict[str, object]:
                 "position": line.position,
                 "description": line.description,
                 "quantity": str(line.quantity),
+                "unit": line.unit,
                 "unit_amount": render_amount(line.unit_amount, issued.currency),
                 "tax_rate_name": line.tax_rate_name,
                 "tax_rate_value": str(line.tax_rate_value),
@@ -401,6 +404,7 @@ def _profile_snapshot(profile: TenantBillingProfile) -> dict[str, object]:
         "billing_email": profile.billing_email,
         "phone": profile.phone,
         "tax_registration": profile.tax_registration,
+        "payment_instructions": profile.payment_instructions,
     }
 
 
@@ -470,6 +474,7 @@ def configure_issue_settings(
         "billing_email",
         "phone",
         "tax_registration",
+        "payment_instructions",
         "default_currency",
         "payment_terms_days",
         "invoice_prefix",
@@ -550,6 +555,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
                 "position": line.position,
                 "description": line.description,
                 "quantity": str(line.quantity),
+                "unit": line.unit,
                 "unit_amount": render_amount(line.unit_amount, locked.currency),
                 "currency": line.currency,
                 "tax_rate_name": line.tax_rate_name,
@@ -567,6 +573,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         currency=locked.currency,
         reference=locked.reference,
         notes=locked.notes,
+        issued_at=issued_at.isoformat(),
         issuer=issuer,
         customer=customer,
         lines=line_records,
@@ -838,6 +845,7 @@ def _origin_snapshot(
             {
                 "description": stock_item.name,
                 "quantity": Decimal("1"),
+                "unit": stock_item.unit,
                 "unit_amount": stock_item.client_price_per_unit,
                 "currency": stock_item.currency,
             },
@@ -905,6 +913,7 @@ def create_line(
         tax_inclusive=bool(snapshot.get("tax_inclusive", False)),
         description=str(snapshot["description"]),
         quantity=cast(Decimal, snapshot["quantity"]),
+        unit=str(snapshot.get("unit", "")),
         unit_amount=cast(Decimal, snapshot["unit_amount"]),
         **origin_fields,
     )
@@ -926,7 +935,7 @@ def update_line(*, line: InvoiceLine, actor_id: UUID, values: dict[str, object])
     locked = InvoiceLine.objects.select_for_update().select_related("invoice", "organization").get(pk=line.pk)
     if locked.invoice.state != "draft":
         raise InvoiceError("Only draft invoice lines can be edited")
-    for field in ("description", "quantity", "unit_amount", "tax_rate_name", "tax_rate_value", "tax_inclusive"):
+    for field in ("description", "quantity", "unit", "unit_amount", "tax_rate_name", "tax_rate_value", "tax_inclusive"):
         if field in values:
             setattr(locked, field, values[field])
     _validate(locked)

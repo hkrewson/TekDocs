@@ -25,6 +25,12 @@ settings in the MSP Workspace are a separate route and remain pending.
 - The collection and focused record fit 320, 390, 768, 1024, 1280 and 1440px
   in Chromium, Firefox and WebKit with no horizontal page overflow or automated
   accessibility violations.
+- Invoice lines retain an optional billing unit. The focused MSP record and client
+  portal show it with quantity and rate; CSV and accounting exports carry the same
+  signed snapshot.
+- Newly issued retained PDFs use friendly dates, an explicit amount due, clear
+  quantity/unit/rate columns, issuer contact details, project notes, payment
+  instructions and issue-time document metadata.
 
 ## Evidence
 
@@ -32,6 +38,19 @@ settings in the MSP Workspace are a separate route and remain pending.
 - Server query and summary contract: `backend/apps/core/tests/test_invoice_drafts.py`
 - Browser matrix: `frontend/e2e/invoice-layout.spec.ts`
 - Preserved lifecycle and recurring workflows: `frontend/e2e/invoices.spec.ts`
+
+## Retained invoice document checkpoint
+
+The PDF is generated and signed only when a draft is issued. Existing issued PDFs
+remain immutable, so the improved document applies to new invoices rather than
+silently changing retained evidence. Payment instructions come from the MSP invoice
+defaults and are included in the issuer snapshot. If they are blank, the PDF gives
+the due date and billing contact without inventing payment details.
+
+Client billing addresses remain deliberately absent because organizations do not
+yet have a dedicated billing-address/contact model; a site address is not assumed
+to be the billing address. Tax calculation and legal/tax policy are unchanged.
+Logo branding and tagged-PDF output remain explicit future document-quality work.
 
 The invoice layout matrix passes 21 cases across the three browser engines. The
 supported invoice backend target passes its invoice, stock, permission, IDOR,

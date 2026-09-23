@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 const settings = {
   configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
   address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
-  billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
+  billing_email: 'billing@example.invalid', phone: '', tax_registration: '', payment_instructions: '', default_currency: 'USD',
   payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none', invoice_separator: '-',
   invoice_sequence_digits: 6, invoice_reset_period: 'never',
   country_choices: [{ value: 'CA', label: 'Canada' }, { value: 'US', label: 'United States' }],
@@ -54,18 +54,21 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Discard changes' }).click()
     await expect(page).toHaveURL(/section=defaults/)
     await expect(page.getByRole('group', { name: 'Invoice defaults' })).toBeVisible()
+    await expect(page.getByLabel('Payment instructions')).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   })
 }
 
 test('invoice settings can retry a failed load', async ({ page }) => {
   await fixtures(page)
-  let attempts = 0
+  await page.unroute('**/api/v1/workspaces/msp/invoice-settings')
+  let shouldFail = true
   await page.route('**/api/v1/workspaces/msp/invoice-settings', (route) => {
-    attempts += 1
-    return attempts === 1 ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: settings })
+    return shouldFail ? route.fulfill({ status: 503, json: {} }) : route.fulfill({ json: settings })
   })
   await page.goto('/invoices')
   await expect(page.getByRole('heading', { name: "Couldn't load invoice settings." })).toBeVisible()
+  shouldFail = false
   await page.getByRole('button', { name: 'Try again' }).click()
   await expect(page.getByRole('group', { name: 'Your business details' })).toBeVisible()
 })

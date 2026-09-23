@@ -91,7 +91,7 @@ def invoice_delivery(db, tmp_path):
         create_line(
             invoice=invoice,
             actor_id=installation.owner.id,
-            values={"description": description, "quantity": "2.000", "unit_amount": "12.50"},
+            values={"description": description, "quantity": "2.000", "unit": "hour", "unit_amount": "12.50"},
         )
         return invoice
 
@@ -142,6 +142,8 @@ def test_portal_exposes_only_exact_client_issued_invoices_with_pdf_csv_parity(in
         assert csv_export["Content-Type"].startswith("text/csv")
         rendered_csv = csv_export.content.decode()
         assert "invoice_number" in rendered_csv
+        assert rendered_csv.splitlines()[0].endswith("invoice_total,unit")
+        assert rendered_csv.splitlines()[1].endswith("25.00,hour")
         assert "'=unsafe-reference" in rendered_csv
         assert "'=unsafe-description" in rendered_csv
 
@@ -228,6 +230,7 @@ def test_invoice_lifecycle_export_idempotency_and_portal_projection(invoice_deli
     assert exported.json()["format"] == "tekdocs-accounting-invoice/v1"
     assert exported.json()["idempotency_key"] == f"tekdocs:invoice:{issued.entity_id}:v1"
     assert exported.json()["total"] == "25.00"
+    assert exported.json()["lines"][0]["unit"] == "hour"
 
     payment = {
         "event_type": "payment_recorded",

@@ -38204,6 +38204,10 @@ components:
           type: string
           default: ''
           maxLength: 120
+        payment_instructions:
+          type: string
+          default: ''
+          maxLength: 2000
         default_currency:
           type: string
           maxLength: 3
@@ -38306,6 +38310,8 @@ components:
           type: string
         tax_registration:
           type: string
+        payment_instructions:
+          type: string
         default_currency:
           type: string
         payment_terms_days:
@@ -38340,6 +38346,7 @@ components:
       - invoice_sequence_digits
       - issue_ready
       - legal_name
+      - payment_instructions
       - payment_terms_days
       - phone
       - postal_code
@@ -38465,6 +38472,8 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit:
+          type: string
         unit_amount:
           type: string
           readOnly: true
@@ -38509,6 +38518,7 @@ components:
       - tax_rate_name
       - tax_rate_value
       - total
+      - unit
       - unit_amount
     InvoiceLineWrite:
       type: object
@@ -38539,6 +38549,9 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit:
+          type: string
+          maxLength: 32
         unit_amount:
           type: string
           format: decimal
@@ -41289,6 +41302,9 @@ components:
           type: string
           format: decimal
           pattern: ^-?\d{0,9}(?:\.\d{0,3})?$
+        unit:
+          type: string
+          maxLength: 32
         unit_amount:
           type: string
           format: decimal

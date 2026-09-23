@@ -131,6 +131,8 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
         {section === 'defaults' && <fieldset className="record-form-section wide-field"><legend>{translate('accounting.invoiceDefaults')}</legend><div className="form-grid">
           <Field autoFocus label={translate('accounting.defaultCurrency')} value={value.default_currency} onChange={(default_currency) => setValue({ ...value, default_currency: default_currency.toUpperCase() })} />
           <Field label={translate('accounting.paymentTerms')} type="number" value={String(value.payment_terms_days)} onChange={(payment_terms_days) => setValue({ ...value, payment_terms_days: Number(payment_terms_days) })} />
+          <label className="wide-field"><span>{translate('accounting.paymentInstructions')}</span><textarea rows={4} maxLength={2000} value={value.payment_instructions} onChange={(event) => setValue({ ...value, payment_instructions: event.target.value })} /></label>
+          <p className="field-help wide-field">{translate('accounting.paymentInstructionsHelp')}</p>
         </div></fieldset>}
         {section === 'numbering' && <fieldset className="record-form-section wide-field numbering-settings"><legend>{translate('accounting.invoiceNumbering')}</legend>
           <p className="field-help">{translate('accounting.numberingHelp')}</p>

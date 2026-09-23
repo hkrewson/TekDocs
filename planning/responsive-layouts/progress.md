@@ -2397,3 +2397,35 @@ checks, the production build and compressed bundle budgets (shell 129173 <=
 Inferred: Phase 6 implementation is ready for technician acceptance. Blocked:
 none. Existing unrelated Wiki edits remain preserved. No external push, Wiki
 publication, deployment, version bump or removal of application data.
+
+## Retained invoice document checkpoint — 2026-09-22
+
+Phase 6 now includes a clearer retained invoice PDF and the inputs required to
+produce it. Invoice lines have an optional billing unit from manual entry or stock;
+the MSP workspace, client portal, CSV export, accounting export, signed manifest
+and PDF use the same snapshotted value. MSP invoice defaults now store optional
+payment instructions. Newly issued PDFs use friendly dates, an explicit amount
+due, quantity/unit/rate columns, issuer phone and tax identity when present,
+project notes, payment directions, and the actual issue time in document metadata.
+
+Existing issued artifacts remain byte-for-byte immutable. No client address is
+inferred from a site because the product has no dedicated client billing-address
+record yet. Logo support and tagged-PDF accessibility remain future document
+quality work. Tax behavior and the 0.8.46 version are unchanged.
+
+Verification covers PDF generation with and without notes, artifact integrity and
+metadata, settings persistence, API/schema generation, and unit retention in issue
+and export paths. `make check` passes with all 643 frontend tests in 117 files,
+schema/migration agreement, the 37-page Wiki contract and production bundle budgets.
+The supported invoice-delivery target passes its complete PostgreSQL permission,
+RLS and migration matrix plus the same frontend suite. All 63 invoice browser cases
+pass at the required widths across Chromium, Firefox and WebKit. The general upgrade
+rehearsal passes from 0.1.3 to 0.8.46, and the isolated real browser-to-Django-to-
+PostgreSQL journey passes in 3.4 minutes. Evidence: `/tmp/tekdocs-invoice-document-
+check.log`, `/tmp/tekdocs-invoice-document-backend.log`, `/tmp/tekdocs-invoice-
+document-browser.log`, `/tmp/tekdocs-invoice-document-upgrade.log` and
+`/tmp/tekdocs-invoice-document-live.log`.
+
+The local 0.8.46 application is rebuilt and healthy at port 3200 with existing
+volumes retained. Blocked: none. Production deployment, Wiki publication and a
+version change remain separate.

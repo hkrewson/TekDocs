@@ -102,6 +102,7 @@ class InvoiceLineWriteSerializer(StrictSerializer):
     origin_id = serializers.UUIDField(required=False, allow_null=True)
     description = serializers.CharField(max_length=1000, required=False)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
+    unit = serializers.CharField(max_length=32, allow_blank=True, required=False)
     unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     tax_rate_id = serializers.UUIDField(required=False, allow_null=True)
 
@@ -109,6 +110,7 @@ class InvoiceLineWriteSerializer(StrictSerializer):
 class InvoiceLineUpdateSerializer(StrictSerializer):
     description = serializers.CharField(max_length=1000, required=False)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False)
+    unit = serializers.CharField(max_length=32, allow_blank=True, required=False)
     unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     tax_rate_name = serializers.CharField(max_length=120, allow_blank=True, required=False)
     tax_rate_value = serializers.DecimalField(max_digits=9, decimal_places=6, required=False)
@@ -120,6 +122,7 @@ class InvoiceLineSerializer(serializers.Serializer):
     position = serializers.IntegerField()
     description = serializers.CharField()
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
+    unit = serializers.CharField(allow_blank=True)
     unit_amount = serializers.SerializerMethodField()
     currency = serializers.CharField()
     tax_rate_name = serializers.CharField()
@@ -355,6 +358,7 @@ class InvoiceIssueSettingsSerializer(StrictSerializer):
     billing_email = serializers.EmailField(max_length=254)
     phone = serializers.CharField(max_length=64, allow_blank=True, required=False, default="")
     tax_registration = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    payment_instructions = serializers.CharField(max_length=2000, allow_blank=True, required=False, default="")
     default_currency = serializers.CharField(max_length=3)
     payment_terms_days = serializers.IntegerField(min_value=0, max_value=365)
     invoice_prefix = serializers.RegexField(r"^[A-Z0-9-]{1,16}$")
@@ -409,6 +413,7 @@ class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
     billing_email = serializers.CharField(allow_blank=True)
     phone = serializers.CharField(allow_blank=True)
     tax_registration = serializers.CharField(allow_blank=True)
+    payment_instructions = serializers.CharField(allow_blank=True)
     default_currency = serializers.CharField()
     payment_terms_days = serializers.IntegerField()
     invoice_prefix = serializers.CharField()
@@ -528,6 +533,7 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         "billing_email": profile.billing_email,
         "phone": profile.phone,
         "tax_registration": profile.tax_registration,
+        "payment_instructions": profile.payment_instructions,
         "default_currency": profile.default_currency,
         "payment_terms_days": profile.payment_terms_days,
         "invoice_prefix": profile.invoice_prefix,

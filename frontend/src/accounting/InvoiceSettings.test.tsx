@@ -9,7 +9,7 @@ import { InvoiceSettings } from './InvoiceSettings'
 const settings = {
   configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
   address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
-  billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
+  billing_email: 'billing@example.invalid', phone: '', tax_registration: '', payment_instructions: '', default_currency: 'USD',
   payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none' as const, invoice_separator: '-' as const,
   invoice_sequence_digits: 6, invoice_reset_period: 'never' as const,
   country_choices: [{ value: 'CA', label: 'Canada' }, { value: 'US', label: 'United States' }],
@@ -59,6 +59,19 @@ describe('InvoiceSettings', () => {
     expect(saveIssueSettings.mock.calls[0][0]).not.toHaveProperty('country_choices')
     expect(saveIssueSettings.mock.calls[0][0]).not.toHaveProperty('readiness_issues')
     expect(await screen.findByText('Invoice settings saved.')).toBeInTheDocument()
+  })
+
+  it('saves payment instructions with invoice defaults', async () => {
+    const user = userEvent.setup()
+    const saved = { ...settings, payment_instructions: 'Pay by ACH.' }
+    const saveIssueSettings = vi.fn().mockResolvedValue(saved)
+    setup({ issueSettings: vi.fn().mockResolvedValue(settings), saveIssueSettings }, '/invoices?section=defaults')
+
+    await user.type(await screen.findByLabelText('Payment instructions'), 'Pay by ACH.')
+    await user.click(screen.getByRole('button', { name: 'Save invoice settings' }))
+
+    await waitFor(() => expect(saveIssueSettings).toHaveBeenCalledWith(expect.objectContaining({ payment_instructions: 'Pay by ACH.' })))
+    expect(screen.getByLabelText('Payment instructions')).toHaveValue('Pay by ACH.')
   })
 
   it('confirms the password and retries a save when recent authentication expired', async () => {

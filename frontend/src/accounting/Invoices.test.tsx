@@ -32,6 +32,7 @@ const draft: InvoiceDraft = {
     position: 1,
     description: 'Managed firewall',
     quantity: '1.000',
+    unit: 'each',
     unit_amount: '125.00',
     currency: 'USD',
     tax_rate_name: 'Sales tax',
@@ -51,7 +52,7 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
   const settings = {
     configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
     address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
-    billing_email: 'billing@example.invalid', phone: '', tax_registration: '', default_currency: 'USD',
+    billing_email: 'billing@example.invalid', phone: '', tax_registration: '', payment_instructions: '', default_currency: 'USD',
     payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none', invoice_separator: '-',
     invoice_sequence_digits: 6, invoice_reset_period: 'never', country_choices: [{ value: 'US', label: 'United States' }],
   }
@@ -128,7 +129,7 @@ describe('Invoices', () => {
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
       'invoice-1',
-      { origin_type: 'service_rate', origin_id: 'rate-1', tax_rate_id: null },
+      { origin_type: 'service_rate', origin_id: 'rate-1', unit: '', tax_rate_id: null },
     ))
   })
 
@@ -157,7 +158,7 @@ describe('Invoices', () => {
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
       'invoice-1',
-      { origin_type: 'stock_item', origin_id: 'stock-1', quantity: '125.500', tax_rate_id: null },
+      { origin_type: 'stock_item', origin_id: 'stock-1', quantity: '125.500', unit: 'foot', tax_rate_id: null },
     ))
   })
 

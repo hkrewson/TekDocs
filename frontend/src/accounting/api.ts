@@ -5,6 +5,7 @@ export type InvoiceLine = {
   position: number
   description: string
   quantity: string
+  unit: string
   unit_amount: string
   currency: string
   tax_rate_name: string
@@ -109,6 +110,7 @@ export type InvoiceIssueSettings = {
   billing_email: string
   phone: string
   tax_registration: string
+  payment_instructions: string
   default_currency: string
   payment_terms_days: number
   invoice_prefix: string

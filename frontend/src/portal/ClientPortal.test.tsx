@@ -66,7 +66,7 @@ describe('ClientPortal', () => {
   })
 
   it('lists own issued invoices and opens matching PDF and CSV downloads', async () => {
-    const invoice = { id: 'invoice-1', state: 'issued', number: 'INV-000001', currency: 'USD', invoice_date: '2026-08-29', due_date: '2026-09-28', reference: 'PO-1', notes: '', subtotal: '25.00', tax_total: '0.00', total: '25.00', lines: [{ id: 'line-1', position: 1, description: 'Managed service', quantity: '1.000', unit_amount: '25.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '25.00', tax: '0.00', total: '25.00', origin_type: '', origin_id: null }], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z', issued_at: '2026-08-29T12:00:00Z' }
+    const invoice = { id: 'invoice-1', state: 'issued', number: 'INV-000001', currency: 'USD', invoice_date: '2026-08-29', due_date: '2026-09-28', reference: 'PO-1', notes: '', subtotal: '25.00', tax_total: '0.00', total: '25.00', lines: [{ id: 'line-1', position: 1, description: 'Managed service', quantity: '1.000', unit: 'hour', unit_amount: '25.00', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '25.00', tax: '0.00', total: '25.00', origin_type: '', origin_id: null }], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z', issued_at: '2026-08-29T12:00:00Z' }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 1, results: [invoice] }), { status: 200 }))
@@ -79,6 +79,7 @@ describe('ClientPortal', () => {
     await user.click(await screen.findByRole('button', { name: /INV-000001/i }))
     expect(await screen.findByRole('heading', { name: 'INV-000001' })).toBeInTheDocument()
     expect(screen.getByText('Managed service')).toBeInTheDocument()
+    expect(screen.getByText('1.000 hour × USD 25.00')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/v1/portal/invoices/invoice-1/pdf')
     expect(screen.getByRole('link', { name: 'Download CSV' })).toHaveAttribute('href', '/api/v1/portal/invoices/invoice-1/csv')
   })

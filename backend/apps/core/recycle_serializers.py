@@ -12,7 +12,7 @@ class RecycleBinQuerySerializer(serializers.Serializer):
         default="",
     )
     page = serializers.IntegerField(min_value=1, max_value=100, required=False, default=1)
-    page_size = serializers.IntegerField(min_value=1, max_value=50, required=False, default=25)
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
 
 class RecycleBinItemSerializer(serializers.Serializer):

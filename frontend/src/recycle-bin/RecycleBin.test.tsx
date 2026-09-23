@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { RecycleBin } from './RecycleBin'
 import type { RecycleBinClient } from './api'
@@ -25,7 +26,7 @@ describe('RecycleBin', () => {
     const restore = vi.fn().mockResolvedValue(undefined)
     const client = { list, restore } as RecycleBinClient
 
-    render(<RecycleBin workspace={null} client={client} />)
+    render(<MemoryRouter><RecycleBin workspace={null} client={client} /></MemoryRouter>)
 
     expect(await screen.findByText('Downtown office')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Restore' }))
@@ -39,10 +40,25 @@ describe('RecycleBin', () => {
 
   it('explains when a record is visible but cannot be restored', async () => {
     const client = { list: vi.fn().mockResolvedValue({ results: [{ ...item, can_restore: false }], page: 1, page_size: 50, count: 1, has_more: false }), restore: vi.fn() } as unknown as RecycleBinClient
-    render(<RecycleBin workspace={null} client={client} />)
+    render(<MemoryRouter><RecycleBin workspace={null} client={client} /></MemoryRouter>)
 
     const button = await screen.findByRole('button', { name: 'Restore' })
     expect(button).toBeDisabled()
     expect(button).toHaveAttribute('title', 'You don’t have permission to restore this record')
+  })
+
+  it('restores URL-addressed collection state and retries a failed read', async () => {
+    const user = userEvent.setup()
+    const list = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ results: [item], page: 2, page_size: 50, count: 30, has_more: false })
+    render(<MemoryRouter initialEntries={['/recycle-bin?q=office&record_type=site&page=2&page_size=50']}><RecycleBin workspace={null} client={{ list, restore: vi.fn() }} /></MemoryRouter>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Archived records couldn’t be loaded')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+    expect(await screen.findByText('Downtown office')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Search: office ×' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Rows per page')).toHaveValue('50')
+    expect(list).toHaveBeenLastCalledWith({}, { query: 'office', recordType: 'site', page: 2, pageSize: 50 }, expect.any(AbortSignal))
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

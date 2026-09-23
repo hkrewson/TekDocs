@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
 import { NotificationDeliveryAdmin } from './NotificationDeliveryAdmin'
@@ -17,7 +18,7 @@ describe('NotificationDeliveryAdmin', () => {
     const retryDelivery = vi.fn().mockResolvedValue({ ...delivery, state: 'pending', attempts: 0, retry_generation: 1 })
     const client = { listDeliveries: vi.fn().mockResolvedValue({ results: [delivery], has_more: false, next_cursor: null }), retryDelivery } satisfies NotificationDeliveryAdminClient
     const user = userEvent.setup()
-    render(<NotificationDeliveryAdmin client={client} />)
+    render(<MemoryRouter><NotificationDeliveryAdmin client={client} /></MemoryRouter>)
 
     expect(await screen.findByText('Client Reader')).toBeInTheDocument()
     expect(screen.queryByText(/document body/i)).not.toBeInTheDocument()
@@ -26,6 +27,7 @@ describe('NotificationDeliveryAdmin', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     expect(retryDelivery).toHaveBeenCalledWith('delivery-1', 'SMTP service recovered')
     expect(await screen.findByText('The email was returned to the delivery queue.')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
   it('appends an older delivery page without losing the visible history', async () => {
@@ -38,7 +40,7 @@ describe('NotificationDeliveryAdmin', () => {
       retryDelivery: vi.fn(),
     } satisfies NotificationDeliveryAdminClient
     const user = userEvent.setup()
-    render(<NotificationDeliveryAdmin client={client} />)
+    render(<MemoryRouter><NotificationDeliveryAdmin client={client} /></MemoryRouter>)
 
     expect(await screen.findByText('Client Reader')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Load older deliveries' }))
@@ -47,5 +49,17 @@ describe('NotificationDeliveryAdmin', () => {
     expect(screen.getByText('Client Reader')).toBeInTheDocument()
     expect(listDeliveries).toHaveBeenNthCalledWith(2, undefined, 'older-page')
     expect(screen.queryByRole('button', { name: 'Load older deliveries' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the status filter in the URL and retries a failed collection read', async () => {
+    const listDeliveries = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ results: [delivery], has_more: false, next_cursor: null })
+    const user = userEvent.setup()
+    render(<MemoryRouter initialEntries={['/notification-delivery?status=dead_letter']}><NotificationDeliveryAdmin client={{ listDeliveries, retryDelivery: vi.fn() }} /></MemoryRouter>)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Email deliveries could not be loaded')
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Client Reader')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Status: Failed ×' })).toBeInTheDocument()
+    expect(listDeliveries).toHaveBeenLastCalledWith('dead_letter')
   })
 })

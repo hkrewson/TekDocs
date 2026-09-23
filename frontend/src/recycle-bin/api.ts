@@ -15,7 +15,7 @@ export type RecycleBinItem = {
 }
 
 export type RecycleBinScope = { organizationId?: string }
-export type RecycleBinQuery = { query?: string; recordType?: RecycleBinRecordType | '' }
+export type RecycleBinQuery = { query?: string; recordType?: RecycleBinRecordType | ''; page?: number; pageSize?: 25 | 50 | 100 }
 export type RecycleBinResult = { results: RecycleBinItem[]; page: number; page_size: number; count: number; has_more: boolean }
 
 export interface RecycleBinClient {
@@ -54,7 +54,7 @@ async function errorFor(response: Response) {
 
 export const browserRecycleBinClient: RecycleBinClient = {
   async list(scope, query = {}, signal) {
-    const parameters = new URLSearchParams({ page: '1', page_size: '50' })
+    const parameters = new URLSearchParams({ page: String(query.page ?? 1), page_size: String(query.pageSize ?? 25) })
     if (query.query) parameters.set('q', query.query)
     if (query.recordType) parameters.set('record_type', query.recordType)
     const response = await fetch(`${collectionPath(scope)}?${parameters}`, {

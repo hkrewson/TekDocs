@@ -2545,3 +2545,41 @@ Phase 7 remains in progress. Notifications, recycle bin, metadata,
 account/access/setup/help/status and client-portal surfaces remain open. Version
 stays 0.8.46. Production deployment, external push and Wiki publication remain
 separate.
+
+## Phase 7 Notifications and recovery checkpoint — 2026-09-23
+
+The shell notification inbox now uses one overlay with a fixed header and one
+scrolling body. It fills the screen below 768 CSS pixels, locks background
+scrolling, exposes an explicit mobile close action and protects dirty email
+preferences across every dismissal path. Read and preference failures remain
+visible while preserving the user's state. The staff delivery register is a
+compact exception feed with a URL-addressed status condition, explicit read
+retry and retained dead-letter reasons.
+
+Both MSP and organization recycle bins now use bounded, URL-addressed search,
+record type, page and 25/50/100 page-size state. Compact recovery rows replace
+the former wide table while retaining archived time, cascade impact and restore
+eligibility. Failed reads can be retried without clearing the collection, and
+failed restores preserve the focused confirmation. The API ceiling increases
+additively from 50 to 100; its 25-record default and existing callers remain
+compatible. See [notifications-and-recovery.md](notifications-and-recovery.md)
+for the interaction, authorization and compatibility contract.
+
+Verification passes 15 focused frontend component/API cases and 11 focused
+PostgreSQL backend cases. All 18 maintained-browser cases pass at 320, 390, 768,
+1024, 1280 and 1440 CSS pixels across Chromium, Firefox and WebKit, including
+accessibility, overlay bounds, background locking, long values, URL state,
+paging and horizontal-overflow checks. The isolated real
+browser-to-Django-to-PostgreSQL journey passes in 3.6 minutes and archives,
+filters, reloads and restores a real site before checking the delivery register.
+The final repository gate passes all 651 frontend tests in 118 files, backend
+static and migration checks, schema/generated contract drift, documentation
+policy, the production build and compressed bundle budgets (shell 130272 <=
+131072; shell style 24568 <= 24576). Evidence:
+`/tmp/tekdocs-notifications-recovery-browser.log`,
+`/tmp/tekdocs-notifications-recovery-live.log` and
+`/tmp/tekdocs-notifications-recovery-check.log`.
+
+Phase 7 remains in progress. Metadata, account/access/setup/help/status and the
+broader client portal remain open. Version stays 0.8.46. Production deployment,
+external push and Wiki publication remain separate.

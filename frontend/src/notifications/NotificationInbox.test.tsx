@@ -104,4 +104,45 @@ describe('NotificationInbox', () => {
     await user.keyboard('{Escape}')
     expect(trigger).toHaveFocus()
   })
+
+  it('keeps the inbox open and explains a failed read change', async () => {
+    const client = {
+      list: vi.fn().mockResolvedValue({ results: [notification], unread_count: 1, has_more: false, next_cursor: null }),
+      setRead: vi.fn().mockRejectedValue(new Error('offline')),
+      getPreferences: vi.fn(),
+      updatePreferences: vi.fn(),
+    } satisfies NotificationsClient
+    const user = userEvent.setup()
+    render(<NotificationInbox client={client} onOpen={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+    await user.click(await screen.findByRole('button', { name: 'Mark Documentation published read' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The notification could not be updated')
+    expect(screen.getByRole('dialog', { name: 'Notifications' })).toBeInTheDocument()
+  })
+
+  it('guards unsaved email preferences before closing the overlay', async () => {
+    const preferences = { email_enabled: true, invitation_events: true, publication_events: true, delivery_mode: 'immediate' as const, timezone: 'UTC', quiet_start: null, quiet_end: null, daily_digest_hour: 8 }
+    const client = {
+      list: vi.fn().mockResolvedValue({ results: [], unread_count: 0, has_more: false, next_cursor: null }),
+      setRead: vi.fn(),
+      getPreferences: vi.fn().mockResolvedValue(preferences),
+      updatePreferences: vi.fn(),
+    } satisfies NotificationsClient
+    const user = userEvent.setup()
+    render(<NotificationInbox client={client} onOpen={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }))
+    await user.click(await screen.findByRole('button', { name: 'Email preferences' }))
+    await user.click(await screen.findByRole('checkbox', { name: 'Published documentation' }))
+    await user.click(screen.getByRole('button', { name: 'Close notifications' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Unsaved changes' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('checkbox', { name: 'Published documentation' })).not.toBeChecked()
+    await user.click(screen.getByRole('button', { name: 'Back to notifications' }))
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }))
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument()
+  })
 })

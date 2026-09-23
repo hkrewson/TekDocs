@@ -10,9 +10,9 @@ describe('recycle-bin API client', () => {
   it('uses the selected organization boundary and bounded filters', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], page: 1, page_size: 50, count: 0, has_more: false }), { status: 200 }))
 
-    await browserRecycleBinClient.list({ organizationId: 'org-1' }, { query: 'floor', recordType: 'location' })
+    await browserRecycleBinClient.list({ organizationId: 'org-1' }, { query: 'floor', recordType: 'location', page: 2, pageSize: 100 })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workspaces/organizations/org-1/recycle-bin?page=1&page_size=50&q=floor&record_type=location', expect.objectContaining({ credentials: 'same-origin' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/workspaces/organizations/org-1/recycle-bin?page=2&page_size=100&q=floor&record_type=location', expect.objectContaining({ credentials: 'same-origin' }))
   })
 
   it('sends CSRF when restoring into the MSP workspace', async () => {

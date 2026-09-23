@@ -140,10 +140,12 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .notification-trigger { position: relative; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
 .notification-trigger:hover, .notification-trigger[aria-expanded="true"] { color: var(--text); background: #ebe9e3; }
 .notification-count { position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; display: grid; place-items: center; padding: 0 4px; color: #fff; background: #8b3e32; border: 2px solid var(--surface); border-radius: 8px; font-size: 9px; font-weight: 700; line-height: 1; }
-.notification-popover { position: absolute; top: calc(100% + var(--space-2)); right: 0; width: min(380px, calc(100vw - var(--space-5))); max-height: min(520px, calc(100vh - 88px)); overflow-y: auto; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-popover); z-index: 50; }
+.notification-popover { position: absolute; top: calc(100% + var(--space-2)); right: 0; width: min(380px, calc(100vw - var(--space-5))); max-height: min(520px, calc(100vh - 88px)); display: grid; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-popover); z-index: 50; }
 .notification-popover > header { min-height: 45px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--border); }
 .notification-popover h2 { margin: 0; font-size: 14px; }
 .notification-popover > header span { color: var(--muted); font-size: 11px; }
+.notification-popover-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.notification-close { display: none; }
 .notification-toolbar { min-height: 34px; display: flex; align-items: center; justify-content: flex-end; padding: 0 12px; border-bottom: 1px solid var(--border); }
 .notification-toolbar button { padding: 4px 2px; color: var(--accent); background: transparent; border: 0; font-size: 11px; cursor: pointer; }
 .notification-state { margin: 0; padding: 20px 14px; color: var(--muted); font-size: 13px; }
@@ -175,14 +177,9 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .notification-preferences .notification-quiet-hours { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .notification-quiet-hours label { align-items: flex-start; flex-direction: column; gap: 5px; }
 .notification-quiet-hours input { width: 100%; min-height: 34px; padding: 5px 7px; border: 1px solid var(--border-strong); border-radius: 6px; }
-.notification-delivery-admin .section-heading label { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-.notification-delivery-admin select { min-height: 34px; padding: 5px 8px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 6px; }
-.notification-delivery-admin .table-scroll { overflow-x: auto; border-top: 1px solid var(--border); }
-.notification-delivery-admin table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-.notification-delivery-admin th, .notification-delivery-admin td { padding: 10px 12px 10px 2px; border-bottom: 1px solid var(--border); text-align: left; }
-.notification-delivery-admin th { color: var(--muted); font-size: 11px; font-weight: 600; }
-.delivery-retry { display: flex; align-items: center; gap: 5px; }
-.delivery-retry input { min-height: 32px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px; }
+.delivery-list > li > div:last-child { text-align: right; }
+.delivery-retry { display: flex; justify-content: flex-end; gap: 5px; margin-top: 6px; }
+.delivery-retry input { max-width: 100%; min-height: 32px; padding: 5px 8px; border: 1px solid var(--border-strong); border-radius: 6px; }
 .main-content { width: min(var(--content-width), 100%); padding: var(--space-5) var(--space-6) calc(var(--space-6) * 2); }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-5); }
 .page-header h1 { margin: 0 0 var(--space-1); font-size: 24px; line-height: 1.2; letter-spacing: -.018em; }
@@ -348,18 +345,13 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .archive-confirmation p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .archive-confirmation .form-actions { flex: none; }
 .recycle-bin-heading { margin-bottom: 12px; }
-.recycle-bin-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto; align-items: end; gap: 10px; padding-bottom: 14px; }
+.recycle-bin-toolbar { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; align-items: end; gap: 10px; padding-bottom: 14px; }
 .recycle-bin-toolbar > label { display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .recycle-bin-toolbar > label input { min-height: 38px; padding: 8px 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
 .recycle-bin-search { position: relative; }
 .recycle-bin-search svg { position: absolute; top: 50%; left: 10px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
 .recycle-bin-toolbar .recycle-bin-search input { padding-left: 34px; }
-.recycle-bin-table-wrap { overflow-x: auto; border-top: 1px solid var(--border); }
-.recycle-bin-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
-.recycle-bin-table th, .recycle-bin-table td { padding: 11px 12px 11px 2px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
-.recycle-bin-table th { color: var(--muted); font-size: 11px; font-weight: 600; }
-.recycle-bin-table td:last-child { width: 1%; padding-right: 2px; text-align: right; }
-.recycle-bin-table .row-action:disabled { color: var(--quiet); cursor: not-allowed; }
+.recovery-list .row-action:disabled { color: var(--quiet); cursor: not-allowed; }
 .breadcrumbs { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
 .breadcrumbs a { color: inherit; }
 .workspace-page-header { align-items: flex-start; }
@@ -495,6 +487,13 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-attachments li > div { display: flex; align-items: center; gap: 6px; }
 .document-attachments .secondary-button { min-height: 31px; padding: 5px 8px; font-size: 11px; }
 @media (max-width: 700px) { .page-actions, .document-actions { flex-wrap: wrap; } .page-header .button-label { display: none; } .catalog-filters, .status-row, .system-status-list div, .notification-preferences .notification-quiet-hours { grid-template-columns: 1fr; gap: 4px; } .document-edit-heading { align-items: stretch; flex-direction: column; } .document-edit-heading label:nth-child(2) { flex-basis: auto; } .document-attachments li { align-items: flex-start; flex-direction: column; padding-block: 10px; } }
+@media (max-width: 767px) {
+  .notification-popover { position: fixed; inset: 0; width: auto; max-height: none; border: 0; border-radius: 0; }
+  .notification-close { display: grid; }
+  .notification-popover > header span { margin-left: auto; }
+  .delivery-list > li, .recovery-list > li { align-items: flex-start; flex-direction: column; }
+  .delivery-list > li > div:last-child { text-align: left; }
+}
 .revision-conflict { padding: 12px 14px; border: 1px solid #c9822a; border-radius: 7px; background: #fff8ed; }
 .revision-conflict p { margin: 4px 0 10px; color: var(--muted); }
 .revision-conflict button { margin-top: 10px; }
@@ -1525,7 +1524,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .network-table-wrap { overflow-x: auto; }
 /* A scrollable table region is focusable so keyboard users can reach overflowing
    columns; give that focus a visible boundary. */
-.network-table-wrap:focus-visible, .people-table-wrap:focus-visible, .recycle-bin-table-wrap:focus-visible,
+.network-table-wrap:focus-visible, .people-table-wrap:focus-visible,
 .asset-csv-table-wrap:focus-visible, .table-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .network-table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 13px; }
 .network-table th, .network-table td { padding: 10px 12px 10px 2px; border-bottom: 1px solid var(--border); text-align: left; }

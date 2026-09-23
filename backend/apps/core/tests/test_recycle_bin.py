@@ -296,13 +296,22 @@ def test_recovery_denies_anonymous_reader_missing_mfa_csrf_foreign_and_sibling_i
 
 @pytest.mark.django_db
 def test_recycle_bin_query_is_bounded_and_validated(owner_client, installation):
-    for name in ("Alpha", "Beta"):
+    for index in range(26):
+        name = "Alpha" if index == 0 else f"Beta {index:02d}"
         site, _, _ = site_with_locations(installation.tenant, None, name)
         archive_site(site=site, actor_id=installation.owner.id)
 
     filtered = owner_client.get(reverse("msp-recycle-bin"), {"q": "alp", "record_type": "site"})
-    invalid = owner_client.get(reverse("msp-recycle-bin"), {"record_type": "secret", "page_size": 1000})
+    second_page = owner_client.get(reverse("msp-recycle-bin"), {"record_type": "site", "page": 2, "page_size": 25})
+    large_page = owner_client.get(reverse("msp-recycle-bin"), {"record_type": "site", "page_size": 100})
+    invalid = owner_client.get(reverse("msp-recycle-bin"), {"record_type": "secret", "page_size": 101})
 
     assert filtered.status_code == 200
     assert [item["label"] for item in filtered.json()["results"]] == ["Alpha"]
+    assert second_page.status_code == 200
+    assert second_page.json()["page"] == 2
+    assert len(second_page.json()["results"]) == 1
+    assert large_page.status_code == 200
+    assert large_page.json()["page_size"] == 100
+    assert len(large_page.json()["results"]) == 26
     assert invalid.status_code == 400

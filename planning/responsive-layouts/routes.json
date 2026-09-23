@@ -194,9 +194,16 @@
   {
     "route": "/notification-delivery",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/notifications-and-recovery.md",
+      "frontend/src/notifications/NotificationInbox.test.tsx",
+      "frontend/src/notifications/NotificationDeliveryAdmin.test.tsx",
+      "frontend/src/recycle-bin/RecycleBin.test.tsx",
+      "frontend/e2e/notifications-recovery-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Loading, empty, populated, long-content, denied/failure, confirmation, success, mutation failure and responsive states verified; stale conflicts remain server-authoritative where applicable."
   },
   {
     "route": "/organizations",
@@ -233,9 +240,16 @@
   {
     "route": "/recycle-bin",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/notifications-and-recovery.md",
+      "frontend/src/notifications/NotificationInbox.test.tsx",
+      "frontend/src/notifications/NotificationDeliveryAdmin.test.tsx",
+      "frontend/src/recycle-bin/RecycleBin.test.tsx",
+      "frontend/e2e/notifications-recovery-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Loading, empty, populated, long-content, denied/failure, confirmation, success, mutation failure and responsive states verified; stale conflicts remain server-authoritative where applicable."
   },
   {
     "route": "/search",
@@ -513,9 +527,16 @@
   {
     "route": "/workspaces/organizations/:organizationId/recycle_bin",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/notifications-and-recovery.md",
+      "frontend/src/notifications/NotificationInbox.test.tsx",
+      "frontend/src/notifications/NotificationDeliveryAdmin.test.tsx",
+      "frontend/src/recycle-bin/RecycleBin.test.tsx",
+      "frontend/e2e/notifications-recovery-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Loading, empty, populated, long-content, denied/failure, confirmation, success, mutation failure and responsive states verified; stale conflicts remain server-authoritative where applicable."
   },
   {
     "route": "/workspaces/organizations/:organizationId/search",

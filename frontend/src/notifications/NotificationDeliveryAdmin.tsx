@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { formatDateTime, translate } from '../i18n/localization'
 import { FilterMenu } from '../FilterMenu'
 
 import type { NotificationDelivery, NotificationDeliveryAdminClient } from './api'
 
-const states = ['', 'pending', 'processing', 'delivered', 'suppressed', 'dead_letter']
+const states = ['', 'pending', 'processing', 'delivered', 'suppressed', 'dead_letter'] as const
+type DeliveryStateFilter = typeof states[number]
+
+function filterFrom(value: string | null): DeliveryStateFilter {
+  return states.includes(value as DeliveryStateFilter) ? value as DeliveryStateFilter : ''
+}
 
 function stateLabel(state: string) {
   if (!state) return translate('notificationDelivery.allStatuses')
@@ -12,31 +18,54 @@ function stateLabel(state: string) {
 }
 
 export function NotificationDeliveryAdmin({ client }: { client: NotificationDeliveryAdminClient }) {
-  const [deliveries, setDeliveries] = useState<NotificationDelivery[]>([])
-  const [filter, setFilter] = useState('')
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [parameters, setParameters] = useSearchParams()
+  const filter = filterFrom(parameters.get('status'))
+  const [revision, setRevision] = useState(0)
+  const key = `${filter}\u0000${revision}`
+  const [loaded, setLoaded] = useState<{ key: string; deliveries: NotificationDelivery[]; nextCursor: string | null } | null>(null)
+  const [failureKey, setFailureKey] = useState<string | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [retrying, setRetrying] = useState<string | null>(null)
   const [reason, setReason] = useState('')
   const [message, setMessage] = useState<string | null>(null)
+  const [messageKind, setMessageKind] = useState<'success' | 'error'>('success')
+  const visible = loaded?.key === key ? loaded : null
+  const phase = failureKey === key ? 'error' : visible ? 'ready' : 'loading'
+
+  function updateFilter(value: string) {
+    const next = new URLSearchParams(parameters)
+    if (value) next.set('status', value)
+    else next.delete('status')
+    setParameters(next)
+    setMessage(null)
+    setRetrying(null)
+    setReason('')
+  }
 
   useEffect(() => {
     let active = true
-    client.listDeliveries(filter || undefined).then((result) => {
-      if (active) { setDeliveries(result.results); setNextCursor(result.next_cursor); setPhase('ready') }
-    }).catch(() => { if (active) setPhase('error') })
+    void client.listDeliveries(filter || undefined).then((result) => {
+      if (active) {
+        setLoaded({ key, deliveries: result.results, nextCursor: result.next_cursor })
+        setFailureKey(null)
+      }
+    }).catch(() => { if (active) setFailureKey(key) })
     return () => { active = false }
-  }, [client, filter])
+  }, [client, filter, key])
 
   async function loadOlder() {
-    if (!nextCursor) return
+    if (!visible?.nextCursor) return
     setLoadingMore(true)
+    setMessage(null)
     try {
-      const result = await client.listDeliveries(filter || undefined, nextCursor)
-      setDeliveries((current) => [...current, ...result.results.filter((item) => !current.some((existing) => existing.id === item.id))])
-      setNextCursor(result.next_cursor)
+      const result = await client.listDeliveries(filter || undefined, visible.nextCursor)
+      setLoaded({
+        key,
+        deliveries: [...visible.deliveries, ...result.results.filter((item) => !visible.deliveries.some((existing) => existing.id === item.id))],
+        nextCursor: result.next_cursor,
+      })
     } catch {
+      setMessageKind('error')
       setMessage(translate('notificationDelivery.olderLoadFailed'))
     } finally {
       setLoadingMore(false)
@@ -47,26 +76,36 @@ export function NotificationDeliveryAdmin({ client }: { client: NotificationDeli
     setMessage(null)
     try {
       const updated = await client.retryDelivery(delivery.id, reason)
-      setDeliveries((items) => items.map((item) => item.id === updated.id ? updated : item))
+      setLoaded((current) => current?.key === key ? { ...current, deliveries: current.deliveries.map((item) => item.id === updated.id ? updated : item) } : current)
       setRetrying(null)
       setReason('')
+      setMessageKind('success')
       setMessage(translate('notificationDelivery.retryQueued'))
     } catch {
+      setMessageKind('error')
       setMessage(translate('notificationDelivery.retryFailed'))
     }
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('notificationDelivery.heading')}</h1></div></header>
-    <section className="content-section notification-delivery-admin">
-      <div className="section-heading"><h2>{translate('notificationDelivery.recent')}</h2><FilterMenu groups={[{ kind: 'choices', label: translate('notificationDelivery.status'), value: filter, choices: states.map((state) => ({ value: state, label: stateLabel(state) })), onChange: (value) => { setPhase('loading'); setFilter(value) } }]} activeCount={filter ? 1 : 0} onClear={() => { setPhase('loading'); setFilter('') }} menuLabel={translate('notificationDelivery.filters')} /></div>
+    <header className="page-header"><div><h1>{translate('notificationDelivery.heading')}</h1><p>{translate('notificationDelivery.intro')}</p></div></header>
+    <section className="content-section notification-delivery-admin" aria-labelledby="notification-delivery-heading">
+      <div className="section-heading"><h2 id="notification-delivery-heading">{translate('notificationDelivery.recent')}</h2><FilterMenu groups={[{ kind: 'choices', label: translate('notificationDelivery.status'), value: filter, choices: states.map((state) => ({ value: state, label: stateLabel(state) })), onChange: updateFilter }]} activeCount={filter ? 1 : 0} onClear={() => updateFilter('')} menuLabel={translate('notificationDelivery.filters')} /></div>
       <p className="workspace-area-note">{translate('notificationDelivery.privacyHelp')}</p>
-      {message && <p role="status">{message}</p>}
-      {phase === 'loading' && <p role="status">{translate('notificationDelivery.loading')}</p>}
-      {phase === 'error' && <p role="alert">{translate('notificationDelivery.loadFailed')}</p>}
-      {phase === 'ready' && deliveries.length === 0 && <p>{translate('notificationDelivery.empty')}</p>}
-      {phase === 'ready' && deliveries.length > 0 && <div className="table-scroll" role="group" aria-label={translate('notifications.deliveryTable')} tabIndex={0}><table><thead><tr><th>{translate('notificationDelivery.recipient')}</th><th>{translate('notificationDelivery.organization')}</th><th>{translate('notificationDelivery.event')}</th><th>{translate('notificationDelivery.status')}</th><th>{translate('notificationDelivery.attempts')}</th><th>{translate('notificationDelivery.nextAttempt')}</th><th><span className="sr-only">{translate('notificationDelivery.actions')}</span></th></tr></thead><tbody>{deliveries.map((delivery) => <tr key={delivery.id}><td>{delivery.recipient}</td><td>{delivery.organization}</td><td>{delivery.event_topic}</td><td>{stateLabel(delivery.state)}</td><td>{delivery.attempts}</td><td><time dateTime={delivery.available_at}>{formatDateTime(delivery.available_at)}</time></td><td>{delivery.state === 'dead_letter' && (retrying === delivery.id ? <form className="delivery-retry" onSubmit={(event) => { event.preventDefault(); void retry(delivery) }}><label><span className="sr-only">{translate('notificationDelivery.retryReason')}</span><input autoFocus required minLength={3} maxLength={240} placeholder={translate('notificationDelivery.retryReasonPlaceholder')} value={reason} onChange={(event) => setReason(event.target.value)} /></label><button type="submit">{translate('common.retry')}</button><button type="button" onClick={() => { setRetrying(null); setReason('') }}>{translate('common.cancel')}</button></form> : <button type="button" onClick={() => setRetrying(delivery.id)}>{translate('common.retry')}</button>)}</td></tr>)}</tbody></table></div>}
-      {phase === 'ready' && nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadOlder() }}>{loadingMore ? translate('common.loading') : translate('notificationDelivery.loadOlder')}</button></div>}
+      {filter && <div className="collection-active-filters"><button type="button" className="row-action" onClick={() => updateFilter('')}>{translate('notificationDelivery.status')}: {stateLabel(filter)} ×</button></div>}
+      {message && <p className={messageKind === 'error' ? 'form-message error' : 'form-message success'} role={messageKind === 'error' ? 'alert' : 'status'}>{message}</p>}
+      {phase === 'loading' && <p className="empty-state" role="status">{translate('notificationDelivery.loading')}</p>}
+      {phase === 'error' && <div className="empty-state" role="alert"><p>{translate('notificationDelivery.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => setRevision((value) => value + 1)}>{translate('common.retry')}</button></div>}
+      {phase === 'ready' && visible?.deliveries.length === 0 && <p className="empty-state">{translate('notificationDelivery.empty')}</p>}
+      {phase === 'ready' && visible && visible.deliveries.length > 0 && <ol className="plain-detail-list delivery-list">{visible.deliveries.map((delivery) => <li key={delivery.id}>
+        <div><strong>{delivery.recipient}</strong><span>{delivery.organization || translate('notificationDelivery.noOrganization')}</span><span style={{ overflowWrap: 'anywhere' }}>{delivery.event_topic}</span></div>
+        <div><strong>{stateLabel(delivery.state)}</strong><span>{translate('notificationDelivery.attemptSummary', { count: delivery.attempts })}</span><time dateTime={delivery.available_at}>{formatDateTime(delivery.available_at)}</time>
+          {delivery.state === 'dead_letter' && (retrying === delivery.id
+            ? <form className="delivery-retry" onSubmit={(event) => { event.preventDefault(); void retry(delivery) }}><label><span className="sr-only">{translate('notificationDelivery.retryReason')}</span><input autoFocus required minLength={3} maxLength={240} placeholder={translate('notificationDelivery.retryReasonPlaceholder')} value={reason} onChange={(event) => setReason(event.target.value)} /></label><button type="submit">{translate('common.retry')}</button><button type="button" onClick={() => { setRetrying(null); setReason('') }}>{translate('common.cancel')}</button></form>
+            : <button className="row-action" type="button" onClick={() => setRetrying(delivery.id)}>{translate('common.retry')}</button>)}
+        </div>
+      </li>)}</ol>}
+      {phase === 'ready' && visible?.nextCursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={() => { void loadOlder() }}>{loadingMore ? translate('common.loading') : translate('notificationDelivery.loadOlder')}</button></div>}
     </section>
   </>
 }

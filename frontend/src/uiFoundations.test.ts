@@ -2,7 +2,10 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+const styles = [
+  readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8'),
+  readFileSync(resolve(process.cwd(), 'src/portal/portal.css'), 'utf8'),
+].join('\n')
 
 const ruleBody = (selector: string) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

@@ -67,7 +67,7 @@
     { "route": "/access-control", "workspace": "msp", "roles": "owner|administrator", "focus": "roles, scopes, assignments and consequences", "problems": ["Every role definition, member, client mode, assignment and custom-role workflow rendered in one expansive page"], "correction": "Separated member roles, client access, staff assignments, custom roles and built-in reference into direct sections while retaining server authorization and consequence review.", "evidence": ["frontend/src/access-control/AccessControl.tsx", "frontend/src/access-control/AccessControl.test.tsx", "frontend/e2e/account-access-layout.spec.ts", "frontend/e2e/workspace-switcher.spec.ts", "frontend/e2e/live-workspace.spec.ts"], "status": "in_progress" },
     { "route": "/notification-delivery", "workspace": "msp", "roles": "administrator", "focus": "delivery status, retry and failure", "status": "pending" },
     { "route": "/system-status", "workspace": "msp", "roles": "administrator", "focus": "service state and technical detail hierarchy", "status": "pending" },
-    { "route": "/portal", "workspace": "client portal", "roles": "client user", "focus": "documents, files, invoices, withdrawn, denied and failure", "status": "pending" },
+    { "route": "/portal", "workspace": "client portal", "roles": "client user", "focus": "focused URL-addressed documents, files, invoices, withdrawn, denied and failure states", "status": "reviewed" },
     { "route": "unknown|unavailable", "workspace": "any", "roles": "authenticated user", "focus": "safe result and recovery without feature advertising", "status": "pending" }
   ]
 }

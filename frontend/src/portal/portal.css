@@ -1,0 +1,30 @@
+.client-portal-shell { min-height: 100dvh; background: var(--canvas); color: var(--text); }
+.client-portal-header { min-height: var(--shell-height); padding: 0 var(--space-5); border-bottom: 1px solid var(--border); background: var(--surface); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.client-portal-brand, .client-portal-account { display: flex; align-items: center; gap: var(--space-2); }
+.client-portal-brand { font-weight: 700; }
+.client-portal-account { min-width: 0; font-size: 14px; }
+.client-portal-account > span { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.client-portal-account button { display: inline-flex; align-items: center; gap: 7px; }
+.client-portal-main { width: min(100%, var(--content-width)); margin: 0 auto; padding: var(--space-5); }
+.portal-workspace { min-height: min(28rem, calc(100dvh - 18rem)); }
+.portal-document-list, .portal-download-list { list-style: none; margin: 0; padding: 0; }
+.portal-document-list li + li, .portal-download-list li + li { border-top: 1px solid var(--border); }
+.portal-document-list button { width: 100%; padding: var(--space-3) 0; border: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); text-align: left; }
+.portal-document-list button:hover strong, .portal-document-list button:focus-visible strong { text-decoration: underline; }
+.portal-document-list button span:first-child { display: grid; gap: 4px; }
+.portal-document-list small, .portal-download-list span { color: var(--muted); }
+.portal-history-action { display: flex; justify-content: center; padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.portal-document-list .visibility-label { padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 0; font-size: 12px; font-weight: 600; }
+.portal-document-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }
+.portal-document-detail > header { margin-bottom: var(--space-5); }
+.portal-review-note { padding: 9px var(--space-3); color: #684719; background: #faf1df; border-left: 3px solid var(--warning); }
+.portal-download-list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.portal-download-list a { display: inline-flex; align-items: center; gap: 8px; }
+
+@media (max-width: 640px) {
+  .client-portal-header { padding: var(--space-3) var(--space-4); }
+  .client-portal-account > span { display: none; }
+  .client-portal-main { padding: var(--space-4); }
+  .portal-document-list button { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
+  .portal-workspace { min-height: 0; }
+}

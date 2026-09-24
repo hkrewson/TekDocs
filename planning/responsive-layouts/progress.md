@@ -2690,3 +2690,34 @@ journeys navigate the new section URLs explicitly.
 Phase 7 remains in progress. Setup/authentication, final client-portal review and
 technician/release acceptance remain open. Version stays 0.8.46. Production
 deployment, external push and Wiki publication remain separate.
+
+## Phase 7 Authentication and client portal checkpoint — 2026-09-24
+
+The signed-out setup and authentication shell is accepted as the focused entry
+workspace for bootstrap, sign-in, invitation activation, MFA challenge, password
+recovery, completion, unavailable, loading and failure states. Its existing
+single-panel structure now participates in the complete 320, 390, 768, 1024,
+1280 and 1440 CSS-pixel review matrix and 200% zoom checks.
+
+The client portal now renders one purposeful section at a time. Documents remain
+the default; Documents and Invoices have direct URLs, use shared desktop tabs and
+the mobile Sections selector, and fetch only the selected bounded collection.
+Document and invoice selections are URL-addressed so refresh and browser
+Back/Forward restore the reader or invoice detail. Notification targets enter the
+same document route. Existing sanitized content, retained review notices, files,
+invoice billing snapshots, downloads, notification preferences and sign-out
+behavior remain intact. Portal-only CSS now ships with the lazy portal asset
+instead of consuming the root stylesheet budget. See
+[authentication-and-client-portal.md](authentication-and-client-portal.md).
+
+Focused component checks pass all nine client portal scenarios. The responsive
+browser suite passes eight Chromium/WebKit cases across the full width set,
+200% zoom, mobile section selection, direct detail URLs, reload, Back/Forward,
+accessibility and horizontal-overflow checks. The production build passes with
+the portal CSS isolated and shell-style compressed size reduced to 24040 bytes.
+The local Docker frontend at `http://localhost:3200` has been rebuilt for review.
+
+Phase 7 remains in progress only for cross-cutting shell overlays and unavailable
+workspace handling. Technician walkthrough and production-image/release gates
+remain Phase 8 work. Version stays 0.8.46. Production deployment, external push
+and Wiki publication remain separate.

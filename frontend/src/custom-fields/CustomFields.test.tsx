@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import type { WorkspaceContext } from '../workspaces/api'
 import { CustomFields } from './CustomFields'
 import type { CustomFieldDefinition, CustomFieldsClient } from './api'
@@ -24,19 +25,23 @@ function client(overrides: Partial<CustomFieldsClient> = {}): CustomFieldsClient
   }
 }
 
+function renderFields(api: CustomFieldsClient, path = `/workspaces/organizations/${workspace.id}/custom_fields`) {
+  return render(<ApplicationRouter initialPath={path}><CustomFields workspace={workspace} client={api} /></ApplicationRouter>)
+}
+
 describe('CustomFields', () => {
   it('distinguishes organization fields from inherited MSP definitions', async () => {
-    render(<CustomFields workspace={workspace} client={client()} />)
+    renderFields(client())
     expect(await screen.findByText('Door code')).toBeInTheDocument()
     expect(screen.getByText('Support tier')).toBeInTheDocument()
-    expect(screen.getByText('From MSP workspace')).toBeInTheDocument()
+    expect(screen.getByText('Support tier').closest('li')).toHaveTextContent('From MSP workspace')
     expect(screen.getByText('Edit from MSP workspace')).toBeInTheDocument()
   })
 
   it('creates a choice definition in the active organization', async () => {
     const user = userEvent.setup()
     const createDefinition = vi.fn().mockResolvedValue(definition)
-    render(<CustomFields workspace={workspace} client={client({ createDefinition })} />)
+    renderFields(client({ createDefinition }))
     await screen.findByText('Door code')
     await user.click(screen.getByRole('button', { name: /New field/ }))
     await user.type(screen.getByLabelText('Label'), 'Support tier')
@@ -46,13 +51,14 @@ describe('CustomFields', () => {
     await user.click(screen.getByRole('button', { name: 'Add field' }))
 
     expect(createDefinition).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({ key: 'support_tier', field_type: 'choice', options: ['Standard', 'Priority'] }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add custom field' })).not.toBeInTheDocument())
   })
 
   it('creates an immutable version with impact feedback and archives a definition', async () => {
     const user = userEvent.setup()
     const createVersion = vi.fn().mockResolvedValue({ definition, migration_impact: { total: 2, compatible: 1, incompatible: 1 } })
     const archiveDefinition = vi.fn().mockResolvedValue(undefined)
-    render(<CustomFields workspace={workspace} client={client({ createVersion, archiveDefinition })} />)
+    renderFields(client({ createVersion, archiveDefinition }))
     await screen.findByText('Door code')
     await user.click(screen.getByRole('button', { name: /New version/ }))
     await user.clear(screen.getByLabelText('Label'))
@@ -60,10 +66,24 @@ describe('CustomFields', () => {
     await user.click(screen.getByRole('button', { name: 'Create version' }))
     expect(await screen.findByRole('status')).toHaveTextContent('1 needs review')
     expect(createVersion).toHaveBeenCalledWith({ organizationId: workspace.id }, definition.id, expect.objectContaining({ label: 'Entry code' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     await user.click(screen.getByRole('button', { name: 'Archive Door code' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Archive Door code?' })
     await user.click(within(dialog).getByRole('button', { name: 'Archive' }))
     expect(archiveDefinition).toHaveBeenCalledWith({ organizationId: workspace.id }, definition.id)
+  })
+
+  it('restores collection filters from the URL and guards a changed editor', async () => {
+    const user = userEvent.setup()
+    renderFields(client(), `/workspaces/organizations/${workspace.id}/custom_fields?q=door&entity_type=site&field=new`)
+    expect(await screen.findByDisplayValue('door')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Site ×' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('Label'), 'Changed')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('heading', { name: 'Unsaved changes' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('dialog', { name: 'Add custom field' })).toBeInTheDocument()
   })
 })

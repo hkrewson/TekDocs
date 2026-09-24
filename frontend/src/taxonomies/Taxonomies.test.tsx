@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import type { TaxonomiesClient, Taxonomy } from './api'
 import { Taxonomies } from './Taxonomies'
 
@@ -36,21 +37,27 @@ function client(): TaxonomiesClient {
   }
 }
 
+function renderTaxonomies(api: TaxonomiesClient, path = '/taxonomies') {
+  return render(<ApplicationRouter initialPath={path}><Taxonomies client={api} /></ApplicationRouter>)
+}
+
 describe('Taxonomies', () => {
   it('lists taxonomies and previews exact tag matches', async () => {
     const api = client()
-    render(<Taxonomies client={api} />)
+    renderTaxonomies(api)
     expect(await screen.findByText('Technology')).toBeVisible()
-    expect(screen.getByText('2 documents · 1 templates')).toBeVisible()
+    expect(screen.getByText('Technology').closest('li')).toHaveTextContent('2 documents · 1 templates')
+    await userEvent.click(screen.getByRole('button', { name: 'Match existing tags' }))
     await userEvent.click(screen.getByRole('button', { name: 'Preview matches' }))
     expect(await screen.findByText('1 matched · 1 unmatched · 0 ambiguous')).toBeVisible()
-    expect(screen.getByText('Azure AD')).toBeVisible()
-    expect(screen.getByText('Entra ID')).toBeVisible()
+    const migrationRow = screen.getByText('Recovery').closest('li')
+    expect(migrationRow).toHaveTextContent('Azure AD')
+    expect(migrationRow).toHaveTextContent('Entra ID')
   })
 
   it('creates a taxonomy with a plain term editor', async () => {
     const api = client()
-    render(<Taxonomies client={api} />)
+    renderTaxonomies(api)
     await screen.findByText('Technology')
     await userEvent.click(screen.getByRole('button', { name: 'New taxonomy' }))
     await userEvent.type(screen.getByLabelText('Taxonomy key'), 'service-tier')
@@ -60,11 +67,12 @@ describe('Taxonomies', () => {
     await userEvent.type(screen.getByLabelText('Term key'), 'gold')
     await userEvent.click(screen.getByRole('button', { name: 'Save taxonomy' }))
     await waitFor(() => expect(createTaxonomy).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New taxonomy' })).not.toBeInTheDocument())
   })
 
   it('reorders a revised taxonomy and archives it after an in-page confirmation', async () => {
     const api = client()
-    render(<Taxonomies client={api} />)
+    renderTaxonomies(api)
     await screen.findByText('Technology')
 
     await userEvent.click(screen.getByRole('button', { name: 'New version' }))
@@ -75,10 +83,26 @@ describe('Taxonomies', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Move up' }).at(-1)!)
     await userEvent.click(screen.getByRole('button', { name: 'Save taxonomy' }))
     await waitFor(() => expect(reviseTaxonomy).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
     await userEvent.click(screen.getByRole('button', { name: 'Archive' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Existing documents and published copies will keep their current terms.')
     await userEvent.click(screen.getByRole('alertdialog').querySelector('.danger-button')!)
     await waitFor(() => expect(archiveTaxonomy).toHaveBeenCalled())
+  })
+
+  it('restores URL filters and protects an edited taxonomy version', async () => {
+    const api = client()
+    const user = userEvent.setup()
+    renderTaxonomies(api, `/taxonomies?q=tech&binding=document_tags&taxonomy=${taxonomy.id}`)
+    expect(await screen.findByDisplayValue('tech')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Document tags ×' })).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    await user.clear(screen.getAllByLabelText('Name')[0])
+    await user.type(screen.getAllByLabelText('Name')[0], 'Changed taxonomy')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(await screen.findByRole('heading', { name: 'Unsaved changes' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('dialog', { name: 'New version of Technology' })).toBeInTheDocument()
   })
 })

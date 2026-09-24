@@ -18,7 +18,7 @@ Delivery is organized around complete user-facing areas. Related routes are audi
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: accepted; the grouped Organizations/People/Sites milestone and connected Stock/Vendors/Products/Licenses milestone pass their responsive and real-stack acceptance.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: in progress; document library/reader, template/reusable-content, ownership/review, retained publication sections, focused editable exports, managed-file/PDF controls, document-wide draft protection, content-health queue, document-link picker and direct-link/history restoration implemented; technician acceptance remains open.
 6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: implemented; invoice, compliance/data-flow and focused integration workspaces complete; technician acceptance remains open.
-7. **Shell and remaining surfaces** — Search, overviews, reminders, activity, notifications, recycle bin, metadata, account/access/setup/help/system status and client portal. Status: in progress; bounded Search, focused MSP/client overviews, the Reminders agenda and Activity event stream, Notifications, MSP/client recovery, contextual Help and System Status are implemented, with the remaining shell areas open.
+7. **Shell and remaining surfaces** — Search, overviews, reminders, activity, notifications, recycle bin, metadata, account/access/setup/help/system status and client portal. Status: in progress; bounded Search, focused MSP/client overviews, the Reminders agenda and Activity event stream, Notifications, MSP/client recovery, contextual Help, System Status, Custom Fields and Taxonomies are implemented, with the remaining shell areas open.
 8. **Release acceptance** — Route/state completion, technician walkthroughs, production image and release gates. Status: pending.
 
 Separate work items cover navigation, collection APIs and personal preferences. Every migrated surface must remove its prior competing layout. Current shell routes are listed in routes.json from App.tsx; authentication, portal, and nested record/workflow states still need expansion during Phase 1; state/viewport requirements are specified in acceptance.json, and evidence must be recorded explicitly before marking a surface complete.
@@ -113,6 +113,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Notifications and recovery workspaces](notifications-and-recovery.md)
 
 - [Help and system status](help-and-system-status.md)
+
+- [Metadata administration](metadata-administration.md)
 
 - [Document ownership and review](ownership-and-review.md)
 

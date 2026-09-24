@@ -487,7 +487,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .notification-popover { position: fixed; inset: 0; width: auto; max-height: none; border: 0; border-radius: 0; }
   .notification-close { display: grid; }
   .notification-popover > header span { margin-left: auto; }
-  .delivery-list > li, .recovery-list > li { align-items: flex-start; flex-direction: column; }
+  .delivery-list > li, .recovery-list > li, .metadata-list > li { align-items: flex-start; flex-direction: column; }
   .delivery-list > li > div:last-child { text-align: left; }
 }
 .revision-conflict { padding: 12px 14px; border: 1px solid #c9822a; border-radius: 7px; background: #fff8ed; }
@@ -774,14 +774,14 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .custom-field-form-wide { grid-column: 1 / -1; }
 .checkbox-label { display: flex !important; align-items: center; flex-direction: row !important; gap: 8px !important; font-weight: 500 !important; }
 .checkbox-label input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
-.custom-field-table { border-top: 1px solid var(--border); }
-.custom-field-row { display: grid; grid-template-columns: minmax(170px, 2fr) repeat(4, minmax(90px, 1fr)) minmax(150px, 1.25fr); gap: 14px; align-items: start; padding: 13px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.custom-field-row.header { color: var(--muted); font-size: 11px; font-weight: 600; }
-.custom-field-row > span:first-child { display: flex; min-width: 0; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
-.custom-field-row code { color: var(--muted); font-size: 11px; }
-.custom-field-row details summary { color: var(--accent); cursor: pointer; }
-.custom-field-row details ol { margin: 8px 0 0; padding-left: 20px; color: var(--muted); }
-.custom-field-row .row-actions { display: flex; flex-wrap: wrap; gap: 3px; }
+.metadata-toolbar { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; align-items: end; gap: 10px; margin-bottom: 10px; }
+.collection-search { min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 10px; color: var(--muted); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; }
+.collection-search input { min-width: 0; width: 100%; border: 0; outline: 0; color: var(--text); background: transparent; }
+.metadata-list > li > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.metadata-list > li > .row-actions { flex: 0 0 auto; }
+.metadata-list details { margin-top: 4px; color: var(--accent); font-size: 12px; }
+.metadata-list details ol { margin: 5px 0 0; padding-left: 18px; color: var(--muted); }
+.metadata-list details li { display: list-item; padding: 2px 0; border: 0; }
 .entity-custom-field-list { border-top: 1px solid var(--border); }
 .entity-custom-field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding: 15px 2px; border-bottom: 1px solid var(--border); }
 .entity-custom-field fieldset { margin: 0; padding: 0; border: 0; }
@@ -1647,13 +1647,6 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .taxonomy-term-row legend { font-size: 13px; font-weight: 700; padding: 0 5px; }
 .taxonomy-term-row legend small { color: var(--muted); font-weight: 500; margin-left: 8px; }
 .taxonomy-term-row > label { display: grid; gap: 6px; margin: 10px 0; }
-.taxonomy-table, .taxonomy-migration-list { border-top: 1px solid var(--border); }
-.taxonomy-table-row { display: grid; grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 1fr) minmax(120px, .8fr) minmax(140px, 1fr) minmax(170px, auto); gap: 16px; align-items: center; min-height: 52px; padding: 9px 0; border-bottom: 1px solid var(--border); }
-.taxonomy-table-row.header, .taxonomy-migration-row.header { color: var(--muted); font-size: 12px; font-weight: 700; min-height: 38px; }
-.taxonomy-table-row > span:first-child { display: grid; gap: 2px; }
-.taxonomy-table-row code { color: var(--muted); font-size: 12px; }
-.taxonomy-table-row small { color: var(--muted); }
-.taxonomy-migration-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, .6fr) minmax(140px, .8fr); gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .document-taxonomy-picker { border: 1px solid var(--border); border-radius: 8px; margin: 14px 0; padding: 14px; }
 .document-taxonomy-picker legend { font-size: 13px; font-weight: 700; padding: 0 5px; }
 .document-taxonomy-picker p { color: var(--muted); margin: 3px 0 10px; }
@@ -1671,8 +1664,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .client-portal-account > span { display: none; }
   .client-portal-main { padding: var(--space-4); }
   .portal-document-list button { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
-  .taxonomy-table-row, .taxonomy-migration-row { grid-template-columns: 1fr; gap: 4px; padding: 13px 0; }
-  .taxonomy-table-row.header, .taxonomy-migration-row.header { display: none; }
+  .metadata-toolbar { grid-template-columns: 1fr; align-items: stretch; }
 
   /* iOS zooms the visual viewport when a focused form control is smaller than
      16px. Keep phone controls at the native reading size so the shell does not

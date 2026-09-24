@@ -2620,3 +2620,37 @@ bundle budgets (shell 130376 <= 131072; shell style 24502 <= 24576). Evidence:
 Phase 7 remains in progress. Metadata, account/access/setup and the broader
 client portal remain open. Version stays 0.8.46. Production deployment, external
 push and Wiki publication remain separate.
+
+## Phase 7 Metadata administration checkpoint — 2026-09-23
+
+MSP and organization Custom Fields plus MSP Taxonomies now use compact,
+URL-addressed collections with search, a primary filter and 25/50/100 paging.
+Active conditions are removable outside the filter menu, long operational values
+wrap within the ordinary page and the former wide tables are removed. Editors
+open only when requested in focused, background-locking overlays and share the
+dirty-form guard. Failed saves retain input, unavailable direct editor links are
+explained, and inherited client fields remain read-only.
+
+Taxonomy legacy-tag matching is now an on-demand workspace instead of a large
+section stacked beneath every definition. Existing exact-match migration,
+versioning, archive retention, ownership and permission rules remain unchanged.
+See [metadata-administration.md](metadata-administration.md) for the interaction
+and compatibility boundaries.
+
+All 18 maintained-browser cases pass at 320, 390, 768, 1024, 1280 and 1440 CSS
+pixels across Chromium, Firefox and WebKit, including off-page search, URL state,
+mobile overlays, background locking, accessibility, long values and horizontal
+overflow checks. The isolated live journey creates and searches a real taxonomy,
+then creates, searches and uses an organization custom field through Django and
+PostgreSQL. That rehearsal exposed a successful-save transition that could leave
+the editor URL open behind its own dirty guard; both editors now retire the saved
+draft before closing, with focused regression coverage. The final repository gate
+passes all 656 frontend tests in 119 files, backend static and migration checks,
+schema/generated contract drift, documentation policy, the production build and
+compressed bundle budgets (shell 130379 <= 131072; shell style 24400 <= 24576).
+Evidence: `/tmp/tekdocs-metadata-browser.log`,
+`/tmp/tekdocs-metadata-live.log` and `/tmp/tekdocs-metadata-check.log`.
+
+Phase 7 remains in progress. Account/access/setup and the broader client portal
+remain open. Version stays 0.8.46. Production deployment, external push and Wiki
+publication remain separate.

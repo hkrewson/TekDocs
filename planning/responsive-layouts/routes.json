@@ -83,9 +83,15 @@
   {
     "route": "/custom-fields",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "frontend/src/custom-fields/CustomFields.tsx",
+      "frontend/src/custom-fields/CustomFields.test.tsx",
+      "frontend/e2e/metadata-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts",
+      "planning/responsive-layouts/metadata-administration.md"
+    ],
+    "states": "Loading, unavailable/retry, empty, no matches, populated and multi-page collections; URL search/type/page/page-size/editor state; create/version/archive, retained failed input, dirty dismissal, removed direct editor target; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/deadlines",
@@ -318,9 +324,16 @@
   {
     "route": "/taxonomies",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "frontend/src/taxonomies/Taxonomies.tsx",
+      "frontend/src/taxonomies/Taxonomies.test.tsx",
+      "frontend/e2e/taxonomies.spec.ts",
+      "frontend/e2e/metadata-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts",
+      "planning/responsive-layouts/metadata-administration.md"
+    ],
+    "states": "Loading, unavailable/retry, empty, no matches, populated and multi-page collections; URL search/binding/page/page-size/editor/migration state; create/version/archive, retained failed input, dirty dismissal, removed direct editor target and on-demand exact-match migration; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/vendors",
@@ -399,9 +412,15 @@
   {
     "route": "/workspaces/organizations/:organizationId/custom_fields",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "frontend/src/custom-fields/CustomFields.tsx",
+      "frontend/src/custom-fields/CustomFields.test.tsx",
+      "frontend/e2e/metadata-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts",
+      "planning/responsive-layouts/metadata-administration.md"
+    ],
+    "states": "Loading, unavailable/retry, empty, no matches, inherited and organization-owned fields, populated and multi-page collections; URL search/type/page/page-size/editor state; create/version/archive, retained failed input, dirty dismissal and removed direct editor target; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/workspaces/organizations/:organizationId/deadlines",

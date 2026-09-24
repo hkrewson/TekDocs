@@ -29,6 +29,7 @@ test('account settings lists and revokes another active browser', async ({ page,
   await page.goto('/overview')
   await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
   await page.getByRole('menuitem', { name: 'Settings' }).click()
+  await page.getByRole('link', { name: 'Active sessions' }).click()
   await expect(page.getByRole('heading', { name: 'Active sessions' })).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   await page.getByRole('button', { name: 'Sign out' }).click()

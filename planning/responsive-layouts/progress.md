@@ -2654,3 +2654,39 @@ Evidence: `/tmp/tekdocs-metadata-browser.log`,
 Phase 7 remains in progress. Account/access/setup and the broader client portal
 remain open. Version stays 0.8.46. Production deployment, external push and Wiki
 publication remain separate.
+
+## Phase 7 Account and access administration checkpoint — 2026-09-23
+
+Settings, Staff and Access Control now present one URL-addressed section at a
+time through the shared desktop tabs and mobile Sections control. Profile,
+two-factor, sessions and API-token administration no longer compete on one tall
+page. Invitation history is a compact list with URL search, status, page and
+25/50/100 page-size state; joined members have their own section. Access Control
+separates member roles, client access modes, staff assignments, custom roles and
+the built-in role reference while preserving every existing review and
+confirmation boundary.
+
+Invitation and API-token creation now open on demand in focused,
+background-locking editors. Changed profile, invitation and token drafts use the
+shared Keep editing/Discard guard; failed requests retain entered values. No API,
+schema, permission or domain-data change was required. See
+[account-access-administration.md](account-access-administration.md).
+
+Focused type and component checks pass 19 account/staff/access cases. All 18
+maintained-browser cases pass at 320, 390, 768, 1024, 1280 and 1440 CSS pixels
+across Chromium, Firefox and WebKit, including direct URL state, long values,
+mobile overlays, background locking, accessibility and horizontal-overflow
+checks. The isolated real browser-to-Django-to-PostgreSQL journey passes in 3.6
+minutes. Its first run found that a successful invitation could close before its
+dirty-form registration retired; the fixed transition and regression test now
+allow immediate navigation without a false discard prompt.
+
+The final repository gate passes all 656 frontend tests in 119 files, backend
+static and migration checks, schema/generated contract drift, documentation
+policy, the production build and compressed bundle budgets (shell 130402 <=
+131072; shell style 24400 <= 24576). Existing MFA, session, profile and policy
+journeys navigate the new section URLs explicitly.
+
+Phase 7 remains in progress. Setup/authentication, final client-portal review and
+technician/release acceptance remain open. Version stays 0.8.46. Production
+deployment, external push and Wiki publication remain separate.

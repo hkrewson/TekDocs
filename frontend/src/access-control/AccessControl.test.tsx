@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { AccessControl } from './AccessControl'
 import type { AccessControlClient } from './api'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 
 const owner = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner' as const, is_owner: true, joined_at: '2026-08-08T12:00:00Z' }
 const technician = { id: 'member', display_name: 'Morgan Ellis', email: 'morgan@example.com', role: 'read_only' as const, is_owner: false, joined_at: '2026-08-08T13:00:00Z' }
@@ -47,15 +48,17 @@ function client(overrides: Partial<AccessControlClient> = {}): AccessControlClie
   }
 }
 
+function renderAccess(api: AccessControlClient, path = '/access-control') {
+  return render(<ApplicationRouter initialPath={path}><AccessControl client={api} /></ApplicationRouter>)
+}
+
 describe('access control', () => {
   it('reviews and confirms a member role without making the owner editable', async () => {
     const user = userEvent.setup()
     const assignRole = vi.fn().mockResolvedValue({ ...technician, role: 'technician' })
-    render(<AccessControl client={client({ assignRole })} />)
+    renderAccess(client({ assignRole }))
 
     expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
-    expect(screen.getByText('Client Administrator')).toBeInTheDocument()
-    expect(screen.getAllByText('Client role')).toHaveLength(2)
     expect(screen.getByText('Always has access')).toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Role for Morgan Ellis' }), 'technician')
     await user.click(screen.getAllByRole('button', { name: 'Review change' })[0])
@@ -69,10 +72,10 @@ describe('access control', () => {
   it('explains the assignment boundary before changing the mode', async () => {
     const user = userEvent.setup()
     const changeAccessMode = vi.fn().mockResolvedValue({ ...clientOrganization, access_mode: 'assigned_only' })
-    render(<AccessControl client={client({ changeAccessMode })} />)
+    renderAccess(client({ changeAccessMode }), '/access-control?section=clients')
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Access for Acme Dental' }), 'assigned_only')
-    await user.click(screen.getAllByRole('button', { name: 'Review change' })[1])
+    await user.click(screen.getByRole('button', { name: 'Review change' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('assigned staff')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
@@ -84,7 +87,7 @@ describe('access control', () => {
     const assignedOrganization = { ...clientOrganization, assigned_staff: [{ id: technician.id, display_name: technician.display_name, email: technician.email, role: technician.role }] }
     const assignStaff = vi.fn().mockResolvedValue(assignedOrganization)
     const removeStaff = vi.fn().mockResolvedValue(clientOrganization)
-    render(<AccessControl client={client({ assignStaff, removeStaff })} />)
+    renderAccess(client({ assignStaff, removeStaff }), '/access-control?section=assignments')
 
     await user.selectOptions(await screen.findByRole('combobox', { name: 'Staff member for Acme Dental' }), technician.id)
     await user.click(screen.getByRole('button', { name: 'Review assignment' }))
@@ -99,7 +102,7 @@ describe('access control', () => {
   })
 
   it('shows one denial state without retaining stale rows', async () => {
-    render(<AccessControl client={client({ catalog: vi.fn().mockRejectedValue(new Error('Access denied.')) })} />)
+    renderAccess(client({ catalog: vi.fn().mockRejectedValue(new Error('Access denied.')) }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Access denied')
     expect(screen.queryByText('Morgan Ellis')).not.toBeInTheDocument()
@@ -109,7 +112,7 @@ describe('access control', () => {
     const user = userEvent.setup()
     const createCustomRole = vi.fn().mockResolvedValue(customRole)
     const createScopedAssignment = vi.fn().mockResolvedValue({ id: 'assignment', member_id: technician.id, member_name: technician.display_name, member_email: technician.email, role_id: customRole.id, role_name: customRole.name, role_scope: customRole.scope, organization_id: clientOrganization.id, organization_name: clientOrganization.name, collection_id: null, collection_name: null, created_at: '2026-08-08T14:00:00Z' })
-    render(<AccessControl client={client({ customRoles: vi.fn().mockResolvedValue([]), createCustomRole, createScopedAssignment })} />)
+    renderAccess(client({ customRoles: vi.fn().mockResolvedValue([]), createCustomRole, createScopedAssignment }), '/access-control?section=custom')
 
     await user.type(await screen.findByRole('textbox', { name: 'Role name' }), 'Documentation lead')
     await user.click(screen.getByRole('checkbox', { name: /Edit documentation/ }))
@@ -130,7 +133,7 @@ describe('access control', () => {
   it('reviews an access collection before applying membership', async () => {
     const user = userEvent.setup()
     const createAccessCollection = vi.fn().mockResolvedValue(accessCollection)
-    render(<AccessControl client={client({ createAccessCollection })} />)
+    renderAccess(client({ createAccessCollection }), '/access-control?section=custom')
 
     const panel = (await screen.findByRole('heading', { name: 'Client collections' })).closest('section')
     if (!panel) throw new Error('Access collection panel was not rendered')

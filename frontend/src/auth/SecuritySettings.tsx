@@ -2,10 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { KeyRound, Laptop, RefreshCw, ShieldCheck } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
+import { useSearchParams } from 'react-router'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession, MfaStatus, TotpSetup } from './api'
 import { ApiTokenSettings } from './ApiTokenSettings'
 import { formatDateTime, translate } from '../i18n/localization'
+import { RecordSections } from '../records/RecordNavigation'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
+import '../administration.css'
 
 function sessionName(userAgent: string): string {
   const browser = userAgent.includes('Edg/') ? 'Edge' : userAgent.includes('Chrome/') ? 'Chrome' : userAgent.includes('Firefox/') ? 'Firefox' : userAgent.includes('Safari/') ? 'Safari' : 'Browser'
@@ -28,6 +32,9 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   context: AuthenticatedContext
   onProfileUpdated: (context: AuthenticatedContext) => void
 }) {
+  const [parameters] = useSearchParams()
+  const requestedSection = parameters.get('section')
+  const section = requestedSection === 'two-factor' || requestedSection === 'sessions' || requestedSection === 'api-tokens' ? requestedSection : 'profile'
   const [displayName, setDisplayName] = useState(context.user.display_name)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -42,6 +49,14 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   const [mfaMessage, setMfaMessage] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [revoking, setRevoking] = useState<number | null>(null)
+  const profileDirty = displayName !== context.user.display_name
+  useUnsavedChanges(profileDirty, savingProfile, () => setDisplayName(context.user.display_name), section === 'profile')
+  const sections = [
+    { id: 'profile', label: translate('settings.profile'), href: '/settings?section=profile' },
+    { id: 'two-factor', label: translate('auth.twoFactorHeading'), href: '/settings?section=two-factor' },
+    { id: 'sessions', label: translate('settings.activeSessions'), href: '/settings?section=sessions' },
+    ...(context.surface === 'msp' ? [{ id: 'api-tokens', label: translate('settings.apiTokens'), href: '/settings?section=api-tokens' }] : []),
+  ]
 
   const loadSessions = useCallback(async () => {
     setError(null)
@@ -169,10 +184,11 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   return (
     <>
       <header className="page-header">
-        <div><h1>{translate('settings.heading')}</h1></div>
+        <div><h1>{translate('settings.heading')}</h1><p>{translate('settings.workspaceHelp')}</p></div>
       </header>
+      <RecordSections sections={sections} current={section} />
       {error && <div className="form-error settings-error" role="alert">{error}</div>}
-      <section className="content-section profile-section" aria-labelledby="profile-heading">
+      {section === 'profile' && <section className="content-section profile-section administration-section" aria-labelledby="profile-heading">
         <div className="section-heading settings-heading">
           <div><h2 id="profile-heading">{translate('settings.profile')}</h2><p>{translate('settings.profileHelp')}</p></div>
         </div>
@@ -184,8 +200,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             {profileMessage && <span className="settings-success" role="status">{profileMessage}</span>}
           </div>
         </form>
-      </section>
-      <section className="content-section security-section" aria-labelledby="two-factor-heading">
+      </section>}
+      {section === 'two-factor' && <section className="content-section security-section administration-section" aria-labelledby="two-factor-heading">
         <div className="section-heading settings-heading">
           <div><h2 id="two-factor-heading">{translate('auth.twoFactorHeading')}</h2><p>{translate('settings.twoFactorHelp')}</p></div>
           {mfa?.totpEnabled && <span className="security-status"><ShieldCheck size={15} aria-hidden="true" />{translate('settings.enabled')}</span>}
@@ -249,8 +265,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             </div>
           </form>
         )}
-      </section>
-      <section className="content-section" aria-labelledby="active-sessions-heading">
+      </section>}
+      {section === 'sessions' && <section className="content-section administration-section" aria-labelledby="active-sessions-heading">
         <div className="section-heading settings-heading">
           <div><h2 id="active-sessions-heading">{translate('settings.activeSessions')}</h2><p>{translate('settings.activeSessionsHelp')}</p></div>
           <button className="secondary-button refresh-button" type="button" onClick={() => { void loadSessions() }}><RefreshCw size={15} aria-hidden="true" />{translate('common.refresh')}</button>
@@ -274,8 +290,8 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
             ))}
           </ul>
         )}
-      </section>
-      {context.surface === 'msp' && <ApiTokenSettings client={client} context={context} />}
+      </section>}
+      {context.surface === 'msp' && section === 'api-tokens' && <ApiTokenSettings client={client} context={context} />}
     </>
   )
 }

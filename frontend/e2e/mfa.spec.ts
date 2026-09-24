@@ -81,6 +81,7 @@ test('security settings enrolls an authenticator and acknowledges one-time recov
   await page.goto('/overview')
   await page.getByRole('button', { name: /Account menu for Primary Owner/ }).click()
   await page.getByRole('menuitem', { name: 'Settings' }).click()
+  await page.getByRole('link', { name: 'Two-factor authentication' }).click()
   await page.getByRole('button', { name: 'Set up authenticator' }).click()
   await expect(page.locator('.mfa-qr-code svg')).toBeVisible()
   await expect(page.getByText('Scan with your authenticator app')).toBeVisible()

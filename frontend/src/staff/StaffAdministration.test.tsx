@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
 import { afterAll, beforeAll, vi } from 'vitest'
 import { AuthRequestError } from '../auth/api'
 import type { Member } from '../access-control/api'
 import type { StaffAdministrationClient, StaffInvitation } from './api'
 import { StaffAdministration } from './StaffAdministration'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 
 const owner: Member = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner', is_owner: true, joined_at: null }
 const invitation: StaffInvitation = {
@@ -25,6 +25,10 @@ function client(overrides: Partial<StaffAdministrationClient> = {}): StaffAdmini
   }
 }
 
+function renderStaff(api: StaffAdministrationClient, path = '/staff') {
+  return render(<ApplicationRouter initialPath={path}><StaffAdministration client={api} /></ApplicationRouter>)
+}
+
 describe('staff administration', () => {
   // These fixtures state absolute times, and a pending invitation stops offering
   // Resend once it expires. Without a pinned clock the suite passes until the fixture
@@ -34,35 +38,41 @@ describe('staff administration', () => {
   afterAll(() => { vi.useRealTimers() })
 
   it('lists MSP members separately from invitation history and links to access control', async () => {
-    render(<MemoryRouter><StaffAdministration client={client()} /></MemoryRouter>)
+    const user = userEvent.setup()
+    renderStaff(client())
 
     expect(await screen.findByRole('heading', { name: 'Staff and invitations' })).toBeInTheDocument()
-    expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
     expect(screen.getByText('technician@example.com')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'MSP members' }))
+    expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Open access control/ })).toHaveAttribute('href', '/access-control')
   })
 
   it('issues a read-only invitation without handling its token', async () => {
     const issue = vi.fn().mockResolvedValue({ ...invitation, id: 'new', email: 'new@example.com' })
     const user = userEvent.setup()
-    render(<MemoryRouter><StaffAdministration client={client({ issue })} /></MemoryRouter>)
+    renderStaff(client({ issue }))
 
-    await screen.findByText('Primary Owner')
+    await screen.findByText('technician@example.com')
+    await user.click(screen.getByRole('button', { name: 'Invite staff' }))
     await user.type(screen.getByRole('textbox', { name: 'Email address' }), 'new@example.com')
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     await waitFor(() => expect(issue).toHaveBeenCalledWith('new@example.com'))
     expect(screen.getByRole('status')).toHaveTextContent('start with Read-only access')
     expect(screen.getByText('new@example.com')).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: 'MSP members' }))
+    expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Discard unsaved changes?' })).not.toBeInTheDocument()
   })
 
   it('reviews resend and revoke before changing an invitation', async () => {
     const resend = vi.fn().mockResolvedValue({ ...invitation, delivery_attempts: 2, send_count: 2 })
     const revoke = vi.fn().mockResolvedValue({ ...invitation, state: 'revoked' })
     const user = userEvent.setup()
-    render(<MemoryRouter><StaffAdministration client={client({ resend, revoke })} /></MemoryRouter>)
+    renderStaff(client({ resend, revoke }))
 
-    const history = await screen.findByRole('table', { name: 'Staff invitation history' })
+    const history = await screen.findByRole('list', { name: 'Staff invitation history' })
     await user.click(within(history).getByRole('button', { name: 'Resend' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('previous link will stop working')
     await user.click(screen.getByRole('button', { name: 'Send replacement' }))
@@ -79,14 +89,15 @@ describe('staff administration', () => {
     const invitations = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([failed])
     const issue = vi.fn().mockRejectedValue(new AuthRequestError('The invitation was retained, but email delivery failed.', 503))
     const user = userEvent.setup()
-    render(<MemoryRouter><StaffAdministration client={client({ invitations, issue })} /></MemoryRouter>)
+    renderStaff(client({ invitations, issue }))
 
-    await screen.findByText('Primary Owner')
+    await screen.findByRole('heading', { name: 'Invitation history' })
+    await user.click(screen.getByRole('button', { name: 'Invite staff' }))
     await user.type(screen.getByRole('textbox', { name: 'Email address' }), invitation.email)
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('retained, but email delivery failed')
-    expect(within(await screen.findByRole('table', { name: 'Staff invitation history' })).getByText('Delivery failed')).toBeInTheDocument()
+    expect(within(await screen.findByRole('list', { name: 'Staff invitation history' })).getByText('Delivery failed')).toBeInTheDocument()
   })
 
   it('paginates the bounded invitation history and resets the page when filtering', async () => {
@@ -96,7 +107,7 @@ describe('staff administration', () => {
       email: `staff-${String(index).padStart(2, '0')}@example.com`,
     }))
     const user = userEvent.setup()
-    render(<MemoryRouter><StaffAdministration client={client({ invitations: vi.fn().mockResolvedValue(records) })} /></MemoryRouter>)
+    renderStaff(client({ invitations: vi.fn().mockResolvedValue(records) }))
 
     await screen.findByText('staff-00@example.com')
     expect(screen.queryByText('staff-25@example.com')).not.toBeInTheDocument()

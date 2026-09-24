@@ -1,0 +1,23 @@
+.administration-help { max-width: 720px; margin: -8px 0 8px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.administration-section { margin-top: 0; }
+.staff-invitation-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.staff-invitation-list > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 14px; padding: 12px 2px; border-bottom: 1px solid var(--border); }
+.staff-invitation-identity { display: grid; min-width: 0; gap: 3px; }
+.staff-invitation-identity strong, .staff-invitation-identity small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.staff-invitation-identity small { color: var(--muted); font-size: 10px; }
+.staff-invitation-list dl { display: grid; grid-column: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.staff-invitation-list .table-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.staff-invitation-list dl div, .staff-assignment-group > *, .staff-assignment-form { min-width: 0; }
+.staff-invitation-list dt { color: var(--muted); font-size: 10px; font-weight: 600; }
+.staff-invitation-list dd { margin: 3px 0 0; overflow-wrap: anywhere; font-size: 11px; }
+.staff-assignment-group { grid-template-columns: minmax(140px, .65fr) minmax(0, 1fr) minmax(160px, .85fr); }
+.staff-assignment-form select { width: 100%; min-width: 0; }
+
+@media (max-width: 767px) {
+  .staff-invitation-list > li { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .staff-invitation-list dl, .staff-invitation-list .table-actions { grid-column: 1 / -1; }
+  .staff-invitation-list .table-actions { grid-row: auto; justify-self: start; }
+  .staff-invitation-list dl { grid-template-columns: 1fr; gap: 7px; }
+  .staff-assignment-group { grid-template-columns: 1fr; }
+  .staff-assignment-group > *, .staff-assignment-form, .staff-assignment-form select { width: 100%; min-width: 0; }
+}

@@ -212,12 +212,14 @@ test('owner reviews role, client access-mode, and staff-assignment changes throu
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText('Morgan Ellis’s role was updated')
 
+  await page.getByRole('link', { name: 'Client access' }).click()
   await page.getByRole('combobox', { name: 'Access for Acme Dental' }).selectOption('assigned_only')
-  await page.getByRole('button', { name: 'Review change' }).last().click()
+  await page.getByRole('button', { name: 'Review change' }).click()
   await expect(page.getByRole('alertdialog')).toContainText('Limit Acme Dental to assigned staff')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText('Access to Acme Dental was updated')
 
+  await page.getByRole('link', { name: 'Staff assignments' }).click()
   await page.getByRole('combobox', { name: 'Staff member for Acme Dental' }).selectOption(accessMember.id)
   await page.getByRole('button', { name: 'Review assignment' }).click()
   await expect(page.getByRole('alertdialog')).toContainText('MSP role still controls what they can do')
@@ -226,6 +228,7 @@ test('owner reviews role, client access-mode, and staff-assignment changes throu
   await page.getByRole('button', { name: 'Remove' }).click()
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText('Morgan Ellis was removed from Acme Dental')
+  await page.getByRole('link', { name: 'Custom roles' }).click()
   await page.getByRole('textbox', { name: 'Role name' }).fill('Documentation lead')
   await page.getByRole('checkbox', { name: /Edit documentation/ }).check()
   await page.getByRole('button', { name: 'Review role' }).click()

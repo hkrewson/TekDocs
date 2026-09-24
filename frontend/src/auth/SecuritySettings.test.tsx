@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { SecuritySettings } from './SecuritySettings'
 import { AuthRequestError } from './api'
 import type { AuthClient, AuthenticatedContext, AuthSession } from './api'
+import { ApplicationRouter } from '../navigation/ApplicationRouter'
 
 const context: AuthenticatedContext = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
@@ -45,8 +46,8 @@ function client(overrides: Partial<AuthClient> = {}): AuthClient {
   } as AuthClient
 }
 
-const settings = (authClient: AuthClient, onProfileUpdated = vi.fn()) => (
-  <SecuritySettings client={authClient} context={context} onProfileUpdated={onProfileUpdated} />
+const settings = (authClient: AuthClient, onProfileUpdated = vi.fn(), path = '/settings') => (
+  <ApplicationRouter initialPath={path}><SecuritySettings client={authClient} context={context} onProfileUpdated={onProfileUpdated} /></ApplicationRouter>
 )
 
 describe('security settings', () => {
@@ -63,7 +64,7 @@ describe('security settings', () => {
       tokens: [],
       permissions: [{ key: 'documents.view', label: 'View documents', category: 'Documentation', requires_mfa: false, service_eligible: true }],
     })
-    render(settings(client({ listApiTokens, issueApiToken })))
+    render(settings(client({ listApiTokens, issueApiToken }), vi.fn(), '/settings?section=api-tokens'))
 
     await user.click(await screen.findByRole('button', { name: 'New token' }))
     await user.type(screen.getByLabelText('Name'), 'Docs export')
@@ -81,7 +82,7 @@ describe('security settings', () => {
   it('lists active sessions and revokes another browser', async () => {
     const user = userEvent.setup()
     const revokeSession = vi.fn().mockResolvedValue([current])
-    render(settings(client({ revokeSession })))
+    render(settings(client({ revokeSession }), vi.fn(), '/settings?section=sessions'))
 
     expect(await screen.findByText('Chrome on macOS')).toBeInTheDocument()
     expect(screen.getByText('Firefox on Windows')).toBeInTheDocument()
@@ -94,7 +95,7 @@ describe('security settings', () => {
 
   it('keeps the list visible when server-side revocation is denied', async () => {
     const user = userEvent.setup()
-    render(settings(client({ revokeSession: vi.fn().mockRejectedValue(new Error('The session could not be revoked.')) })))
+    render(settings(client({ revokeSession: vi.fn().mockRejectedValue(new Error('The session could not be revoked.')) }), vi.fn(), '/settings?section=sessions'))
 
     await screen.findByText('Firefox on Windows')
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
@@ -108,7 +109,7 @@ describe('security settings', () => {
     const listSessions = vi.fn()
       .mockRejectedValueOnce(new Error('Active sessions could not be loaded.'))
       .mockResolvedValueOnce([current])
-    render(settings(client({ listSessions })))
+    render(settings(client({ listSessions }), vi.fn(), '/settings?section=sessions'))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Active sessions could not be loaded.')
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
@@ -127,7 +128,7 @@ describe('security settings', () => {
     render(settings(client({
       beginTotp: vi.fn().mockResolvedValue(setup),
       activateTotp,
-    })))
+    }), vi.fn(), '/settings?section=two-factor'))
 
     await user.click(await screen.findByRole('button', { name: 'Set up authenticator' }))
     expect(document.querySelector('.mfa-qr-code svg')).toBeInTheDocument()
@@ -156,7 +157,7 @@ describe('security settings', () => {
       loadMfa: vi.fn().mockResolvedValue({ totpEnabled: true, recoveryCodeTotal: 10, recoveryCodeUnused: 7 }),
       reauthenticate,
       regenerateRecoveryCodes,
-    })))
+    }), vi.fn(), '/settings?section=two-factor'))
 
     await user.click(await screen.findByRole('button', { name: 'Replace codes' }))
     const passwordInput = screen.getByLabelText('Current password')
@@ -179,7 +180,7 @@ describe('security settings', () => {
       .mockRejectedValueOnce(new AuthRequestError('Password confirmation required.', 401))
       .mockResolvedValueOnce(['new-one', 'new-two'])
     const reauthenticate = vi.fn().mockResolvedValue(undefined)
-    render(settings(client({ beginTotp, activateTotp, reauthenticate })))
+    render(settings(client({ beginTotp, activateTotp, reauthenticate }), vi.fn(), '/settings?section=two-factor'))
 
     await user.click(await screen.findByRole('button', { name: 'Set up authenticator' }))
     await user.type(screen.getByLabelText('Authentication code'), '111111')

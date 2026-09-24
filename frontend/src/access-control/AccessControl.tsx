@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
 import type { AccessCatalog, AccessControlClient, AssignedStaff, BuiltInRole, Member, OrganizationAccess, OrganizationAccessMode, TenantRole } from './api'
 import { browserAccessControlClient } from './api'
 import { CustomRolesPanel } from './CustomRolesPanel'
+import { RecordSections } from '../records/RecordNavigation'
+import '../administration.css'
 
 const tenantRoles: TenantRole[] = ['administrator', 'technician', 'contributor', 'read_only']
 
@@ -17,6 +20,9 @@ function errorMessage(error: unknown) {
 }
 
 export function AccessControl({ client = browserAccessControlClient }: { client?: AccessControlClient }) {
+  const [parameters] = useSearchParams()
+  const requestedSection = parameters.get('section')
+  const section = requestedSection === 'clients' || requestedSection === 'assignments' || requestedSection === 'custom' || requestedSection === 'roles' ? requestedSection : 'members'
   const [catalog, setCatalog] = useState<AccessCatalog | null>(null)
   const [members, setMembers] = useState<Member[] | null>(null)
   const [organizations, setOrganizations] = useState<OrganizationAccess[] | null>(null)
@@ -80,19 +86,27 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
   return (
     <section className="content-section access-control-page" aria-labelledby="access-control-heading" aria-busy={loading}>
       <div className="section-heading"><div><h1 id="access-control-heading">{translate('accessControl.heading')}</h1><p>{translate('accessControl.headingHelp')}</p></div></div>
+      <p className="administration-help">{translate('accessControl.sectionsHelp')}</p>
+      <RecordSections sections={[
+        { id: 'members', label: translate('accessControl.members'), href: '/access-control?section=members' },
+        { id: 'clients', label: translate('accessControl.clientAccess'), href: '/access-control?section=clients' },
+        { id: 'assignments', label: translate('accessControl.assignments'), href: '/access-control?section=assignments' },
+        { id: 'custom', label: translate('accessControl.customRoles'), href: '/access-control?section=custom' },
+        { id: 'roles', label: translate('accessControl.builtInRoles'), href: '/access-control?section=roles' },
+      ]} current={section} />
       {error && <div className="form-error" role="alert">{error}</div>}
       {message && <div className="form-success" role="status">{message}</div>}
       {loading && !error && <p role="status">{translate('accessControl.loading')}</p>}
       {!loading && (
         <>
-          <section className="access-section" aria-labelledby="roles-heading">
+          {section === 'roles' && <section className="access-section administration-section" aria-labelledby="roles-heading">
             <div className="section-heading"><div><h2 id="roles-heading">{translate('accessControl.builtInRoles')}</h2><p>{translate('accessControl.builtInRolesHelp')}</p></div></div>
             <ul className="role-definitions">
               {catalog.roles.map((role) => <li key={role.value}><strong>{role.label}</strong><span>{role.description}</span><small>{role.assignable_scope === 'installation' ? translate('accessControl.ownerRole') : role.assignable_scope === 'tenant' ? translate('accessControl.mspWideRole') : translate('accessControl.clientRole')}</small></li>)}
             </ul>
-          </section>
-          <CustomRolesPanel client={client} catalog={catalog} members={members} organizations={organizations} />
-          <section className="access-section" aria-labelledby="members-heading">
+          </section>}
+          {section === 'custom' && <CustomRolesPanel client={client} catalog={catalog} members={members} organizations={organizations} />}
+          {section === 'members' && <section className="access-section administration-section" aria-labelledby="members-heading">
             <div className="section-heading"><div><h2 id="members-heading">{translate('accessControl.members')}</h2><p>{translate('accessControl.membersHelp')}</p></div></div>
             {members.length === 0 && <p>{translate('accessControl.noMembers')}</p>}
             {members.length > 0 && <div className="access-table" role="table" aria-label={translate('accessControl.members')}>
@@ -107,8 +121,8 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
                   : <button className="secondary-button" type="button" disabled={selectedRoles[member.id] === member.role} onClick={() => setPending({ kind: 'role', member, role: selectedRoles[member.id] })}>{translate('accessControl.reviewChange')}</button>}</span>
               </div>)}
             </div>}
-          </section>
-          <section className="access-section" aria-labelledby="organization-access-heading">
+          </section>}
+          {section === 'clients' && <section className="access-section administration-section" aria-labelledby="organization-access-heading">
             <div className="section-heading"><div><h2 id="organization-access-heading">{translate('accessControl.clientAccess')}</h2><p>{translate('accessControl.clientAccessHelp')}</p></div></div>
             {organizations.length === 0 && <p>{translate('accessControl.noClients')}</p>}
             {organizations.length > 0 && <div className="access-table organization-access-table" role="table" aria-label={translate('accessControl.clientAccess')}>
@@ -119,8 +133,8 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
                 <span role="cell"><button className="secondary-button" type="button" disabled={selectedModes[organization.id] === organization.access_mode} onClick={() => setPending({ kind: 'access', organization, accessMode: selectedModes[organization.id] })}>{translate('accessControl.reviewChange')}</button></span>
               </div>)}
             </div>}
-          </section>
-          <section className="access-section" aria-labelledby="staff-assignments-heading">
+          </section>}
+          {section === 'assignments' && <section className="access-section administration-section" aria-labelledby="staff-assignments-heading">
             <div className="section-heading"><div><h2 id="staff-assignments-heading">{translate('accessControl.assignments')}</h2><p>{translate('accessControl.assignmentsHelp')}</p></div></div>
             {organizations.length === 0 && <p>{translate('accessControl.noClients')}</p>}
             <div className="staff-assignment-list">
@@ -139,7 +153,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
                 </section>
               })}
             </div>
-          </section>
+          </section>}
         </>
       )}
       {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="access-change-heading">

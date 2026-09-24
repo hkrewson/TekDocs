@@ -2583,3 +2583,40 @@ policy, the production build and compressed bundle budgets (shell 130272 <=
 Phase 7 remains in progress. Metadata, account/access/setup/help/status and the
 broader client portal remain open. Version stays 0.8.46. Production deployment,
 external push and Wiki publication remain separate.
+
+## Phase 7 Help and System Status checkpoint — 2026-09-23
+
+Contextual Help now uses one route-specific reader across the authenticated
+shell. It is a right-side overlay on larger screens and fills the viewport below
+768 CSS pixels, with one scrolling body, background locking, heading focus,
+Escape/outside dismissal, an explicit mobile close action and focus restoration.
+Help continues to use the maintained route-topic registry and never downloads
+unpublished Wiki content into the application.
+
+System Status now presents TekDocs, database and diagram-renderer health as three
+compact service rows. Renderer capacity, queue depth, last check and version stay
+available while recent failures use a compact exception list instead of a wide
+table. Initial failures provide retry; degraded or failed refreshes leave the
+latest safe diagnostics visible. Existing authorization, backend bounds and the
+value-minimized response contract remain unchanged. See
+[help-and-system-status.md](help-and-system-status.md) for the final interaction
+and privacy boundaries.
+
+Verification passes five focused help/status component cases, two API cases and
+all seven PostgreSQL backend health/diagnostic cases. All 18 maintained-browser
+cases pass at 320, 390, 768, 1024, 1280 and 1440 CSS pixels across Chromium,
+Firefox and WebKit, including accessibility, focus return, background locking,
+long values, mobile bounds and horizontal-overflow checks. The isolated real
+browser-to-Django-to-PostgreSQL journey passes in 3.6 minutes and opens both the
+real authorized diagnostics endpoint and its route-specific help reader. The
+final repository gate passes all 654 frontend tests in 119 files, backend static
+and migration checks, documentation policy, the production build and compressed
+bundle budgets (shell 130376 <= 131072; shell style 24502 <= 24576). Evidence:
+`/tmp/tekdocs-help-status-backend.log`,
+`/tmp/tekdocs-help-status-browser.log`,
+`/tmp/tekdocs-help-status-live.log` and
+`/tmp/tekdocs-help-status-check.log`.
+
+Phase 7 remains in progress. Metadata, account/access/setup and the broader
+client portal remain open. Version stays 0.8.46. Production deployment, external
+push and Wiki publication remain separate.

@@ -303,9 +303,17 @@
   {
     "route": "/system-status",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "frontend/src/system-status/SystemStatus.tsx",
+      "frontend/src/system-status/SystemStatus.test.tsx",
+      "frontend/src/help/ContextualHelp.tsx",
+      "frontend/src/help/ContextualHelp.test.tsx",
+      "frontend/e2e/help-system-status-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts",
+      "planning/responsive-layouts/help-and-system-status.md"
+    ],
+    "states": "Loading, unavailable/retry, ready, degraded/stale, empty/recent failures, refresh with retained diagnostics, route help open/close/focus restoration; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/taxonomies",

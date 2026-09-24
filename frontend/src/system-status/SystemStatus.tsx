@@ -5,7 +5,13 @@ import { browserSystemStatusClient } from './api'
 import type { SystemDiagnostics, SystemStatusClient } from './api'
 
 function label(value: string) {
-  return value === 'ready' ? translate('systemStatus.ready') : value.replaceAll('_', ' ')
+  const labels: Record<string, Parameters<typeof translate>[0]> = {
+    ready: 'systemStatus.ready',
+    stale: 'systemStatus.stale',
+    unavailable: 'systemStatus.unavailable',
+    not_configured: 'systemStatus.notConfigured',
+  }
+  return translate(labels[value] ?? 'systemStatus.unavailable')
 }
 
 export function SystemStatus({ client = browserSystemStatusClient }: { client?: SystemStatusClient }) {
@@ -32,7 +38,7 @@ export function SystemStatus({ client = browserSystemStatusClient }: { client?: 
 
   return <>
     <header className="page-header">
-      <div><h1>{translate('systemStatus.heading')}</h1></div>
+      <div><h1>{translate('systemStatus.heading')}</h1><p>{translate('systemStatus.intro')}</p></div>
       <button className="secondary-button" type="button" disabled={phase === 'loading'} onClick={() => { void refresh() }}>
         <RefreshCw size={16} aria-hidden="true" />{phase === 'loading' ? translate('systemStatus.checking') : translate('systemStatus.checkAgain')}
       </button>
@@ -40,24 +46,21 @@ export function SystemStatus({ client = browserSystemStatusClient }: { client?: 
     <section className="content-section system-status" aria-labelledby="system-status-heading">
       <div className="section-heading"><h2 id="system-status-heading">{translate('systemStatus.services')}</h2></div>
       <p className="workspace-area-note">{translate('systemStatus.privacyHelp')}</p>
-      {phase === 'loading' && !diagnostics && <p role="status">{translate('systemStatus.loading')}</p>}
-      {phase === 'error' && <p role="alert">{translate('systemStatus.loadFailed')}</p>}
+      {phase === 'loading' && !diagnostics && <p className="empty-state" role="status">{translate('systemStatus.loading')}</p>}
+      {phase === 'loading' && diagnostics && <p role="status">{translate('systemStatus.refreshing')}</p>}
+      {phase === 'error' && <div className="empty-state" role="alert"><p>{translate('systemStatus.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => { void refresh() }}>{translate('common.retry')}</button></div>}
       {diagnostics && <>
-        <dl className="system-status-list">
-          <div><dt>{translate('systemStatus.tekdocs')}</dt><dd>{diagnostics.application_version}</dd></div>
-          <div><dt>{translate('systemStatus.database')}</dt><dd>{label(diagnostics.database)}</dd></div>
-          <div><dt>{translate('systemStatus.diagramService')}</dt><dd>{label(diagnostics.diagram_renderer.status)}</dd></div>
-          <div><dt>{translate('systemStatus.diagramServiceVersion')}</dt><dd>{diagnostics.diagram_renderer.version ?? translate('systemStatus.notReported')}</dd></div>
-          <div><dt>{translate('systemStatus.diagramJobs')}</dt><dd>{translate('systemStatus.capacityUsed', { used: diagnostics.diagram_renderer.queue.total, capacity: diagnostics.diagram_renderer.capacity })}</dd></div>
-          <div><dt>{translate('systemStatus.waiting')}</dt><dd>{diagnostics.diagram_renderer.queue.waiting}</dd></div>
-          <div><dt>{translate('systemStatus.processing')}</dt><dd>{diagnostics.diagram_renderer.queue.processing}</dd></div>
-          <div><dt>{translate('systemStatus.lastDiagramCheck')}</dt><dd>{diagnostics.diagram_renderer.last_checked_at ? formatDateTime(new Date(diagnostics.diagram_renderer.last_checked_at)) : translate('systemStatus.notReported')}</dd></div>
-        </dl>
+        {diagnostics.status === 'degraded' && <p className="form-message error" role="alert">{translate('systemStatus.degraded')}</p>}
+        <ol className="plain-detail-list">
+          <li><div><strong>{translate('systemStatus.tekdocs')}</strong><span>{translate('systemStatus.versionSummary', { version: diagnostics.application_version })}</span></div><strong>{label('ready')}</strong></li>
+          <li><div><strong>{translate('systemStatus.database')}</strong><span>{translate('systemStatus.databaseHelp')}</span></div><strong>{label(diagnostics.database)}</strong></li>
+          <li><div><strong>{translate('systemStatus.diagramService')}</strong><span style={{ overflowWrap: 'anywhere' }}>{diagnostics.diagram_renderer.version ?? translate('systemStatus.notReported')}</span><span>{translate('systemStatus.capacityUsed', { used: diagnostics.diagram_renderer.queue.total, capacity: diagnostics.diagram_renderer.capacity })} · {translate('systemStatus.queueSummary', { waiting: diagnostics.diagram_renderer.queue.waiting, processing: diagnostics.diagram_renderer.queue.processing })}</span><span>{translate('systemStatus.lastDiagramCheck')}: {diagnostics.diagram_renderer.last_checked_at ? formatDateTime(new Date(diagnostics.diagram_renderer.last_checked_at)) : translate('systemStatus.notReported')}</span></div><strong>{label(diagnostics.diagram_renderer.status)}</strong></li>
+        </ol>
         <section className="system-status-errors" aria-labelledby="renderer-errors-heading">
           <div className="section-heading"><h2 id="renderer-errors-heading">{translate('systemStatus.recentDiagramErrors')}</h2></div>
           {diagnostics.diagram_renderer.recent_failures.length === 0
             ? <p>{translate('systemStatus.noDiagramErrors')}</p>
-            : <div className="table-scroll" role="group" aria-label={translate('systemStatus.rendererErrorsTable')} tabIndex={0}><table><thead><tr><th>{translate('systemStatus.code')}</th><th>{translate('systemStatus.occurred')}</th></tr></thead><tbody>{diagnostics.diagram_renderer.recent_failures.map((failure, index) => <tr key={`${failure.occurred_at}-${failure.code}-${index}`}><td><code>{failure.code}</code></td><td><time dateTime={new Date(failure.occurred_at).toISOString()}>{formatDateTime(new Date(failure.occurred_at))}</time></td></tr>)}</tbody></table></div>}
+            : <ol className="plain-detail-list">{diagnostics.diagram_renderer.recent_failures.map((failure, index) => <li key={`${failure.occurred_at}-${failure.code}-${index}`}><code style={{ overflowWrap: 'anywhere' }}>{failure.code}</code><time dateTime={new Date(failure.occurred_at).toISOString()}>{formatDateTime(new Date(failure.occurred_at))}</time></li>)}</ol>}
         </section>
         <p className="system-status-checked">{translate('systemStatus.checked')} <time dateTime={diagnostics.checked_at}>{formatDateTime(diagnostics.checked_at)}</time></p>
       </>}

@@ -1644,6 +1644,18 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.goto('/notification-delivery')
   await expect(page.getByRole('heading', { name: 'Email delivery' })).toBeVisible()
   await expect(page.getByRole('table')).toHaveCount(0)
+
+  // Help and system diagnostics remain value-minimized and use one focused
+  // responsive surface against the real authorized endpoint.
+  await page.goto('/system-status')
+  await expect(page.getByRole('heading', { name: 'System status' })).toBeVisible()
+  await expect(page.getByText('Version 0.8.46')).toBeVisible()
+  await expect(page.getByText('Primary application data store')).toBeVisible()
+  await expect(page.getByRole('table')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Help for System status' }).click()
+  await expect(page.getByRole('dialog', { name: 'System status help' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'System status help' })).toHaveCount(0)
   await portalContext.close()
   await staffContext.close()
 })

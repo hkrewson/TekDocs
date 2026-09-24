@@ -25,15 +25,29 @@ it('shows bounded renderer diagnostics and refreshes them', async () => {
   render(<SystemStatus client={{ load }} />)
 
   expect(await screen.findByText('@mermaid-js/mermaid-cli@11.16.0')).toBeInTheDocument()
-  expect(screen.getByText('2 of 8 slots in use')).toBeInTheDocument()
+  expect(screen.getByText('Diagram service').closest('li')).toHaveTextContent('2 of 8 slots in use · 1 waiting, 1 processing')
   expect(screen.getByText('renderer_timeout')).toBeInTheDocument()
   expect(screen.getByText(/does not include documents/)).toBeInTheDocument()
+  expect(screen.queryByRole('table')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Check again' }))
   expect(load).toHaveBeenCalledTimes(2)
 })
 
-it('reports an unavailable diagnostic request', async () => {
-  const client: SystemStatusClient = { load: vi.fn().mockRejectedValue(new Error('Unavailable')) }
+it('reports an unavailable request and retries without reloading the page', async () => {
+  const user = userEvent.setup()
+  const load = vi.fn().mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue(diagnostics)
+  const client: SystemStatusClient = { load }
   render(<SystemStatus client={client} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('System status could not be loaded.')
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByText('@mermaid-js/mermaid-cli@11.16.0')).toBeInTheDocument()
+  expect(load).toHaveBeenCalledTimes(2)
+})
+
+it('keeps service details visible when the system is degraded', async () => {
+  const client: SystemStatusClient = { load: vi.fn().mockResolvedValue({ ...diagnostics, status: 'degraded', diagram_renderer: { ...diagnostics.diagram_renderer, status: 'stale' } }) }
+  render(<SystemStatus client={client} />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('services need attention')
+  expect(screen.getByText('Check overdue')).toBeInTheDocument()
+  expect(screen.getByText('Version 0.8.46')).toBeInTheDocument()
 })

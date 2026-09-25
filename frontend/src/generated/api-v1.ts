@@ -2684,6 +2684,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description Returns the compatible unpaginated domain array by default. Set paginated=true to receive the bounded collection envelope used by the responsive workspace. */
         readonly get: operations["msp_domain_list"];
         readonly put?: never;
         readonly post: operations["msp_domain_create"];
@@ -5646,6 +5647,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description Returns the compatible unpaginated domain array by default. Set paginated=true to receive the bounded collection envelope used by the responsive workspace. */
         readonly get: operations["organization_domain_list"];
         readonly put?: never;
         readonly post: operations["organization_domain_create"];
@@ -10103,6 +10105,15 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        readonly DomainCollection: {
+            readonly results: readonly components["schemas"]["Domain"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
+        };
+        readonly DomainCollectionResponse: readonly components["schemas"]["Domain"][] | components["schemas"]["DomainCollection"];
         readonly DomainMonitorRun: {
             /** Format: uuid */
             readonly id: string;
@@ -21835,7 +21846,28 @@ export interface operations {
     };
     readonly msp_domain_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `expiration_date` - expiration_date
+                 *     * `-expiration_date` - -expiration_date
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 */
+                readonly ordering?: "name" | "-name" | "expiration_date" | "-expiration_date" | "status" | "-status";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly paginated?: boolean;
+                readonly q?: string;
+                /**
+                 * @description * `active` - active
+                 *     * `pending` - pending
+                 *     * `expired` - expired
+                 *     * `transferred` - transferred
+                 */
+                readonly status?: "active" | "pending" | "expired" | "transferred" | "";
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -21849,7 +21881,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Domain"][];
+                    readonly "application/json": components["schemas"]["DomainCollectionResponse"];
                 };
             };
         };
@@ -29886,7 +29918,28 @@ export interface operations {
     };
     readonly organization_domain_list: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `expiration_date` - expiration_date
+                 *     * `-expiration_date` - -expiration_date
+                 *     * `status` - status
+                 *     * `-status` - -status
+                 */
+                readonly ordering?: "name" | "-name" | "expiration_date" | "-expiration_date" | "status" | "-status";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly paginated?: boolean;
+                readonly q?: string;
+                /**
+                 * @description * `active` - active
+                 *     * `pending` - pending
+                 *     * `expired` - expired
+                 *     * `transferred` - transferred
+                 */
+                readonly status?: "active" | "pending" | "expired" | "transferred" | "";
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;
@@ -29902,7 +29955,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": readonly components["schemas"]["Domain"][];
+                    readonly "application/json": components["schemas"]["DomainCollectionResponse"];
                 };
             };
         };

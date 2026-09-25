@@ -76,6 +76,17 @@ def test_registered_domain_is_normalized_and_exact_workspace_scoped(installation
     sibling_url = reverse("organization-domain-list-create", kwargs={"organization_entity_id": sibling.entity_id})
     assert browser.get(first_url).json()[0]["id"] == str(domain.entity_id)
     assert browser.get(sibling_url).json() == []
+    page_response = browser.get(
+        first_url,
+        {"paginated": "true", "q": "EXAMPLE", "status": "active", "ordering": "-expiration_date", "page_size": 25},
+    )
+    assert page_response.status_code == 200
+    page = page_response.json()
+    assert {key: page[key] for key in ("page", "page_size", "count", "has_more", "can_manage")} == {
+        "page": 1, "page_size": 25, "count": 1, "has_more": False, "can_manage": True,
+    }
+    assert [item["id"] for item in page["results"]] == [str(domain.entity_id)]
+    assert browser.get(first_url, {"paginated": "true", "unexpected": "value"}).status_code == 400
 
     hostname = create_hostname(
         workspace=workspace,

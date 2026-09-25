@@ -9254,6 +9254,73 @@ paths:
   /api/v1/workspaces/msp/domains:
     get:
       operationId: msp_domain_list
+      description: Returns the compatible unpaginated domain array by default. Set
+        paginated=true to receive the bounded collection envelope used by the responsive
+        workspace.
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - expiration_date
+          - -expiration_date
+          - status
+          - -status
+          type: string
+          x-spec-enum-id: 5597bc733d674d54
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `expiration_date` - expiration_date
+          * `-expiration_date` - -expiration_date
+          * `status` - status
+          * `-status` - -status
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - pending
+          - expired
+          - transferred
+          - ''
+          type: string
+          x-spec-enum-id: f8a20e2b1f53ad2c
+          default: ''
+        description: |-
+          * `active` - active
+          * `pending` - pending
+          * `expired` - expired
+          * `transferred` - transferred
       tags:
       - workspaces
       security:
@@ -9264,9 +9331,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -20943,13 +21008,79 @@ paths:
   /api/v1/workspaces/organizations/{organization_entity_id}/domains:
     get:
       operationId: organization_domain_list
+      description: Returns the compatible unpaginated domain array by default. Set
+        paginated=true to receive the bounded collection envelope used by the responsive
+        workspace.
       parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - expiration_date
+          - -expiration_date
+          - status
+          - -status
+          type: string
+          x-spec-enum-id: 5597bc733d674d54
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `expiration_date` - expiration_date
+          * `-expiration_date` - -expiration_date
+          * `status` - status
+          * `-status` - -status
       - in: path
         name: organization_entity_id
         schema:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: paginated
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 253
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - pending
+          - expired
+          - transferred
+          - ''
+          type: string
+          x-spec-enum-id: f8a20e2b1f53ad2c
+          default: ''
+        description: |-
+          * `active` - active
+          * `pending` - pending
+          * `expired` - expired
+          * `transferred` - transferred
       tags:
       - workspaces
       security:
@@ -20960,9 +21091,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Domain'
+                $ref: '#/components/schemas/DomainCollectionResponse'
           description: ''
           headers:
             X-Request-ID:
@@ -36076,6 +36205,36 @@ components:
       - renewal_mode
       - review_state
       - status
+    DomainCollection:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    DomainCollectionResponse:
+      oneOf:
+      - type: array
+        items:
+          $ref: '#/components/schemas/Domain'
+      - $ref: '#/components/schemas/DomainCollection'
     DomainMonitorRun:
       type: object
       properties:

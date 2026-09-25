@@ -101,12 +101,14 @@ export function CustomFields({ workspace, client = browserCustomFieldsClient }: 
   const [revision, setRevision] = useState(0)
 
   function updateParameters(changes: Record<string, string | number | null>, replace = false) {
-    const next = new URLSearchParams(parameters)
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === null || value === '' || key === 'page' && value === 1 || key === 'page_size' && value === 25) next.delete(key)
-      else next.set(key, String(value))
-    }
-    setParameters(next, { replace })
+    setParameters((current) => {
+      const next = new URLSearchParams(current)
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null || value === '' || key === 'page' && value === 1 || key === 'page_size' && value === 25) next.delete(key)
+        else next.set(key, String(value))
+      }
+      return next
+    }, { replace })
   }
   const load = async (signal?: AbortSignal) => {
     setPhase('loading'); setError(null)

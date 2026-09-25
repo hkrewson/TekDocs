@@ -1,11 +1,12 @@
 from typing import Any
 
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from django.db.models import Q
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema, extend_schema_view
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey, require_permission
+from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
 from .certificate_monitoring import (
     CertificateMonitoringError,
@@ -13,6 +14,7 @@ from .certificate_monitoring import (
     endpoints_for_domain,
     enqueue_certificate_monitoring,
 )
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .domain_monitoring import enqueue_domain_monitoring, monitoring_runs_for_domain
 from .domains import DomainError, DomainInput, create_domain, domains_for_scope, review_domain
 from .models import (
@@ -68,6 +70,29 @@ class DomainSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
 
 
+class DomainCollectionSerializer(serializers.Serializer):
+    results = DomainSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    can_manage = serializers.BooleanField()
+
+
+class DomainCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
+    paginated = serializers.BooleanField(required=False, default=False)
+    q = serializers.CharField(max_length=253, required=False, allow_blank=True, trim_whitespace=True, default="")
+    status = serializers.ChoiceField(
+        choices=("active", "pending", "expired", "transferred"), required=False, allow_blank=True, default=""
+    )
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "expiration_date", "-expiration_date", "status", "-status"),
+        required=False,
+        default="name",
+    )
+
+
 def _workspace(request: Any, organization_entity_id: Any = None) -> ResolvedWorkspace:
     return (
         resolve_organization_workspace(request.user, entity_id=organization_entity_id)
@@ -77,11 +102,58 @@ def _workspace(request: Any, organization_entity_id: Any = None) -> ResolvedWork
 
 
 class DomainListCreateView(APIView):
-    @extend_schema(responses={200: DomainSerializer(many=True)})
+    @extend_schema(
+        parameters=[DomainCollectionQuerySerializer],
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name="DomainCollectionResponse",
+                serializers=[DomainSerializer(many=True), DomainCollectionSerializer],
+                resource_type_field_name=None,
+                many=False,
+            )
+        },
+        description=(
+            "Returns the compatible unpaginated domain array by default. Set paginated=true to receive the bounded "
+            "collection envelope used by the responsive workspace."
+        ),
+    )
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id)
         require_permission(request.user, PermissionKey.DOMAINS_VIEW, organization=workspace.organization)
-        return Response(DomainSerializer(domains_for_scope(workspace)[:500], many=True).data)
+        query = DomainCollectionQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        domains = domains_for_scope(workspace)
+        if not values["paginated"]:
+            return Response(DomainSerializer(domains[:500], many=True).data)
+        if values["q"]:
+            domains = domains.filter(
+                Q(ascii_name__icontains=values["q"])
+                | Q(registrar__entity__display_name__icontains=values["q"])
+                | Q(owner__display_name__icontains=values["q"])
+            )
+        if values["status"]:
+            domains = domains.filter(status=values["status"])
+        ordering = values["ordering"]
+        descending = ordering.startswith("-")
+        field = ordering.removeprefix("-")
+        order_field = {"name": "ascii_name", "expiration_date": "expiration_date", "status": "status"}[field]
+        domains = domains.order_by(f"-{order_field}" if descending else order_field, "entity_id")
+        page = paginate(domains, page=values["page"], page_size=values["page_size"])
+        return Response(
+            DomainCollectionSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "can_manage": context_has_permission(
+                        workspace.member, PermissionKey.DOMAINS_EDIT, organization=workspace.organization
+                    ),
+                }
+            ).data
+        )
 
     @extend_schema(request=DomainWriteSerializer, responses={201: DomainSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]

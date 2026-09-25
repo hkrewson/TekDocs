@@ -13,6 +13,7 @@ describe('domains API client', () => {
   it('uses exact organization routes and CSRF-protected monitoring writes', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserDomainsClient.list(workspace)
+    await browserDomainsClient.listPage(workspace, { q: 'example', status: 'active', ordering: '-expiration_date', page: 2, pageSize: 25 })
     await browserDomainsClient.create(workspace, { name: 'example.com' } as never)
     await browserDomainsClient.monitoring(workspace, 'domain/1')
     await browserDomainsClient.scan(workspace, 'domain/1')
@@ -23,6 +24,10 @@ describe('domains API client', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/v1/workspaces/organizations/client%2F1/domains/domain%2F1/monitoring',
+      expect.objectContaining({ credentials: 'same-origin' }),
+    )
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/v1/workspaces/organizations/client%2F1/domains?paginated=true&page=2&page_size=25&ordering=-expiration_date&q=example&status=active',
       expect.objectContaining({ credentials: 'same-origin' }),
     )
     expect(fetch).toHaveBeenCalledWith(

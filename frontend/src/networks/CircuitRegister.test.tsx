@@ -75,7 +75,7 @@ it('updates kind separately and confirms consequential status changes', async ()
   await waitFor(() => expect(write).toHaveBeenLastCalledWith(workspace, 'circuit-1', { kind: 'wan' }))
   expect(await within(drawer).findByText('WAN', { selector: 'dd' })).toBeVisible()
 
-  await user.click(within(drawer).getByRole('button', { name: 'Change circuit status' }))
+  await user.click(await within(drawer).findByRole('button', { name: 'Change circuit status' }))
   await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Status' }), 'suspended')
   await user.click(within(drawer).getByRole('button', { name: 'Review status change' }))
   const confirmation = within(drawer).getByRole('alertdialog')

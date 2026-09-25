@@ -1572,18 +1572,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .selected-row { background: var(--surface-subtle); }
 .inline-choice { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; white-space: nowrap; }
 .inline-choice input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
-.domain-monitor-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 20px; border-top: 1px solid var(--border); }
-.domain-monitor-summary div { padding: 10px 16px 10px 0; border-bottom: 1px solid var(--border); }
-.domain-monitor-summary dt { color: var(--muted); font-size: 12px; }
-.domain-monitor-summary dd { margin: 3px 0 0; font-weight: 600; }
-.domain-monitor-alerts { margin: 0 0 20px; padding: 0; list-style: none; border-top: 1px solid var(--border); }
-.domain-monitor-alerts li { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.domain-monitor-alerts strong { font-size: 13px; text-transform: capitalize; }
-.domain-monitor-alerts span { color: var(--muted); font-size: 12px; }
-.domain-subsection-heading { margin-top: 28px; }
-.certificate-form-row { align-items: end; display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 18px; }
-.certificate-form-row label { display: grid; gap: 6px; min-width: 220px; }
-.certificate-history { border-top: 1px solid var(--border); margin-top: 22px; padding-top: 18px; }
+
 
 @media (max-width: 720px) {
   .import-upload-form { grid-template-columns: 1fr; }
@@ -1617,7 +1606,6 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .network-relationship-list li > span:nth-child(3) { display: none; }
   .network-record-toolbar { align-items: stretch; flex-direction: column; }
   .webhook-secret { grid-template-columns: 1fr; }
-  .domain-monitor-summary { grid-template-columns: 1fr; }
 }
 .visibility-label { display: inline-flex; align-items: center; width: fit-content; border: 1px solid var(--border); border-radius: 999px; padding: 3px 8px; font-size: 12px; font-weight: 650; white-space: nowrap; }
 .visibility-label.client-visible { border-color: color-mix(in srgb, var(--success) 45%, var(--border)); color: var(--success); }

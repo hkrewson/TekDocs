@@ -18,11 +18,10 @@ evidence files disappear, or when a started route retains the placeholder state
 description. This makes the inventory an active release contract instead of a
 manually maintained list that can drift from the product.
 
-The reconciliation records 61 supported routes: 47 complete, 10 in progress,
-and 4 pending. The pending routes are Domains and Certificates in MSP and
-organization workspaces. Those four routes remain genuine Phase 4 implementation
-work. Credential references now pass the shared responsive collection and drawer
-contract. Authentication reset and client-portal entry paths
+The reconciliation records 61 supported routes: 51 complete, 10 in progress,
+and none pending. Domains and Certificates now pass the shared responsive
+collection and drawer contract in MSP and organization workspaces, completing
+the Phase 4 implementation routes. Authentication reset and client-portal entry paths
 are tracked alongside the React router. Assets, Documentation/Files, Networks, and
 Contracts have implemented layouts with broader acceptance still open; they
 remain `in_progress` rather than being reported as unfinished screens.

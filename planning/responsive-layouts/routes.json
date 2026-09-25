@@ -104,9 +104,16 @@
   {
     "route": "/certificates",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/domain-certificate-workspaces.md",
+      "frontend/src/domains/Domains.test.tsx",
+      "frontend/src/domains/Certificates.test.tsx",
+      "frontend/src/domains/api.test.ts",
+      "frontend/e2e/domains-layout.spec.ts",
+      "backend/apps/core/tests/test_domains.py"
+    ],
+    "states": "Bounded URL search/order/page/page-size state; URL-addressable domain and certificate endpoint drawers; off-page direct retrieval; monitoring, evidence, creation, failed-input and dirty-dismissal states; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/compliance",
@@ -184,9 +191,16 @@
   {
     "route": "/domains",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/domain-certificate-workspaces.md",
+      "frontend/src/domains/Domains.test.tsx",
+      "frontend/src/domains/Certificates.test.tsx",
+      "frontend/src/domains/api.test.ts",
+      "frontend/e2e/domains-layout.spec.ts",
+      "backend/apps/core/tests/test_domains.py"
+    ],
+    "states": "Bounded URL search/order/page/page-size state; URL-addressable domain and certificate endpoint drawers; off-page direct retrieval; monitoring, evidence, creation, failed-input and dirty-dismissal states; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/files",
@@ -538,9 +552,16 @@
   {
     "route": "/workspaces/organizations/:organizationId/certificates",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/domain-certificate-workspaces.md",
+      "frontend/src/domains/Domains.test.tsx",
+      "frontend/src/domains/Certificates.test.tsx",
+      "frontend/src/domains/api.test.ts",
+      "frontend/e2e/domains-layout.spec.ts",
+      "backend/apps/core/tests/test_domains.py"
+    ],
+    "states": "Organization-scoped bounded URL collections and direct domain/endpoint drawers; workspace isolation; monitoring, evidence, creation, unavailable, failed-input and dirty-dismissal states; all required widths."
   },
   {
     "route": "/workspaces/organizations/:organizationId/compliance",
@@ -618,9 +639,16 @@
   {
     "route": "/workspaces/organizations/:organizationId/domains",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/domain-certificate-workspaces.md",
+      "frontend/src/domains/Domains.test.tsx",
+      "frontend/src/domains/Certificates.test.tsx",
+      "frontend/src/domains/api.test.ts",
+      "frontend/e2e/domains-layout.spec.ts",
+      "backend/apps/core/tests/test_domains.py"
+    ],
+    "states": "Organization-scoped bounded URL collections and direct domain/endpoint drawers; workspace isolation; monitoring, evidence, creation, unavailable, failed-input and dirty-dismissal states; all required widths."
   },
   {
     "route": "/workspaces/organizations/:organizationId/files",

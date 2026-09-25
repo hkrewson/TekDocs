@@ -2808,3 +2808,40 @@ The enforced inventory now records 47 complete, 10 in-progress, and 4 pending
 routes. The remaining Phase 4 implementation routes are Domains and Certificates
 in MSP and organization workspaces. Version stays 0.8.46. Production deployment,
 external push, and Wiki publication remain separate.
+
+## Phase 4 Domain and certificate workspace checkpoint — 2026-09-25
+
+Domains and Certificates now complete the remaining Phase 4 interface routes in
+both MSP and organization workspaces. Their bounded collections default to 25
+rows, support 25/50/100 page sizes, and retain search, ordering, paging, and
+selected records in the URL. Domain names open a useful overlay drawer with
+registration and monitoring facts, recent checks, TLS endpoints, certificate
+history, and the existing operational actions. Certificates use the same drawer
+to move from a domain summary to focused endpoint evidence and history without a
+nested drawer or a second page-wide scrolling surface.
+
+The Domain API preserves its legacy array response and adds an explicit paginated
+form with stable search, filtering, ordering, page metadata, and permission
+context. Direct links can restore domains and certificate endpoints outside the
+current page. Domain and endpoint creation preserve failed input, and the shared
+dirty-change guard covers backdrop, Escape, Back, and browser navigation.
+
+Focused frontend checks pass all 14 domain, certificate, and API scenarios. The
+production frontend build passes its compressed bundle budgets, with the new
+styles shipped only with these lazy workspaces. The responsive browser matrix
+passes 42 Chromium, Firefox, and WebKit cases across 320, 390, 768, 1024, 1280,
+and 1440 CSS pixels, including organization routes, direct records,
+accessibility, overflow, monitoring evidence, and dirty drafts. See
+[domain-certificate-workspaces.md](domain-certificate-workspaces.md).
+
+The isolated real browser-to-Django-to-PostgreSQL journey also passes domain
+creation, endpoint creation, and reopening the retained endpoint from the
+Certificates workspace. That rehearsal identified and verified fixes for a
+post-save dirty-guard race and for delayed URL updates overwriting newer
+collection input.
+
+The enforced inventory now records 51 complete, 10 in-progress, and no pending
+routes. Phase 4 implementation is complete; focused acceptance of the ten broad
+in-progress workspaces, technician walkthroughs, and production/release gates
+remain in Phase 8. Version stays 0.8.46. Production deployment, external push,
+and Wiki publication remain separate.

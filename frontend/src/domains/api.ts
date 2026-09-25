@@ -102,8 +102,26 @@ export type CertificateMonitoring = {
 
 export type DomainDraft = Pick<RegisteredDomain, 'name' | 'registrar_id' | 'registration_date' | 'expiration_date' | 'renewal_mode' | 'owner_id' | 'status' | 'notes'>
 
+export type DomainPage = {
+  results: RegisteredDomain[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+  can_manage: boolean
+}
+
+export type DomainListParameters = {
+  q: string
+  status: '' | RegisteredDomain['status']
+  ordering: 'name' | '-name' | 'expiration_date' | '-expiration_date' | 'status' | '-status'
+  page: number
+  pageSize: number
+}
+
 export interface DomainsClient {
   list(workspace: WorkspaceContext | null, signal?: AbortSignal): Promise<RegisteredDomain[]>
+  listPage(workspace: WorkspaceContext | null, parameters: DomainListParameters, signal?: AbortSignal): Promise<DomainPage>
   create(workspace: WorkspaceContext | null, draft: DomainDraft): Promise<RegisteredDomain>
   monitoring(workspace: WorkspaceContext | null, domainId: string, signal?: AbortSignal): Promise<DomainMonitoring>
   scan(workspace: WorkspaceContext | null, domainId: string): Promise<DomainMonitorRun>
@@ -146,6 +164,16 @@ async function parse<T>(response: Response): Promise<T> {
 export const browserDomainsClient: DomainsClient = {
   async list(workspace, signal) {
     return parse(await fetch(path(workspace), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async listPage(workspace, parameters, signal) {
+    const query = new URLSearchParams({
+      paginated: 'true', page: String(parameters.page), page_size: String(parameters.pageSize), ordering: parameters.ordering,
+    })
+    if (parameters.q) query.set('q', parameters.q)
+    if (parameters.status) query.set('status', parameters.status)
+    return parse(await fetch(`${path(workspace)}?${query}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
   },
   async create(workspace, draft) {
     await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })

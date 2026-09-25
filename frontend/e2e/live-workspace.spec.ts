@@ -1468,12 +1468,18 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Domain name').fill('live-acme.example')
   await page.getByLabel('Expires on').fill('2027-08-13')
   await page.getByRole('button', { name: 'Save domain' }).click()
-  await expect(page.getByText('live-acme.example', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Details' }).click()
-  await expect(page.getByRole('heading', { name: 'Domain checks' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'live-acme.example' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Recent monitoring' })).toBeVisible()
   await page.getByRole('button', { name: 'Add endpoint' }).click()
   await page.getByRole('button', { name: 'Save endpoint' }).click()
-  await expect(page.getByRole('cell', { name: 'HTTPS' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /live-acme\.example HTTPS/ })).toBeVisible()
+
+  await page.goto(`/workspaces/organizations/${clientId}/certificates`)
+  await page.getByRole('button', { name: 'live-acme.example' }).click()
+  await expect(page.getByRole('heading', { name: 'Certificates · live-acme.example' })).toBeVisible()
+  await page.getByRole('button', { name: 'live-acme.example HTTPS certificate' }).click()
+  await expect(page.getByRole('heading', { name: 'live-acme.example' })).toBeVisible()
+  await expect(page.getByText('No certificate checks have run.')).toBeVisible()
 
   const privateLink = 'https://start.1password.com/open/i?a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com'
   await page.goto(`/workspaces/organizations/${clientId}/credentials`)

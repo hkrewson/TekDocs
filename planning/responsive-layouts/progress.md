@@ -2769,8 +2769,42 @@ remain in progress. Authentication reset and client-portal entry paths are also
 tracked even though their rendering is selected before the authenticated shell
 router.
 
-Phase 8 remains in progress. The next implementation slice is the connected
-Domains, Certificates and Credential references milestone, followed by focused
-acceptance of the ten in-progress routes, technician walkthroughs and the
-production/release gates. Version stays 0.8.46. Production deployment, external
-push and Wiki publication remain separate.
+Phase 8 remains in progress. Credential references are completed in the next
+checkpoint below; Domains and Certificates remain the connected Phase 4 slices,
+followed by focused acceptance of the ten in-progress routes, technician
+walkthroughs and the production/release gates. Version stays 0.8.46. Production
+deployment, external push and Wiki publication remain separate.
+
+## Phase 4 Credential-reference workspace checkpoint — 2026-09-24
+
+Credential references now use the shared responsive collection and record
+pattern in both MSP and organization workspaces. The bounded collection defaults
+to 25 rows, supports 25/50/100 page sizes, and retains search, page, page size,
+and selected record in the URL. Compact identity rows open a useful overlay
+drawer with provider context, last-update information, the audited 1Password
+open action, editing, and explicit archive confirmation. Create and edit forms
+live in that drawer and retain input after errors.
+
+The backend now supports an authorized single-record read for direct and
+off-page links without returning the stored private provider URL. Archived IDs
+and sibling-workspace IDs remain indistinguishable 404s. Direct unavailable
+records have an explicit retry state. Dirty create and edit forms guard drawer,
+Escape, return-link, and browser navigation dismissal, and one confirmed discard
+closes the drawer without a second prompt. The shared drawer stylesheet now
+ships with this lazy route, and shared drawers fill the viewport below 768 CSS
+pixels. See
+[credential-reference-workspace.md](credential-reference-workspace.md).
+
+Focused frontend checks pass eight scenarios and backend credential-reference
+checks pass twelve scenarios. The new browser journey passes 21 Chromium,
+Firefox, and WebKit cases across 320, 390, 768, 1024, 1280, and 1440 CSS pixels,
+including the organization route, direct off-page retrieval, dirty edits, axe, and overflow.
+The local Docker application at `http://localhost:3200` has been rebuilt for
+review. The isolated real browser-to-Django-to-PostgreSQL workspace journey also
+passes credential creation, audited 1Password handoff, and private-link response
+redaction alongside the existing operational workflow.
+
+The enforced inventory now records 47 complete, 10 in-progress, and 4 pending
+routes. The remaining Phase 4 implementation routes are Domains and Certificates
+in MSP and organization workspaces. Version stays 0.8.46. Production deployment,
+external push, and Wiki publication remain separate.

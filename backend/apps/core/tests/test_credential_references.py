@@ -160,7 +160,12 @@ def test_credential_reference_collection_is_bounded_and_archive_closes_every_rea
             "credential_reference_entity_id": target["id"],
         },
     )
+    retrieved = client.get(detail)
+    assert retrieved.status_code == 200
+    assert retrieved.json()["title"] == "Beta administrator"
+    assert "reference_url" not in retrieved.json()
     assert client.delete(detail).status_code == 204
+    assert client.get(detail).status_code == 404
     assert client.get(opened).status_code == 404
     assert [item["title"] for item in client.get(collection).json()["results"]] == [
         "Alpha administrator",
@@ -184,6 +189,7 @@ def test_client_scope_blocks_sibling_reference_idor_and_secret_shaped_fields(ins
         "organization-credential-reference-detail",
         kwargs={"organization_entity_id": second.entity_id, "credential_reference_entity_id": entity_id},
     )
+    assert client.get(sibling_detail).status_code == 404
     assert client.patch(sibling_detail, {"title": "Cross-scope"}, content_type="application/json").status_code == 404
     assert client.delete(sibling_detail).status_code == 404
     assert CredentialReference.objects.get(entity_id=entity_id).entity.display_name == "Router"

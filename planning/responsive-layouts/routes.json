@@ -125,9 +125,15 @@
   {
     "route": "/credentials",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/credential-reference-workspace.md",
+      "frontend/src/credential-references/CredentialReferences.test.tsx",
+      "frontend/src/credential-references/api.test.ts",
+      "frontend/e2e/credential-references-layout.spec.ts",
+      "backend/apps/core/tests/test_credential_references.py"
+    ],
+    "states": "Bounded URL search/page/page-size state; URL-addressable preview/create drawer; off-page detail retrieval; unavailable/retry, permission, archive and retained failed-input states; dirty dismissal; 320/390/768/1024/1280/1440 CSS pixels."
   },
   {
     "route": "/custom-fields",
@@ -553,9 +559,15 @@
   {
     "route": "/workspaces/organizations/:organizationId/credentials",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/credential-reference-workspace.md",
+      "frontend/src/credential-references/CredentialReferences.test.tsx",
+      "frontend/src/credential-references/api.test.ts",
+      "frontend/e2e/credential-references-layout.spec.ts",
+      "backend/apps/core/tests/test_credential_references.py"
+    ],
+    "states": "Organization-scoped bounded URL collection and direct drawer records; sibling-ID isolation; permission, unavailable/retry, edit, archive and dirty dismissal states; all required widths."
   },
   {
     "route": "/workspaces/organizations/:organizationId/custom_fields",

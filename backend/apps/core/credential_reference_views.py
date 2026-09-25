@@ -172,6 +172,20 @@ def _get(workspace: ResolvedWorkspace, entity_id: UUID) -> CredentialReference:
     return get_object_or_404(references_for_scope(workspace.data_scope), entity_id=entity_id)
 
 
+def _retrieve(workspace: ResolvedWorkspace, entity_id: UUID) -> Response:
+    can_manage = context_has_permission(
+        workspace.member,
+        PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
+        organization=workspace.organization,
+    )
+    can_open = context_has_permission(
+        workspace.member,
+        PermissionKey.CREDENTIAL_REFERENCES_OPEN,
+        organization=workspace.organization,
+    )
+    return Response(_serialize(_get(workspace, entity_id), can_manage=can_manage, can_open=can_open))
+
+
 def _update(workspace: ResolvedWorkspace, request, entity_id: UUID) -> Response:  # type: ignore[no-untyped-def]
     reference = _get(workspace, entity_id)
     serializer = CredentialReferenceUpdateSerializer(data=request.data)
@@ -226,6 +240,11 @@ class _CredentialReferenceDetailView(APIView):
         if organization_entity_id is None:
             return _msp_workspace(request, permission)
         return _organization_workspace(request, organization_entity_id, permission)
+
+    @extend_schema(responses={200: CredentialReferenceSerializer})
+    def get(self, request, credential_reference_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = self.workspace(request, PermissionKey.CREDENTIAL_REFERENCES_VIEW, organization_entity_id)
+        return _retrieve(workspace, credential_reference_entity_id)
 
     @extend_schema(request=CredentialReferenceUpdateSerializer, responses={200: CredentialReferenceSerializer})
     def patch(self, request, credential_reference_entity_id, organization_entity_id=None):  # type: ignore[no-untyped-def]

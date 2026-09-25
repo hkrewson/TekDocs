@@ -395,7 +395,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["credential_references_retrieve_2"];
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["credential_references_destroy"];
@@ -4894,7 +4894,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["workspaces_organizations_credential_references_retrieve_2"];
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["workspaces_organizations_credential_references_destroy"];
@@ -15657,6 +15657,29 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CredentialReference"];
+                };
+            };
+        };
+    };
+    readonly credential_references_retrieve_2: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly credential_reference_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;
@@ -27945,6 +27968,30 @@ export interface operations {
         };
         readonly responses: {
             readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CredentialReference"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_credential_references_retrieve_2: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly credential_reference_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

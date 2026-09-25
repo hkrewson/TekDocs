@@ -2749,3 +2749,28 @@ budgets (shell 129242 <= 131072; shell style 24040 <= 24576).
 This completes Phase 7 implementation. Technician walkthroughs, production-image
 checks and release acceptance remain Phase 8 work. Version stays 0.8.46.
 Production deployment, external push and Wiki publication remain separate.
+
+## Phase 8 Route and state inventory checkpoint — 2026-09-24
+
+The tracked responsive inventory now agrees with all literal application routes
+and organization routes expanded from the supported capability registry. A new
+repository check rejects missing, stale or duplicate routes, inconsistent status
+values, missing evidence files and placeholder state descriptions on work that
+has started. This converts the inventory from a planning snapshot into an active
+pre-1.0 release contract. See
+[phase-8-route-state-inventory.md](phase-8-route-state-inventory.md).
+
+Reconciliation records 61 routes: 45 complete, 10 in progress and 6 pending. The
+six genuinely pending routes are Domains, Certificates and Credential references
+in MSP and organization workspaces. The Phase 4 summary has been corrected to
+keep those routes open. Assets, Documentation/Files, Networks and Contracts are
+implemented layouts with broader acceptance still open, so their ten routes
+remain in progress. Authentication reset and client-portal entry paths are also
+tracked even though their rendering is selected before the authenticated shell
+router.
+
+Phase 8 remains in progress. The next implementation slice is the connected
+Domains, Certificates and Credential references milestone, followed by focused
+acceptance of the ten in-progress routes, technician walkthroughs and the
+production/release gates. Version stays 0.8.46. Production deployment, external
+push and Wiki publication remain separate.

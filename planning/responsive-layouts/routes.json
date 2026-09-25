@@ -2,42 +2,70 @@
   {
     "route": "*",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/access-control",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/account-access-administration.md",
+      "frontend/src/auth/SecuritySettings.test.tsx",
+      "frontend/src/staff/StaffAdministration.test.tsx",
+      "frontend/src/access-control/AccessControl.test.tsx",
+      "frontend/e2e/account-access-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Direct section URLs; loading, populated, validation, denied, failure, confirmation, dirty-navigation and responsive states for account, staff and access administration."
   },
   {
     "route": "/accounting",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/activity",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-operations.md",
+      "frontend/src/operations/Reminders.test.tsx",
+      "frontend/src/operations/ActivityLog.test.tsx",
+      "frontend/e2e/shell-operations-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "URL-addressed search, filters, ordering and 25/50/100 paging; loading, empty, populated, long-content, failure/retry, dirty reminder creation and responsive event-stream states."
   },
   {
     "route": "/assets",
     "source": "frontend/src/App.tsx",
-    "status": "in progress",
+    "status": "in_progress",
     "evidence": [
       "planning/responsive-layouts/assets-layout.md",
       "frontend/e2e/asset-layout.spec.ts",
@@ -48,9 +76,30 @@
   {
     "route": "/auth/invitations/accept",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/authentication-and-client-portal.md",
+      "frontend/src/auth/AuthGate.test.tsx",
+      "frontend/e2e/invitation.spec.ts",
+      "frontend/e2e/mfa.spec.ts",
+      "frontend/e2e/password-reset.spec.ts",
+      "frontend/e2e/responsive.spec.ts"
+    ],
+    "states": "Invitation token loading, valid activation, validation failure, expired or missing token, successful authentication and responsive focused-form states."
+  },
+  {
+    "route": "/auth/reset-password",
+    "source": "frontend/src/auth/api.ts",
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/authentication-and-client-portal.md",
+      "frontend/src/auth/AuthGate.test.tsx",
+      "frontend/e2e/invitation.spec.ts",
+      "frontend/e2e/mfa.spec.ts",
+      "frontend/e2e/password-reset.spec.ts",
+      "frontend/e2e/responsive.spec.ts"
+    ],
+    "states": "Reset-link validation, missing or expired key, password validation, failed submission, successful completion and return-to-sign-in states."
   },
   {
     "route": "/certificates",
@@ -96,9 +145,15 @@
   {
     "route": "/deadlines",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-operations.md",
+      "frontend/src/operations/Reminders.test.tsx",
+      "frontend/src/operations/ActivityLog.test.tsx",
+      "frontend/e2e/shell-operations-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "URL-addressed search, filters, ordering and 25/50/100 paging; loading, empty, populated, long-content, failure/retry, dirty reminder creation and responsive event-stream states."
   },
   {
     "route": "/documentation",
@@ -130,9 +185,14 @@
   {
     "route": "/files",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "planning/responsive-layouts/document-workspace.md",
+      "planning/responsive-layouts/managed-files-and-pdf.md",
+      "frontend/src/files/Files.test.tsx",
+      "frontend/e2e/document-files.spec.ts"
+    ],
+    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open."
   },
   {
     "route": "/integrations",
@@ -162,9 +222,14 @@
   {
     "route": "/licenses",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/license-workspace.md",
+      "frontend/src/inventory/Licenses.test.tsx",
+      "frontend/e2e/licenses-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/networks",
@@ -214,9 +279,16 @@
   {
     "route": "/organizations",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/operational-records.md",
+      "frontend/src/organizations/Organizations.test.tsx",
+      "frontend/src/people/People.test.tsx",
+      "frontend/src/sites/Sites.test.tsx",
+      "frontend/e2e/operational-records.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection loading, empty, populated, search, filtering, stable ordering and paging; direct records, full responsive drawers, long values, failed writes, dirty dismissal, archive confirmation and unavailable records."
   },
   {
     "route": "/overview",
@@ -232,16 +304,40 @@
   {
     "route": "/people",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/operational-records.md",
+      "frontend/src/organizations/Organizations.test.tsx",
+      "frontend/src/people/People.test.tsx",
+      "frontend/src/sites/Sites.test.tsx",
+      "frontend/e2e/operational-records.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection loading, empty, populated, search, filtering, stable ordering and paging; direct records, full responsive drawers, long values, failed writes, dirty dismissal, archive confirmation and unavailable records."
+  },
+  {
+    "route": "/portal",
+    "source": "frontend/src/portal/ClientPortal.tsx",
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/authentication-and-client-portal.md",
+      "frontend/src/portal/ClientPortal.test.tsx",
+      "frontend/e2e/responsive.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "URL-addressed Documents and Invoices collections and details; bounded loading, empty, failure/retry, unavailable record, retained publication, download, notification and sign-out states."
   },
   {
     "route": "/products",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/product-workspace.md",
+      "frontend/src/catalog/Products.test.tsx",
+      "frontend/e2e/products-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/recycle-bin",
@@ -281,30 +377,56 @@
   {
     "route": "/settings",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/account-access-administration.md",
+      "frontend/src/auth/SecuritySettings.test.tsx",
+      "frontend/src/staff/StaffAdministration.test.tsx",
+      "frontend/src/access-control/AccessControl.test.tsx",
+      "frontend/e2e/account-access-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Direct section URLs; loading, populated, validation, denied, failure, confirmation, dirty-navigation and responsive states for account, staff and access administration."
   },
   {
     "route": "/sites",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/operational-records.md",
+      "frontend/src/organizations/Organizations.test.tsx",
+      "frontend/src/people/People.test.tsx",
+      "frontend/src/sites/Sites.test.tsx",
+      "frontend/e2e/operational-records.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection loading, empty, populated, search, filtering, stable ordering and paging; direct records, full responsive drawers, long values, failed writes, dirty dismissal, archive confirmation and unavailable records."
   },
   {
     "route": "/staff",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/account-access-administration.md",
+      "frontend/src/auth/SecuritySettings.test.tsx",
+      "frontend/src/staff/StaffAdministration.test.tsx",
+      "frontend/src/access-control/AccessControl.test.tsx",
+      "frontend/e2e/account-access-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Direct section URLs; loading, populated, validation, denied, failure, confirmation, dirty-navigation and responsive states for account, staff and access administration."
   },
   {
     "route": "/stock",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/stock-workspace.md",
+      "frontend/src/stock/Stock.test.tsx",
+      "frontend/e2e/stock.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/system-status",
@@ -338,42 +460,68 @@
   {
     "route": "/vendors",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/vendor-workspace.md",
+      "frontend/src/inventory/Vendors.test.tsx",
+      "frontend/e2e/vendors.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/workspaces/organizations/:organizationId",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/workspaces/organizations/:organizationId/*",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/workspaces/organizations/:organizationId/accounting",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-overlays-and-unavailable-workspaces.md",
+      "frontend/src/App.test.tsx",
+      "frontend/e2e/shell.spec.ts",
+      "frontend/e2e/workspace-switcher.spec.ts"
+    ],
+    "states": "Compatible default and legacy redirects; value-free unavailable routes; workspace loading, denial, retry, browser navigation, keyboard focus and responsive shell behavior."
   },
   {
     "route": "/workspaces/organizations/:organizationId/activity",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-operations.md",
+      "frontend/src/operations/Reminders.test.tsx",
+      "frontend/src/operations/ActivityLog.test.tsx",
+      "frontend/e2e/shell-operations-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "URL-addressed search, filters, ordering and 25/50/100 paging; loading, empty, populated, long-content, failure/retry, dirty reminder creation and responsive event-stream states."
   },
   {
     "route": "/workspaces/organizations/:organizationId/assets",
     "source": "frontend/src/App.tsx",
-    "status": "in progress",
+    "status": "in_progress",
     "evidence": [
       "planning/responsive-layouts/assets-layout.md",
       "frontend/e2e/asset-layout.spec.ts",
@@ -425,9 +573,15 @@
   {
     "route": "/workspaces/organizations/:organizationId/deadlines",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/shell-operations.md",
+      "frontend/src/operations/Reminders.test.tsx",
+      "frontend/src/operations/ActivityLog.test.tsx",
+      "frontend/e2e/shell-operations-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "URL-addressed search, filters, ordering and 25/50/100 paging; loading, empty, populated, long-content, failure/retry, dirty reminder creation and responsive event-stream states."
   },
   {
     "route": "/workspaces/organizations/:organizationId/documentation",
@@ -459,9 +613,14 @@
   {
     "route": "/workspaces/organizations/:organizationId/files",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "in_progress",
+    "evidence": [
+      "planning/responsive-layouts/document-workspace.md",
+      "planning/responsive-layouts/managed-files-and-pdf.md",
+      "frontend/src/files/Files.test.tsx",
+      "frontend/e2e/document-files.spec.ts"
+    ],
+    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/integrations",
@@ -491,9 +650,14 @@
   {
     "route": "/workspaces/organizations/:organizationId/licenses",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/license-workspace.md",
+      "frontend/src/inventory/Licenses.test.tsx",
+      "frontend/e2e/licenses-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/workspaces/organizations/:organizationId/networks",
@@ -540,16 +704,28 @@
   {
     "route": "/workspaces/organizations/:organizationId/people",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/operational-records.md",
+      "frontend/src/organizations/Organizations.test.tsx",
+      "frontend/src/people/People.test.tsx",
+      "frontend/src/sites/Sites.test.tsx",
+      "frontend/e2e/operational-records.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection loading, empty, populated, search, filtering, stable ordering and paging; direct records, full responsive drawers, long values, failed writes, dirty dismissal, archive confirmation and unavailable records."
   },
   {
     "route": "/workspaces/organizations/:organizationId/products",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/product-workspace.md",
+      "frontend/src/catalog/Products.test.tsx",
+      "frontend/e2e/products-layout.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   },
   {
     "route": "/workspaces/organizations/:organizationId/recycle_bin",
@@ -589,15 +765,27 @@
   {
     "route": "/workspaces/organizations/:organizationId/sites",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/operational-records.md",
+      "frontend/src/organizations/Organizations.test.tsx",
+      "frontend/src/people/People.test.tsx",
+      "frontend/src/sites/Sites.test.tsx",
+      "frontend/e2e/operational-records.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection loading, empty, populated, search, filtering, stable ordering and paging; direct records, full responsive drawers, long values, failed writes, dirty dismissal, archive confirmation and unavailable records."
   },
   {
     "route": "/workspaces/organizations/:organizationId/vendors",
     "source": "frontend/src/App.tsx",
-    "status": "pending",
-    "evidence": [],
-    "states": "All applicable states in acceptance.json; applicability must be recorded during migration."
+    "status": "complete",
+    "evidence": [
+      "planning/responsive-layouts/vendor-workspace.md",
+      "frontend/src/inventory/Vendors.test.tsx",
+      "frontend/e2e/vendors.spec.ts",
+      "frontend/e2e/live-workspace.spec.ts"
+    ],
+    "states": "Bounded collection and direct-record loading; URL search, filters, stable ordering, paging and record selection; responsive drawer, long-content, unavailable, failed write, dirty edit and confirmation states."
   }
 ]

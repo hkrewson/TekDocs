@@ -1,6 +1,6 @@
 import { ApplicationRouter } from './navigation/ApplicationRouter'
 import { useNavigationGuard } from './navigation/navigationGuard'
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import {
@@ -71,7 +71,6 @@ import { browserStaffAdministrationClient } from './staff/api'
 import type { StaffAdministrationClient } from './staff/api'
 import { browserNotificationDeliveryAdminClient, browserNotificationsClient } from './notifications/api'
 import type { NotificationsClient, NotificationTarget } from './notifications/api'
-import { NotificationInbox } from './notifications/NotificationInbox'
 import { browserPeopleClient } from './people/api'
 import type { PeopleClient } from './people/api'
 import { browserRelationshipsClient } from './relationships/api'
@@ -90,6 +89,9 @@ import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/n
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
+import { ShellOverlayProvider } from './shell/ShellOverlayProvider'
+import { trapOverlayFocus } from './shell/focusTrap'
+import { useShellOverlay } from './shell/useShellOverlay'
 const Overview = lazy(() => import('./workspaces/Overview'))
 
 const Assets = lazy(async () => ({ default: (await import('./inventory/Assets')).Assets }))
@@ -100,6 +102,7 @@ const CustomFields = lazy(async () => ({ default: (await import('./custom-fields
 const Taxonomies = lazy(async () => ({ default: (await import('./taxonomies/Taxonomies')).Taxonomies }))
 const Documentation = lazy(async () => ({ default: (await import('./documentation/Documentation')).Documentation }))
 const NotificationDeliveryAdmin = lazy(async () => ({ default: (await import('./notifications/NotificationDeliveryAdmin')).NotificationDeliveryAdmin }))
+const NotificationInbox = lazy(async () => ({ default: (await import('./notifications/NotificationInbox')).NotificationInbox }))
 const Organizations = lazy(async () => ({ default: (await import('./organizations/Organizations')).Organizations }))
 const People = lazy(async () => ({ default: (await import('./people/People')).People }))
 const Products = lazy(async () => ({ default: (await import('./catalog/Products')).Products }))
@@ -250,11 +253,12 @@ function NavSection({ id, items, label, collapsed, sectionCollapsed, onToggle, o
   )
 }
 
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDismiss, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
   onMobileClose: () => void
+  onMobileDismiss: () => void
   tenant: AuthenticatedContext['tenant']
   workspace: WorkspaceContext | null
   activeArea: WorkspaceArea
@@ -263,6 +267,8 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
   organizationRoute: boolean
   canManageInvoiceSettings: boolean
 }) {
+  const sidebarRef = useRef<HTMLElement>(null)
+  const closeRef = useRef<HTMLButtonElement>(null)
   const activeGroup = workspaceCapabilities.includes(activeArea as WorkspaceCapability)
     ? capabilityRegistry[activeArea as WorkspaceCapability].group
     : null
@@ -292,6 +298,21 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
     }
   }, [navigationState.collapsedSections])
 
+  useEffect(() => {
+    if (!mobileOpen) return
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeRef.current?.focus()
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onMobileDismiss()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = overflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [mobileOpen, onMobileDismiss])
+
   function sectionIsCollapsed(id: CapabilityGroup, state = navigationState): boolean {
     const mustRevealActive = id === activeGroup && (
       state.acknowledgedArea !== activeArea
@@ -315,13 +336,13 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
 
   return (
     <>
-      <aside className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
+      <aside ref={sidebarRef} className={`sidebar${collapsed ? ' collapsed' : ''}${mobileOpen ? ' mobile-open' : ''}`} onKeyDown={(event) => { if (mobileOpen) trapOverlayFocus(event, sidebarRef) }}>
         <div className="sidebar-topline">
           <Brand collapsed={collapsed} />
           <button className="icon-button desktop-collapse" onClick={onCollapse} aria-label={collapsed ? translate('navigation.expand') : translate('navigation.collapse')}>
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
-          <button className="icon-button mobile-close" onClick={onMobileClose} aria-label={translate('navigation.close')}><X size={19} /></button>
+          <button ref={closeRef} className="icon-button mobile-close" onClick={onMobileDismiss} aria-label={translate('navigation.close')}><X size={19} /></button>
         </div>
 
         <WorkspaceSwitcher tenant={tenant} activeWorkspace={workspace} activeArea={activeArea} client={workspaceClient} collapsed={collapsed} workspaceLoading={workspaceLoading} onNavigate={onMobileClose} />
@@ -337,7 +358,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, tenant, wor
             ))}
         </div>
       </aside>
-      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileClose} aria-label={translate('navigation.close')} />}
+      {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileDismiss} aria-label={translate('navigation.close')} />}
     </>
   )
 }
@@ -354,15 +375,20 @@ function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotificat
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const overlay = useShellOverlay('profile-menu')
 
   useEffect(() => {
     if (!open) return
     const close = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false)
+      if (!ref.current?.contains(event.target as Node)) {
+        setOpen(false)
+        overlay.release()
+      }
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setOpen(false)
+        overlay.release()
         triggerRef.current?.focus()
       }
     }
@@ -372,23 +398,33 @@ function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotificat
       document.removeEventListener('mousedown', close)
       document.removeEventListener('keydown', escape)
     }
-  }, [open])
+  }, [open, overlay])
+
+  function closeMenu() {
+    setOpen(false)
+    overlay.release()
+  }
+
+  function toggleMenu() {
+    if (open) { closeMenu(); return }
+    if (overlay.activate()) setOpen(true)
+  }
 
   return (
     <div className="profile-menu" ref={ref}>
-      <button ref={triggerRef} className="profile-trigger" onClick={() => setOpen((value) => !value)} aria-haspopup="menu" aria-expanded={open} aria-label={translate('shell.accountMenu', { name: user.display_name })}>
+      <button ref={triggerRef} className="profile-trigger" onClick={toggleMenu} aria-haspopup="menu" aria-expanded={open} aria-label={translate('shell.accountMenu', { name: user.display_name })} disabled={overlay.blocked}>
         <CircleUserRound size={22} />
         <span className="profile-copy"><strong>{user.display_name}</strong><span>{user.email}</span></span>
         <ChevronDown size={15} />
       </button>
       {open && (
         <div className="profile-popover" role="menu">
-          <AppLink to="/settings" role="menuitem" onClick={() => setOpen(false)}><Settings size={17} />{translate('shell.settings')}</AppLink>
-          {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={() => setOpen(false)}><UserPlus size={17} />{translate('shell.staff')}</AppLink>}
-          {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={() => setOpen(false)}><ShieldCheck size={17} />{translate('shell.accessControl')}</AppLink>}
-          {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={() => setOpen(false)}><Activity size={17} />{translate('shell.emailDelivery')}</AppLink>}
-          {canViewSystemStatus && <AppLink to="/system-status" role="menuitem" onClick={() => setOpen(false)}><ServerCog size={17} />{translate('shell.systemStatus')}</AppLink>}
-          <button type="button" role="menuitem" disabled={signingOut} onClick={() => { setOpen(false); void onSignOut() }}><LogOut size={17} />{signingOut ? translate('shell.signingOut') : translate('shell.signOut')}</button>
+          <AppLink to="/settings" role="menuitem" onClick={closeMenu}><Settings size={17} />{translate('shell.settings')}</AppLink>
+          {canManageStaff && <AppLink to="/staff" role="menuitem" onClick={closeMenu}><UserPlus size={17} />{translate('shell.staff')}</AppLink>}
+          {canManageAccess && <AppLink to="/access-control" role="menuitem" onClick={closeMenu}><ShieldCheck size={17} />{translate('shell.accessControl')}</AppLink>}
+          {canManageNotifications && <AppLink to="/notification-delivery" role="menuitem" onClick={closeMenu}><Activity size={17} />{translate('shell.emailDelivery')}</AppLink>}
+          {canViewSystemStatus && <AppLink to="/system-status" role="menuitem" onClick={closeMenu}><ServerCog size={17} />{translate('shell.systemStatus')}</AppLink>}
+          <button type="button" role="menuitem" disabled={signingOut} onClick={() => { closeMenu(); void onSignOut() }}><LogOut size={17} />{signingOut ? translate('shell.signingOut') : translate('shell.signOut')}</button>
         </div>
       )}
     </div>
@@ -411,13 +447,13 @@ type OrganizationWorkspaceState =
   | { phase: 'error'; organizationId: string; message: string }
 
 function workspaceErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'The workspace could not be loaded.'
+  return error instanceof Error ? error.message : translate('navigation.workspaceLoadFailed')
 }
 
-function OrganizationWorkspaceRoute({ state, relationshipsClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient }) {
+function OrganizationWorkspaceRoute({ state, relationshipsClient, onRetry }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient; onRetry: () => void }) {
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingOrganizationWorkspace')}</section>
   if (state.phase === 'error') {
-    return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.workspaceUnavailable')}</h1><p>{state.message}</p><Link className="secondary-button" to="/organizations">{translate('navigation.returnToOrganizations')}</Link></section>
+    return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.workspaceUnavailable')}</h1><p>{state.message}</p><div className="form-actions"><button className="primary-button" type="button" onClick={onRetry}>{translate('common.retry')}</button><Link className="secondary-button" to="/organizations">{translate('navigation.returnToOrganizations')}</Link></div></section>
   }
   return <WorkspaceOverview workspace={state.workspace} relationshipsClient={relationshipsClient} />
 }
@@ -426,10 +462,10 @@ const organizationWorkspaceAreas = workspaceCapabilities.filter((area) =>
   area !== 'overview' && capabilityRegistry[area].scopes.some((scope) => scope === 'organization'),
 )
 
-function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient?: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null }) {
-  if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
+function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customFieldsClient, relationshipsClient, recycleBinClient, documentsClient, workspaceClient, credentialReferencesClient, catalogClient, inventoryClient, webhooksClient, complianceClient, domainsClient, networksClient, initialDocumentId, onRetry }: { state: OrganizationWorkspaceState | { phase: 'loading' }; area: WorkspaceCapability; peopleClient: PeopleClient; sitesClient: SitesClient; customFieldsClient: CustomFieldsClient; relationshipsClient: RelationshipsClient; recycleBinClient: RecycleBinClient; documentsClient?: DocumentsClient; workspaceClient: WorkspaceClient; credentialReferencesClient: CredentialReferencesClient; catalogClient: CatalogClient; inventoryClient: InventoryClient; webhooksClient: WebhooksClient; complianceClient: ComplianceClient; domainsClient: DomainsClient; networksClient?: NetworksClient; initialDocumentId?: string | null; onRetry: () => void }) {
+  if (area === 'overview') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} onRetry={onRetry} />
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingOrganizationWorkspace')}</section>
-  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
+  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} onRetry={onRetry} />
   if (!state.workspace.capabilities.includes(area) || !organizationWorkspaceAreas.includes(area)) {
     return <section className="content-section workspace-error" role="alert"><h1>{translate('navigation.areaUnavailable')}</h1><p>{translate('navigation.areaUnavailableHelp')}</p><Link className="secondary-button" to={organizationWorkspacePath(state.workspace, 'overview')}>{translate('navigation.returnToOverview')}</Link></section>
   }
@@ -456,9 +492,9 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   return <UnavailablePage organizationOverview={organizationWorkspacePath(state.workspace, 'overview')} />
 }
 
-function OrganizationSearchRoute({ state, relationshipsClient, searchClient }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient; searchClient: WorkspaceSearchClient }) {
+function OrganizationSearchRoute({ state, relationshipsClient, searchClient, onRetry }: { state: OrganizationWorkspaceState | { phase: 'loading' }; relationshipsClient: RelationshipsClient; searchClient: WorkspaceSearchClient; onRetry: () => void }) {
   if (state.phase === 'loading' || state.phase === 'idle') return <section className="content-section" role="status">{translate('shell.loadingWorkspaceSearch')}</section>
-  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} />
+  if (state.phase === 'error') return <OrganizationWorkspaceRoute state={state} relationshipsClient={relationshipsClient} onRetry={onRetry} />
   return <SearchResults workspace={state.workspace} client={searchClient} />
 }
 
@@ -492,10 +528,12 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   const [mobileOpen, setMobileOpen] = useState(false)
   const [shellContext, setShellContext] = useState(authContext)
   const [organizationWorkspace, setOrganizationWorkspace] = useState<OrganizationWorkspaceState>({ phase: 'idle' })
+  const [workspaceRevision, setWorkspaceRevision] = useState(0)
   const location = useLocation()
   const [searchDraft, setSearchDraft] = useState(() => new URLSearchParams(location.search).get('q') ?? '')
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
+  const mobileMenuRef = useRef<HTMLButtonElement>(null)
   const previousPathname = useRef(location.pathname)
   const organizationMatch = useMatch('/workspaces/organizations/:organizationId/*')
   const organizationId = organizationMatch?.params.organizationId
@@ -507,7 +545,21 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
       .then((workspace) => { if (!controller.signal.aborted) setOrganizationWorkspace({ phase: 'ready', organizationId, workspace }) })
       .catch((error: unknown) => { if (!controller.signal.aborted) setOrganizationWorkspace({ phase: 'error', organizationId, message: workspaceErrorMessage(error) }) })
     return () => controller.abort()
-  }, [organizationId, workspaceClient])
+  }, [organizationId, workspaceClient, workspaceRevision])
+
+  const closeMobileNavigation = useCallback(() => {
+    setMobileOpen(false)
+  }, [])
+
+  const dismissMobileNavigation = useCallback(() => {
+    closeMobileNavigation()
+    window.setTimeout(() => mobileMenuRef.current?.focus(), 0)
+  }, [closeMobileNavigation])
+
+  function retryOrganizationWorkspace() {
+    setOrganizationWorkspace({ phase: 'idle' })
+    setWorkspaceRevision((value) => value + 1)
+  }
 
   const visibleWorkspaceState = !organizationId
     ? { phase: 'idle' as const }
@@ -559,13 +611,13 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">{translate('shell.skip')}</a>
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={() => setMobileOpen(false)} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={closeMobileNavigation} onMobileDismiss={dismissMobileNavigation} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
-          <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={translate('navigation.open')}><Menu size={20} /></button>
+          <button ref={mobileMenuRef} className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={translate('navigation.open')}><Menu size={20} /></button>
           <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
-          <NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} />
+          <Suspense fallback={<span className="notification-menu" aria-hidden="true"><button className="notification-trigger" type="button" disabled tabIndex={-1} /></span>}><NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} /></Suspense>
           <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} canViewSystemStatus={shellContext.permissions?.includes('system_diagnostics.view') ?? false} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
@@ -605,9 +657,9 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/domains" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDomains')}</section>}><Domains workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/certificates" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingCertificates')}</section>}><Certificates workspace={null} client={domainsClient} /></Suspense>} />
             <Route path="/workspaces/organizations/:organizationId" element={<Navigate to="overview" replace />} />
-            <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} />} />
-            <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} searchClient={searchClient} />} />
-            {organizationWorkspaceAreas.map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} />} />)}
+            <Route path="/workspaces/organizations/:organizationId/overview" element={<OrganizationWorkspaceRoute state={visibleWorkspaceState} relationshipsClient={relationshipsClient} onRetry={retryOrganizationWorkspace} />} />
+            <Route path="/workspaces/organizations/:organizationId/search" element={<OrganizationSearchRoute key={location.search} state={visibleWorkspaceState} relationshipsClient={relationshipsClient} searchClient={searchClient} onRetry={retryOrganizationWorkspace} />} />
+            {organizationWorkspaceAreas.map((area) => <Route key={area} path={`/workspaces/organizations/:organizationId/${area}`} element={<OrganizationAreaRoute state={visibleWorkspaceState} area={area} peopleClient={peopleClient} sitesClient={sitesClient} customFieldsClient={customFieldsClient} relationshipsClient={relationshipsClient} recycleBinClient={recycleBinClient} documentsClient={documentsClient} workspaceClient={workspaceClient} credentialReferencesClient={credentialReferencesClient} catalogClient={catalogClient} inventoryClient={inventoryClient} webhooksClient={webhooksClient} complianceClient={complianceClient} domainsClient={domainsClient} networksClient={networksClient} initialDocumentId={requestedDocumentId} onRetry={retryOrganizationWorkspace} />} />)}
             <Route path="/workspaces/organizations/:organizationId/accounting" element={<Navigate to={`/workspaces/organizations/${organizationId}/invoices`} replace />} />
             <Route path="/workspaces/organizations/:organizationId/*" element={<UnavailablePage organizationOverview={`/workspaces/organizations/${organizationId}/overview`} />} />
             <Route path="*" element={<UnavailablePage />} />
@@ -677,5 +729,5 @@ export function App({ initialPath, authClient = browserAuthClient, accessControl
       )}
     </AuthGate>
   )
-  return <ApplicationRouter initialPath={initialPath}>{application}</ApplicationRouter>
+  return <ApplicationRouter initialPath={initialPath}><ShellOverlayProvider>{application}</ShellOverlayProvider></ApplicationRouter>
 }

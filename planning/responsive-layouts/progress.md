@@ -2721,3 +2721,31 @@ Phase 7 remains in progress only for cross-cutting shell overlays and unavailabl
 workspace handling. Technician walkthrough and production-image/release gates
 remain Phase 8 work. Version stays 0.8.46. Production deployment, external push
 and Wiki publication remain separate.
+
+## Phase 7 Shell overlays and unavailable workspaces checkpoint — 2026-09-24
+
+The workspace selector, contextual help, notification inbox and account menu now
+share one overlay coordinator, preventing stacked shell panels. Open dialogs keep
+keyboard focus inside their visible controls and restore focus when dismissed.
+The small-screen navigation now locks background scrolling and restores its menu
+trigger after close, backdrop or Escape dismissal while preserving destination
+focus after navigation.
+
+The workspace selector's remaining interface copy is localized. A workspace that
+cannot be loaded now offers one explicit in-place Retry action, keeps its direct
+URL and returns through the normal loading state without an uncertain automatic
+retry. The notification inbox is loaded on demand so the added shell behavior
+does not expand the initial application bundle. See
+[shell-overlays-and-unavailable-workspaces.md](shell-overlays-and-unavailable-workspaces.md).
+
+Focused component coverage passes 38 shell, help, notification, workspace and
+localization scenarios. The new browser journeys pass six Chromium, Firefox and
+WebKit cases for overlay coordination, focus containment and workspace retry,
+plus two mobile Chromium/WebKit cases for scroll locking, Escape and close focus
+restoration. The local Docker frontend at `http://localhost:3200` is healthy at
+version 0.8.46. The production bundle remains within its existing compressed
+budgets (shell 129242 <= 131072; shell style 24040 <= 24576).
+
+This completes Phase 7 implementation. Technician walkthroughs, production-image
+checks and release acceptance remain Phase 8 work. Version stays 0.8.46.
+Production deployment, external push and Wiki publication remain separate.

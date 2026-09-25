@@ -1,6 +1,8 @@
 import { Bell, Check, Mail, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { formatDateTime, formatHour, runtimeTimeZone, translate } from '../i18n/localization'
+import { trapOverlayFocus } from '../shell/focusTrap'
+import { useShellOverlay } from '../shell/useShellOverlay'
 
 import type { InboxNotification, NotificationPreferences, NotificationsClient, NotificationTarget } from './api'
 
@@ -39,6 +41,8 @@ export function NotificationInbox({ client, onOpen }: {
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const overlay = useShellOverlay('notifications')
   const preferencesDirty = preferencesPhase === 'ready' && JSON.stringify(preferences) !== JSON.stringify(savedPreferences)
 
   async function load(cursor?: string) {
@@ -101,8 +105,9 @@ export function NotificationInbox({ client, onOpen }: {
       return
     }
     setOpen(false)
+    overlay.release()
     triggerRef.current?.focus()
-  }, [savedPreferences])
+  }, [overlay, savedPreferences])
 
   const requestDeparture = useCallback((target: 'close' | 'inbox') => {
     if (preferencesDirty || savingPreferences) setDiscardTarget(target)
@@ -135,6 +140,7 @@ export function NotificationInbox({ client, onOpen }: {
       requestDeparture('close')
       return
     }
+    if (!overlay.activate()) return
     setOpen(true)
     setView('inbox')
     void load()
@@ -155,17 +161,18 @@ export function NotificationInbox({ client, onOpen }: {
     if (!notification.read) await setRead(notification, true)
     if (notification.target) {
       setOpen(false)
+      overlay.release()
       await onOpen(notification.target)
     }
   }
 
   return (
     <div className="notification-menu" ref={ref}>
-      <button ref={triggerRef} className="notification-trigger" type="button" aria-label={unreadCount ? translate('notifications.triggerUnread', { count: unreadCount }) : translate('notifications.trigger')} aria-controls="notification-popover" aria-expanded={open} onClick={toggleOpen}>
+      <button ref={triggerRef} className="notification-trigger" type="button" aria-label={unreadCount ? translate('notifications.triggerUnread', { count: unreadCount }) : translate('notifications.trigger')} aria-controls="notification-popover" aria-expanded={open} disabled={overlay.blocked} onClick={toggleOpen}>
         <Bell size={19} aria-hidden="true" />
         {unreadCount > 0 && <span className="notification-count" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>}
       </button>
-      {open && <section id="notification-popover" className="notification-popover" role="dialog" aria-modal="true" aria-labelledby="notification-popover-heading" aria-busy={phase === 'loading' || loadingMore}>
+      {open && <section ref={dialogRef} id="notification-popover" className="notification-popover" role="dialog" aria-modal="true" aria-labelledby="notification-popover-heading" aria-busy={phase === 'loading' || loadingMore} onKeyDown={(event) => trapOverlayFocus(event, dialogRef)}>
         <header><h2 id="notification-popover-heading" ref={headingRef} tabIndex={-1}>{view === 'inbox' ? translate('notifications.heading') : translate('notifications.emailPreferences')}</h2>{view === 'inbox' && phase === 'ready' && <span>{translate('notifications.unread', { count: unreadCount })}</span>}<button className="icon-button notification-close" type="button" aria-label={translate('notifications.close')} onClick={() => requestDeparture('close')}><X size={18} aria-hidden="true" /></button></header>
         <div className="notification-popover-body">
           {view === 'inbox' && <>

@@ -27,7 +27,6 @@ const PENDING_PARAMETERISED_LABELS: Record<string, number> = {
   'src/documentation/Documentation.tsx': 3,
   'src/networks/NetworkAddressing.tsx': 1,
   'src/networks/NetworkEndpoints.tsx': 1,
-  'src/workspaces/WorkspaceSwitcher.tsx': 1,
 }
 
 const sources = Object.entries(

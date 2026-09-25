@@ -35,3 +35,16 @@ it('closes from the explicit small-screen action', async () => {
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Help for Documentation' })).toHaveFocus()
 })
+
+it('keeps keyboard focus inside the open help dialog', async () => {
+  const user = userEvent.setup()
+  render(<ContextualHelp pathname="/documentation" />)
+
+  await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
+  const close = screen.getByRole('button', { name: 'Close help' })
+  close.focus()
+  await user.keyboard('{Tab}')
+  expect(close).toHaveFocus()
+  await user.keyboard('{Shift>}{Tab}{/Shift}')
+  expect(close).toHaveFocus()
+})

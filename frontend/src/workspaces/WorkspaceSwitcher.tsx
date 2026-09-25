@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Building2, Check, ChevronDown, CornerLeftUp, Search } from 'lucide-react'
 import { useNavigate } from 'react-router'
+import { translate } from '../i18n/localization'
+import { trapOverlayFocus } from '../shell/focusTrap'
+import { useShellOverlay } from '../shell/useShellOverlay'
 import type { WorkspaceClient, WorkspaceContext, WorkspaceOption } from './api'
 import { classificationSummary, mspWorkspacePath, organizationWorkspacePath } from './navigation'
 import type { WorkspaceArea } from './navigation'
@@ -37,22 +40,27 @@ export function WorkspaceSwitcher({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const firstOptionRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const requestRef = useRef(0)
+  const overlay = useShellOverlay('workspace-switcher')
   const navigate = useNavigate()
   const workspaceName = activeWorkspace?.name ?? tenant.name
-  const workspaceLabel = activeWorkspace ? `${classificationSummary(activeWorkspace.classifications)} workspace` : 'MSP workspace'
+  const workspaceLabel = activeWorkspace ? translate('workspaceSwitcher.classifiedWorkspace', { classification: classificationSummary(activeWorkspace.classifications) }) : translate('workspaceSwitcher.mspWorkspace')
   const searchClassification = activeWorkspace?.classifications.includes('client') ? 'client' : undefined
-  const searchLabel = searchClassification ? 'Find a client' : 'Find an organization'
+  const searchLabel = searchClassification ? translate('workspaceSwitcher.findClient') : translate('workspaceSwitcher.findOrganization')
 
   useEffect(() => {
     if (!open) return
     searchRef.current?.focus()
     const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+        overlay.release()
+      }
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
-  }, [open])
+  }, [open, overlay])
 
   useEffect(() => {
     if (!open) return
@@ -97,6 +105,7 @@ export function WorkspaceSwitcher({
 
   function closeAndRestoreFocus() {
     setOpen(false)
+    overlay.release()
     window.setTimeout(() => triggerRef.current?.focus(), 0)
   }
 
@@ -109,12 +118,14 @@ export function WorkspaceSwitcher({
 
   function selectMsp() {
     setOpen(false)
+    overlay.release()
     onNavigate()
     void navigate(mspWorkspacePath(activeArea))
   }
 
   function selectOrganization(workspace: WorkspaceOption) {
     setOpen(false)
+    overlay.release()
     onNavigate()
     void navigate(organizationWorkspacePath(workspace, activeArea))
   }
@@ -126,17 +137,22 @@ export function WorkspaceSwitcher({
         className="tenant-switcher"
         type="button"
         title={collapsed ? workspaceName : undefined}
-        aria-label={`Switch workspace. Current workspace: ${workspaceName}. ${workspaceLabel}`}
+        aria-label={translate('workspaceSwitcher.triggerLabel', { name: workspaceName, type: workspaceLabel })}
         aria-expanded={open}
         aria-haspopup="dialog"
-        disabled={workspaceLoading}
-        onClick={() => setOpen((value) => { if (!value) beginSearch(); return !value })}
+        disabled={workspaceLoading || overlay.blocked}
+        onClick={() => {
+          if (open) { closeAndRestoreFocus(); return }
+          if (!overlay.activate()) return
+          beginSearch()
+          setOpen(true)
+        }}
       >
         <span className="tenant-initials">{initials(workspaceName)}</span>
-        {!collapsed && <><span className="tenant-copy"><strong>{workspaceLoading ? 'Loading workspace…' : workspaceName}</strong><span>{workspaceLabel}</span></span><ChevronDown size={15} /></>}
+        {!collapsed && <><span className="tenant-copy"><strong>{workspaceLoading ? translate('workspaceSwitcher.loadingWorkspace') : workspaceName}</strong><span>{workspaceLabel}</span></span><ChevronDown size={15} /></>}
       </button>
       {open && (
-        <div className="workspace-switcher-popover" role="dialog" aria-label="Switch workspace">
+        <div ref={dialogRef} className="workspace-switcher-popover" role="dialog" aria-label={translate('workspaceSwitcher.dialogLabel')} onKeyDown={(event) => trapOverlayFocus(event, dialogRef)}>
           <label className="workspace-switcher-search">
             <Search size={15} aria-hidden="true" />
             <span className="sr-only">{searchLabel}</span>
@@ -150,23 +166,23 @@ export function WorkspaceSwitcher({
             />
           </label>
           <div className="workspace-options" aria-live="polite">
-            <button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={activeWorkspace ? `Back to ${tenant.name}. MSP workspace` : `${tenant.name}. MSP workspace`} aria-current={activeWorkspace ? undefined : 'true'}>
+            <button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={activeWorkspace ? translate('workspaceSwitcher.backToMspLabel', { name: tenant.name }) : translate('workspaceSwitcher.mspLabel', { name: tenant.name })} aria-current={activeWorkspace ? undefined : 'true'}>
               {activeWorkspace ? <CornerLeftUp size={17} aria-hidden="true" /> : <Building2 size={17} aria-hidden="true" />}
-              <span><strong>{activeWorkspace ? `Back to ${tenant.name}` : tenant.name}</strong><span>MSP workspace</span></span>
-              {!activeWorkspace && <Check size={15} aria-label="Current workspace" />}
+              <span><strong>{activeWorkspace ? translate('workspaceSwitcher.backToMsp', { name: tenant.name }) : tenant.name}</strong><span>{translate('workspaceSwitcher.mspWorkspace')}</span></span>
+              {!activeWorkspace && <Check size={15} aria-label={translate('workspaceSwitcher.current')} />}
             </button>
             <div className="workspace-option-divider" />
-            {phase === 'loading' && <p className="workspace-switcher-state">Searching…</p>}
-            {phase === 'error' && <p className="workspace-switcher-state" role="alert">Workspaces could not be loaded.</p>}
-            {phase === 'ready' && results.length === 0 && <p className="workspace-switcher-state">{searchClassification ? 'No matching clients.' : 'No matching organizations.'}</p>}
+            {phase === 'loading' && <p className="workspace-switcher-state">{translate('workspaceSwitcher.searching')}</p>}
+            {phase === 'error' && <p className="workspace-switcher-state" role="alert">{translate('workspaceSwitcher.loadFailed')}</p>}
+            {phase === 'ready' && results.length === 0 && <p className="workspace-switcher-state">{searchClassification ? translate('workspaceSwitcher.noClients') : translate('workspaceSwitcher.noOrganizations')}</p>}
             {results.map((workspace) => (
               <button key={workspace.id} type="button" className="workspace-option" onClick={() => selectOrganization(workspace)} aria-label={`${workspace.name}. ${classificationSummary(workspace.classifications)}`} aria-current={workspace.id === activeWorkspace?.id ? 'true' : undefined}>
                 <span className="workspace-option-initials" aria-hidden="true">{initials(workspace.name)}</span>
                 <span><strong>{workspace.name}</strong><span>{classificationSummary(workspace.classifications)}</span></span>
-                {workspace.id === activeWorkspace?.id && <Check size={15} aria-label="Current workspace" />}
+                {workspace.id === activeWorkspace?.id && <Check size={15} aria-label={translate('workspaceSwitcher.current')} />}
               </button>
             ))}
-            {phase === 'ready' && hasMore && <button type="button" className="workspace-more" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? 'Loading more…' : 'Show more results'}</button>}
+            {phase === 'ready' && hasMore && <button type="button" className="workspace-more" disabled={loadingMore} onClick={() => void loadMore()}>{loadingMore ? translate('workspaceSwitcher.loadingMore') : translate('workspaceSwitcher.showMore')}</button>}
           </div>
         </div>
       )}

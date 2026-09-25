@@ -163,6 +163,38 @@ describe('application shell', () => {
     expect(screen.getByRole('button', { name: 'Help for Documentation' })).toHaveFocus()
   })
 
+  it('allows only one shell overlay at a time', async () => {
+    const user = userEvent.setup()
+    render(app('/overview'))
+    expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Help for Workspace overview' }))
+    expect(screen.getByRole('dialog', { name: 'Workspace overview help' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Account menu for Primary Owner/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Current workspace: Example MSP/ })).toBeDisabled()
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /Account menu for Primary Owner/ })).toBeEnabled()
+  })
+
+  it('retries an unavailable organization workspace in place', async () => {
+    const user = userEvent.setup()
+    const retryLoad = vi.fn()
+      .mockRejectedValueOnce(new Error('That workspace is temporarily unavailable.'))
+      .mockResolvedValueOnce({
+        kind: 'organization', id: '00000000-0000-4000-8000-000000000010', name: 'Acme Dental', classifications: ['client'], capabilities: ['overview'], organization: null,
+      })
+    const retryClient = { ...workspaceClient, loadOrganization: retryLoad } as WorkspaceClient
+    render(<App initialPath="/workspaces/organizations/00000000-0000-4000-8000-000000000010/overview" initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={retryClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />)
+
+    expect(await screen.findByRole('heading', { name: 'Workspace unavailable' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('button', { name: /Current workspace: Acme Dental/ })).toBeInTheDocument()
+    expect(retryLoad).toHaveBeenCalledTimes(2)
+  })
+
   it('renders MSP-owned assets instead of an aggregate placeholder', async () => {
     const list = vi.spyOn(browserAssetCollectionClient, 'list').mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false, can_manage: true, can_view_relationships: false, can_create_relationships: false, can_archive_relationships: false })
     vi.spyOn(browserCollectionPreferences, 'load').mockResolvedValue(defaultPreferences(assetColumns))

@@ -278,6 +278,26 @@ test('direct workspace links reload deterministically and denial stays value-fre
   await expect(page.getByText('Private Client Name')).not.toBeVisible()
 })
 
+test('an unavailable workspace can be retried without leaving its route', async ({ page }) => {
+  await mockWorkspaceApplication(page)
+  const retryId = crypto.randomUUID()
+  const retryWorkspace = { ...clientWorkspace, id: retryId, organization: { ...clientWorkspace.organization, id: retryId } }
+  let attempts = 0
+  await page.route(`**/api/v1/workspaces/organizations/${retryId}`, (route) => {
+    attempts += 1
+    return attempts === 1
+      ? route.fulfill({ status: 503, json: { detail: 'The workspace could not be loaded.' } })
+      : route.fulfill({ json: retryWorkspace })
+  })
+  await page.goto(`/workspaces/organizations/${retryId}/overview`)
+
+  await expect(page.getByRole('heading', { name: 'Workspace unavailable' })).toBeVisible()
+  await page.getByRole('button', { name: 'Retry' }).click()
+  await expect(page.getByRole('button', { name: /Current workspace: Acme Dental/ })).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${retryId}/overview$`))
+  expect(attempts).toBe(2)
+})
+
 test('mobile workspace switching remains operable', async ({ page }) => {
   await mockWorkspaceApplication(page)
   await page.setViewportSize({ width: 390, height: 844 })

@@ -58,6 +58,7 @@ Compose project and keeps the media volume owned by the restore project.
 ## Remaining boundary
 
 `acceptance.json` records all four groups as recovery `complete`; both listed
-backup and upgrade rehearsals have passed. Phase 8 still requires the human
-technician/assistive-technology record, final production-image and release gates,
-and release approval. Deployment remains separately authorized.
+backup and upgrade rehearsals have passed. The production-image rehearsal is
+recorded separately and also passes. Phase 8 still requires the human technician/
+assistive-technology record, final release gate, and release approval. Deployment
+remains separately authorized.

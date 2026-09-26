@@ -48,13 +48,20 @@ def string_list(value: Any, name: str) -> list[str]:
 def validate_acceptance(
     acceptance_path: Path = ACCEPTANCE,
     routes_path: Path = ROUTES,
-) -> tuple[int, int, int, int, int]:
+) -> tuple[int, int, int, int, int, int]:
     acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
     routes = json.loads(routes_path.read_text(encoding="utf-8"))
 
     require(acceptance.get("widths") == REQUIRED_WIDTHS, "acceptance widths must retain the required matrix")
     require(acceptance.get("zoom_percent") == REQUIRED_ZOOM, "acceptance zoom levels must retain 100 and 200 percent")
     require(acceptance.get("short_height") == 600, "acceptance short height must remain 600 pixels")
+
+    production_image = acceptance.get("production_image")
+    require(isinstance(production_image, dict), "production_image must be an object")
+    production_image_status = string_value(production_image.get("status"), "production_image.status")
+    require(production_image_status in {"pending", "complete"}, "production_image has invalid status")
+    repository_path(production_image.get("rehearsal"), "production_image.rehearsal")
+    repository_path(production_image.get("record"), "production_image.record")
 
     workspaces = acceptance.get("workspace_acceptance")
     require(isinstance(workspaces, list) and bool(workspaces), "workspace_acceptance must be a non-empty list")
@@ -115,16 +122,26 @@ def validate_acceptance(
     stale = sorted(covered_routes - in_progress_routes)
     require(not missing, f"in-progress routes are missing workspace acceptance: {', '.join(missing)}")
     require(not stale, f"workspace acceptance contains routes that are not in progress: {', '.join(stale)}")
-    return len(workspaces), automated_complete, backup_complete, recovery_complete, human_complete
+    return (
+        len(workspaces),
+        automated_complete,
+        backup_complete,
+        recovery_complete,
+        int(production_image_status == "complete"),
+        human_complete,
+    )
 
 
 def main() -> None:
-    workspaces, automated_complete, backup_complete, recovery_complete, human_complete = validate_acceptance()
+    workspaces, automated_complete, backup_complete, recovery_complete, production_complete, human_complete = (
+        validate_acceptance()
+    )
     print(
         "Responsive acceptance ledger passed: "
         f"{workspaces} workspace groups, {automated_complete} automated complete, "
         f"{backup_complete} backup rehearsed, "
         f"{recovery_complete} upgrade rehearsed, "
+        f"{production_complete} production image rehearsed, "
         f"{human_complete} human reviewed."
     )
 

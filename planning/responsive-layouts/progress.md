@@ -2,6 +2,23 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 8 production-image acceptance checkpoint — 2026-09-25
+
+The isolated 0.8.46 production-target image rehearsal passes. The packaged frontend,
+backend, migration job, worker, scheduler, database, Valkey, mail service, ClamAV,
+and network-isolated diagram renderer all reached their production health boundary.
+The run verified current migrations, real malware scanning, SVG/PNG diagram export,
+non-root and read-only execution, dropped capabilities, PID limits, file readability,
+and renderer/browser version agreement.
+
+Production secrets remained file-backed and absent from container environments,
+image history, the generated environment file, and service logs. The rehearsal also
+confirmed service-specific secret visibility and rejection of ambiguous direct/file
+secret configuration. It ran in disposable volumes and did not use existing user or
+demo data. The enforced acceptance ledger now records this production-image gate as
+complete. The human technician/assistive-technology record and final release gate
+remain open; deployment remains separately authorized.
+
 ## Phase 8 responsive workspace upgrade checkpoint — 2026-09-25
 
 All four acceptance groups now pass their supported-source upgrade boundary into

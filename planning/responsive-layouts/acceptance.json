@@ -38,6 +38,11 @@
     "live-runtime"
   ],
   "default_status": "pending",
+  "production_image": {
+    "status": "complete",
+    "rehearsal": "tests/rehearsals/rehearse-production-image.sh",
+    "record": "planning/responsive-layouts/phase-8-production-image-acceptance.md"
+  },
   "workspace_acceptance": [
     {
       "id": "assets",

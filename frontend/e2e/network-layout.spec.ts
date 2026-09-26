@@ -33,6 +33,11 @@ async function fixtures(page: Page, denied = false) {
   return records
 }
 
+async function selectNetworkView(page: Page, view: string) {
+  if (page.viewportSize()!.width < 768) await page.getByRole('combobox', { name: 'Network views', exact: true }).selectOption(view.toLowerCase())
+  else await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: view, exact: true }).click()
+}
+
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   test(`Networks collection and full record fit ${width}px`, async ({ page }) => {
     const records = await fixtures(page)
@@ -374,7 +379,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await wirelessFixtures(page, false, true)
     await page.setViewportSize({ width, height: 600 })
     await page.goto('/networks')
-    await page.getByRole('navigation', { name: 'Network views' }).getByRole('link', { name: 'Wireless', exact: true }).click()
+    await selectNetworkView(page, 'Wireless')
     await expect(page.getByText('31 wireless networks', { exact: true })).toBeVisible()
     await page.getByRole('searchbox', { name: 'Search wireless networks' }).fill('Office 31')
     await page.locator('.collection-search').getByRole('button', { name: 'Search', exact: true }).click()

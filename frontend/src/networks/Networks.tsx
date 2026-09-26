@@ -34,6 +34,7 @@ type NetworksProps = { workspace: WorkspaceContext; client?: NetworksClient; pre
 export function Networks(props: NetworksProps) {
   const [params] = useSearchParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const wireless = params.get('view') === 'wireless'
   function href(view: string) {
     const next = new URLSearchParams(params)
@@ -41,8 +42,18 @@ export function Networks(props: NetworksProps) {
     if (view !== 'networks') next.set('view', view); else next.delete('view')
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }
+  const viewIds = ['networks', 'wireless', 'vlans', 'vrfs', 'racks', 'devices', 'dns', 'circuits', 'netbox'] as const
+  const requestedView = params.get('view')
+  const currentView = viewIds.includes(requestedView as typeof viewIds[number]) ? requestedView as typeof viewIds[number] : 'networks'
+  const views = viewIds.map((id) => ({ id, label: id === 'netbox' ? translate('netbox.nav') : id === 'networks' ? t('heading') : t(id), href: href(id) }))
   return <>
-    <nav aria-label={t('views')} className="collection-toolbar"><Link to={href('networks')} aria-current={!['wireless', 'vlans', 'vrfs', 'racks', 'devices', 'dns', 'circuits', 'netbox'].includes(params.get('view') ?? '') ? 'page' : undefined}>{t('heading')}</Link><Link to={href('wireless')} aria-current={wireless ? 'page' : undefined}>{t('wireless')}</Link>{(['vlans', 'vrfs', 'racks', 'devices', 'dns', 'circuits'] as const).map((kind) => <Link key={kind} to={href(kind)} aria-current={params.get('view') === kind ? 'page' : undefined}>{t(kind)}</Link>)}<Link to={href('netbox')} aria-current={params.get('view') === 'netbox' ? 'page' : undefined}>{translate('netbox.nav')}</Link></nav>
+    <nav aria-label={t('views')} className="record-sections network-views">
+      {views.map((view) => <Link key={view.id} to={view.href} aria-current={currentView === view.id ? 'page' : undefined}>{view.label}</Link>)}
+    </nav>
+    <label className="record-sections-mobile network-views-mobile">{t('views')}<select aria-label={t('views')} value={currentView} onChange={(event) => {
+      const target = views.find((view) => view.id === event.target.value)
+      if (target) void navigate(target.href, { state: location.state as unknown })
+    }}>{views.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}</select></label>
     {params.get('view') === 'netbox' ? <NetworkNetBox workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'circuits' ? <CircuitRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'dns' ? <DNSRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'devices' ? <DeviceRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} relationshipsClient={props.relationshipsClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'racks' ? <RackRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'vlans' || params.get('view') === 'vrfs' ? <AddressingRegister kind={params.get('view') as 'vlans' | 'vrfs'} workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
   </>
 }

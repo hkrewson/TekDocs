@@ -2,6 +2,27 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 3/8 combined Networks workspace acceptance checkpoint — 2026-09-25
+
+Networks, Wireless, VLANs, VRFs, Racks, Devices, DNS, Circuits, and NetBox now
+share one responsive workspace-view contract. Desktop keeps direct view links;
+below 768 CSS pixels, the former nine-link strip becomes one labeled selector
+while retaining direct URLs and browser navigation. This reduces phone-page
+height before the collection without removing access to any register.
+
+New combined acceptance traverses every view at all six required widths, a short
+viewport, and the CSS width produced by 200% browser zoom. It covers both MSP and
+organization entry points, accessibility, page overflow, direct URL state, and
+exact client API scoping. All 195 combined network layout cases pass in Chromium,
+Firefox, and WebKit: 168 existing detailed network/record cases and 27 new
+whole-workspace cases. Focused lint, typing, and component checks pass, and the
+local 0.8.46 frontend image has been refreshed. See
+[network-workspace-acceptance.md](network-workspace-acceptance.md).
+
+This completes automated combined route acceptance for Networks. Technician and
+assistive-technology walkthroughs plus final recovery/release approval remain
+open, so both Networks routes remain `in_progress`.
+
 ## Phase 3 NetBox identity register checkpoint — 2026-09-25
 
 Networks now mounts a bounded NetBox identity register in MSP and organization
@@ -109,14 +130,14 @@ The Assets summary collection and typed browser API client are implemented under
 |---|---|---|
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
-| 3 — Contracts/Networks | Implemented; acceptance open | Responsive Contracts and all planned Networks object registers are implemented; combined technician, assistive-technology, production and release acceptance remains |
+| 3 — Contracts/Networks | Implemented; automated route acceptance complete | Responsive Contracts and all planned Networks object registers are implemented; technician, assistive-technology and final release acceptance remain |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
-| 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
+| 5 — Documentation/files | Implemented; acceptance open | Library, reader/editor, templates, blocks, review, publication, export, managed-file and standalone file-register workflows are implemented; combined technician acceptance remains |
 | 6 — Financial/compliance/integrations | Implemented; acceptance open | Invoice, compliance/data-flow and integration workspaces complete; technician acceptance remains |
-| 7 — Shell/remaining surfaces | Pending | All planned migrations |
-| 8 — Acceptance | Pending | Technician, browser, production-image and release evidence for every supported surface |
+| 7 — Shell/remaining surfaces | Implemented; acceptance open | Route-level implementations are complete; grouped technician and release acceptance remain |
+| 8 — Acceptance | In progress | Production routes plus Assets, Contracts, and Networks workspace matrices are recorded; Documentation/Files grouping, technician, recovery and release evidence remain |
 
-No route is marked fully accepted. Assets has an implemented replacement layout with remaining acceptance work. The shell route inventory uses actual App.tsx declarations; organization areas now derive from the existing capability registry. Additional auth/portal/shell states are recorded separately; nested record/workflow coverage remains an explicit task.
+The enforced inventory currently records 51 completed routes and 10 broad workspace routes in acceptance. Assets, Contracts, Networks, Documentation, and Files remain open in both MSP and organization contexts until their final grouped acceptance boundary is met. The shell route inventory uses actual App.tsx declarations; organization areas derive from the capability registry.
 
 ## People record workspace checkpoint — 2026-09-17
 

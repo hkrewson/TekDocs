@@ -27,9 +27,10 @@ class ResponsiveAcceptanceTests(unittest.TestCase):
         return path
 
     def test_current_acceptance_ledger_is_complete(self) -> None:
-        workspaces, automated_complete, human_complete = MODULE.validate_acceptance()
+        workspaces, automated_complete, backup_complete, human_complete = MODULE.validate_acceptance()
         self.assertEqual(workspaces, 4)
         self.assertEqual(automated_complete, 4)
+        self.assertEqual(backup_complete, 4)
         self.assertEqual(human_complete, 0)
 
     def test_rejects_an_uncovered_in_progress_route(self) -> None:

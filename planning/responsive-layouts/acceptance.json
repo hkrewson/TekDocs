@@ -57,6 +57,8 @@
         "tests/rehearsals/rehearse-inventory-backup.sh",
         "tests/rehearsals/rehearse-inventory-upgrade.sh"
       ],
+      "recovery_status": "backup_complete",
+      "recovery_evidence": "planning/responsive-layouts/phase-8-recovery-acceptance.md",
       "human_review": {
         "status": "pending",
         "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
@@ -80,6 +82,8 @@
         "tests/rehearsals/rehearse-inventory-backup.sh",
         "tests/rehearsals/rehearse-inventory-upgrade.sh"
       ],
+      "recovery_status": "backup_complete",
+      "recovery_evidence": "planning/responsive-layouts/phase-8-recovery-acceptance.md",
       "human_review": {
         "status": "pending",
         "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
@@ -103,6 +107,8 @@
         "tests/rehearsals/rehearse-network-backup.sh",
         "tests/rehearsals/rehearse-network-upgrade.sh"
       ],
+      "recovery_status": "backup_complete",
+      "recovery_evidence": "planning/responsive-layouts/phase-8-recovery-acceptance.md",
       "human_review": {
         "status": "pending",
         "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
@@ -130,6 +136,8 @@
         "tests/rehearsals/rehearse-documentation-backup.sh",
         "tests/rehearsals/rehearse-documentation-upgrade.sh"
       ],
+      "recovery_status": "backup_complete",
+      "recovery_evidence": "planning/responsive-layouts/phase-8-recovery-acceptance.md",
       "human_review": {
         "status": "pending",
         "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"

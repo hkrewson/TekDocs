@@ -2,6 +2,22 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 8 responsive workspace recovery checkpoint — 2026-09-25
+
+The Assets/Contracts inventory, Networks, and Documentation/Files backup rehearsals
+now pass against disposable source and clean-restore stacks. They verify PostgreSQL,
+managed media, organization ownership, operational child records, retained document
+history, signed publications, generated artifacts, and regenerable exports. Existing
+user and demo data were not used.
+
+The runs exposed two stale rehearsal assumptions. Inventory and network fixture
+setup now binds the retained owner as an explicit user principal under current RLS;
+clean restore projects now build both backend and diagram-renderer images before
+creating the backend/media volume. The three final backup/restore runs pass after
+those corrections. The ledger records all four groups as `backup_complete`; their
+upgrade rehearsals and final release-candidate gate remain open. See
+[phase-8-recovery-acceptance.md](phase-8-recovery-acceptance.md).
+
 ## Phase 8 enforced acceptance ledger — 2026-09-25
 
 The ten remaining `in_progress` workspace routes are now grouped into Assets,

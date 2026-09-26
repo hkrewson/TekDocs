@@ -24,7 +24,7 @@ from apps.core.models import (
     SoftwareLicenseSeat,
 )
 from apps.core.organizations import create_organization
-from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope, rls_scope
+from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope, rls_scope
 from apps.core.scoping import DataScope
 from apps.core.software_inventory import assign_seat, create_license, link_installation
 
@@ -97,6 +97,12 @@ def create_fixture():
         password=os.environ["TEKDOCS_FIXTURE_PASSWORD"],
     )
     with rls_scope(DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        bind_local_rls_scope(
+            DataScope.tenant(result.tenant),
+            organization_mode=OrganizationRLSMode.MSP_ONLY,
+            actor_user_id=result.owner.id,
+            principal_mode=RLSPrincipalMode.USER,
+        )
         supplier = create_organization(
             tenant=result.tenant,
             actor_id=result.owner.id,
@@ -225,8 +231,15 @@ def create_fixture():
 
 
 def verify_fixture():
-    tenant = InstallationState.objects.select_related("tenant").get(pk=1).tenant
+    state = InstallationState.objects.select_related("tenant", "owner").get(pk=1)
+    tenant = state.tenant
     with rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.ALL_AUTHORIZED):
+        bind_local_rls_scope(
+            DataScope.tenant(tenant),
+            organization_mode=OrganizationRLSMode.ALL_AUTHORIZED,
+            actor_user_id=state.owner.id,
+            principal_mode=RLSPrincipalMode.USER,
+        )
         client = tenant.organizations.get(entity__display_name="Recovery Client")
         bind_local_rls_scope(
             DataScope.organization(tenant, client),

@@ -126,6 +126,7 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Shell overlays and unavailable workspaces](shell-overlays-and-unavailable-workspaces.md)
 - [Phase 8 route and state inventory](phase-8-route-state-inventory.md)
 - [Phase 8 technician and assistive-technology walkthrough](phase-8-technician-walkthrough.md)
+- [Phase 8 responsive workspace recovery acceptance](phase-8-recovery-acceptance.md)
 
 - [Document ownership and review](ownership-and-review.md)
 

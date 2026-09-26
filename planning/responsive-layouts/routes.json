@@ -186,9 +186,10 @@
       "frontend/e2e/document-operations.spec.ts",
       "planning/responsive-layouts/document-direct-links-and-history.md",
       "frontend/e2e/document-direct-links.spec.ts",
-      "planning/responsive-layouts/production-route-acceptance.md"
+      "planning/responsive-layouts/production-route-acceptance.md",
+      "documentation-files-workspace-acceptance.md"
     ],
-    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open."
+    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open. Combined automated Documentation-to-Files route acceptance is complete; technician, assistive-technology, recovery and release acceptance remain open."
   },
   {
     "route": "/domains",
@@ -215,9 +216,10 @@
       "frontend/src/files/Files.test.tsx",
       "frontend/e2e/files-layout.spec.ts",
       "frontend/e2e/document-files.spec.ts",
-      "planning/responsive-layouts/production-route-acceptance.md"
+      "planning/responsive-layouts/production-route-acceptance.md",
+      "documentation-files-workspace-acceptance.md"
     ],
-    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open."
+    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open. Combined automated Documentation-to-Files route acceptance is complete; technician, assistive-technology, recovery and release acceptance remain open."
   },
   {
     "route": "/integrations",
@@ -644,9 +646,10 @@
       "frontend/e2e/document-operations.spec.ts",
       "planning/responsive-layouts/document-direct-links-and-history.md",
       "frontend/e2e/document-direct-links.spec.ts",
-      "planning/responsive-layouts/production-route-acceptance.md"
+      "planning/responsive-layouts/production-route-acceptance.md",
+      "documentation-files-workspace-acceptance.md"
     ],
-    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open."
+    "states": "Document library and focused reader plus templates/reusable content, ownership/review, publication/export, managed files, draft protection, health/link search and URL-restorable focused views, revision comparisons and publication sections. Technician acceptance remains open. Combined automated Documentation-to-Files route acceptance is complete; technician, assistive-technology, recovery and release acceptance remain open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/domains",
@@ -673,9 +676,10 @@
       "frontend/src/files/Files.test.tsx",
       "frontend/e2e/files-layout.spec.ts",
       "frontend/e2e/document-files.spec.ts",
-      "planning/responsive-layouts/production-route-acceptance.md"
+      "planning/responsive-layouts/production-route-acceptance.md",
+      "documentation-files-workspace-acceptance.md"
     ],
-    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open."
+    "states": "Managed file collection, upload, direct download and PDF viewing states are implemented; technician and broad Phase 5 acceptance remain open. Combined automated Documentation-to-Files route acceptance is complete; technician, assistive-technology, recovery and release acceptance remain open."
   },
   {
     "route": "/workspaces/organizations/:organizationId/integrations",

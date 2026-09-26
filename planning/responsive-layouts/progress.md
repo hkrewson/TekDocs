@@ -2,6 +2,21 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 5/8 Documentation-to-Files acceptance checkpoint — 2026-09-25
+
+The bounded Files register now has an explicit journey into the focused document
+reader and back. MSP checks run at all six required widths; client checks run at
+390 and 1280 pixels. The selected document retains the owning workspace route,
+and browser Back restores the file search and off-page result. All 24 Files cases
+pass in Chromium, Firefox, and WebKit with the existing accessibility, overflow,
+long-value, pagination, and personal-column assertions. See
+[documentation-files-workspace-acceptance.md](documentation-files-workspace-acceptance.md).
+
+Together with the existing six-width Documentation workflow matrices, this
+completes automated combined route acceptance for Documentation and Files. Human
+technician/assistive-technology review and final recovery/release approval remain
+open, so the four broad routes stay `in_progress`.
+
 ## Phase 3/8 combined Networks workspace acceptance checkpoint — 2026-09-25
 
 Networks, Wireless, VLANs, VRFs, Racks, Devices, DNS, Circuits, and NetBox now

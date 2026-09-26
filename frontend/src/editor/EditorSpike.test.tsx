@@ -107,7 +107,7 @@ describe('editor feasibility spike', () => {
 
     const diagrams = await screen.findByRole('button', { name: 'Diagrams' })
     await user.click(diagrams)
-    expect(screen.getByRole('dialog', { name: 'Insert diagram' })).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Insert diagram' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Insert diagram' }))
 
     expect(onMarkdownChange).toHaveBeenLastCalledWith(expect.stringContaining('```mermaid'))

@@ -2,10 +2,18 @@ import { expect, test } from '@playwright/test'
 import type { Browser, Page } from '@playwright/test'
 
 const enabled = process.env.TEKDOCS_PERFORMANCE_REHEARSAL === 'true'
+const editorDecodedJavaScriptBudget = 1_500 * 1024
 const authContext = {
   user: { id: crypto.randomUUID(), email: 'owner@example.invalid', display_name: 'Capacity Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Capacity MSP' },
+  role: 'owner',
+  permissions: ['documents.view', 'documents.edit'],
+  surface: 'msp',
+  organization: null,
+  mfa_enrollment_required: false,
 }
+const blockId = crypto.randomUUID()
+const revisionId = crypto.randomUUID()
 const documentRecord = {
   id: crypto.randomUUID(),
   title: 'Capacity Runbook',
@@ -16,13 +24,19 @@ const documentRecord = {
   category: 'guide',
   is_template: false,
   markdown: '# Capacity Runbook\n\nUse **approved** access.\n',
-  block_id: crypto.randomUUID(),
-  current_revision_id: crypto.randomUUID(),
+  block_id: blockId,
+  current_revision_id: revisionId,
   revision_number: 1,
   checksum: '0'.repeat(64),
   resolved_markdown: '# Capacity Runbook\n\nUse **approved** access.\n',
-  placements: [],
-  placement_count: 0,
+  placements: [{
+    id: crypto.randomUUID(), block_id: blockId, block_name: 'Capacity Runbook — content', block_kind: 'rich_text',
+    parent_id: null, position: 0, depth: 0, resolution_mode: 'live', audience_profile: 'shared', pinned_revision_id: null,
+    resolved_revision_id: revisionId, resolved_revision_number: 1, resolved_checksum: '0'.repeat(64),
+    resolved_markdown: '# Capacity Runbook\n\nUse **approved** access.\n',
+    resolved_html: '<h1>Capacity Runbook</h1><p>Use <strong>approved</strong> access.</p>', is_primary: true,
+  }],
+  placement_count: 1,
   attachments: [],
   attachment_count: 0,
   primary_file: null,
@@ -40,7 +54,10 @@ async function mockAuthenticated(page: Page) {
     json: { status: 200, meta: { is_authenticated: true }, data: { user: authContext.user } },
   }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: authContext }))
-  await page.route('**/api/v1/documents*', (route) => route.fulfill({ json: { results: [documentRecord], count: 1 } }))
+  await page.route('**/api/v1/documents/topic-schemas', (route) => route.fulfill({ json: { topics: [] } }))
+  await page.route('**/api/v1/documents**', (route) => route.fulfill({
+    json: { results: [documentRecord], count: 1, page: 1, page_size: 25, has_more: false },
+  }))
 }
 
 type ResourceMetric = { name: string; initiatorType: string; decodedBodySize: number; transferSize: number }
@@ -84,6 +101,7 @@ async function measureProfile(
 
   const editorStarted = Date.now()
   await page.getByRole('button', { name: 'Capacity Runbook' }).click()
+  await page.getByRole('button', { name: 'Edit this content' }).click()
   await expect(page.locator('.milkdown-host [contenteditable="true"]')).toBeVisible({ timeout: 12_000 })
   const editorReadyMs = Date.now() - editorStarted
   const afterEditor = await resources(page)
@@ -97,7 +115,7 @@ async function measureProfile(
   expect(shellReadyMs, `${profile.name} shell ready time`).toBeLessThan(8_000)
   expect(editorReadyMs, `${profile.name} editor ready time`).toBeLessThan(12_000)
   expect(initialJavaScript, `${profile.name} initial decoded JavaScript`).toBeLessThan(900 * 1024)
-  expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(1_500 * 1024)
+  expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(editorDecodedJavaScriptBudget)
   expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(true)
   await context.close()
   return { ...profile, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }

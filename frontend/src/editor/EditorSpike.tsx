@@ -1,16 +1,17 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
 import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
-import { useEffect, useId, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 
 import { EditorControls } from './EditorControls'
-import { DiagramEditor } from './DiagramEditor'
 import { MarkdownHelp } from './MarkdownHelp'
 import { SanitizedMarkdown } from './SanitizedMarkdown'
 import { renderMarkdownPreview } from './api'
 import { markdownFixture } from './fixtures'
 import { configureTekDocsMarkdown, extendSelectionToolbar, normalizeTekDocsMarkdown } from './markdownExtensions'
+
+const DiagramEditor = lazy(async () => ({ default: (await import('./DiagramEditor')).DiagramEditor }))
 
 type EditorMode = 'wysiwyg' | 'markdown' | 'preview' | 'help'
 type PreviewState = { phase: 'idle' | 'loading' } | { phase: 'ready'; html: string } | { phase: 'error'; message: string }
@@ -179,7 +180,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
         {preview.phase === 'ready' && <SanitizedMarkdown html={preview.html} />}
       </div>}
       {mode === 'help' && <div id={`${tabsId}-help-panel`} role="tabpanel" aria-labelledby={`${tabsId}-help-tab`}><MarkdownHelp /></div>}
-      {diagramOpen && <DiagramEditor markdown={markdown} onSave={saveDiagram} onCancel={closeDiagram} />}
+      {diagramOpen && <Suspense fallback={<p role="status">Loading diagram editor…</p>}><DiagramEditor markdown={markdown} onSave={saveDiagram} onCancel={closeDiagram} /></Suspense>}
     </section>
   )
 }

@@ -143,13 +143,12 @@ async function mockWorkspaceApplication(page: Page) {
     const url = new URL(route.request().url())
     if (/\/workspaces\/organizations\/[^/]+\/search$/.test(url.pathname)) {
       const pageNumber = Number(url.searchParams.get('page') ?? '1')
-      const resultType = url.searchParams.get('result_type')
       const results = pageNumber === 1 ? [{
         id: crypto.randomUUID(), result_type: 'document', entity_type: 'document', title: 'Firewall recovery guide', excerpt: 'Rotate the firewall recovery key before maintenance.', workspace_label: clientWorkspace.name, target: `/workspaces/organizations/${clientWorkspace.id}/documentation?document=document-1`, score: 1000, updated_at: '2026-08-31T12:00:00Z', review_state: 'approved',
       }] : [{
         id: crypto.randomUUID(), result_type: 'document', entity_type: 'document', title: 'Firewall replacement notes', excerpt: 'Replacement firewall inventory and handoff.', workspace_label: clientWorkspace.name, target: `/workspaces/organizations/${clientWorkspace.id}/documentation?document=document-2`, score: 900, updated_at: '2026-08-30T12:00:00Z', review_state: 'unreviewed',
       }]
-      return route.fulfill({ json: { results, facets: [{ value: 'document', label: 'Documents', count: 17 }], page: pageNumber, page_size: 15, count: resultType === 'document' ? 17 : 17, has_more: pageNumber === 1, truncated: false } })
+      return route.fulfill({ json: { results, facets: [{ value: 'document', label: 'Documents', count: 26 }], page: pageNumber, page_size: 25, count: 26, has_more: pageNumber === 1, truncated: false } })
     }
     if (url.pathname.endsWith('/entities/search')) {
       const query = url.searchParams.get('q')?.toLowerCase() ?? ''
@@ -373,7 +372,7 @@ test('client custom-field definitions and Site values remain workspace scoped an
 
   await expect(page.getByRole('heading', { name: 'Custom fields' })).toBeVisible()
   await expect(page.getByText('Door code', { exact: true })).toBeVisible()
-  await expect(page.getByRole('cell', { name: 'This workspace' })).toBeVisible()
+  await expect(page.getByText(/This workspace · Version 1/)).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Sites' }).click()

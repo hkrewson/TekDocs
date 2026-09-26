@@ -50,6 +50,24 @@ bundle budgets. The next acceptance run must execute the complete release target
 from a clean commit and record its final exit status here before changing
 `acceptance.json` to complete.
 
+The clean `28a9928` release-gate attempt on 2026-09-26 reached the complete
+maintained-browser matrix after passing the frontend, backend, capacity,
+performance, API, integration, authorization, documentation, export, catalog,
+inventory, network, and assembled-stack boundaries. The browser matrix reported
+1,460 passed, 3 skipped, 15 failed, and 3 timed out. The failures exposed one
+real keyboard-focus race in the editor and stale browser contracts for saved file
+columns, credential drawers, recycle-bin status messages, compact custom-field
+rows, and default workspace-search pagination. The gate therefore remains
+pending.
+
+The remediation slice now gives drawers an explicit initial-control focus path,
+makes editor-tab focus synchronous with the rendered tab, and aligns the focused
+browser fixtures with the shipped drawer and collection behavior. Its combined
+browser run passes all 135 affected scenarios in Chromium, Firefox, and WebKit.
+The 673-test frontend suite, the frontend verification/build boundary, 50 release-
+script contract tests, and whitespace validation also pass. These focused results
+do not replace the required clean full-gate rerun.
+
 ## Remaining human boundary
 
 The automated release gate cannot complete the technician and assistive-

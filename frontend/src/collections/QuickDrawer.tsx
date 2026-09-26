@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import { translate } from '../i18n/localization'
 
-export function QuickDrawer({ title, children, onClose, returnFocusId, returnHref, returnLabel }: { title: string; children: ReactNode; onClose: () => void; returnFocusId?: string; returnHref: string; returnLabel: string }) {
+export function QuickDrawer({ title, children, onClose, returnFocusId, returnHref, returnLabel, initialFocusSelector }: { title: string; children: ReactNode; onClose: () => void; returnFocusId?: string; returnHref: string; returnLabel: string; initialFocusSelector?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const heading = useRef<HTMLHeadingElement>(null)
@@ -13,7 +13,8 @@ export function QuickDrawer({ title, children, onClose, returnFocusId, returnHre
     const overflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     dialog.showModal()
-    heading.current?.focus({ preventScroll: true })
+    const initialFocus = initialFocusSelector ? dialog.querySelector<HTMLElement>(initialFocusSelector) : null
+    ;(initialFocus ?? heading.current)?.focus({ preventScroll: true })
     return () => {
       dialog.close(); document.body.style.overflow = overflow
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
@@ -22,7 +23,7 @@ export function QuickDrawer({ title, children, onClose, returnFocusId, returnHre
         else if (previous?.isConnected && previous !== document.body) previous.focus({ preventScroll: true })
       }))
     }
-  }, [returnFocusId])
+  }, [initialFocusSelector, returnFocusId])
   return <dialog ref={ref} className="collection-drawer" aria-labelledby={titleId} onPointerDown={(event) => { pressedOutside.current = event.button === 0 && isBackdrop(event) }} onPointerCancel={() => { pressedOutside.current = false }} onClick={(event) => {
     const dismiss = pressedOutside.current && isBackdrop(event)
     pressedOutside.current = false

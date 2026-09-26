@@ -91,6 +91,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole('checkbox', { name: 'File name', exact: true })).toBeDisabled()
     await page.getByRole('checkbox', { name: 'File type', exact: true }).uncheck()
     await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Columns', exact: true })).toHaveAttribute('aria-expanded', 'false')
+    if (width >= 768) await expect(page.getByRole('columnheader', { name: 'File type' })).toHaveCount(0)
     await page.reload()
     await expect(page.getByText(files[30].filename, { exact: true })).toBeVisible()
     if (width >= 768) await expect(page.getByRole('columnheader', { name: 'File type' })).toHaveCount(0)

@@ -43,6 +43,6 @@ test('MSP recycle bin confirms and restores an archived cascade', async ({ page,
   await page.getByRole('button', { name: 'Restore' }).click()
   await expect(page.getByText('This also restores 2 related records that were archived with it.')).toBeVisible()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Restore' }).click()
-  await expect(page.getByRole('status')).toHaveText('Downtown office restored.')
+  await expect(page.getByRole('status').filter({ hasText: 'Downtown office restored.' })).toBeVisible()
   await expect(page.getByText('There are no archived records in this workspace.')).toBeVisible()
 })

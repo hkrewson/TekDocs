@@ -1,7 +1,7 @@
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
 import '@milkdown/crepe/theme/common/style.css'
 import '@milkdown/crepe/theme/frame.css'
-import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 
 import { EditorControls } from './EditorControls'
@@ -32,7 +32,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
   const requestedTabFocus = useRef<EditorMode | null>(null)
   useEffect(() => { markdownChange.current = onMarkdownChange }, [onMarkdownChange])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (requestedTabFocus.current !== mode) return
     tabRefs.current[mode]?.focus()
     requestedTabFocus.current = null

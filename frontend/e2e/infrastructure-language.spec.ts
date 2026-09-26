@@ -34,7 +34,10 @@ test('credential links explain the 1Password boundary without unnecessary contro
   await page.goto('/credentials')
   await expect(page.getByRole('heading', { name: 'Credential links' })).toBeVisible()
   await expect(page.getByText('Credentials stay in 1Password')).toBeVisible()
+  await page.getByRole('button', { name: 'Firewall administrator' }).click()
   await expect(page.getByRole('link', { name: 'Open in 1Password' })).toHaveAttribute('href', new RegExp(`${credentialId}/open$`))
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'Firewall administrator' })).toHaveCount(0)
 
   await page.getByRole('button', { name: 'New link' }).click()
   const editor = page.getByRole('heading', { name: 'New credential link' }).locator('..').locator('..').locator('..')
@@ -50,7 +53,8 @@ test('credential links explain the 1Password boundary without unnecessary contro
   expect(await page.locator('main').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
 
   await page.getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('button', { name: 'Archive Firewall administrator' }).click()
+  await page.getByRole('button', { name: 'Firewall administrator' }).click()
+  await page.getByRole('dialog', { name: 'Firewall administrator' }).getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(page.getByRole('alertdialog')).toContainText('The item and its access in 1Password will not change.')
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })

@@ -202,7 +202,7 @@ export function CredentialReferences({ workspace, client }: { workspace: Workspa
         <CollectionPagination label={translate('credentials.heading')} page={page} pageSize={pageSize} count={pageState.count} hasMore={pageState.hasMore} onPageChange={(next) => changeCollection({ page: next })} />
       </>}
     </section>
-    {selectedId && <QuickDrawer title={drawerTitle} returnFocusId={selectedId === 'new' ? undefined : `credential-row-${selectedId}`} returnHref={returnHref} returnLabel={translate('credentials.back')} onClose={closeDrawer}>
+    {selectedId && <QuickDrawer title={drawerTitle} returnFocusId={selectedId === 'new' ? undefined : `credential-row-${selectedId}`} returnHref={returnHref} returnLabel={translate('credentials.back')} initialFocusSelector={selectedId === 'new' ? '[data-drawer-initial-focus]' : undefined} onClose={closeDrawer}>
       {selectedId === 'new' && !canManage && phase === 'ready' && <p className="form-message error" role="alert">{translate('credentials.createDenied')}</p>}
       {detailPhase === 'loading' && <p className="empty-state" role="status">{translate('credentials.recordLoading')}</p>}
       {detailPhase === 'error' && <div className="empty-state" role="alert"><p>{translate('credentials.recordUnavailable')}</p><button type="button" className="secondary-button" onClick={() => { setDetailFailure(null); setRevision((value) => value + 1) }}>{translate('common.retry')}</button></div>}
@@ -218,7 +218,7 @@ function CredentialForm({ draft, creating, saving, error, onChange, onSave, onCa
   return <form className="credential-reference-form" onSubmit={(event) => { event.preventDefault(); void onSave() }}>
     <p>{translate('credentials.formHelp')}</p>
     {error && <div className="form-message error" role="alert">{error}</div>}
-    <div className="form-grid"><label><span>{translate('credentials.title')}</span><input autoFocus required value={draft.title} maxLength={240} onChange={(event) => onChange({ ...draft, title: event.target.value })} /></label><label className="wide-field"><span>{creating ? translate('credentials.privateLink') : translate('credentials.replacementLink')}</span><input required={creating} type="url" autoComplete="off" spellCheck={false} value={draft.reference_url} placeholder="https://start.1password.com/open/i?…" onChange={(event) => onChange({ ...draft, reference_url: event.target.value })} /><small>{translate('credentials.copyHelp')}</small></label></div>
+    <div className="form-grid"><label><span>{translate('credentials.title')}</span><input autoFocus data-drawer-initial-focus required value={draft.title} maxLength={240} onChange={(event) => onChange({ ...draft, title: event.target.value })} /></label><label className="wide-field"><span>{creating ? translate('credentials.privateLink') : translate('credentials.replacementLink')}</span><input required={creating} type="url" autoComplete="off" spellCheck={false} value={draft.reference_url} placeholder="https://start.1password.com/open/i?…" onChange={(event) => onChange({ ...draft, reference_url: event.target.value })} /><small>{translate('credentials.copyHelp')}</small></label></div>
     <div className="form-actions"><button className="primary-button" disabled={saving}>{saving ? translate('common.saving') : translate('credentials.save')}</button><button className="secondary-button" type="button" disabled={saving} onClick={onCancel}>{translate('common.cancel')}</button></div>
   </form>
 }

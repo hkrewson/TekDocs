@@ -24,6 +24,11 @@ class CollectionDefinition:
 
 
 COLLECTIONS = {
+    "network-netbox": CollectionDefinition(
+        PermissionKey.NETWORKS_VIEW,
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "type", "object", "observation")),
+        ("name", "type", "object", "observation"),
+    ),
     "network-circuits": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple(

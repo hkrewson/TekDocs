@@ -3590,6 +3590,22 @@ export interface paths {
         readonly patch: operations["workspaces_msp_networks_mac_addresses_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/networks/netbox/choice-collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_networks_netbox_choice_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/networks/netbox/choices": {
         readonly parameters: {
             readonly query?: never;
@@ -3616,6 +3632,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_msp_networks_netbox_reconcile_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/networks/netbox/reference-collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_networks_netbox_reference_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -6905,6 +6937,22 @@ export interface paths {
         readonly patch: operations["workspaces_organizations_networks_mac_addresses_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choice-collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_networks_netbox_choice_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choices": {
         readonly parameters: {
             readonly query?: never;
@@ -6931,6 +6979,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["workspaces_organizations_networks_netbox_reconcile_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/reference-collection": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_networks_netbox_reference_collection_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -11699,6 +11763,15 @@ export interface components {
             readonly object_type: string;
             readonly linked: boolean;
         };
+        readonly NetBoxChoicePage: {
+            readonly results: readonly components["schemas"]["NetBoxChoice"][];
+            readonly selected: components["schemas"]["NetBoxChoice"] | null;
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
+        };
         readonly NetBoxChoiceResult: {
             readonly results: readonly components["schemas"]["NetBoxChoice"][];
             readonly can_manage: boolean;
@@ -11755,6 +11828,14 @@ export interface components {
             readonly observed_fingerprint: string;
             /** Format: date-time */
             readonly last_observed_at: string | null;
+        };
+        readonly NetBoxReferenceResult: {
+            readonly results: readonly components["schemas"]["NetBoxReference"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly can_manage: boolean;
         };
         readonly NetBoxReferenceWrite: {
             /** Format: uuid */
@@ -24540,6 +24621,42 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_networks_netbox_choice_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `dcim.rack` - dcim.rack
+                 *     * `dcim.device` - dcim.device
+                 *     * `dcim.macaddress` - dcim.macaddress
+                 *     * `ipam.vlan` - ipam.vlan
+                 *     * `ipam.prefix` - ipam.prefix
+                 *     * `ipam.ipaddress` - ipam.ipaddress
+                 */
+                readonly object_type?: "" | "dcim.rack" | "dcim.device" | "dcim.macaddress" | "ipam.vlan" | "ipam.prefix" | "ipam.ipaddress";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly selected_id?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxChoicePage"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_networks_netbox_choices_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -24584,6 +24701,52 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["NetBoxPreviewResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_networks_netbox_reference_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `dcim.rack` - dcim.rack
+                 *     * `dcim.device` - dcim.device
+                 *     * `dcim.macaddress` - dcim.macaddress
+                 *     * `ipam.vlan` - ipam.vlan
+                 *     * `ipam.prefix` - ipam.prefix
+                 *     * `ipam.ipaddress` - ipam.ipaddress
+                 */
+                readonly object_type?: "" | "dcim.rack" | "dcim.device" | "dcim.macaddress" | "ipam.vlan" | "ipam.prefix" | "ipam.ipaddress";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `object_type` - object_type
+                 *     * `-object_type` - -object_type
+                 *     * `object_id` - object_id
+                 *     * `-object_id` - -object_id
+                 *     * `observed` - observed
+                 *     * `-observed` - -observed
+                 */
+                readonly ordering?: "name" | "-name" | "object_type" | "-object_type" | "object_id" | "-object_id" | "observed" | "-observed";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxReferenceResult"];
                 };
             };
         };
@@ -33719,6 +33882,44 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_networks_netbox_choice_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `dcim.rack` - dcim.rack
+                 *     * `dcim.device` - dcim.device
+                 *     * `dcim.macaddress` - dcim.macaddress
+                 *     * `ipam.vlan` - ipam.vlan
+                 *     * `ipam.prefix` - ipam.prefix
+                 *     * `ipam.ipaddress` - ipam.ipaddress
+                 */
+                readonly object_type?: "" | "dcim.rack" | "dcim.device" | "dcim.macaddress" | "ipam.vlan" | "ipam.prefix" | "ipam.ipaddress";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly selected_id?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxChoicePage"];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_networks_netbox_choices_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -33767,6 +33968,54 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["NetBoxPreviewResult"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_networks_netbox_reference_collection_retrieve: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `dcim.rack` - dcim.rack
+                 *     * `dcim.device` - dcim.device
+                 *     * `dcim.macaddress` - dcim.macaddress
+                 *     * `ipam.vlan` - ipam.vlan
+                 *     * `ipam.prefix` - ipam.prefix
+                 *     * `ipam.ipaddress` - ipam.ipaddress
+                 */
+                readonly object_type?: "" | "dcim.rack" | "dcim.device" | "dcim.macaddress" | "ipam.vlan" | "ipam.prefix" | "ipam.ipaddress";
+                /**
+                 * @description * `name` - name
+                 *     * `-name` - -name
+                 *     * `object_type` - object_type
+                 *     * `-object_type` - -object_type
+                 *     * `object_id` - object_id
+                 *     * `-object_id` - -object_id
+                 *     * `observed` - observed
+                 *     * `-observed` - -observed
+                 */
+                readonly ordering?: "name" | "-name" | "object_type" | "-object_type" | "object_id" | "-object_id" | "observed" | "-observed";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxReferenceResult"];
                 };
             };
         };

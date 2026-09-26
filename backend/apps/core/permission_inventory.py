@@ -52,7 +52,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "msp-credential-reference-detail",
-        ("PATCH", "DELETE"),
+        ("GET", "PATCH", "DELETE"),
+        PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         mutations=(PermissionKey.CREDENTIAL_REFERENCES_MANAGE, PermissionKey.CREDENTIAL_REFERENCES_MANAGE),
     ),
     route("msp-credential-reference-open", ("GET",), PermissionKey.CREDENTIAL_REFERENCES_OPEN),
@@ -70,6 +71,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-document-review-request", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-document-review-decision", ("POST",), mutations=(PermissionKey.DOCUMENTS_APPROVE,)),
     route("msp-document-file-backed-create", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route("msp-document-file-list", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route(
         "msp-document-detail",
         ("GET", "PUT", "DELETE"),
@@ -724,6 +726,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-netbox-reference-detail", ("DELETE",), mutations=(PermissionKey.NETWORKS_EDIT,)),
     route("msp-netbox-reference-choices", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-netbox-reference-collection", ("GET",), PermissionKey.NETWORKS_VIEW),
+    route("msp-netbox-reference-choice-collection", ("GET",), PermissionKey.NETWORKS_VIEW),
     route("msp-netbox-reconcile-preview", ("POST",), PermissionKey.NETWORKS_VIEW),
     route("msp-network-racks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route("msp-network-rack-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
@@ -1031,6 +1035,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-netbox-reference-collection",
+        ("GET",),
+        PermissionKey.NETWORKS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-netbox-reference-choice-collection",
+        ("GET",),
+        PermissionKey.NETWORKS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
         "organization-netbox-reconcile-preview",
         ("POST",),
         PermissionKey.NETWORKS_VIEW,
@@ -1226,7 +1242,8 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-credential-reference-detail",
-        ("PATCH", "DELETE"),
+        ("GET", "PATCH", "DELETE"),
+        PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         mutations=(PermissionKey.CREDENTIAL_REFERENCES_MANAGE, PermissionKey.CREDENTIAL_REFERENCES_MANAGE),
         organization_scoped=True,
     ),
@@ -1291,6 +1308,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-document-file-backed-create",
         ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-document-file-list",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
         organization_scoped=True,
     ),
     route(

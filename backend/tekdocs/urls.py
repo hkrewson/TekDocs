@@ -293,9 +293,11 @@ from apps.core.invoice_views import (
 )
 from apps.core.netbox_reconciliation_views import (
     NetBoxReconciliationPreviewView,
+    NetBoxReferenceChoicePageView,
     NetBoxReferenceChoiceView,
     NetBoxReferenceCollectionView,
     NetBoxReferenceDetailView,
+    NetBoxReferencePageView,
 )
 from apps.core.network_addressing_views import (
     SubnetDetailView,
@@ -866,6 +868,11 @@ urlpatterns = [
         name="msp-netbox-reference-list-create",
     ),
     path(
+        "api/v1/workspaces/msp/networks/netbox/reference-collection",
+        NetBoxReferencePageView.as_view(),
+        name="msp-netbox-reference-collection",
+    ),
+    path(
         "api/v1/workspaces/msp/networks/netbox/references/<uuid:reference_id>",
         NetBoxReferenceDetailView.as_view(),
         name="msp-netbox-reference-detail",
@@ -874,6 +881,11 @@ urlpatterns = [
         "api/v1/workspaces/msp/networks/netbox/choices",
         NetBoxReferenceChoiceView.as_view(),
         name="msp-netbox-reference-choices",
+    ),
+    path(
+        "api/v1/workspaces/msp/networks/netbox/choice-collection",
+        NetBoxReferenceChoicePageView.as_view(),
+        name="msp-netbox-reference-choice-collection",
     ),
     path(
         "api/v1/workspaces/msp/networks/netbox/reconcile-preview",
@@ -1280,6 +1292,11 @@ urlpatterns = [
         name="organization-netbox-reference-list-create",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/reference-collection",
+        NetBoxReferencePageView.as_view(),
+        name="organization-netbox-reference-collection",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/references/<uuid:reference_id>",
         NetBoxReferenceDetailView.as_view(),
         name="organization-netbox-reference-detail",
@@ -1288,6 +1305,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/choices",
         NetBoxReferenceChoiceView.as_view(),
         name="organization-netbox-reference-choices",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/choice-collection",
+        NetBoxReferenceChoicePageView.as_view(),
+        name="organization-netbox-reference-choice-collection",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/networks/netbox/reconcile-preview",

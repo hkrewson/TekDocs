@@ -89,6 +89,10 @@ export type CircuitChoices = { providers: Array<{ id: string; name: string }>; c
 export type NetBoxObjectType = 'dcim.rack' | 'dcim.device' | 'dcim.macaddress' | 'ipam.vlan' | 'ipam.prefix' | 'ipam.ipaddress'
 export type NetBoxReference = { id: string; entity_id: string; entity_name: string; entity_type: string; object_type: NetBoxObjectType; object_id: number; observed_fingerprint: string; last_observed_at: string | null }
 export type NetBoxChoice = { id: string; name: string; entity_type: string; object_type: NetBoxObjectType; linked: boolean }
+export type NetBoxReferenceQuery = { q: string; object_type?: NetBoxObjectType; ordering: 'name' | '-name' | 'object_type' | '-object_type' | 'object_id' | '-object_id' | 'observed' | '-observed'; page: number; page_size: 25 | 50 | 100 }
+export type NetBoxReferenceResult = { results: NetBoxReference[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
+export type NetBoxChoiceQuery = { q: string; object_type?: NetBoxObjectType; page: number; page_size: 25 | 50 | 100; selected_id?: string }
+export type NetBoxChoicePage = { results: NetBoxChoice[]; selected: NetBoxChoice | null; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean }
 export type NetBoxReferenceWrite = { entity_id: string; object_type: NetBoxObjectType; object_id: number; fingerprint?: string }
 export type NetBoxObservation = { object_type: NetBoxObjectType; object_id: number; fingerprint: string }
 export type NetBoxPreview = { results: Array<{ object_type: NetBoxObjectType; object_id: number; status: 'current' | 'changed' | 'unmatched' | 'missing_remote'; entity_id: string | null; entity_name: string; entity_type: string }>; counts: Record<string, number> }
@@ -200,7 +204,9 @@ export interface NetworksClient {
   createCircuitHandoff(workspace: WorkspaceContext, circuitId: string, values: HandoffWrite): Promise<HandoffDetail>
   updateCircuitHandoff(workspace: WorkspaceContext, circuitId: string, id: string, values: Partial<HandoffWrite>): Promise<HandoffDetail>
   listNetBoxReferences(workspace: WorkspaceContext, signal?: AbortSignal): Promise<NetBoxReference[]>
+  netBoxReferenceCollection(workspace: WorkspaceContext, query: NetBoxReferenceQuery, signal?: AbortSignal): Promise<NetBoxReferenceResult>
   netBoxChoices(workspace: WorkspaceContext, signal?: AbortSignal): Promise<{ results: NetBoxChoice[]; can_manage: boolean }>
+  netBoxChoiceCollection(workspace: WorkspaceContext, query: NetBoxChoiceQuery, signal?: AbortSignal): Promise<NetBoxChoicePage>
   setNetBoxReference(workspace: WorkspaceContext, values: NetBoxReferenceWrite): Promise<NetBoxReference>
   removeNetBoxReference(workspace: WorkspaceContext, id: string): Promise<void>
   previewNetBoxReconciliation(workspace: WorkspaceContext, observations: NetBoxObservation[]): Promise<NetBoxPreview>
@@ -435,8 +441,16 @@ export const browserNetworksClient: NetworksClient = {
   async listNetBoxReferences(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/netbox/references`, { credentials: 'same-origin', signal }))
   },
+  async netBoxReferenceCollection(workspace, query, signal) {
+    const parameters = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]))
+    return json(await fetch(`${basePath(workspace)}/netbox/reference-collection?${parameters}`, { credentials: 'same-origin', signal }))
+  },
   async netBoxChoices(workspace, signal) {
     return json(await fetch(`${basePath(workspace)}/netbox/choices`, { credentials: 'same-origin', signal }))
+  },
+  async netBoxChoiceCollection(workspace, query, signal) {
+    const parameters = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)]))
+    return json(await fetch(`${basePath(workspace)}/netbox/choice-collection?${parameters}`, { credentials: 'same-origin', signal }))
   },
   setNetBoxReference: (workspace, values) => write(`${basePath(workspace)}/netbox/references`, 'POST', values),
   removeNetBoxReference: (workspace, id) => remove(`${basePath(workspace)}/netbox/references/${encodeURIComponent(id)}`),

@@ -1,6 +1,36 @@
 # Progress and verification
 
-Updated 2026-09-18. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+
+## Phase 3 NetBox identity register checkpoint — 2026-09-25
+
+Networks now mounts a bounded NetBox identity register in MSP and organization
+workspaces. Full-collection search, object-type filtering, deterministic ordering,
+25/50/100 paging and personal columns replace the dormant unbounded table. Linking
+uses one guarded drawer with bounded eligible-record search and retained failed
+input; unlinking retains its explicit confirmation. The UI stores only the existing
+stable object identity and observation state, not a NetBox URL or credential.
+
+Additive bounded reference and choice endpoints preserve the legacy API. Focused
+tests cover paging, off-page and numeric search, strict parameters, selected choices,
+failed writes, URL context and sibling-workspace isolation. The maintained-browser
+matrix covers both routes at all six required widths with accessibility, overflow,
+search and preference checks. See
+[netbox-identity-register.md](netbox-identity-register.md). Networks remains in
+progress for combined technician, assistive-technology, production and release
+acceptance. Version remains 0.8.46.
+
+Verification passes three focused PostgreSQL reconciliation/API cases, 11 focused
+frontend component/client cases, and 24 Chromium/Firefox/WebKit layout cases. The
+full project gate passes 673 tests in 120 frontend files, Python lint/type and
+migration checks, OpenAPI/generated-type agreement, and production bundle budgets.
+The deeper network validation run passed its network, reconciliation, relationship,
+IDOR, RLS and migration cases before its final inventory assertion exposed six
+additive routes missing from the centralized permission catalog: the four new
+NetBox collections and the two previously implemented Files collections. The catalog
+now includes all six, also correcting the existing credential-reference detail GET
+contracts; the inventory assertion and 27 focused anonymous/non-member/CSRF/MFA
+matrix cases pass. No authorization behavior was weakened.
 
 ## Phase 5/8 bounded Files register checkpoint — 2026-09-25
 
@@ -79,7 +109,7 @@ The Assets summary collection and typed browser API client are implemented under
 |---|---|---|
 | 1 — Inventory/foundation | In progress | Expand nested states, extract reusable record header/sections through validation surfaces, and complete acceptance evidence; list/drawer/chooser and URL-backed Assets records implemented |
 | 2 — Assets | In progress | Layout, preview actions, site filtering and software audit history implemented; expanded state/technician/release acceptance remains |
-| 3 — Contracts/Networks | In progress: Contracts and simplified Networks collection/full record migrations | Remaining network object surfaces, wider validation and phase acceptance |
+| 3 — Contracts/Networks | Implemented; acceptance open | Responsive Contracts and all planned Networks object registers are implemented; combined technician, assistive-technology, production and release acceptance remains |
 | 4 — Operational records | Accepted: Organizations/People/Sites and connected Stock/Vendors/Products/Licenses milestones complete | Responsive and real-stack acceptance recorded in [operational-records.md](operational-records.md) and the linked workspace records |
 | 5 — Documentation/files | In progress | Document library collection and focused reader/editor frame implemented; templates, blocks, review, publication, export, and file workflows remain in the grouped migration |
 | 6 — Financial/compliance/integrations | Implemented; acceptance open | Invoice, compliance/data-flow and integration workspaces complete; technician acceptance remains |

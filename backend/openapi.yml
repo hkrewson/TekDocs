@@ -12987,6 +12987,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/networks/netbox/choice-collection:
+    get:
+      operationId: workspaces_msp_networks_netbox_choice_collection_retrieve
+      parameters:
+      - in: query
+        name: object_type
+        schema:
+          enum:
+          - ''
+          - dcim.rack
+          - dcim.device
+          - dcim.macaddress
+          - ipam.vlan
+          - ipam.prefix
+          - ipam.ipaddress
+          type: string
+          x-spec-enum-id: 83c6092a9b9b645b
+          default: ''
+        description: "* `` - \n* `dcim.rack` - dcim.rack\n* `dcim.device` - dcim.device\n\
+          * `dcim.macaddress` - dcim.macaddress\n* `ipam.vlan` - ipam.vlan\n* `ipam.prefix`\
+          \ - ipam.prefix\n* `ipam.ipaddress` - ipam.ipaddress"
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected_id
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxChoicePage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/networks/netbox/choices:
     get:
       operationId: workspaces_msp_networks_netbox_choices_retrieve
@@ -13034,6 +13098,90 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetBoxPreviewResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/networks/netbox/reference-collection:
+    get:
+      operationId: workspaces_msp_networks_netbox_reference_collection_retrieve
+      parameters:
+      - in: query
+        name: object_type
+        schema:
+          enum:
+          - ''
+          - dcim.rack
+          - dcim.device
+          - dcim.macaddress
+          - ipam.vlan
+          - ipam.prefix
+          - ipam.ipaddress
+          type: string
+          x-spec-enum-id: 83c6092a9b9b645b
+          default: ''
+        description: "* `` - \n* `dcim.rack` - dcim.rack\n* `dcim.device` - dcim.device\n\
+          * `dcim.macaddress` - dcim.macaddress\n* `ipam.vlan` - ipam.vlan\n* `ipam.prefix`\
+          \ - ipam.prefix\n* `ipam.ipaddress` - ipam.ipaddress"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - object_type
+          - -object_type
+          - object_id
+          - -object_id
+          - observed
+          - -observed
+          type: string
+          x-spec-enum-id: fe8b0b967ef4043a
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `object_type` - object_type
+          * `-object_type` - -object_type
+          * `object_id` - object_id
+          * `-object_id` - -object_id
+          * `observed` - observed
+          * `-observed` - -observed
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxReferenceResult'
           description: ''
           headers:
             X-Request-ID:
@@ -26755,6 +26903,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choice-collection:
+    get:
+      operationId: workspaces_organizations_networks_netbox_choice_collection_retrieve
+      parameters:
+      - in: query
+        name: object_type
+        schema:
+          enum:
+          - ''
+          - dcim.rack
+          - dcim.device
+          - dcim.macaddress
+          - ipam.vlan
+          - ipam.prefix
+          - ipam.ipaddress
+          type: string
+          x-spec-enum-id: 83c6092a9b9b645b
+          default: ''
+        description: "* `` - \n* `dcim.rack` - dcim.rack\n* `dcim.device` - dcim.device\n\
+          * `dcim.macaddress` - dcim.macaddress\n* `ipam.vlan` - ipam.vlan\n* `ipam.prefix`\
+          \ - ipam.prefix\n* `ipam.ipaddress` - ipam.ipaddress"
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      - in: query
+        name: selected_id
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxChoicePage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/choices:
     get:
       operationId: workspaces_organizations_networks_netbox_choices_retrieve
@@ -26816,6 +27034,96 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NetBoxPreviewResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/networks/netbox/reference-collection:
+    get:
+      operationId: workspaces_organizations_networks_netbox_reference_collection_retrieve
+      parameters:
+      - in: query
+        name: object_type
+        schema:
+          enum:
+          - ''
+          - dcim.rack
+          - dcim.device
+          - dcim.macaddress
+          - ipam.vlan
+          - ipam.prefix
+          - ipam.ipaddress
+          type: string
+          x-spec-enum-id: 83c6092a9b9b645b
+          default: ''
+        description: "* `` - \n* `dcim.rack` - dcim.rack\n* `dcim.device` - dcim.device\n\
+          * `dcim.macaddress` - dcim.macaddress\n* `ipam.vlan` - ipam.vlan\n* `ipam.prefix`\
+          \ - ipam.prefix\n* `ipam.ipaddress` - ipam.ipaddress"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - -name
+          - object_type
+          - -object_type
+          - object_id
+          - -object_id
+          - observed
+          - -observed
+          type: string
+          x-spec-enum-id: fe8b0b967ef4043a
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `-name` - -name
+          * `object_type` - object_type
+          * `-object_type` - -object_type
+          * `object_id` - object_id
+          * `-object_id` - -object_id
+          * `observed` - observed
+          * `-observed` - -observed
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxReferenceResult'
           description: ''
           headers:
             X-Request-ID:
@@ -40019,6 +40327,35 @@ components:
       - linked
       - name
       - object_type
+    NetBoxChoicePage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetBoxChoice'
+        selected:
+          allOf:
+          - $ref: '#/components/schemas/NetBoxChoice'
+          nullable: true
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+      - selected
     NetBoxChoiceResult:
       type: object
       properties:
@@ -40154,6 +40491,30 @@ components:
       - object_id
       - object_type
       - observed_fingerprint
+    NetBoxReferenceResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetBoxReference'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        can_manage:
+          type: boolean
+      required:
+      - can_manage
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     NetBoxReferenceWrite:
       type: object
       properties:

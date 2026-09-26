@@ -32,6 +32,19 @@ describe('network inventory API client', () => {
     expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/msp/networks/circuits/choices', { credentials: 'same-origin', signal })
   })
 
+  it('requests bounded NetBox references and eligible choices', async () => {
+    const signal = new AbortController().signal
+    const workspace = { kind: 'organization', id: 'client/1' } as never
+    await browserNetworksClient.netBoxReferenceCollection(workspace, {
+      q: 'rack / 26', object_type: 'dcim.rack', ordering: '-object_id', page: 2, page_size: 25,
+    }, signal)
+    await browserNetworksClient.netBoxChoiceCollection(workspace, {
+      q: 'edge / rack', object_type: 'dcim.rack', selected_id: 'rack/31', page: 2, page_size: 25,
+    }, signal)
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/netbox/reference-collection?q=rack+%2F+26&object_type=dcim.rack&ordering=-object_id&page=2&page_size=25', { credentials: 'same-origin', signal })
+    expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/client%2F1/networks/netbox/choice-collection?q=edge+%2F+rack&object_type=dcim.rack&selected_id=rack%2F31&page=2&page_size=25', { credentials: 'same-origin', signal })
+  })
+
   it('uses exact client workspace routes and CSRF-protected writes', async () => {
     const workspace = { kind: 'organization', id: 'client/1' } as never
     await browserNetworksClient.listNetworks(workspace)

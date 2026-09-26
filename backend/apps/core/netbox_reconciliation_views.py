@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied
@@ -12,8 +13,9 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, context_has_permission, require_permission
 
+from .collection_pagination import BoundedCollectionQuerySerializer, paginate
 from .inventory import InventoryError, require_operational_owner
-from .models import CatalogProductKind, ClientAsset, NetBoxObjectType, NetBoxReference
+from .models import CatalogProductKind, ClientAsset, Entity, NetBoxObjectType, NetBoxReference
 from .netbox_reconciliation import (
     NETBOX_ENTITY_TYPES,
     NetBoxReferenceError,
@@ -55,6 +57,45 @@ class NetBoxChoiceSerializer(serializers.Serializer):
 
 class NetBoxChoiceResultSerializer(serializers.Serializer):
     results = NetBoxChoiceSerializer(many=True)
+    can_manage = serializers.BooleanField()
+
+
+class NetBoxReferenceQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=240, default="")
+    object_type = serializers.ChoiceField(
+        choices=("", *NetBoxObjectType.values), required=False, allow_blank=True, default=""
+    )
+    ordering = serializers.ChoiceField(
+        choices=("name", "-name", "object_type", "-object_type", "object_id", "-object_id", "observed", "-observed"),
+        required=False,
+        default="name",
+    )
+
+
+class NetBoxReferenceResultSerializer(serializers.Serializer):
+    results = NetBoxReferenceSerializer(many=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+    can_manage = serializers.BooleanField()
+
+
+class NetBoxChoiceQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(required=False, allow_blank=True, max_length=240, default="")
+    object_type = serializers.ChoiceField(
+        choices=("", *NetBoxObjectType.values), required=False, allow_blank=True, default=""
+    )
+    selected_id = serializers.UUIDField(required=False)
+
+
+class NetBoxChoicePageSerializer(serializers.Serializer):
+    results = NetBoxChoiceSerializer(many=True)
+    selected = NetBoxChoiceSerializer(allow_null=True)
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    count = serializers.IntegerField()
+    has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
 
 
@@ -136,6 +177,57 @@ class NetBoxReferenceCollectionView(APIView):
         return Response(NetBoxReferenceSerializer(reference).data, status=status.HTTP_201_CREATED)
 
 
+class NetBoxReferencePageView(APIView):
+    @extend_schema(
+        parameters=[NetBoxReferenceQuerySerializer],
+        responses={200: NetBoxReferenceResultSerializer},
+    )
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
+        query = NetBoxReferenceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        records = references_for_scope(workspace.data_scope)
+        if values["q"]:
+            search = (
+                Q(entity__display_name__icontains=values["q"])
+                | Q(entity__entity_type__icontains=values["q"])
+                | Q(object_type__icontains=values["q"])
+            )
+            if values["q"].isdigit():
+                search |= Q(object_id=int(values["q"]))
+            records = records.filter(search)
+        if values["object_type"]:
+            records = records.filter(object_type=values["object_type"])
+        order = values["ordering"]
+        descending = order.startswith("-")
+        field = {
+            "name": "entity__display_name",
+            "object_type": "object_type",
+            "object_id": "object_id",
+            "observed": "last_observed_at",
+        }[order.removeprefix("-")]
+        page = paginate(
+            records.order_by(f"-{field}" if descending else field, "id"),
+            page=values["page"],
+            page_size=values["page_size"],
+        )
+        return Response(
+            NetBoxReferenceResultSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "can_manage": context_has_permission(
+                        workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                    ),
+                }
+            ).data
+        )
+
+
 class NetBoxReferenceDetailView(APIView):
     @extend_schema(responses={204: None})
     def delete(self, request, reference_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -174,6 +266,79 @@ class NetBoxReferenceChoiceView(APIView):
                         workspace.member,
                         PermissionKey.NETWORKS_EDIT,
                         organization=workspace.organization,
+                    ),
+                }
+            ).data
+        )
+
+
+class NetBoxReferenceChoicePageView(APIView):
+    @extend_schema(
+        parameters=[NetBoxChoiceQuerySerializer],
+        responses={200: NetBoxChoicePageSerializer},
+    )
+    def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.NETWORKS_VIEW)
+        query = NetBoxChoiceQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        values = query.validated_data
+        linked = references_for_scope(workspace.data_scope).values_list("entity_id", flat=True)
+        records = eligible_entities(workspace.data_scope).exclude(id__in=linked)
+        if values["q"]:
+            records = records.filter(display_name__icontains=values["q"])
+        if values["object_type"]:
+            records = records.filter(entity_type=NETBOX_ENTITY_TYPES[values["object_type"]])
+        hardware_assets = (
+            ClientAsset.scoped.for_scope(workspace.data_scope)
+            .filter(archived_at__isnull=True, product__kind=CatalogProductKind.HARDWARE)
+            .values_list("entity_id", flat=True)
+        )
+        if values.get("object_type") == NetBoxObjectType.DEVICE:
+            records = records.filter(id__in=hardware_assets)
+        elif not values.get("object_type"):
+            records = records.filter(~Q(entity_type="client_asset") | Q(id__in=hardware_assets))
+        records = records.order_by("display_name", "id")
+        selected_record = (
+            eligible_entities(workspace.data_scope).filter(id=values["selected_id"]).first()
+            if "selected_id" in values else None
+        )
+        if selected_record is not None and references_for_scope(workspace.data_scope).filter(
+            entity_id=selected_record.id
+        ).exists():
+            selected_record = None
+        if (
+            selected_record is not None
+            and selected_record.entity_type == "client_asset"
+            and not ClientAsset.scoped.for_scope(workspace.data_scope).filter(
+                entity_id=selected_record.id,
+                archived_at__isnull=True,
+                product__kind=CatalogProductKind.HARDWARE,
+            ).exists()
+        ):
+            selected_record = None
+        inverse = {entity_type: object_type for object_type, entity_type in NETBOX_ENTITY_TYPES.items()}
+
+        def choice(entity: Entity) -> dict[str, object]:
+            return {
+                "id": entity.id,
+                "name": entity.display_name,
+                "entity_type": entity.entity_type,
+                "object_type": inverse[entity.entity_type],
+                "linked": False,
+            }
+
+        page = paginate(records, page=values["page"], page_size=values["page_size"])
+        return Response(
+            NetBoxChoicePageSerializer(
+                {
+                    "results": [choice(entity) for entity in page.records],
+                    "selected": choice(selected_record) if selected_record is not None else None,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "can_manage": context_has_permission(
+                        workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
                     ),
                 }
             ).data

@@ -37,13 +37,13 @@ const preferenceClient = { load: vi.fn().mockResolvedValue(defaultPreferences(['
 function render(children: ReactNode) { return rawRender(<ApplicationRouter>{children}</ApplicationRouter>) }
 
 describe('Networks', () => {
-  it('shows one simple network list without NetBox-style object tabs', async () => {
+  it('shows the network collection and exposes the separate NetBox register', async () => {
     render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
     expect(await screen.findByText('Office LAN')).toBeInTheDocument()
     expect(screen.getByText('Headquarters · Server room')).toBeInTheDocument()
     expect(screen.getByText('192.0.2.0/24')).toBeInTheDocument()
     expect(screen.queryByText('192.0.2.1–192.0.2.254')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'NetBox' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'NetBox' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Racks' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'IP addresses' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'MAC addresses' })).not.toBeInTheDocument()

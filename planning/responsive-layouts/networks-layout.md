@@ -5,11 +5,10 @@ Phase 3 (#80), required pre-1.0 under #60/#75. Version remains 0.8.46.
 ## Supported route boundary
 
 This checkpoint replaces the visible simplified Networks page at `/networks` and
-`/workspaces/organizations/:organizationId/networks`. It does not resurrect the old
-NetBox-style object tabs. `NetworkAddressing`, `NetworkEndpoints`, `NetworkServices`,
-`NetworkCircuits`, and related legacy components are not mounted by App.tsx today;
-their APIs remain supported and their interface disposition remains Phase 3 work.
-Do not mark every network object surface migrated based on this checkpoint.
+`/workspaces/organizations/:organizationId/networks`. Later Phase 3 checkpoints
+mounted the bounded object registers intentionally; see the linked child records
+and [NetBox identity register](netbox-identity-register.md). Do not mark the broad
+Networks routes complete until their combined acceptance work passes.
 
 The visible collection has curated name, location, VLAN and CIDR columns, personal
 column preferences and 25/50/100-row pages. Identity cannot be hidden. All supported
@@ -62,11 +61,10 @@ fixture lacked a CSRF cookie, so the real client correctly refused to send the
 request before the intended conflict simulation; a random per-page test cookie now
 allows the server-conflict assertion to exercise the intended path.
 
-Remaining: explicit disposition/migration of device/rack/addressing/interface/
-wireless/DNS/circuit/NetBox surfaces and child records; record relationships beyond
-the optional existing map; technician/assistive-technology acceptance; complete
-pre-1.0 release/recovery gates. The visible simplified page is not evidence that
-these other surfaces are complete. Detailed gate results follow in progress.md.
+The originally listed device/rack/addressing/interface/wireless/DNS/circuit/NetBox
+surfaces now have explicit responsive implementations and focused evidence.
+Remaining: technician/assistive-technology acceptance and complete pre-1.0
+production/release/recovery gates. Detailed gate results follow in progress.md.
 
 ## Child address follow-up
 

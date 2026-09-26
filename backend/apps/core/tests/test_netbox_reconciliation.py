@@ -8,6 +8,7 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import InstallationState, NetBoxReference, workspace_for_owner
+from apps.core.netbox_reconciliation import set_reference
 from apps.core.network_inventory import create_rack
 from apps.core.organizations import create_organization
 from apps.core.sites import create_site
@@ -186,6 +187,63 @@ def test_netbox_reference_and_deterministic_preview_are_exact_workspace(owner_cl
     assert removed.status_code == 204
     assert owner_client.get(collection).json() == []
     assert Client().get(collection).status_code in {401, 403}
+
+
+@pytest.mark.django_db
+def test_netbox_register_collections_are_bounded_searchable_and_workspace_exact(owner_client, installation):
+    client = _organization(installation, "Paged client")
+    sibling = _organization(installation, "Paged sibling")
+    racks = [_rack(installation, client, f"Rack {number:02d}") for number in range(1, 28)]
+    sibling_rack = _rack(installation, sibling, "Sibling only rack")
+    kwargs = {"organization_entity_id": client.entity_id}
+    choice_url = reverse("organization-netbox-reference-choice-collection", kwargs=kwargs)
+
+    first_choices = owner_client.get(choice_url, {"page": 1, "page_size": 25})
+    assert first_choices.status_code == 200
+    assert first_choices.json()["count"] == 27
+    assert len(first_choices.json()["results"]) == 25
+    assert first_choices.json()["has_more"] is True
+    selected = owner_client.get(choice_url, {"page": 1, "page_size": 25, "selected_id": racks[-1].entity_id})
+    assert selected.json()["selected"]["name"] == "Rack 27"
+    assert owner_client.get(choice_url, {"q": "Sibling"}).json()["count"] == 0
+
+    for number, rack in enumerate(racks[:26], start=1):
+        set_reference(
+            tenant=installation.tenant,
+            organization=client,
+            actor_id=installation.owner.id,
+            entity_id=rack.entity_id,
+            object_type="dcim.rack",
+            object_id=number,
+            fingerprint="",
+        )
+    set_reference(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        entity_id=sibling_rack.entity_id,
+        object_type="dcim.rack",
+        object_id=999,
+        fingerprint="",
+    )
+
+    collection_url = reverse("organization-netbox-reference-collection", kwargs=kwargs)
+    first = owner_client.get(collection_url, {"page": 1, "page_size": 25, "ordering": "name"})
+    assert first.status_code == 200
+    assert first.json()["count"] == 26
+    assert len(first.json()["results"]) == 25
+    assert first.json()["has_more"] is True
+    assert first.json()["can_manage"] is True
+    second = owner_client.get(collection_url, {"page": 2, "page_size": 25, "ordering": "name"})
+    assert [record["entity_name"] for record in second.json()["results"]] == ["Rack 26"]
+    off_page = owner_client.get(collection_url, {"q": "Rack 26", "page": 1, "page_size": 25})
+    assert [record["entity_name"] for record in off_page.json()["results"]] == ["Rack 26"]
+    by_identifier = owner_client.get(collection_url, {"q": "26"})
+    assert any(record["object_id"] == 26 for record in by_identifier.json()["results"])
+    assert owner_client.get(collection_url, {"object_type": "ipam.vlan"}).json()["count"] == 0
+    assert owner_client.get(collection_url, {"unexpected": "1"}).status_code == 400
+    assert owner_client.get(choice_url, {"unexpected": "1"}).status_code == 400
+    assert all(record["object_id"] != 999 for record in owner_client.get(collection_url).json()["results"])
 
 
 @pytest.mark.django_db(transaction=True)

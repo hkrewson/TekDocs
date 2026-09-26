@@ -1,8 +1,9 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { DocumentRecord, DocumentsClient } from '../documentation/api'
+import type { DocumentFile, DocumentRecord, DocumentsClient } from '../documentation/api'
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import { Files } from './Files'
 
 const document: DocumentRecord = {
@@ -16,13 +17,20 @@ const document: DocumentRecord = {
   attachments: [{ id: 'file-1', filename: 'firewall-runbook.pdf', media_type: 'application/pdf', size: 2048, checksum: 'b'.repeat(64), scan_status: 'clean', scan_engine: 'scanner', scanned_at: '2026-08-28T12:00:00Z', created_at: '2026-08-28T12:00:00Z' }],
 }
 
+const file: DocumentFile = {
+  id: 'file-1', document_id: document.id, document_title: document.title, filename: 'firewall-runbook.pdf',
+  kind: 'attachment', version: null, media_type: 'application/pdf', size: 2048, checksum: 'b'.repeat(64),
+  created_at: '2026-08-28T12:00:00Z',
+}
+
 describe('Files', () => {
   it('lists authorized document files with download and owning-document links', async () => {
     const client = {
-      list: vi.fn().mockResolvedValue({ results: [document], count: 1 }),
+      listFiles: vi.fn().mockResolvedValue({ results: [file], count: 1, page: 1, page_size: 25, has_more: false }),
       attachmentDownloadUrl: vi.fn().mockReturnValue('/api/files/file-1/download'),
     } as unknown as DocumentsClient
-    render(<MemoryRouter initialEntries={['/files?q=firewall']}><Files workspace={null} client={client} /></MemoryRouter>)
+    const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Files workspace={null} client={client} /></NavigationGuardProvider> }], { initialEntries: ['/files?q=firewall'] })
+    render(<RouterProvider router={router} />)
 
     expect(await screen.findByText('firewall-runbook.pdf')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
@@ -31,8 +39,9 @@ describe('Files', () => {
   })
 
   it('shows a truthful empty state when documents have no files', async () => {
-    const client = { list: vi.fn().mockResolvedValue({ results: [{ ...document, attachments: [], attachment_count: 0 }], count: 1 }) } as unknown as DocumentsClient
-    render(<MemoryRouter><Files workspace={null} client={client} /></MemoryRouter>)
+    const client = { listFiles: vi.fn().mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false }) } as unknown as DocumentsClient
+    const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Files workspace={null} client={client} /></NavigationGuardProvider> }], { initialEntries: ['/files'] })
+    render(<RouterProvider router={router} />)
     expect(await screen.findByText('No files have been added to documents in this workspace.')).toBeInTheDocument()
   })
 })

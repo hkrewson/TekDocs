@@ -3346,3 +3346,56 @@ def test_template_library_search_and_pages_cover_only_shared_msp_templates(owner
     assert empty["count"] == 0
     for query in ({"page": 0}, {"page_size": 101}, {"unknown": "value"}):
         assert owner_client.get(url, query).status_code == 400
+@pytest.mark.django_db
+def test_document_file_collection_is_bounded_searchable_and_workspace_scoped(owner_client, installation, tmp_path):
+    acme = organization(installation.tenant, "Acme file register")
+    beta = organization(installation.tenant, "Beta file register")
+    with override_settings(MEDIA_ROOT=tmp_path):
+        created = owner_client.post(
+            reverse("organization-document-list-create", kwargs={"organization_entity_id": acme.entity_id}),
+            {"title": "Acme operations", "markdown": "", "category": "reference"},
+            content_type="application/json",
+        ).json()
+        upload_url = reverse(
+            "organization-document-attachment-list-create",
+            kwargs={"organization_entity_id": acme.entity_id, "document_entity_id": created["id"]},
+        )
+        for index in range(1, 27):
+            response = owner_client.post(
+                upload_url,
+                {"file": SimpleUploadedFile(f"runbook-{index:02}.txt", b"safe UTF-8 notes")},
+            )
+            assert response.status_code == 201
+
+        beta_document = owner_client.post(
+            reverse("organization-document-list-create", kwargs={"organization_entity_id": beta.entity_id}),
+            {"title": "Beta private", "markdown": "", "category": "reference"},
+            content_type="application/json",
+        ).json()
+        owner_client.post(
+            reverse(
+                "organization-document-attachment-list-create",
+                kwargs={"organization_entity_id": beta.entity_id, "document_entity_id": beta_document["id"]},
+            ),
+            {"file": SimpleUploadedFile("beta-secret.txt", b"private notes")},
+        )
+
+        collection_url = reverse(
+            "organization-document-file-list", kwargs={"organization_entity_id": acme.entity_id}
+        )
+        first = owner_client.get(collection_url, {"ordering": "filename", "page": 1, "page_size": 25})
+        assert first.status_code == 200
+        assert first.json()["count"] == 26
+        assert len(first.json()["results"]) == 25
+        assert first.json()["has_more"] is True
+        assert first.json()["results"][0]["filename"] == "runbook-01.txt"
+
+        second = owner_client.get(collection_url, {"ordering": "filename", "page": 2, "page_size": 25})
+        assert [item["filename"] for item in second.json()["results"]] == ["runbook-26.txt"]
+        assert second.json()["has_more"] is False
+
+        searched = owner_client.get(collection_url, {"q": "runbook-26", "kind": "attachment"})
+        assert searched.status_code == 200
+        assert [item["filename"] for item in searched.json()["results"]] == ["runbook-26.txt"]
+        assert all(item["filename"] != "beta-secret.txt" for item in searched.json()["results"])
+        assert owner_client.get(collection_url, {"unsupported": "value"}).status_code == 400

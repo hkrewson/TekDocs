@@ -29,6 +29,7 @@ A 200% root CSS zoom stress case reproduced an oversized drawer in all maintaine
 ## Verification sources
 
 - `frontend/e2e/asset-layout.spec.ts`: 131 synthetic records, six widths at short heights, keyboard/focus, accessibility scan, drawer/full-record URLs, refresh, column save/reset, off-page identifier search, page-only selection, dirty preview actions, filtered-row departure and touch/CSS zoom.
+- The same matrix includes explicit organization-workspace checks at 390 and 1280 pixels in every maintained engine. Direct off-page preview and full-record URLs retain the client path, use only organization-scoped collection APIs, and return to the owning client collection.
 - `frontend/e2e/asset-edit-navigation.spec.ts`: registered dirty forms, Keep/Discard, browser Back/Forward, native unload and failed-save continuation across Chromium, Firefox and WebKit.
 - `frontend/src/inventory/Assets.test.tsx`: summary/detail separation, preference denial, missing direct record, failed preview saves, lifecycle/history failure and existing mutation regressions. Relationship and application tests cover the integrated routing/permission changes.
 - `frontend/e2e/live-workspace.spec.ts`: isolated browser-to-Django-to-PostgreSQL workflow, including created hardware/software, retained specifications, installation and addresses, with independent database verification. Existing user/demo data is untouched.

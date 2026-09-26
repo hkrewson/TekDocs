@@ -107,6 +107,8 @@ from .serializers import (
     DocumentAttachmentSerializer,
     DocumentAttachmentWriteSerializer,
     DocumentCreateSerializer,
+    DocumentFileQuerySerializer,
+    DocumentFileResultSerializer,
     DocumentListQuerySerializer,
     DocumentOperationsChoiceSerializer,
     DocumentOperationsWriteSerializer,
@@ -185,6 +187,59 @@ def _list(workspace: ResolvedWorkspace, request: Request) -> Response:
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
     return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
+
+
+def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
+    serializer = DocumentFileQuerySerializer(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    values = serializer.validated_data
+    queryset = DocumentAttachment.objects.filter(
+        document_id__in=documents_for_scope(workspace.data_scope).values("id"),
+        archived_at__isnull=True,
+    ).select_related("entity", "document__entity")
+    if values["q"]:
+        queryset = queryset.filter(
+            Q(original_filename__icontains=values["q"])
+            | Q(document__entity__display_name__icontains=values["q"])
+            | Q(media_type__icontains=values["q"])
+        )
+    if values["kind"]:
+        purpose = (
+            DocumentAttachmentPurpose.PRIMARY_FILE
+            if values["kind"] == "primary"
+            else DocumentAttachmentPurpose.ATTACHMENT
+        )
+        queryset = queryset.filter(purpose=purpose)
+    ordering = values["ordering"]
+    descending = ordering.startswith("-")
+    field = ordering.removeprefix("-")
+    ordering_fields = {
+        "filename": "original_filename",
+        "document": "document__entity__display_name",
+        "kind": "purpose",
+        "type": "media_type",
+        "size": "size",
+        "created_at": "created_at",
+    }
+    selected = ordering_fields[field]
+    if descending:
+        selected = f"-{selected}"
+    count = queryset.count()
+    page = values["page"]
+    page_size = int(values["page_size"])
+    start = (page - 1) * page_size
+    records = list(queryset.order_by(selected, "entity_id")[start : start + page_size])
+    return Response(
+        DocumentFileResultSerializer(
+            {
+                "results": records,
+                "count": count,
+                "page": page,
+                "page_size": page_size,
+                "has_more": start + page_size < count,
+            }
+        ).data
+    )
 
 
 def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) -> list[Document]:
@@ -1421,6 +1476,16 @@ class MSPDocumentListCreateView(APIView):
         return _create(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), request)
 
 
+class MSPDocumentFileListView(APIView):
+    @extend_schema(
+        operation_id="document_files_msp_list",
+        parameters=[DocumentFileQuerySerializer],
+        responses={200: DocumentFileResultSerializer},
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _files(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), request)
+
+
 class MSPDocumentSearchView(APIView):
     @extend_schema(
         operation_id="documents_msp_search",
@@ -1824,6 +1889,18 @@ class OrganizationDocumentListCreateView(APIView):
     )
     def post(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
         return _create(_organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), request)
+
+
+class OrganizationDocumentFileListView(APIView):
+    @extend_schema(
+        operation_id="document_files_organization_list",
+        parameters=[DocumentFileQuerySerializer],
+        responses={200: DocumentFileResultSerializer},
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _files(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), request
+        )
 
 
 class OrganizationDocumentSearchView(APIView):

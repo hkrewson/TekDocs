@@ -26,6 +26,12 @@ are tracked alongside the React router. Assets, Documentation/Files, Networks, a
 Contracts have implemented layouts with broader acceptance still open; they
 remain `in_progress` rather than being reported as unfinished screens.
 
+Assets now has explicit MSP and client-workspace browser coverage for off-page
+records, previews, section URLs and return context. Files now has a bounded
+server collection and responsive acceptance coverage in both workspace scopes.
+Those routes remain `in_progress` until the technician walkthrough and final
+release gates are complete.
+
 Every inventoried route is also part of the production-image refresh gate. The
 gate materializes dynamic and wildcard paths and checks local and HTTPS-proxy
 origins; focused query URLs cover the ten in-progress workspace routes. See

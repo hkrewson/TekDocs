@@ -15,6 +15,7 @@ Make Files a focused document workspace with primary-file history and attachment
 - Each PDF URL and retry starts a fresh viewer session. Previous page, scale, text and search state cannot carry into another file. Abandoned loads and searches cannot update the new session. Page/zoom changes cancel old canvas renders before reusing the canvas.
 - PDF failures provide a generic error, retry and the protected original download. Accessible text remains available after a same-page search. Escape restores focus to the originating file action; parent updates do not steal search focus.
 - The packaged Nginx server explicitly serves module workers as JavaScript while retaining standard MIME mappings, asset caching and security headers. The scrollable PDF canvas is keyboard focusable.
+- The standalone Files route now uses the bounded, searchable register described in [file-register.md](file-register.md). It loads file summaries from the server, supports full-collection filtering and ordering, and links each file back to its owning document without loading document bodies or histories.
 - No API, schema, permission, dependency or version change.
 
 ## Verification

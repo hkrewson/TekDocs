@@ -102,6 +102,26 @@ export type DocumentRecord = {
 }
 export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; scan_status: 'clean'; scan_engine: string; scanned_at: string; created_at: string }
 export type DocumentPrimaryFile = DocumentAttachment & { version_number: number; replaces_id: string | null; is_current: boolean }
+export type DocumentFile = {
+  id: string
+  document_id: string
+  document_title: string
+  filename: string
+  kind: 'primary' | 'attachment'
+  version: number | null
+  media_type: string
+  size: number
+  checksum: string
+  created_at: string
+}
+export type DocumentFileQuery = {
+  q?: string
+  kind?: '' | DocumentFile['kind']
+  ordering?: 'filename' | '-filename' | 'document' | '-document' | 'kind' | '-kind' | 'type' | '-type' | 'size' | '-size' | 'created_at' | '-created_at'
+  page?: number
+  page_size?: 25 | 50 | 100
+}
+export type DocumentFileResult = { results: DocumentFile[]; count: number; page: number; page_size: number; has_more: boolean }
 export type PublicationVerification = { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
 export type PublicationAudience = 'msp_internal' | 'client_visible'
 export type PublicationRetention = 'permanent' | 'review_on'
@@ -326,6 +346,7 @@ export class RevisionConflictError extends AuthRequestError {
 
 export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
+  listFiles(scope: DocumentScope, query: DocumentFileQuery, signal?: AbortSignal): Promise<DocumentFileResult>
   get(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentRecord>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
@@ -513,6 +534,15 @@ export const browserDocumentsClient: DocumentsClient = {
     if (filters.exclude_document) query.set('exclude_document', filters.exclude_document)
     const response = await fetch(`${collectionPath(scope)}/search${query.size ? `?${query}` : ''}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })
     return parse<DocumentResult>(response)
+  },
+  async listFiles(scope, query, signal) {
+    const parameters = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== '') parameters.set(key, String(value))
+    }
+    return parse<DocumentFileResult>(await fetch(`${collectionPath(scope)}/files?${parameters}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
   },
   async get(scope, id, signal) {
     return parse<DocumentRecord>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))

@@ -3,7 +3,9 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 const columns = ['name', 'model', 'status', 'assignment', 'site', 'warranty']
-async function fixtures(page: Page) {
+const organizationId = '00000000-0000-4000-8000-000000000081'
+
+async function fixtures(page: Page, organization = false, collectionRequests: string[] = []) {
   let preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
   const assets = Array.from({ length: 131 }, (_, index) => ({
     id: `asset-${index + 1}`, name: `Asset ${String(index + 1).padStart(3, '0')}${index === 0 ? ` ${'LongIdentifier'.repeat(15)}` : ''}`,
@@ -14,12 +16,17 @@ async function fixtures(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: { user: { id: 'owner', email: 'layout@example.invalid', display_name: 'Layout owner' }, tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', permissions: ['assets.view', 'assets.edit'], surface: 'msp', organization: null, mfa_enrollment_required: false } }))
+  if (organization) await page.route(`**/api/v1/workspaces/organizations/${organizationId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: organizationId, name: 'Regional Technology Group', classifications: ['client'], capabilities: ['overview', 'assets'],
+    organization: { id: organizationId, name: 'Regional Technology Group', legal_name: '', website: '', classifications: ['client'], access_mode: 'assigned_only', created_at: '2026-09-25T12:00:00Z', updated_at: '2026-09-25T12:00:00Z' },
+  } }))
   await page.route('**/collection-preferences/assets', (route) => {
     if (route.request().method() === 'PUT') preferences = { ...preferences, ...route.request().postDataJSON() as { columns: string[]; page_size: number } }
     if (route.request().method() === 'DELETE') preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
     return route.fulfill({ json: preferences })
   })
   await page.route('**/assets/collection?*', (route) => {
+    collectionRequests.push(route.request().url())
     const params = new URL(route.request().url()).searchParams
     const size = Number(params.get('page_size') ?? 25), pageNumber = Number(params.get('page') ?? 1)
     let found = assets.filter((asset) => `${asset.name} ${asset.hardware.serial_number}`.includes(params.get('search') ?? ''))
@@ -121,6 +128,36 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('link', { name: 'Back to assets' }).click()
     await expect(page.getByText('131 assets', { exact: true })).toBeVisible()
+  })
+}
+
+for (const width of [390, 1280]) {
+  test(`Organization assets preserve their workspace at ${width}px`, async ({ page }) => {
+    const collectionRequests: string[] = []
+    const assets = await fixtures(page, true, collectionRequests)
+    await page.setViewportSize({ width, height: 600 })
+    const path = `/workspaces/organizations/${organizationId}/assets`
+    await page.goto(`${path}?preview=asset-131&section=network`)
+
+    const drawer = page.getByRole('dialog', { name: assets[130].name })
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByRole('heading', { name: 'MAC addresses' })).toBeVisible()
+    await expect(drawer.getByRole('link', { name: 'Open in full page' })).toHaveAttribute('href', `${path}?record=asset-131&section=network`)
+    expect(collectionRequests.some((url) => url.includes(`/workspaces/organizations/${organizationId}/assets/collection?`))).toBe(true)
+    expect(collectionRequests.some((url) => url.includes('/workspaces/msp/assets/collection?'))).toBe(false)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+
+    await dismissDrawer(page, drawer)
+    await expect(drawer).toHaveCount(0)
+    await expect(page).toHaveURL(path)
+    await expect(page.getByRole('button', { name: 'Asset 001', exact: false }).first()).toBeVisible()
+
+    await page.goto(`${path}?record=asset-131&section=network`)
+    await expect(page.getByRole('heading', { level: 1, name: assets[130].name })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'MAC addresses' })).toBeVisible()
+    await page.getByRole('link', { name: 'Back to assets' }).click()
+    await expect(page).toHaveURL(path)
   })
 }
 

@@ -33,6 +33,15 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/revisions?page=3&page_size=50')
   })
 
+  it('requests the bounded workspace file register without loading document records', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 2, page_size: 25, has_more: false }), { status: 200 }))
+    await browserDocumentsClient.listFiles(
+      { organizationId: 'client/id' },
+      { q: 'recovery & router', kind: 'attachment', ordering: '-created_at', page: 2, page_size: 25 },
+    )
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/client%2Fid/documents/files?q=recovery+%26+router&kind=attachment&ordering=-created_at&page=2&page_size=25')
+  })
+
   it('adds a pinned placement inside the selected organization route with CSRF', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     const fetchMock = vi

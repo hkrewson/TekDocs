@@ -211,7 +211,9 @@
     "evidence": [
       "planning/responsive-layouts/document-workspace.md",
       "planning/responsive-layouts/managed-files-and-pdf.md",
+      "planning/responsive-layouts/file-register.md",
       "frontend/src/files/Files.test.tsx",
+      "frontend/e2e/files-layout.spec.ts",
       "frontend/e2e/document-files.spec.ts",
       "planning/responsive-layouts/production-route-acceptance.md"
     ],
@@ -664,7 +666,9 @@
     "evidence": [
       "planning/responsive-layouts/document-workspace.md",
       "planning/responsive-layouts/managed-files-and-pdf.md",
+      "planning/responsive-layouts/file-register.md",
       "frontend/src/files/Files.test.tsx",
+      "frontend/e2e/files-layout.spec.ts",
       "frontend/e2e/document-files.spec.ts",
       "planning/responsive-layouts/production-route-acceptance.md"
     ],

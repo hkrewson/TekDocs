@@ -176,6 +176,7 @@
   "files.added": "Added",
   "files.version": "version {version}",
   "files.download": "Download",
+  "files.count": "{count} files",
   "pdf.unavailable": "PDF unavailable",
   "pdf.loadFailed": "The PDF could not be opened.",
   "pdf.renderFailed": "This page could not be displayed.",

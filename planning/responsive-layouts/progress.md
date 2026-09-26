@@ -2,6 +2,31 @@
 
 Updated 2026-09-18. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 5/8 bounded Files register checkpoint — 2026-09-25
+
+The standalone Files route no longer derives an incomplete register from one page of
+full document records. New MSP and organization file-summary APIs apply authorized
+search, file-use filtering, deterministic ordering, and 25/50/100 paging over the
+complete visible workspace. The responsive register retains file identity, owning
+document and protected download links, URL state, personal columns, explicit
+loading/empty/error states, and long-value access without loading document bodies,
+placements, publications, or history. See [file-register.md](file-register.md).
+
+The focused backend case passes with 26 files across two pages, off-page search,
+strict query validation, and sibling-client isolation. Component and API-client
+checks pass. The 24-case maintained-browser matrix covers six widths plus explicit
+390/1280 organization routes in Chromium, Firefox, and WebKit, including API-boundary
+assertions, accessibility, column persistence, long content, and page overflow.
+
+## Phase 8 Assets client-workspace acceptance checkpoint — 2026-09-25
+
+Assets now has explicit organization-workspace acceptance at 390 and 1280 pixels in
+all maintained engines. Direct off-page drawer and full-record Network links retain
+the client route, call only the client collection boundary, pass accessibility and
+overflow checks, and return to the owning client collection. The complete Assets
+matrix passes all 99 Chromium, Firefox, and WebKit cases across the six required
+widths. Technician walkthroughs and final release/recovery gates remain open.
+
 ## Phase 8 production route refresh checkpoint — 2026-09-25
 
 The production frontend routing gate now derives concrete refresh paths from all

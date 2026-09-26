@@ -3383,6 +3383,99 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/documents/files:
+    get:
+      operationId: document_files_msp_list
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - primary
+          - attachment
+          type: string
+          x-spec-enum-id: d5fc1b2669039e72
+          default: ''
+        description: "* `` - \n* `primary` - primary\n* `attachment` - attachment"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - filename
+          - -filename
+          - document
+          - -document
+          - kind
+          - -kind
+          - type
+          - -type
+          - size
+          - -size
+          - created_at
+          - -created_at
+          type: string
+          x-spec-enum-id: b1240c59039d946a
+          default: -created_at
+          minLength: 1
+        description: |-
+          * `filename` - filename
+          * `-filename` - -filename
+          * `document` - document
+          * `-document` - -document
+          * `kind` - kind
+          * `-kind` - -kind
+          * `type` - type
+          * `-type` - -type
+          * `size` - size
+          * `-size` - -size
+          * `created_at` - created_at
+          * `-created_at` - -created_at
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      tags:
+      - documents
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFileResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/documents/from-template:
     post:
       operationId: document_templates_msp_instantiate
@@ -20472,6 +20565,105 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/documents/files:
+    get:
+      operationId: document_files_organization_list
+      parameters:
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - primary
+          - attachment
+          type: string
+          x-spec-enum-id: d5fc1b2669039e72
+          default: ''
+        description: "* `` - \n* `primary` - primary\n* `attachment` - attachment"
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - filename
+          - -filename
+          - document
+          - -document
+          - kind
+          - -kind
+          - type
+          - -type
+          - size
+          - -size
+          - created_at
+          - -created_at
+          type: string
+          x-spec-enum-id: b1240c59039d946a
+          default: -created_at
+          minLength: 1
+        description: |-
+          * `filename` - filename
+          * `-filename` - -filename
+          * `document` - document
+          * `-document` - -document
+          * `kind` - kind
+          * `-kind` - -kind
+          * `type` - type
+          * `-type` - -type
+          * `size` - size
+          * `-size` - -size
+          * `created_at` - created_at
+          * `-created_at` - -created_at
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          enum:
+          - 25
+          - 50
+          - 100
+          type: integer
+          x-spec-enum-id: 73dd9410cc002acc
+          default: 25
+        description: |-
+          * `25` - 25
+          * `50` - 50
+          * `100` - 100
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentFileResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/from-template:
     post:
       operationId: document_templates_organization_instantiate
@@ -34620,6 +34812,66 @@ components:
       required:
       - count
       - value
+    DocumentFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        document_title:
+          type: string
+        filename:
+          type: string
+        kind:
+          type: string
+          readOnly: true
+        version:
+          type: integer
+          nullable: true
+        media_type:
+          type: string
+        size:
+          type: integer
+        checksum:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - checksum
+      - created_at
+      - document_id
+      - document_title
+      - filename
+      - id
+      - kind
+      - media_type
+      - size
+      - version
+    DocumentFileResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentFile'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
     DocumentKey:
       type: object
       properties:

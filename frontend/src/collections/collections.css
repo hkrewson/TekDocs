@@ -15,6 +15,7 @@
 .collection-table .collection-selection { width: 2.5rem; }
 .collection-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; font: inherit; font-weight: 600; background: none; border: 0; color: var(--text); padding: 0; cursor: pointer; overflow-wrap: anywhere; }
 .collection-secondary { display: block; margin-block-start: .2rem; color: var(--muted); font-size: .8rem; }
+.collection-file-download { display: inline-flex; align-items: center; gap: .35rem; margin-block-start: .4rem; }
 .collection-record-link { display: inline-block; margin-block-start: .4rem; font-size: .875rem; }
 .collection-cell-label, .collection-mobile-order { display: none; }
 .collection-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(64rem, 90%); height: auto; max-width: 100%; max-height: none; padding: 0; border: 0; border-left: 1px solid var(--border); background: var(--surface); color: var(--text); overflow: hidden; }

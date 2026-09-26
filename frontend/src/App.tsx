@@ -473,7 +473,7 @@ function OrganizationAreaRoute({ state, area, peopleClient, sitesClient, customF
   if (area === 'sites') return <Sites workspace={state.workspace} client={sitesClient} customFieldsClient={customFieldsClient} />
   if (area === 'custom_fields') return <CustomFields workspace={state.workspace} client={customFieldsClient} />
   if (area === 'documentation') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={state.workspace} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={initialDocumentId} /></Suspense>
-  if (area === 'files') return <Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={state.workspace} client={documentsClient} /></Suspense>
+  if (area === 'files') return <Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={state.workspace} preferenceWorkspace={state.workspace} client={documentsClient} /></Suspense>
   if (area === 'credentials') return <CredentialReferences workspace={state.workspace} client={credentialReferencesClient} />
   if (area === 'products') return <Products workspace={state.workspace} client={catalogClient} />
   if (area === 'assets') return <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingAssets')}</section>}><Assets workspace={state.workspace} client={inventoryClient} /></Suspense>
@@ -627,7 +627,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Suspense fallback={<section role="status">{translate('collections.loading')}</section>}><Overview /></Suspense>} />
             <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
-            <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={null} client={documentsClient} /></Suspense>} />
+            <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={null} preferenceWorkspace={mspWorkspace} client={documentsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />
             <Route path="/people" element={<People workspace={null} client={peopleClient} sitesClient={sitesClient} />} />
             <Route path="/sites" element={<Sites workspace={null} client={sitesClient} customFieldsClient={customFieldsClient} />} />

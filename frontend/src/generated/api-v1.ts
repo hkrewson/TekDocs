@@ -1044,6 +1044,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/files": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_files_msp_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/from-template": {
         readonly parameters: {
             readonly query?: never;
@@ -5512,6 +5528,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/files": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["document_files_organization_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/from-template": {
         readonly parameters: {
             readonly query?: never;
@@ -9437,6 +9469,28 @@ export interface components {
         readonly DocumentFacet: {
             readonly value: string;
             readonly count: number;
+        };
+        readonly DocumentFile: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly document_id: string;
+            readonly document_title: string;
+            readonly filename: string;
+            readonly kind: string;
+            readonly version: number | null;
+            readonly media_type: string;
+            readonly size: number;
+            readonly checksum: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly DocumentFileResult: {
+            readonly results: readonly components["schemas"]["DocumentFile"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
         };
         readonly DocumentKey: {
             readonly expression: string;
@@ -17289,6 +17343,57 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Document"];
+                };
+            };
+        };
+    };
+    readonly document_files_msp_list: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `primary` - primary
+                 *     * `attachment` - attachment
+                 */
+                readonly kind?: "" | "primary" | "attachment";
+                /**
+                 * @description * `filename` - filename
+                 *     * `-filename` - -filename
+                 *     * `document` - document
+                 *     * `-document` - -document
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `type` - type
+                 *     * `-type` - -type
+                 *     * `size` - size
+                 *     * `-size` - -size
+                 *     * `created_at` - created_at
+                 *     * `-created_at` - -created_at
+                 */
+                readonly ordering?: "filename" | "-filename" | "document" | "-document" | "kind" | "-kind" | "type" | "-type" | "size" | "-size" | "created_at" | "-created_at";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentFileResult"];
                 };
             };
         };
@@ -29594,6 +29699,59 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["Document"];
+                };
+            };
+        };
+    };
+    readonly document_files_organization_list: {
+        readonly parameters: {
+            readonly query?: {
+                /**
+                 * @description * `` -
+                 *     * `primary` - primary
+                 *     * `attachment` - attachment
+                 */
+                readonly kind?: "" | "primary" | "attachment";
+                /**
+                 * @description * `filename` - filename
+                 *     * `-filename` - -filename
+                 *     * `document` - document
+                 *     * `-document` - -document
+                 *     * `kind` - kind
+                 *     * `-kind` - -kind
+                 *     * `type` - type
+                 *     * `-type` - -type
+                 *     * `size` - size
+                 *     * `-size` - -size
+                 *     * `created_at` - created_at
+                 *     * `-created_at` - -created_at
+                 */
+                readonly ordering?: "filename" | "-filename" | "document" | "-document" | "kind" | "-kind" | "type" | "-type" | "size" | "-size" | "created_at" | "-created_at";
+                readonly page?: number;
+                /**
+                 * @description * `25` - 25
+                 *     * `50` - 50
+                 *     * `100` - 100
+                 */
+                readonly page_size?: 25 | 50 | 100;
+                readonly q?: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentFileResult"];
                 };
             };
         };

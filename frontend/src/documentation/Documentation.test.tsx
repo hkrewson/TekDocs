@@ -103,6 +103,7 @@ function clients() {
   const requestReview = vi.fn().mockResolvedValue({ ...document, review_state: 'pending' as const, reviewer_id: 'reviewer-1', reviewer_name: 'Alex Rivera', health_status: 'pending' as const })
   const documents: DocumentsClient = {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
+    listFiles: vi.fn().mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false }),
     get: getDocument,
     create: createDocument,
     createFileBacked,

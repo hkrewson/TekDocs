@@ -139,6 +139,7 @@ from apps.core.document_views import (
     MSPDocumentBlockLibraryView,
     MSPDocumentDetailView,
     MSPDocumentExportView,
+    MSPDocumentFileListView,
     MSPDocumentListCreateView,
     MSPDocumentMentionSearchView,
     MSPDocumentOperationsChoicesView,
@@ -175,6 +176,7 @@ from apps.core.document_views import (
     OrganizationDocumentBlockLibraryView,
     OrganizationDocumentDetailView,
     OrganizationDocumentExportView,
+    OrganizationDocumentFileListView,
     OrganizationDocumentListCreateView,
     OrganizationDocumentMentionSearchView,
     OrganizationDocumentOperationsChoicesView,
@@ -585,6 +587,7 @@ urlpatterns = [
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),
+    path("api/v1/documents/files", MSPDocumentFileListView.as_view(), name="msp-document-file-list"),
     path("api/v1/documents/topic-schemas", DocumentTopicSchemaView.as_view(), name="document-topic-schemas"),
     path("api/v1/documents/search", MSPDocumentSearchView.as_view(), name="msp-document-search"),
     path(
@@ -1615,6 +1618,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents",
         OrganizationDocumentListCreateView.as_view(),
         name="organization-document-list-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/files",
+        OrganizationDocumentFileListView.as_view(),
+        name="organization-document-file-list",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/search",

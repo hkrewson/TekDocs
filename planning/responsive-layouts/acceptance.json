@@ -37,5 +37,103 @@
     "authorized-api",
     "live-runtime"
   ],
-  "default_status": "pending"
+  "default_status": "pending",
+  "workspace_acceptance": [
+    {
+      "id": "assets",
+      "routes": [
+        "/assets",
+        "/workspaces/organizations/:organizationId/assets"
+      ],
+      "automated_status": "complete",
+      "automated_evidence": [
+        "frontend/e2e/asset-layout.spec.ts",
+        "frontend/e2e/asset-edit-navigation.spec.ts",
+        "frontend/src/inventory/Assets.test.tsx"
+      ],
+      "live_runtime_evidence": "frontend/e2e/live-workspace.spec.ts",
+      "production_route_evidence": "planning/responsive-layouts/production-route-acceptance.md",
+      "recovery_rehearsals": [
+        "tests/rehearsals/rehearse-inventory-backup.sh",
+        "tests/rehearsals/rehearse-inventory-upgrade.sh"
+      ],
+      "human_review": {
+        "status": "pending",
+        "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
+      }
+    },
+    {
+      "id": "contracts",
+      "routes": [
+        "/services",
+        "/workspaces/organizations/:organizationId/services"
+      ],
+      "automated_status": "complete",
+      "automated_evidence": [
+        "frontend/e2e/contract-layout.spec.ts",
+        "frontend/src/commercial/Contracts.test.tsx",
+        "backend/apps/core/tests/test_commercial.py"
+      ],
+      "live_runtime_evidence": "frontend/e2e/live-workspace.spec.ts",
+      "production_route_evidence": "planning/responsive-layouts/production-route-acceptance.md",
+      "recovery_rehearsals": [
+        "tests/rehearsals/rehearse-inventory-backup.sh",
+        "tests/rehearsals/rehearse-inventory-upgrade.sh"
+      ],
+      "human_review": {
+        "status": "pending",
+        "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
+      }
+    },
+    {
+      "id": "networks",
+      "routes": [
+        "/networks",
+        "/workspaces/organizations/:organizationId/networks"
+      ],
+      "automated_status": "complete",
+      "automated_evidence": [
+        "frontend/e2e/network-layout.spec.ts",
+        "frontend/e2e/network-workspace-acceptance.spec.ts",
+        "frontend/src/networks/Networks.test.tsx"
+      ],
+      "live_runtime_evidence": "frontend/e2e/live-workspace.spec.ts",
+      "production_route_evidence": "planning/responsive-layouts/production-route-acceptance.md",
+      "recovery_rehearsals": [
+        "tests/rehearsals/rehearse-network-backup.sh",
+        "tests/rehearsals/rehearse-network-upgrade.sh"
+      ],
+      "human_review": {
+        "status": "pending",
+        "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
+      }
+    },
+    {
+      "id": "documentation_files",
+      "routes": [
+        "/documentation",
+        "/files",
+        "/workspaces/organizations/:organizationId/documentation",
+        "/workspaces/organizations/:organizationId/files"
+      ],
+      "automated_status": "complete",
+      "automated_evidence": [
+        "frontend/e2e/document-libraries.spec.ts",
+        "frontend/e2e/document-operations.spec.ts",
+        "frontend/e2e/document-direct-links.spec.ts",
+        "frontend/e2e/files-layout.spec.ts",
+        "frontend/e2e/document-files.spec.ts"
+      ],
+      "live_runtime_evidence": "frontend/e2e/live-workspace.spec.ts",
+      "production_route_evidence": "planning/responsive-layouts/production-route-acceptance.md",
+      "recovery_rehearsals": [
+        "tests/rehearsals/rehearse-documentation-backup.sh",
+        "tests/rehearsals/rehearse-documentation-upgrade.sh"
+      ],
+      "human_review": {
+        "status": "pending",
+        "record": "planning/responsive-layouts/phase-8-technician-walkthrough.md"
+      }
+    }
+  ]
 }

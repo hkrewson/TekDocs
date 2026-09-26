@@ -2,6 +2,23 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 8 enforced acceptance ledger — 2026-09-25
+
+The ten remaining `in_progress` workspace routes are now grouped into Assets,
+Contracts, Networks, and Documentation/Files in `acceptance.json`. Each group points
+to its component/browser evidence, the real browser-to-Django-to-PostgreSQL journey,
+production-route evidence, applicable backup/upgrade rehearsals, and the shared
+human walkthrough record. A new project check rejects missing routes, duplicate
+coverage, stale/nonexistent evidence, relaxed viewport requirements, and human
+completion without reviewer/date attribution.
+
+The companion technician and assistive-technology record defines repeatable desktop
+keyboard, touch/mobile, screen-reader, and native 200% zoom profiles, common tasks,
+group-specific journeys, and a result table. It deliberately keeps all human statuses
+pending until a person performs and records those checks. This removes the former
+ambiguous “broader acceptance” boundary without claiming human evidence that does
+not exist. Final release-candidate recovery/release gates remain separate.
+
 ## Phase 5/8 Documentation-to-Files acceptance checkpoint — 2026-09-25
 
 The bounded Files register now has an explicit journey into the focused document

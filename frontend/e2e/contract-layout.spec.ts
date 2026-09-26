@@ -3,8 +3,11 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 
 const columns = ['name', 'provider', 'kind', 'status', 'renews_on', 'ends_on']
-async function fixtures(page: Page, costsAllowed = true) {
+const organizationId = '00000000-0000-4000-8000-000000000080'
+
+async function fixtures(page: Page, costsAllowed = true, organization = false) {
   let preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
+  const collectionRequests: string[] = []
   const contracts = Array.from({ length: 131 }, (_, index) => ({
     id: `contract-${index + 1}`, name: `Contract ${String(index + 1).padStart(3, '0')}${index === 0 ? ` ${'LongIdentifier'.repeat(15)}` : ''}`,
     provider_id: 'provider-1', provider_name: 'Synthetic provider', kind: 'support', status: 'active',
@@ -18,12 +21,17 @@ async function fixtures(page: Page, costsAllowed = true) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: { user: { id: 'owner', email: 'layout@example.invalid', display_name: 'Layout owner' }, tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', permissions: ['assets.view', 'assets.edit'], surface: 'msp', organization: null, mfa_enrollment_required: false } }))
+  if (organization) await page.route(`**/api/v1/workspaces/organizations/${organizationId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: organizationId, name: 'Regional Technology Group', classifications: ['client'], capabilities: ['overview', 'services'],
+    organization: { id: organizationId, name: 'Regional Technology Group', legal_name: '', website: '', classifications: ['client'], access_mode: 'assigned_only', created_at: '2026-09-25T12:00:00Z', updated_at: '2026-09-25T12:00:00Z' },
+  } }))
   await page.route('**/collection-preferences/contracts', (route) => {
     if (route.request().method() === 'PUT') preferences = { ...preferences, ...route.request().postDataJSON() as { columns: string[]; page_size: number } }
     if (route.request().method() === 'DELETE') preferences = { columns, available_columns: columns, default_columns: columns, page_size: 25 }
     return route.fulfill({ json: preferences })
   })
   await page.route('**/contracts?*', (route) => {
+    collectionRequests.push(route.request().url())
     const params = new URL(route.request().url()).searchParams
     const size = Number(params.get('page_size') ?? 25), pageNumber = Number(params.get('page') ?? 1)
     let found = contracts.filter((item) => `${item.name} ${item.reference}`.includes(params.get('q') ?? ''))
@@ -39,7 +47,7 @@ async function fixtures(page: Page, costsAllowed = true) {
     return route.fulfill(record ? { json: record } : { status: 404, json: {} })
   })
   await page.route('**/contracts/providers', (route) => route.fulfill({ json: { results: [{ id: 'provider-1', name: 'Synthetic provider' }] } }))
-  return contracts
+  return { contracts, collectionRequests }
 }
 
 async function section(page: Page, container: Locator, name: string) {
@@ -49,7 +57,7 @@ async function section(page: Page, container: Locator, name: string) {
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   test(`Contracts list and full drawer fit ${width}px`, async ({ page }) => {
-    const records = await fixtures(page)
+    const { contracts: records } = await fixtures(page)
     await page.setViewportSize({ width, height: 600 })
     const details: string[] = []
     page.on('request', (request) => { if (/\/contracts\/contract-\d+$/.test(request.url())) details.push(request.url()) })
@@ -92,6 +100,29 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await page.getByRole('link', { name: 'Back to contracts' }).click()
     await expect(page.getByText('131 contracts', { exact: true })).toBeVisible()
+  })
+}
+
+for (const width of [390, 1280]) {
+  test(`Organization contracts preserve their workspace at ${width}px`, async ({ page }) => {
+    const { contracts, collectionRequests } = await fixtures(page, true, true)
+    await page.setViewportSize({ width, height: 600 })
+    const path = `/workspaces/organizations/${organizationId}/services`
+    await page.goto(`${path}?preview=contract-131&section=costs`)
+
+    const drawer = page.getByRole('dialog', { name: contracts[130].name })
+    await expect(drawer).toBeVisible()
+    await expect(drawer.getByText(/USD 100.00/)).toBeVisible()
+    expect(collectionRequests.some((url) => url.includes(`/workspaces/organizations/${organizationId}/contracts?`))).toBe(true)
+    expect(collectionRequests.some((url) => url.includes('/workspaces/msp/contracts?'))).toBe(false)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    expect((await new AxeBuilder({ page }).include('.collection-drawer').analyze()).violations).toEqual([])
+
+    if (width < 768) await drawer.getByRole('link', { name: 'Back to contracts' }).click()
+    else await page.mouse.click(10, 100)
+    await expect(drawer).toHaveCount(0)
+    await expect(page).toHaveURL(path)
+    await expect(page.getByRole('button', { name: 'Contract 001', exact: false }).first()).toBeVisible()
   })
 }
 

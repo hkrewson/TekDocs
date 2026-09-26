@@ -26,6 +26,13 @@ are tracked alongside the React router. Assets, Documentation/Files, Networks, a
 Contracts have implemented layouts with broader acceptance still open; they
 remain `in_progress` rather than being reported as unfinished screens.
 
+Every inventoried route is also part of the production-image refresh gate. The
+gate materializes dynamic and wildcard paths and checks local and HTTPS-proxy
+origins; focused query URLs cover the ten in-progress workspace routes. See
+[production-route-acceptance.md](production-route-acceptance.md). This closes the
+production routing/public-port portion of Phase 8 without claiming the remaining
+authenticated technician walkthroughs.
+
 ## State coverage
 
 Each route records the states that apply to it and links to the component,
@@ -41,8 +48,9 @@ instead of duplicating their complete state matrices.
 - `python3 -m unittest scripts.tests.test_check_responsive_route_inventory`
 - `make check-responsive-route-inventory`
 - `make check` at the completed checkpoint
+- `make test-frontend-routing`
 
-This checkpoint does not claim technician walkthrough, production-image,
-upgrade/recovery, security, or final release acceptance. Those remain later
-Phase 8 gates. Production deployment, external push, Wiki publication, and a
-version change remain separate work.
+This checkpoint does not claim technician walkthrough, full production-stack,
+upgrade/recovery, security, or final release acceptance. Those remain later Phase
+8 gates. Production deployment, external push, Wiki publication, and a version
+change remain separate work.

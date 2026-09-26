@@ -3,11 +3,43 @@
 Run through make test-frontend-routing; the disposable container has no data volumes.
 """
 import http.client
+import json
 import os
 import re
 import subprocess
 import time
 import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+ROUTE_INVENTORY = ROOT / 'planning' / 'responsive-layouts' / 'routes.json'
+
+
+def refresh_path(route: str) -> str:
+    """Turn a React route pattern into one concrete browser-refresh path."""
+    if route == '*':
+        return '/phase-8-unknown-route'
+    path = route.replace(':organizationId', 'synthetic-organization')
+    if path.endswith('/*'):
+        path = path[:-1] + 'phase-8-unknown-route'
+    return path
+
+
+def supported_refresh_paths() -> list[str]:
+    routes = json.loads(ROUTE_INVENTORY.read_text(encoding='utf-8'))
+    paths = [refresh_path(item['route']) for item in routes]
+    focused_states = {
+        '/assets': '?preview=synthetic-asset&section=history',
+        '/documentation': '?document=synthetic-document&section=history',
+        '/files': '?file=synthetic-file',
+        '/networks': '?network=synthetic-network&section=history',
+        '/services': '?contract=synthetic-contract&section=history',
+    }
+    for path, query in focused_states.items():
+        paths.append(path + query)
+        paths.append(f'/workspaces/organizations/synthetic-organization{path}{query}')
+    return paths
 
 
 class FrontendRoutingTests(unittest.TestCase):
@@ -43,12 +75,11 @@ class FrontendRoutingTests(unittest.TestCase):
         finally:
             connection.close()
 
-    def test_refresh_preserves_public_origin_and_serves_entry_document(self):
+    def test_every_supported_route_refresh_preserves_public_origin(self):
         index = self.request('/index.html')[2]
         for headers in ({'Host': 'localhost:3200'},
                         {'Host': 'docs.example.invalid', 'X-Forwarded-Proto': 'https'}):
-            for path in ('/assets', '/assets/', '/assets?preview=synthetic&section=network',
-                         '/organizations/synthetic/assets', '/networks'):
+            for path in supported_refresh_paths():
                 with self.subTest(path=path, headers=headers):
                     status, response_headers, body = self.request(path, headers)
                     self.assertEqual(status, 200)
@@ -56,6 +87,11 @@ class FrontendRoutingTests(unittest.TestCase):
                     self.assertEqual(body, index)
                     self.assertIn('no-cache', response_headers.get('Cache-Control', ''))
                     self.assertIn('Content-Security-Policy', response_headers)
+
+    def test_route_inventory_produces_unique_refresh_paths(self):
+        paths = supported_refresh_paths()
+        self.assertEqual(len(paths), len(set(paths)))
+        self.assertGreaterEqual(len(paths), 71)
 
     def test_hashed_files_keep_cache_and_missing_chunks_do_not_return_html(self):
         index = self.request('/index.html')[2].decode()

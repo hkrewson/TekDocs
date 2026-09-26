@@ -16,8 +16,11 @@ export function QuickDrawer({ title, children, onClose, returnFocusId, returnHre
     heading.current?.focus({ preventScroll: true })
     return () => {
       dialog.close(); document.body.style.overflow = overflow
-      if (previous?.isConnected && previous !== document.body) previous.focus({ preventScroll: true })
-      else if (returnFocusId) document.getElementById(returnFocusId)?.focus({ preventScroll: true })
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        if (document.querySelector('dialog.collection-drawer[open]')) return
+        if (returnFocusId) document.getElementById(returnFocusId)?.focus({ preventScroll: true })
+        else if (previous?.isConnected && previous !== document.body) previous.focus({ preventScroll: true })
+      }))
     }
   }, [returnFocusId])
   return <dialog ref={ref} className="collection-drawer" aria-labelledby={titleId} onPointerDown={(event) => { pressedOutside.current = event.button === 0 && isBackdrop(event) }} onPointerCancel={() => { pressedOutside.current = false }} onClick={(event) => {

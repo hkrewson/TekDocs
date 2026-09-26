@@ -2,6 +2,48 @@
 
 Updated 2026-09-18. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 8 production route refresh checkpoint — 2026-09-25
+
+The production frontend routing gate now derives concrete refresh paths from all
+61 entries in the enforced responsive route inventory. It covers both local
+published-port and HTTPS-proxy origins, organization path parameters, wildcard
+fallbacks, and focused record-state URLs for Assets, Documentation, Files,
+Networks, and Contracts in MSP and organization workspaces. Each response must
+serve the exact production entry document with no redirect, revalidation caching,
+and the production content-security policy. This extends the earlier Assets-only
+port correction across the complete supported application surface.
+
+The production image remains disposable and has no application data volumes.
+Hashed asset caching, missing-chunk behavior, PDF-worker MIME handling, and
+relative Nginx directory redirects retain their existing assertions. The final
+`make test-frontend-routing` run passes all five tests, covering 71 concrete paths
+through both public origins. This is production routing evidence rather than
+authenticated technician, upgrade/recovery, deployment, or release approval.
+Version remains 0.8.46.
+
+## Phase 8 Contracts workspace acceptance checkpoint — 2026-09-25
+
+Contracts now has explicit client-workspace acceptance instead of relying on MSP
+coverage and API-unit inference. Direct off-page Costs links use the organization
+collection/detail boundary, never the MSP boundary, and return to the owning client
+route. Mobile and desktop organization checks include accessibility, overflow, and
+drawer dismissal in all maintained engines. The complete focused Contracts matrix
+passes 36 cases across Chromium, Firefox, and WebKit.
+
+The acceptance run found that WebKit returned focus to the shell's main region after
+Escape instead of the contract row. The shared drawer now waits for the route focus
+cycle and restores the explicit record trigger. Assets, Contracts, and Networks pass
+their remembered row IDs, retaining collection-heading fallback for direct links.
+All 12 WebKit reference collection/drawer cases for Assets and Networks pass at the
+six required widths after the correction. Component behavior remains covered by 29
+focused tests; the tests themselves passed, while their deliberately partial
+coverage invocation did not meet the repository-wide coverage threshold. The
+authoritative project gate passes all 669 frontend tests in 119 files, coverage,
+lint, type checks, API/schema checks, the production build, and bundle budgets.
+
+Technician walkthroughs, full production-stack/recovery gates, deployment, and
+release approval remain open. Version stays 0.8.46.
+
 ## Completed implementation slices
 
 The Assets summary collection and typed browser API client are implemented under #86. This is a foundation slice, not completion of Phase 1 or the Assets redesign. The navigation slice adds the data router, capability-derived organization routes and registered Assets edit protection under #88; see [navigation-foundation.md](navigation-foundation.md). See [the API contract and integration notes](asset-collection.md). Personal collection preference persistence and its browser client are the next implemented foundation under #87; the chooser is now integrated in the Assets reference layout; see [assets-layout.md](assets-layout.md).

@@ -14,7 +14,7 @@ Delivery is organized around complete user-facing areas. Related routes are audi
 
 1. **Inventory and foundation** — Route/state inventory, shared list, overlay preview, URL state, tabs, dirty-form protection through Assets. Status: implemented; the 61-route inventory is enforced against the router, capability registry, and authentication/portal entry paths, while feature-specific acceptance remains in its delivery phase.
 2. **Assets** — Complete reference layout, operational overview, focused sections in a full record drawer and optional full page. Status: in progress; collection, previews and tabbed records implemented, acceptance and remaining actions open.
-3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts, the simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers with associated subnet navigation, Racks and Devices core record drawers with parent-scoped interface editing and IP/MAC assignment migrated; DNS zone/record drawers, focused editing, history and record transfers verified against PostgreSQL and the live browser; circuit register/service-detail editing and handoff browsing verified as a bounded checkpoint; remaining network object surfaces and acceptance open.
+3. **Contracts and Networks** — Validate the shared patterns against costs and connected network records. Status: in progress; Contracts passes the automated MSP/client responsive acceptance matrix, including cost permissions and organization-boundary checks. The simplified Networks page and its child Addresses/Wireless sections and workspace-wide Wireless, VLAN and VRF registers with associated subnet navigation, Racks and Devices core record drawers with parent-scoped interface editing and IP/MAC assignment are migrated; DNS zone/record drawers, focused editing, history and record transfers are verified against PostgreSQL and the live browser; circuit register/service-detail editing and handoff browsing is verified as a bounded checkpoint. Broader Networks and technician acceptance remain open.
 4. **Operational records** — Organizations, vendors, people, sites, products, licenses, stock, domains, certificates, credential references. Status: implemented; all Phase 4 collections and record workspaces pass responsive acceptance in MSP and client workspaces. Technician acceptance remains in Phase 8.
 5. **Documentation and files** — Libraries, reader/editor, templates, blocks, maps, reviews, publications, exports and files. Status: in progress; document library/reader, template/reusable-content, ownership/review, retained publication sections, focused editable exports, managed-file/PDF controls, document-wide draft protection, content-health queue, document-link picker and direct-link/history restoration implemented; technician acceptance remains open.
 6. **Financial and integration workflows** — Invoices, recurring workflows, compliance/data flows, integrations/imports/webhooks and exceptions. Status: implemented; invoice, compliance/data-flow and focused integration workspaces complete; technician acceptance remains open.
@@ -73,6 +73,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Integration workspace](integration-workspace.md)
 
 - [Refresh routing and public addresses](frontend-routing.md)
+
+- [Production route refresh acceptance](production-route-acceptance.md)
 
 - [Full asset record drawer](asset-record-drawer.md)
 

@@ -91,3 +91,23 @@ Final gate results are recorded in progress.md. Technician validation (#39), the
 broader touch/assistive-technology and 200% zoom acceptance inventory, production
 rollout and full release/recovery obligations remain open. Networks is the next
 visible migration, starting with record-specific lists and parent/child details.
+
+## Phase 8 acceptance follow-up — 2026-09-25
+
+The browser gate now proves organization-workspace routing independently at mobile
+and desktop widths. It opens an off-page contract directly in the Costs section,
+checks the organization API boundary, verifies that the MSP endpoint was not used,
+and covers drawer accessibility, overflow, dismissal, and return to the owning
+organization route across Chromium, Firefox, and WebKit.
+
+That expanded matrix exposed WebKit losing the row focus after Escape. Pointer
+activation in WebKit does not necessarily focus a button, and the application
+shell focuses the main region after the URL transition. The shared drawer now
+restores the explicit feature-supplied target after the route focus cycle. Assets,
+Contracts, and Networks supply their remembered record-row identifiers, with their
+collection headings as direct-link fallbacks. The focused 36-case Contracts matrix
+and the 12-case WebKit Assets/Networks regression set pass at all required widths.
+
+Automated Contracts acceptance is complete for the implemented MSP and organization
+workspace behavior. The route remains in Phase 8 until the tracked technician and
+full release obligations are resolved; no deployment or version change is included.

@@ -43,6 +43,11 @@
     "rehearsal": "tests/rehearsals/rehearse-production-image.sh",
     "record": "planning/responsive-layouts/phase-8-production-image-acceptance.md"
   },
+  "release_gate": {
+    "status": "pending",
+    "target": "release-gate",
+    "record": "planning/responsive-layouts/phase-8-release-gate-execution.md"
+  },
   "workspace_acceptance": [
     {
       "id": "assets",

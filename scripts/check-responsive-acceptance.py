@@ -48,7 +48,7 @@ def string_list(value: Any, name: str) -> list[str]:
 def validate_acceptance(
     acceptance_path: Path = ACCEPTANCE,
     routes_path: Path = ROUTES,
-) -> tuple[int, int, int, int, int, int]:
+) -> tuple[int, int, int, int, int, int, int]:
     acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
     routes = json.loads(routes_path.read_text(encoding="utf-8"))
 
@@ -62,6 +62,13 @@ def validate_acceptance(
     require(production_image_status in {"pending", "complete"}, "production_image has invalid status")
     repository_path(production_image.get("rehearsal"), "production_image.rehearsal")
     repository_path(production_image.get("record"), "production_image.record")
+
+    release_gate = acceptance.get("release_gate")
+    require(isinstance(release_gate, dict), "release_gate must be an object")
+    release_gate_status = string_value(release_gate.get("status"), "release_gate.status")
+    require(release_gate_status in {"pending", "complete"}, "release_gate has invalid status")
+    require(string_value(release_gate.get("target"), "release_gate.target") == "release-gate", "release_gate.target must be release-gate")
+    repository_path(release_gate.get("record"), "release_gate.record")
 
     workspaces = acceptance.get("workspace_acceptance")
     require(isinstance(workspaces, list) and bool(workspaces), "workspace_acceptance must be a non-empty list")
@@ -128,12 +135,13 @@ def validate_acceptance(
         backup_complete,
         recovery_complete,
         int(production_image_status == "complete"),
+        int(release_gate_status == "complete"),
         human_complete,
     )
 
 
 def main() -> None:
-    workspaces, automated_complete, backup_complete, recovery_complete, production_complete, human_complete = (
+    workspaces, automated_complete, backup_complete, recovery_complete, production_complete, release_complete, human_complete = (
         validate_acceptance()
     )
     print(
@@ -142,6 +150,7 @@ def main() -> None:
         f"{backup_complete} backup rehearsed, "
         f"{recovery_complete} upgrade rehearsed, "
         f"{production_complete} production image rehearsed, "
+        f"{release_complete} release gate complete, "
         f"{human_complete} human reviewed."
     )
 

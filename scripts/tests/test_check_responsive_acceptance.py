@@ -33,6 +33,7 @@ class ResponsiveAcceptanceTests(unittest.TestCase):
             backup_complete,
             recovery_complete,
             production_complete,
+            release_complete,
             human_complete,
         ) = MODULE.validate_acceptance()
         self.assertEqual(workspaces, 4)
@@ -40,7 +41,16 @@ class ResponsiveAcceptanceTests(unittest.TestCase):
         self.assertEqual(backup_complete, 4)
         self.assertEqual(recovery_complete, 4)
         self.assertEqual(production_complete, 1)
+        self.assertEqual(release_complete, 0)
         self.assertEqual(human_complete, 0)
+
+    def test_rejects_an_invalid_release_gate_target(self) -> None:
+        def replace_target(value) -> None:
+            value["release_gate"]["target"] = "partial-release-gate"
+
+        acceptance = self.temporary_json(MODULE.ACCEPTANCE, replace_target)
+        with self.assertRaisesRegex(ValueError, "release_gate.target"):
+            MODULE.validate_acceptance(acceptance_path=acceptance)
 
     def test_rejects_an_uncovered_in_progress_route(self) -> None:
         def remove_route(value) -> None:

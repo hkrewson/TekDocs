@@ -3045,3 +3045,27 @@ routes. Phase 4 implementation is complete; focused acceptance of the ten broad
 in-progress workspaces, technician walkthroughs, and production/release gates
 remain in Phase 8. Version stays 0.8.46. Production deployment, external push,
 and Wiki publication remain separate.
+
+## Phase 8 release-gate execution checkpoint — 2026-09-26
+
+The final automated gate now shares one frontend test prerequisite across its
+feature boundaries. Standalone feature targets still run the complete frontend
+contract, while one compound release invocation runs the 673-test suite once,
+then API agreement, lint, type checking, production build and bundle budgets
+once. The security boundary retains its separate dependency and license audit.
+This replaces almost twenty identical frontend repetitions that added hours and
+could turn one timing-sensitive repetition into a false release failure.
+
+The constrained desktop/mobile documentation rehearsal was also updated for the
+reader-first interface: selecting a document opens its reader, and editing is an
+explicit second action. Its fixtures now represent current authorization and
+document placements, and the diagram editor loads only when requested. The
+throttled desktop and mobile profiles pass the original time and JavaScript
+limits. See
+[phase-8-release-gate-execution.md](phase-8-release-gate-execution.md).
+
+The release ledger now tracks the final gate explicitly and keeps it pending
+until one complete `make release-gate` run exits successfully from a clean
+commit. Technician/native zoom, software-keyboard and screen-reader walkthroughs
+also remain open. Version stays 0.8.46; deployment, publication and tagging are
+separate authorized actions.

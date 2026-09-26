@@ -25,7 +25,7 @@ BACKEND_IMAGE_GATES := check security \
 .PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization check-ui-language check-responsive-route-inventory check-responsive-acceptance test-public-beta-performance test-browser-artifact-hygiene test-automated-security-review-gate assemble-security-evidence assemble-diagram-release-evidence automated-security-review-gate external-security-review-gate wiki-check check-renderer-dependency-contract test-diagram-exports diagram-export-release-gate
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
-.PHONY: bootstrap build up down logs check test test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization file-export-release-gate test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
+.PHONY: bootstrap build up down logs check check-frontend test test-frontend test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization file-export-release-gate test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
 
 bootstrap:
 	./scripts/bootstrap-env.sh .env
@@ -49,7 +49,7 @@ down:
 logs:
 	docker compose logs --tail=150
 
-check:
+check: check-frontend
 	./scripts/check-version.sh
 	./scripts/check-supply-chain-pins.sh
 	$(MAKE) test-automated-security-review-gate
@@ -64,7 +64,12 @@ check:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend mypy apps tekdocs
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test backend python manage.py makemigrations --check --dry-run
 	./scripts/check-openapi.sh
-	./scripts/frontend-gate.sh check
+
+test-frontend:
+	./scripts/frontend-gate.sh test
+
+check-frontend: test-frontend
+	./scripts/frontend-gate.sh verify
 
 test-automated-security-review-gate:
 	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
@@ -86,14 +91,12 @@ wiki-check:
 check-renderer-dependency-contract:
 	python3 scripts/check_renderer_dependency_contract.py
 
-test:
+test: test-frontend
 	docker compose run --rm migrate pytest --cov
-	./scripts/frontend-gate.sh test
 
-test-localization:
+test-localization: test-frontend
 	$(MAKE) check-ui-language
 	docker compose run --rm migrate pytest apps/core/tests/test_email_settings.py apps/core/tests/test_notification_delivery_scheduling.py -q
-	./scripts/frontend-gate.sh test
 
 check-ui-language:
 	python3 scripts/check-ui-language.py
@@ -104,48 +107,38 @@ check-responsive-route-inventory:
 check-responsive-acceptance:
 	python3 scripts/check-responsive-acceptance.py
 
-test-api-contracts:
+test-api-contracts: check-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_api_contracts.py -q
-	./scripts/frontend-gate.sh check
 
-test-api-tokens:
+test-api-tokens: test-frontend
 	docker compose run --rm migrate pytest apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
-	./scripts/frontend-gate.sh test
 
-test-webhooks:
+test-webhooks: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_webhooks.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-integrations:
+test-integrations: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_halopsa_provider.py apps/core/tests/test_halopsa_integration.py apps/core/tests/test_ninjaone_provider.py apps/core/tests/test_ninjaone_integration.py apps/core/tests/test_integrations.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-integration-stabilization:
+test-integration-stabilization: check-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_halopsa_provider.py apps/core/tests/test_halopsa_integration.py apps/core/tests/test_ninjaone_provider.py apps/core/tests/test_ninjaone_integration.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_integrations.py apps/core/tests/test_webhooks.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh check
 
-test-integration-validation:
+test-integration-validation: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_microsoft_graph_provider.py apps/core/tests/test_halopsa_provider.py apps/core/tests/test_halopsa_integration.py apps/core/tests/test_ninjaone_provider.py apps/core/tests/test_ninjaone_integration.py apps/core/tests/test_api_contracts.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_webhooks.py apps/core/tests/test_integrations.py apps/core/tests/test_integration_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-monitoring-stabilization:
+test-monitoring-stabilization: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_domains.py apps/core/tests/test_domain_monitoring_egress.py apps/core/tests/test_certificate_monitoring.py apps/core/tests/test_certificate_monitoring_egress.py apps/core/tests/test_monitoring_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-compliance-catalogs:
+test-compliance-catalogs: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-compliance-monitoring-validation:
+test-compliance-monitoring-validation: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_compliance_catalogs.py apps/core/tests/test_domains.py apps/core/tests/test_domain_monitoring_egress.py apps/core/tests/test_certificate_monitoring.py apps/core/tests/test_certificate_monitoring_egress.py apps/core/tests/test_monitoring_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
 test-auth-abuse:
 	docker compose run --rm migrate pytest apps/accounts/tests -q
 
-test-client-portal-boundary:
+test-client-portal-boundary: test-frontend
 	docker compose run --rm migrate pytest apps/accounts/tests/test_client_portal_boundary.py apps/accounts/tests/test_invitations.py apps/accounts/tests/test_invitation_acceptance.py apps/accounts/tests/test_auth_session.py apps/core/tests/test_portal_documents.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
 test-outbox:
 	docker compose run --rm migrate pytest apps/core/tests/test_outbox.py -q
@@ -153,22 +146,18 @@ test-outbox:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py -q
 	docker compose run --rm migrate pytest apps/core/tests/test_runtime_rls.py -q
 
-test-notifications:
+test-notifications: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_notifications.py -q
 	docker compose run --rm migrate pytest apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
-	./scripts/frontend-gate.sh test
 
-test-notification-email:
+test-notification-email: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_email.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_notifications.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-portal-notification-stabilization:
+test-portal-notification-stabilization: test-frontend
 	docker compose run --rm migrate pytest apps/accounts/tests/test_client_portal_boundary.py apps/core/tests/test_portal_documents.py apps/core/tests/test_outbox.py apps/core/tests/test_notifications.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_portal_notification_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
-test-portal-notification-validation:
+test-portal-notification-validation: test-frontend
 	docker compose run --rm migrate pytest apps/accounts/tests/test_client_portal_boundary.py apps/accounts/tests/test_invitations.py apps/accounts/tests/test_invitation_acceptance.py apps/accounts/tests/test_auth_session.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_documents.py apps/core/tests/test_portal_documents.py apps/core/tests/test_outbox.py apps/core/tests/test_notifications.py apps/core/tests/test_email.py apps/core/tests/test_notification_email.py apps/core/tests/test_notification_delivery_scheduling.py apps/core/tests/test_portal_notification_stabilization.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
 test-policy:
 	docker compose run --rm migrate pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py -q
@@ -206,10 +195,9 @@ test-recovery:
 test-stabilization:
 	docker compose run --rm migrate pytest apps/accounts/tests/test_access_control.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_scoping.py apps/core/tests/test_workspaces.py apps/core/tests/test_relationships.py apps/core/tests/test_recycle_bin.py apps/core/tests/test_audit_immutability.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py apps/core/tests/test_stabilization_performance.py -q
 
-test-public-beta-performance:
+test-public-beta-performance: check-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_public_beta_capacity.py -m performance -q -s
 	docker compose run --rm -e TEKDOCS_ENFORCE_LATENCY_BUDGETS=true migrate pytest apps/core/tests/test_stabilization_performance.py apps/core/tests/test_inventory_stabilization.py apps/core/tests/test_portal_notification_stabilization.py -q -s
-	./scripts/frontend-gate.sh check
 	./tests/rehearsals/rehearse-browser-performance.sh
 
 test-entity-rbac-validation:
@@ -218,9 +206,8 @@ test-entity-rbac-validation:
 test-documentation-validation:
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/core/tests/test_rendering.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_stabilization_performance.py -q
 
-test-file-export-stabilization:
+test-file-export-stabilization: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
-	./scripts/frontend-gate.sh test
 
 file-export-release-gate: check test-file-export-stabilization test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
 
@@ -231,9 +218,8 @@ test-diagram-exports:
 
 diagram-export-release-gate: check test-diagram-exports test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
 
-test-publication-control:
+test-publication-control: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
 test-credential-references:
 	docker compose run --rm migrate pytest apps/core/tests/test_credential_references.py apps/accounts/tests/test_custom_roles.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
@@ -259,9 +245,8 @@ test-invoice-recurrence:
 test-invoice-drafts:
 	docker compose run --rm migrate pytest apps/core/tests/test_invoice_issue.py apps/core/tests/test_invoice_drafts.py apps/core/tests/test_stock_inventory.py apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
 
-test-invoice-delivery:
+test-invoice-delivery: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_invoice_delivery.py apps/core/tests/test_invoice_issue.py apps/core/tests/test_invoice_drafts.py apps/core/tests/test_money.py apps/core/tests/test_billing_foundation.py apps/core/tests/test_entity_rbac_validation.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
-	./scripts/frontend-gate.sh test
 
 test-networks:
 	docker compose run --rm migrate pytest apps/core/tests/test_network_inventory.py apps/core/tests/test_network_addressing.py apps/core/tests/test_network_endpoints.py apps/core/tests/test_network_services.py apps/core/tests/test_network_circuits.py apps/core/tests/test_netbox_reconciliation.py apps/core/tests/test_network_transfer.py apps/core/tests/test_relationships.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py -q
@@ -269,15 +254,13 @@ test-networks:
 test-network-stabilization:
 	docker compose run --rm migrate pytest apps/core/tests/test_network_stabilization.py -q -s
 
-test-network-validation: test-networks test-network-stabilization
-	./scripts/frontend-gate.sh test
+test-network-validation: test-networks test-network-stabilization test-frontend
 
 test-secret-files:
 	docker compose run --rm migrate pytest apps/core/tests/test_secret_files.py apps/core/tests/test_health.py apps/core/tests/test_email_settings.py -q
 
-test-markdown:
+test-markdown: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_rendering.py -q
-	./scripts/frontend-gate.sh test
 
 test-compose:
 	docker compose -f compose.yml -f compose.test.yml up -d --build --wait

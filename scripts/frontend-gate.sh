@@ -13,6 +13,12 @@ run_gate() {
       npm --prefix "$repository_root/frontend" run test -- --maxWorkers=1 --no-file-parallelism
       npm --prefix "$repository_root/frontend" run build
       ;;
+    verify)
+      npm --prefix "$repository_root/frontend" run api:check
+      npm --prefix "$repository_root/frontend" run lint
+      npm --prefix "$repository_root/frontend" run typecheck
+      npm --prefix "$repository_root/frontend" run build
+      ;;
     test) npm --prefix "$repository_root/frontend" run test -- --maxWorkers=1 --no-file-parallelism ;;
     audit)
       npm --prefix "$repository_root/frontend" audit --omit=dev --audit-level=high
@@ -47,6 +53,7 @@ docker run --rm \
     npm ci --no-audit --no-fund
     case "$FRONTEND_GATE_MODE" in
       check) npm run api:check && npm run lint && npm run typecheck && npm run test -- --maxWorkers=1 --no-file-parallelism && npm run build ;;
+      verify) npm run api:check && npm run lint && npm run typecheck && npm run build ;;
       test) npm run test -- --maxWorkers=1 --no-file-parallelism ;;
       audit) npm audit --omit=dev --audit-level=high && npm run license:check ;;
       *) exit 2 ;;

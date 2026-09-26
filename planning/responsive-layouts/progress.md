@@ -2,6 +2,23 @@
 
 Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 8 responsive workspace upgrade checkpoint — 2026-09-25
+
+All four acceptance groups now pass their supported-source upgrade boundary into
+0.8.46. Inventory and Contracts retain 0.3.12 data, Networks retains 0.4.9 data,
+and Documentation/Files retains 0.2.8 history, files, publications, and generated
+artifacts. Each upgraded installation passes scoped content verification, the
+application system check, and migration-drift detection.
+
+The first inventory run exposed that its shared fixture imported the modern
+explicit-principal enum while executing inside the older source image. Inventory
+and network fixtures now detect that capability: source releases create data under
+their native policy, while current verification binds the retained owner as an
+explicit user principal. The inventory, network, and documentation upgrade
+rehearsals all pass after the correction. The acceptance ledger records all four
+groups as recovery complete. Human technician/assistive-technology review and the
+final production-image/release gates remain open.
+
 ## Phase 8 responsive workspace recovery checkpoint — 2026-09-25
 
 The Assets/Contracts inventory, Networks, and Documentation/Files backup rehearsals

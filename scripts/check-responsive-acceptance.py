@@ -48,7 +48,7 @@ def string_list(value: Any, name: str) -> list[str]:
 def validate_acceptance(
     acceptance_path: Path = ACCEPTANCE,
     routes_path: Path = ROUTES,
-) -> tuple[int, int, int, int]:
+) -> tuple[int, int, int, int, int]:
     acceptance = json.loads(acceptance_path.read_text(encoding="utf-8"))
     routes = json.loads(routes_path.read_text(encoding="utf-8"))
 
@@ -68,6 +68,7 @@ def validate_acceptance(
     covered_routes: set[str] = set()
     automated_complete = 0
     backup_complete = 0
+    recovery_complete = 0
     human_complete = 0
     for index, workspace in enumerate(workspaces):
         require(isinstance(workspace, dict), f"workspace_acceptance[{index}] must be an object")
@@ -95,6 +96,8 @@ def validate_acceptance(
         repository_path(workspace.get("recovery_evidence"), f"{identifier}.recovery_evidence")
         if recovery_status in {"backup_complete", "complete"}:
             backup_complete += 1
+        if recovery_status == "complete":
+            recovery_complete += 1
         if automated_status == "complete":
             automated_complete += 1
 
@@ -112,15 +115,16 @@ def validate_acceptance(
     stale = sorted(covered_routes - in_progress_routes)
     require(not missing, f"in-progress routes are missing workspace acceptance: {', '.join(missing)}")
     require(not stale, f"workspace acceptance contains routes that are not in progress: {', '.join(stale)}")
-    return len(workspaces), automated_complete, backup_complete, human_complete
+    return len(workspaces), automated_complete, backup_complete, recovery_complete, human_complete
 
 
 def main() -> None:
-    workspaces, automated_complete, backup_complete, human_complete = validate_acceptance()
+    workspaces, automated_complete, backup_complete, recovery_complete, human_complete = validate_acceptance()
     print(
         "Responsive acceptance ledger passed: "
         f"{workspaces} workspace groups, {automated_complete} automated complete, "
         f"{backup_complete} backup rehearsed, "
+        f"{recovery_complete} upgrade rehearsed, "
         f"{human_complete} human reviewed."
     )
 

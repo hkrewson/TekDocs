@@ -151,6 +151,14 @@ def test_generated_draft_withdrawal_is_idempotent_and_visible(browser, setup, mo
     assert retried.status_code == 200
     assert retried.json()["recurring"]["withdrawal_reason"] == "Client cancelled before issue"
     assert AuditEvent.objects.filter(action="invoice.recurring_draft_withdrawn").count() == 1
+    collection = reverse(
+        "organization-invoice-list-create", kwargs={"organization_entity_id": setup[1].entity_id}
+    )
+    assert browser.get(collection, {"summary": "true"}).json()["count"] == 0
+    history = browser.get(collection, {"summary": "true", "state": "withdrawn"})
+    assert history.status_code == 200
+    assert history.json()["count"] == 1
+    assert history.json()["results"][0]["recurring"]["disposition"] == "withdrawn"
 
 
 @pytest.mark.django_db

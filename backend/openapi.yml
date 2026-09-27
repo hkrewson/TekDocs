@@ -23662,12 +23662,14 @@ paths:
           enum:
           - draft
           - issued
+          - withdrawn
           type: string
-          x-spec-enum-id: 06aac5bc09af5f6e
+          x-spec-enum-id: b9da80cae4b58376
           minLength: 1
         description: |-
           * `draft` - draft
           * `issued` - issued
+          * `withdrawn` - withdrawn
       - in: query
         name: summary
         schema:

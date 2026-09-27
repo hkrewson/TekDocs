@@ -72,6 +72,7 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     issueSettings: vi.fn().mockResolvedValue(settings),
     saveIssueSettings: vi.fn().mockResolvedValue(settings),
     issue: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) }),
+    withdrawRecurring: vi.fn().mockResolvedValue(draft),
     deliver: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }),
     recordEvent: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001' }),
     pdfUrl: vi.fn().mockReturnValue('/invoice.pdf'),
@@ -223,6 +224,45 @@ describe('Invoices', () => {
 
     await waitFor(() => expect(remove).toHaveBeenCalledWith(workspace, 'invoice-1'))
     expect(await screen.findByText('No invoices have been created for this client.')).toBeInTheDocument()
+  })
+
+  it('withdraws a recurring draft with retained reason and removes mutation controls', async () => {
+    const recurring = { ...draft, recurring: { starts_on: '2026-08-01', ends_before: '2026-09-01', disposition: 'active' as const, withdrawn_at: null, withdrawal_reason: '' } }
+    const withdrawn = { ...recurring, recurring: { ...recurring.recurring, disposition: 'withdrawn' as const, withdrawn_at: '2026-08-30T10:00:00Z', withdrawal_reason: 'Client cancelled before issue' } }
+    const withdrawRecurring = vi.fn().mockResolvedValue(withdrawn)
+    renderInvoice(invoiceClient({ list: vi.fn().mockResolvedValue({ results: [recurring], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }), get: vi.fn().mockResolvedValue(recurring), withdrawRecurring }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw draft' }))
+    const confirmation = screen.getByRole('alertdialog')
+    expect(confirmation).toHaveTextContent('invoice and claimed billing period remain in history')
+    fireEvent.change(within(confirmation).getByLabelText('Reason for withdrawal'), { target: { value: 'Client cancelled before issue' } })
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Withdraw draft' }))
+
+    await waitFor(() => expect(withdrawRecurring).toHaveBeenCalledWith(workspace, 'invoice-1', 'Client cancelled before issue'))
+    expect(await screen.findByText('Client cancelled before issue')).toBeInTheDocument()
+    expect(screen.getByText('Withdrawn', { selector: '.lifecycle-state' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Issue invoice' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
+  })
+
+  it('reauthenticates and safely retries a recurring withdrawal', async () => {
+    const recurring = { ...draft, recurring: { starts_on: '2026-08-01', ends_before: '2026-09-01', disposition: 'active' as const, withdrawn_at: null, withdrawal_reason: '' } }
+    const withdrawn = { ...recurring, recurring: { ...recurring.recurring, disposition: 'withdrawn' as const, withdrawn_at: '2026-08-30T10:00:00Z', withdrawal_reason: 'Duplicate draft' } }
+    const withdrawRecurring = vi.fn().mockRejectedValueOnce(new InvoiceRequestError('Recent authentication required', 403, 'recent_authentication_required')).mockResolvedValueOnce(withdrawn)
+    const reauthenticate = vi.fn().mockResolvedValue(undefined)
+    renderInvoice(invoiceClient({ get: vi.fn().mockResolvedValue(recurring), withdrawRecurring }), undefined, { reauthenticate })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Withdraw draft' }))
+    fireEvent.change(screen.getByLabelText('Reason for withdrawal'), { target: { value: 'Duplicate draft' } })
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Withdraw draft' }))
+    expect(await screen.findByRole('heading', { name: 'Confirm recurring draft withdrawal' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'current-password' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm and withdraw' }))
+
+    await waitFor(() => expect(reauthenticate).toHaveBeenCalledWith('current-password'))
+    await waitFor(() => expect(withdrawRecurring).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Duplicate draft')).toBeInTheDocument()
   })
 
   it('retains the snapshotted tax when an existing line is edited', async () => {

@@ -1,8 +1,8 @@
 # Retained recurring-draft withdrawal — 0.8.46 checkpoint
 
 Issue #76 pre-1.0 implementation checkpoint. Version remains `0.8.46`. This
-slice adds the retained data, service, and API boundary for withdrawing an
-unissued recurring draft. The invoice, generated line, approved terms, and
+slice adds the retained data, service, API, and operator workflow for withdrawing
+an unissued recurring draft. The invoice, generated line, approved terms, and
 permanent period claim remain intact.
 
 ## Delivered boundary
@@ -21,6 +21,16 @@ permanent period claim remain intact.
   and derived `active` or `withdrawn` disposition. Withdrawn responses include
   the retained reason and time so interfaces can present them as history rather
   than actionable drafts.
+- The invoice record replaces deletion with a focused **Withdraw draft** action
+  for active recurring drafts. Confirmation names the consequence and requires
+  a reason; expired recent authentication opens the existing password check and
+  safely resumes the same idempotent withdrawal.
+- A withdrawn record is read-only, shows its service period, withdrawal date,
+  and retained reason, and offers no issue, edit, line-add, or line-change
+  controls.
+- Ordinary invoice collection requests exclude withdrawals. The explicit
+  **Withdrawn** status filter provides retained history access, including stable
+  direct record URLs.
 - The audit event contains the invoice identity and action only; the operator's
   reason is retained on the protected disposition and is not copied into audit
   metadata.
@@ -51,6 +61,13 @@ withdrawal route.
 - Focused tests prove retained idempotency, value-minimized auditing, edit and
   issue refusal, direct database update/delete refusal, and migration guard
   rollback/reapply compatibility.
+- Focused invoice-interface tests prove confirmation, required reason,
+  read-only retained history, recent-authentication recovery, and safe retry.
+- A Chromium browser rehearsal at 390 CSS pixels proves initial reason focus,
+  accessible confirmation, retained history, read-only controls, and no
+  horizontal page overflow.
+- Collection API coverage proves default exclusion and explicit withdrawn
+  history retrieval.
 - Targeted permission-matrix and runtime-authorization checks pass for the new
   route and the existing terms routes.
 - Ruff, mypy, migration drift, OpenAPI drift, generated TypeScript checks,
@@ -58,11 +75,10 @@ withdrawal route.
 
 ## Next slice
 
-Add the focused Withdraw draft confirmation to invoice details, show retained
-withdrawal history in the invoice drawer/record, remove withdrawn records from
-ordinary actionable-draft summaries while preserving explicit history access,
-and cover dirty/failure/responsive/accessibility states. Then extend recovery
-fixtures and live browser acceptance across terms amendments and withdrawals.
+Extend recovery fixtures and live browser acceptance across terms amendments
+and withdrawals, including narrow-screen and keyboard checks. Close the final
+recurring-invoice acceptance matrix alongside the remaining pre-1.0 release
+evidence.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

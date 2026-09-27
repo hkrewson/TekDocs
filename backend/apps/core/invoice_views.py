@@ -372,7 +372,7 @@ INVOICE_ORDERING = {
 
 class InvoiceQuerySerializer(BoundedCollectionQuerySerializer):
     summary = serializers.BooleanField(required=False, default=False, help_text="Omit invoice lines and history.")
-    state = serializers.ChoiceField(choices=InvoiceState.values, required=False)
+    state = serializers.ChoiceField(choices=(*InvoiceState.values, "withdrawn"), required=False)
     ordering = serializers.ChoiceField(
         choices=[key for field in INVOICE_ORDERING for key in (field, f"-{field}")],
         required=False,
@@ -597,8 +597,12 @@ class InvoiceListCreateView(APIView):
                 | Q(reference__icontains=values["q"])
                 | Q(notes__icontains=values["q"])
             )
-        if "state" in values:
-            records = records.filter(state=values["state"])
+        if values.get("state") == "withdrawn":
+            records = records.filter(recurring_period__withdrawal__isnull=False)
+        elif "state" in values:
+            records = records.filter(state=values["state"]).exclude(recurring_period__withdrawal__isnull=False)
+        else:
+            records = records.exclude(recurring_period__withdrawal__isnull=False)
         ordering = values["ordering"]
         records = records.order_by(
             ("-" if ordering.startswith("-") else "") + INVOICE_ORDERING[ordering.lstrip("-")],

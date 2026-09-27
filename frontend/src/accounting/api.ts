@@ -46,6 +46,13 @@ export type InvoiceDraft = {
   last_event_at?: string | null
   lifecycle_events?: InvoiceLifecycleEvent[]
   bill_to?: InvoiceBillingIdentity
+  recurring?: {
+    starts_on: string
+    ends_before: string
+    disposition: 'active' | 'withdrawn'
+    withdrawn_at: string | null
+    withdrawal_reason: string
+  } | null
 }
 
 export type InvoiceBillingIdentity = {
@@ -65,7 +72,7 @@ export type InvoiceBillingIdentity = {
 
 export type InvoiceCollectionQuery = {
   q: string
-  state?: 'draft' | 'issued'
+  state?: 'draft' | 'issued' | 'withdrawn'
   ordering: 'name' | '-name' | 'state' | '-state' | 'invoice_date' | '-invoice_date' | 'due_date' | '-due_date' | 'reference' | '-reference' | 'total' | '-total'
   page: number
   page_size: number
@@ -150,6 +157,7 @@ export interface InvoiceClient {
   issueSettings(signal?: AbortSignal): Promise<InvoiceIssueSettings>
   saveIssueSettings(values: object): Promise<InvoiceIssueSettings>
   issue(workspace: WorkspaceContext, invoiceId: string): Promise<InvoiceDraft>
+  withdrawRecurring(workspace: WorkspaceContext, invoiceId: string, reason: string): Promise<InvoiceDraft>
   deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
   recordEvent(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
   pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
@@ -224,6 +232,7 @@ export const browserInvoiceClient: InvoiceClient = {
   issueSettings: (signal) => read('/api/v1/workspaces/msp/invoice-settings', signal),
   saveIssueSettings: (values) => mutate('/api/v1/workspaces/msp/invoice-settings', 'PUT', values),
   issue: (workspace, invoiceId) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/issue`, 'POST'),
+  withdrawRecurring: (workspace, invoiceId, reason) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/withdraw-recurring-draft`, 'POST', { reason }),
   deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
   recordEvent: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/events`, 'POST', values),
   pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,

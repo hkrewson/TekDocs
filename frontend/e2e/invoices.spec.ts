@@ -114,6 +114,59 @@ test('expired authentication can be confirmed and invoice issue resumes', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
+test('a recurring draft can be withdrawn as retained history on a narrow screen', async ({ page, baseURL }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const recurringDraft = {
+    ...issuedInvoice,
+    state: 'draft',
+    number: undefined,
+    issued_at: undefined,
+    content_digest: undefined,
+    signature_algorithm: undefined,
+    key_fingerprint: undefined,
+    lifecycle_events: [],
+    recurring: { starts_on: '2026-08-01', ends_before: '2026-09-01', disposition: 'active', withdrawn_at: null, withdrawal_reason: '' },
+  }
+  const withdrawn = {
+    ...recurringDraft,
+    recurring: { ...recurringDraft.recurring, disposition: 'withdrawn', withdrawn_at: '2026-08-30T10:00:00Z', withdrawal_reason: 'Client cancelled before issue' },
+  }
+  await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
+  await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
+  await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
+  await page.route('**/collection-preferences/invoices', (route) => route.fulfill({ json: { columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], available_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], default_columns: ['name', 'state', 'invoice_date', 'due_date', 'reference', 'total'], page_size: 25 } }))
+  await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
+    user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
+    tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
+    role: 'owner',
+    permissions: ['invoices.view', 'invoices.edit', 'invoices.issue'],
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}`, (route) => route.fulfill({ json: {
+    kind: 'organization', id: clientId, name: 'Example Client', classifications: ['client'], capabilities: ['overview', 'invoices'],
+    organization: { id: clientId, name: 'Example Client', legal_name: 'Example Client, LLC', website: '', classifications: ['client'], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z' },
+  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/origin-choices`, (route) => route.fulfill({ json: { origins: [], tax_rates: [] } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [recurringDraft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}/withdraw-recurring-draft`, async (route) => {
+    expect(await route.request().postDataJSON()).toEqual({ reason: 'Client cancelled before issue' })
+    await route.fulfill({ json: withdrawn })
+  })
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: recurringDraft }))
+
+  await page.goto(`/workspaces/organizations/${clientId}/invoices?invoice=${invoiceId}`)
+  await page.getByRole('button', { name: 'Withdraw draft' }).click()
+  await expect(page.getByLabel('Reason for withdrawal')).toBeFocused()
+  await page.getByLabel('Reason for withdrawal').fill('Client cancelled before issue')
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Withdraw draft' }).click()
+  await expect(page.getByText('Client cancelled before issue')).toBeVisible()
+  await expect(page.locator('.lifecycle-state')).toHaveText('Withdrawn')
+  await expect(page.getByRole('button', { name: 'Issue invoice' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit draft' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add item' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
+
 test('a stock line records its quantity for the client in one save', async ({ page, baseURL }) => {
   const draftId = crypto.randomUUID()
   const stockId = crypto.randomUUID()

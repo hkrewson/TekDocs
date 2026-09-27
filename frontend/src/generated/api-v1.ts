@@ -31954,8 +31954,9 @@ export interface operations {
                 /**
                  * @description * `draft` - draft
                  *     * `issued` - issued
+                 *     * `withdrawn` - withdrawn
                  */
-                readonly state?: "draft" | "issued";
+                readonly state?: "draft" | "issued" | "withdrawn";
                 /** @description Omit invoice lines and history. */
                 readonly summary?: boolean;
             };

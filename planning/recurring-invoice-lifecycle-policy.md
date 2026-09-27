@@ -117,4 +117,7 @@ selection, compatibility notes, and focused verification are recorded in
 [operator amendment workflow](recurring-invoice-terms-interface.md) are also
 complete. The retained withdrawal data, service, and API boundary is recorded in
 [Retained recurring-draft withdrawal](recurring-invoice-draft-withdrawal.md).
-Its focused operator confirmation and history presentation remain next.
+Its focused operator confirmation, recent-authentication recovery, read-only
+record history, and explicit collection-history filter are complete. Recovery
+rehearsal and live responsive browser acceptance remain in the final acceptance
+slice.

@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router'
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Settings, Share2, ShieldCheck, Table2, Type, Unlink, X } from 'lucide-react'
 import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
@@ -25,6 +25,7 @@ import { DocumentRemoteSourcePanel } from './DocumentRemoteSourcePanel'
 import { DocumentRestructurePanel } from './DocumentRestructurePanel'
 import { DocumentReusePanel } from './DocumentReusePanel'
 import { useDocumentCollectionState } from './useDocumentCollectionState'
+import { useDocumentCollection } from './useDocumentCollection'
 import { TemplateLibrary } from './TemplateLibrary'
 import { TemplateUpdateReview } from './TemplateUpdateReview'
 import { useNavigationGuard, useUnsavedChanges } from '../navigation/navigationGuard'
@@ -127,8 +128,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setTemplate: setTemplateFilter,
     clearFilters: clearDocumentFilters,
   } = collectionState
-  const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; count: number; page: number; pageSize: number; hasMore: boolean; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
   const [newDocumentMode, setNewDocumentMode] = useState<'write' | 'file'>('write')
   const [newPrimaryFile, setNewPrimaryFile] = useState<File | null>(null)
@@ -267,7 +266,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const replacementFileInput = useRef<HTMLInputElement>(null)
   const insertionMenu = useRef<HTMLDivElement>(null)
   const restoreInsertionPosition = useRef<number | null>(null)
-  const openedDeepLink = useRef<string | null>(null)
   const openedRevision = useRef<string | null>(null)
   const pendingDocumentView = useRef<{ value: DocumentDirectView | null } | null>(null)
 
@@ -284,43 +282,41 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     })
   }, [inserterOpen, newBlockOpen, newBlockPosition])
 
-  useEffect(() => {
-    const controller = new AbortController()
-    client.list(scope, controller.signal, { q: documentQuery, category: categoryFilter, template: templateFilter, collection: collectionFilter, tag: tagFilter, health: indexMode === 'health' && !healthFilter ? 'attention' : healthFilter, ordering: documentOrdering, page: documentPage, page_size: 25 })
-      .then(async (result) => {
-        if (controller.signal.aborted) return
-        setLoaded({ key: scopeKey, results: result.results, count: result.count, page: result.page ?? documentPage, pageSize: result.page_size ?? 25, hasMore: result.has_more ?? false, collections: result.collections ?? [], tags: result.tags ?? [], health: result.health ?? [] })
-        setPhase('ready')
-        const deepLinkKey = requestedDocumentId ? `${scopeKey}:${requestedDocumentId}:${requestedPublicationId ?? ''}` : null
-        let deepLinked = requestedDocumentId ? result.results.find((item) => item.id === requestedDocumentId) : null
-        if (requestedDocumentId && deepLinkKey && openedDeepLink.current !== deepLinkKey) {
-          if (!deepLinked) {
-            try {
-              deepLinked = await client.get(scope, requestedDocumentId, controller.signal)
-            } catch {
-              if (!controller.signal.aborted) setError('That document is not available in this workspace.')
-              return
-            }
-          }
-          if (controller.signal.aborted) return
-          openedDeepLink.current = deepLinkKey
-          setSelected(deepLinked)
-          setTitle(deepLinked.title)
-          setMarkdown(deepLinked.markdown)
-          setCategory(deepLinked.category)
-          setTopicType(deepLinked.topic_type ?? 'unstructured')
-          setIsTemplate(deepLinked.is_template)
-          setLibraryVisible(deepLinked.library_visible)
-          if (!requestedPublicationId) setPublicationView(null)
-          if (deepLinked.primary_file?.media_type === 'application/pdf') {
-            setViewedPdf({ filename: deepLinked.primary_file.filename, url: client.attachmentDownloadUrl(scope, deepLinked.id, deepLinked.primary_file.id) })
-          }
-        }
-        setError(null)
-      })
-      .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
-    return () => controller.abort()
-  }, [categoryFilter, client, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, requestedDocumentId, requestedPublicationId, revision, scope, scopeKey, tagFilter, templateFilter])
+  const applyDeepLinkedDocument = useCallback((document: DocumentRecord) => {
+    setSelected(document)
+    setTitle(document.title)
+    setMarkdown(document.markdown)
+    setCategory(document.category)
+    setTopicType(document.topic_type ?? 'unstructured')
+    setIsTemplate(document.is_template)
+    setLibraryVisible(document.library_visible)
+    if (!requestedPublicationId) setPublicationView(null)
+    if (document.primary_file?.media_type === 'application/pdf') {
+      setViewedPdf({ filename: document.primary_file.filename, url: client.attachmentDownloadUrl(scope, document.id, document.primary_file.id) })
+    }
+  }, [client, requestedPublicationId, scope])
+  const collectionFilters = useMemo<DocumentFilters>(() => ({
+    q: documentQuery,
+    category: categoryFilter,
+    template: templateFilter,
+    collection: collectionFilter,
+    tag: tagFilter,
+    health: indexMode === 'health' && !healthFilter ? 'attention' : healthFilter,
+    ordering: documentOrdering,
+    page: documentPage,
+    page_size: 25,
+  }), [categoryFilter, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, tagFilter, templateFilter])
+  const { loaded, phase, rememberDeepLink, updateLoadedDocument } = useDocumentCollection({
+    client,
+    filters: collectionFilters,
+    requestedDocumentId,
+    requestedPublicationId,
+    revision,
+    scope,
+    scopeKey,
+    onDeepLinkLoaded: applyDeepLinkedDocument,
+    onError: setError,
+  })
 
   useEffect(() => {
     if (!urlManaged || requestedDocumentId) return
@@ -331,7 +327,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     setPublicationForm(null)
     setPublicationControl(null)
     setActivePanel(null)
-    openedDeepLink.current = null
   }, [requestedDocumentId, urlManaged])
 
   useEffect(() => {
@@ -398,7 +393,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     if (!urlManaged) return
     pendingDocumentView.current = { value: null }
     // Explicit selection already supplies the record; a list refresh must not reopen stale metadata.
-    openedDeepLink.current = documentId ? `${scopeKey}:${documentId}:` : null
+    rememberDeepLink(documentId)
     const parameters = new URLSearchParams(window.location.search)
     clearDocumentDetailParameters(parameters)
     if (documentId) parameters.set('document', documentId)
@@ -426,7 +421,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const updatePublicationLocation = (documentId: string, publicationId: string, section: PublicationSection, mode: 'push' | 'replace' = 'push') => {
     if (!urlManaged) return
     pendingDocumentView.current = { value: null }
-    openedDeepLink.current = `${scopeKey}:${documentId}:${publicationId}`
+    rememberDeepLink(documentId, publicationId)
     const parameters = new URLSearchParams(window.location.search)
     clearDocumentDetailParameters(parameters)
     parameters.set('document', documentId)
@@ -957,7 +952,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         supersedes_id: publicationForm.supersedesId,
       })
       const sourceId = publicationForm.source.id
-      setLoaded((current) => current ? { ...current, results: current.results.map((document) => document.id === sourceId ? { ...document, publications: [publication, ...document.publications], publication_count: document.publication_count + 1 } : document) } : current)
+      updateLoadedDocument(sourceId, (document) => ({ ...document, publications: [publication, ...document.publications], publication_count: document.publication_count + 1 }))
       updatePublicationLocation(sourceId, publication.id, 'content', 'replace')
       setActivePublicationSection('content')
       setSelected(null); setPublicationForm(null)

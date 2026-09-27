@@ -375,6 +375,8 @@ from apps.core.recurring_invoice_views import (
     RecurringSourceListView,
     RecurringSourceView,
     RecurringStopView,
+    RecurringTermsApplyView,
+    RecurringTermsPreviewView,
 )
 from apps.core.recycle_views import (
     MSPRecycleBinListView,
@@ -1535,6 +1537,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/preview",
         RecurringPreviewView.as_view(),
         name="organization-recurring-invoice-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/terms/preview",
+        RecurringTermsPreviewView.as_view(),
+        name="organization-recurring-invoice-terms-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/terms/apply",
+        RecurringTermsApplyView.as_view(),
+        name="organization-recurring-invoice-terms-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/recurring-invoices/<uuid:schedule_id>/stop",

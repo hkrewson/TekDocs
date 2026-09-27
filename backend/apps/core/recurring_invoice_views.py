@@ -34,6 +34,7 @@ from .recurring_invoice_preview import (
     review_recurring_source,
 )
 from .recurring_invoices import enroll_recurring_schedule, stop_recurring_schedule
+from .recurring_terms_preview import apply_recurring_terms_preview, preview_recurring_terms_amendment
 from .workspaces import ResolvedWorkspace
 
 Result = TypeVar("Result")
@@ -209,6 +210,46 @@ class RecurringClaimSerializer(serializers.Serializer):
     line_id = serializers.UUIDField()
 
 
+class RecurringTermsAmendmentWriteSerializer(StrictSerializer):
+    expected_terms_id = serializers.UUIDField()
+    expected_source_digest = serializers.RegexField(r"^[0-9a-f]{64}$")
+    effective_from = serializers.DateField()
+    description = serializers.CharField(max_length=1000)
+    unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4, min_value=0)
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=Decimal("0.001"))
+    currency = serializers.CharField(min_length=3, max_length=3)
+    due_days = serializers.IntegerField(min_value=0, max_value=3650)
+    tax_rate_id = serializers.UUIDField(allow_null=True, required=False)
+
+
+class RecurringTermsProjectionSerializer(serializers.Serializer):
+    terms_id = serializers.UUIDField(required=False)
+    version = serializers.IntegerField()
+    effective_from = serializers.DateField()
+    description = serializers.CharField()
+    quantity = serializers.CharField()
+    unit_amount = serializers.CharField()
+    currency = serializers.CharField()
+    due_days = serializers.IntegerField()
+    tax_rate_id = serializers.UUIDField(allow_null=True)
+    net = serializers.CharField()
+    tax = serializers.CharField()
+    total = serializers.CharField()
+
+
+class RecurringTermsAmendmentPreviewSerializer(serializers.Serializer):
+    preview_id = serializers.CharField()
+    preview_token = serializers.CharField()
+    expires_in_seconds = serializers.IntegerField()
+    schedule_id = serializers.UUIDField()
+    expected_terms_id = serializers.UUIDField()
+    expected_source_digest = serializers.CharField()
+    reviewed_on = serializers.DateField()
+    source_changed = serializers.BooleanField()
+    current = RecurringTermsProjectionSerializer()
+    proposed = RecurringTermsProjectionSerializer()
+
+
 def _authorized_workspace(request: Any, organization_entity_id: UUID) -> ResolvedWorkspace:
     workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_EDIT)
     require_permission(request.user, PermissionKey.INVOICES_VIEW, organization=workspace.organization)
@@ -358,6 +399,58 @@ class RecurringApplyView(APIView):
             **data.validated_data,
         )
         return Response(RecurringClaimSerializer(result, many=True).data)
+
+
+class RecurringTermsPreviewView(APIView):
+    @extend_schema(
+        request=RecurringTermsAmendmentWriteSerializer,
+        responses={
+            200: RecurringTermsAmendmentPreviewSerializer,
+            400: RecurringErrorSerializer,
+            403: RecurringErrorSerializer,
+            404: RecurringErrorSerializer,
+            409: RecurringErrorSerializer,
+        },
+    )
+    def post(self, request, organization_entity_id, schedule_id):  # type: ignore[no-untyped-def]
+        workspace = _authorized_workspace(request, organization_entity_id)
+        _schedule(workspace, schedule_id)
+        data = RecurringTermsAmendmentWriteSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        result = _call(
+            preview_recurring_terms_amendment,
+            user=request.user,
+            organization=workspace.organization,
+            schedule_id=schedule_id,
+            **data.validated_data,
+        )
+        return Response(RecurringTermsAmendmentPreviewSerializer(result).data)
+
+
+class RecurringTermsApplyView(APIView):
+    @extend_schema(
+        request=RecurringApplySerializer,
+        responses={
+            200: RecurringTermsSerializer,
+            400: RecurringErrorSerializer,
+            403: RecurringErrorSerializer,
+            404: RecurringErrorSerializer,
+            409: RecurringErrorSerializer,
+        },
+    )
+    def post(self, request, organization_entity_id, schedule_id):  # type: ignore[no-untyped-def]
+        workspace = _authorized_workspace(request, organization_entity_id)
+        _schedule(workspace, schedule_id)
+        data = RecurringApplySerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        terms = _call(
+            apply_recurring_terms_preview,
+            user=request.user,
+            organization=workspace.organization,
+            schedule_id=schedule_id,
+            **data.validated_data,
+        )
+        return Response(RecurringTermsSerializer(terms).data)
 
 
 class RecurringDueView(APIView):

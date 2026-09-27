@@ -77,13 +77,14 @@ the lifecycle work is closed.
 
 ## Remaining lifecycle slices
 
-1. Add an authenticated source-review and amendment preview/apply API with a
-   signed boundary decision and current-permission/MFA rechecks.
-2. Add the operator amendment workflow showing current and proposed terms,
+1. Add the operator amendment workflow showing current and proposed terms,
    source differences, effective period, totals, and retained prior versions.
-3. Add retained recurring-draft withdrawal and its edit/issue restrictions.
-4. Extend recovery, live browser, responsive/accessibility, and final release
+2. Add retained recurring-draft withdrawal and its edit/issue restrictions.
+3. Extend recovery, live browser, responsive/accessibility, and final release
    acceptance across amendments and withdrawals.
+
+The authenticated signed preview/apply API is complete and recorded in
+[recurring-invoice-terms-api.md](recurring-invoice-terms-api.md).
 
 Deployment, external push, Wiki publication, and a version change are outside
 this checkpoint.

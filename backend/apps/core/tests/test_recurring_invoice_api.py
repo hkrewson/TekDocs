@@ -10,8 +10,15 @@ from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core.commercial import update_cost
-from apps.core.models import AuditEvent, Invoice, RecurringInvoicePeriod, RecurringInvoiceSchedule
+from apps.core.models import (
+    AuditEvent,
+    Invoice,
+    RecurringInvoicePeriod,
+    RecurringInvoiceSchedule,
+    RecurringInvoiceTerms,
+)
 from apps.core.recurring_invoice_preview import PREVIEW_SALT
+from apps.core.recurring_terms_preview import TERMS_PREVIEW_SALT
 from apps.core.tests import test_recurring_invoices as recurrence_fixtures
 
 setup = recurrence_fixtures.setup
@@ -43,6 +50,42 @@ def preview(browser, setup, schedule, **overrides):
 def apply(browser, setup, schedule, token, **overrides):
     return browser.post(
         url(setup, "apply", schedule, **overrides), {"preview_token": token}, content_type="application/json"
+    )
+
+
+def terms_payload(browser, setup, schedule, **overrides):
+    source = browser.get(url(setup, "source"))
+    assert source.status_code == 200
+    current = schedule.terms.order_by("-version").first()
+    assert current is not None
+    payload = {
+        "expected_terms_id": str(current.pk),
+        "expected_source_digest": source.json()["source_digest"],
+        "effective_from": "2025-02-01",
+        "description": "Revised managed service",
+        "quantity": "3.000",
+        "unit_amount": "90.00",
+        "currency": "USD",
+        "due_days": 14,
+        "tax_rate_id": None,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def terms_preview(browser, setup, schedule, **overrides):
+    return browser.post(
+        url(setup, "terms-preview", schedule),
+        terms_payload(browser, setup, schedule, **overrides),
+        content_type="application/json",
+    )
+
+
+def terms_apply(browser, setup, schedule, token, **overrides):
+    return browser.post(
+        url(setup, "terms-apply", schedule, **overrides),
+        {"preview_token": token},
+        content_type="application/json",
     )
 
 
@@ -108,6 +151,101 @@ def test_preview_requires_separate_review_across_terms_versions(browser, setup):
     assert reviewed.status_code == 200, reviewed.content
     assert reviewed.json()["terms_id"] == str(amended.pk)
     assert reviewed.json()["periods"][0]["total"] == "270.00"
+
+
+@pytest.mark.django_db
+def test_terms_preview_apply_and_retry_are_bound_to_exact_review(browser, setup):
+    schedule = enroll(setup)
+    with patch("apps.core.recurring_terms_preview.timezone.localdate", return_value=date(2025, 1, 15)):
+        reviewed = terms_preview(browser, setup, schedule)
+        assert reviewed.status_code == 200, reviewed.content
+        data = reviewed.json()
+        assert data["current"]["total"] == "150.00"
+        assert data["proposed"]["total"] == "270.00"
+        assert data["proposed"]["effective_from"] == "2025-02-01"
+        assert data["source_changed"] is False
+        applied = terms_apply(browser, setup, schedule, data["preview_token"])
+        assert applied.status_code == 200, applied.content
+        retried = terms_apply(browser, setup, schedule, data["preview_token"])
+    assert retried.status_code == 200 and retried.json() == applied.json()
+    assert applied.json()["version"] == 2 and applied.json()["effective_from"] == "2025-02-01"
+    assert RecurringInvoiceTerms.objects.count() == 2
+    assert AuditEvent.objects.filter(action="invoice.recurring_terms_amended").count() == 1
+
+
+@pytest.mark.django_db
+def test_terms_preview_can_approve_refreshed_source_but_apply_rejects_later_drift(browser, setup):
+    schedule = enroll(setup)
+    update_cost(
+        contract=setup[3],
+        cost_id=setup[4].pk,
+        actor_id=setup[0].owner.pk,
+        values={"amount": Decimal("21.00")},
+    )
+    with patch("apps.core.recurring_terms_preview.timezone.localdate", return_value=date(2025, 1, 15)):
+        reviewed = terms_preview(browser, setup, schedule)
+        assert reviewed.status_code == 200 and reviewed.json()["source_changed"] is True
+        token = reviewed.json()["preview_token"]
+        update_cost(
+            contract=setup[3],
+            cost_id=setup[4].pk,
+            actor_id=setup[0].owner.pk,
+            values={"amount": Decimal("22.00")},
+        )
+        assert terms_apply(browser, setup, schedule, token).status_code == 409
+    assert RecurringInvoiceTerms.objects.count() == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("change", ["claimed", "stopped", "tampered", "expired", "other_actor"])
+def test_terms_apply_rejects_changed_or_unowned_review(browser, setup, change):
+    schedule = enroll(setup)
+    with patch("apps.core.recurring_terms_preview.timezone.localdate", return_value=date(2025, 1, 15)):
+        token = terms_preview(browser, setup, schedule).json()["preview_token"]
+        if change == "claimed":
+            recurrence_fixtures.generate(setup, schedule, date(2025, 2, 1))
+        elif change == "stopped":
+            browser.post(url(setup, "stop", schedule), {"reason": "Service ended"}, content_type="application/json")
+        elif change == "tampered":
+            token += "invalid"
+        elif change == "expired":
+            with patch("django.core.signing.time.time", return_value=1):
+                token = signing.dumps(signing.loads(token, salt=TERMS_PREVIEW_SALT), salt=TERMS_PREVIEW_SALT)
+        elif change == "other_actor":
+            plan = signing.loads(token, salt=TERMS_PREVIEW_SALT)
+            plan["actor_id"] = "00000000-0000-0000-0000-000000000001"
+            token = signing.dumps(plan, salt=TERMS_PREVIEW_SALT)
+        result = terms_apply(browser, setup, schedule, token)
+    assert result.status_code == 409, result.content
+    assert RecurringInvoiceTerms.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_terms_routes_recheck_workspace_permission_mfa_and_strict_payload(browser, setup):
+    schedule = enroll(setup)
+    payload = terms_payload(browser, setup, schedule)
+    assert (
+        browser.post(
+            url(setup, "terms-preview", schedule, setup[2]),
+            payload,
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
+    assert (
+        browser.post(
+            url(setup, "terms-preview", schedule),
+            {**payload, "unreviewed": True},
+            content_type="application/json",
+        ).status_code
+        == 400
+    )
+    user = User.objects.create_user(email="terms-no-mfa@example.invalid")
+    TenantMembership.objects.create(tenant=setup[0].tenant, user=user, role=BuiltInRole.ADMINISTRATOR)
+    browser.force_login(user)
+    assert (
+        browser.post(url(setup, "terms-preview", schedule), payload, content_type="application/json").status_code == 403
+    )
 
 
 @pytest.mark.django_db

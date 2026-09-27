@@ -7338,6 +7338,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/terms/apply": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_recurring_invoices_terms_apply_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/{schedule_id}/terms/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_recurring_invoices_terms_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/recurring-invoices/sources": {
         readonly parameters: {
             readonly query?: never;
@@ -13571,6 +13603,54 @@ export interface components {
             /** Format: uuid */
             readonly tax_rate_id: string | null;
             readonly source_digest: string;
+        };
+        readonly RecurringTermsAmendmentPreview: {
+            readonly preview_id: string;
+            readonly preview_token: string;
+            readonly expires_in_seconds: number;
+            /** Format: uuid */
+            readonly schedule_id: string;
+            /** Format: uuid */
+            readonly expected_terms_id: string;
+            readonly expected_source_digest: string;
+            /** Format: date */
+            readonly reviewed_on: string;
+            readonly source_changed: boolean;
+            readonly current: components["schemas"]["RecurringTermsProjection"];
+            readonly proposed: components["schemas"]["RecurringTermsProjection"];
+        };
+        readonly RecurringTermsAmendmentWrite: {
+            /** Format: uuid */
+            readonly expected_terms_id: string;
+            readonly expected_source_digest: string;
+            /** Format: date */
+            readonly effective_from: string;
+            readonly description: string;
+            /** Format: decimal */
+            readonly unit_amount: string;
+            /** Format: decimal */
+            readonly quantity: string;
+            readonly currency: string;
+            readonly due_days: number;
+            /** Format: uuid */
+            readonly tax_rate_id?: string | null;
+        };
+        readonly RecurringTermsProjection: {
+            /** Format: uuid */
+            readonly terms_id?: string;
+            readonly version: number;
+            /** Format: date */
+            readonly effective_from: string;
+            readonly description: string;
+            readonly quantity: string;
+            readonly unit_amount: string;
+            readonly currency: string;
+            readonly due_days: number;
+            /** Format: uuid */
+            readonly tax_rate_id: string | null;
+            readonly net: string;
+            readonly tax: string;
+            readonly total: string;
         };
         readonly RecycleBinItem: {
             /** Format: uuid */
@@ -35334,6 +35414,146 @@ export interface operations {
                 };
             };
             readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_terms_apply_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringApply"];
+                readonly "multipart/form-data": components["schemas"]["RecurringApply"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringTerms"];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_recurring_invoices_terms_preview_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+                readonly schedule_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringTermsAmendmentWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringTermsAmendmentWrite"];
+                readonly "multipart/form-data": components["schemas"]["RecurringTermsAmendmentWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringTermsAmendmentPreview"];
+                };
+            };
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RecurringError"];
+                };
+            };
+            readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

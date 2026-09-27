@@ -580,6 +580,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-recurring-invoice-terms-preview",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-recurring-invoice-terms-apply",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-invoice-list-create",
         ("GET", "POST"),
         PermissionKey.INVOICES_VIEW,

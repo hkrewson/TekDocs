@@ -6,9 +6,14 @@ import { useLocation, useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
 
 import '../collections/collections.css'
+import { CollectionPagination } from '../CollectionPagination'
+import { QuickDrawer } from '../collections/QuickDrawer'
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
 import type { AuthClient } from '../auth/api'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { browserNetworksClient } from '../networks/api'
+import type { NetBoxChoice, NetBoxObjectType, NetworksClient } from '../networks/api'
+import { RackPlaceChoice } from '../networks/RackPlaceChoice'
 import { RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
@@ -32,8 +37,8 @@ const EMPTY_CONNECTION: IntegrationConnectionDraft = {
   provider: 'netbox', name: '', base_url: '', credentials: {}, sync_interval_minutes: 60,
 }
 
-export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, importsClient, authClient = browserAuthClient }: {
-  workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient; authClient?: Pick<AuthClient, 'reauthenticate'>
+export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, networksClient = browserNetworksClient, importsClient, authClient = browserAuthClient }: {
+  workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; networksClient?: NetworksClient; importsClient?: ImportsClient; authClient?: Pick<AuthClient, 'reauthenticate'>
 }) {
   const [params] = useSearchParams()
   const location = useLocation()
@@ -61,6 +66,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [error, setError] = useState<string | null>(null)
   const [rotating, setRotating] = useState<{ connection: IntegrationConnection; credentials: Record<string, string> } | null>(null)
   const [editing, setEditing] = useState<{ connection: IntegrationConnection; name: string; base_url: string; sync_interval_minutes: number } | null>(null)
+  const [adopting, setAdopting] = useState<IntegrationConflict | null>(null)
   const [reauthenticationAction, setReauthenticationAction] = useState<'create' | 'rotate' | null>(null)
   const [password, setPassword] = useState('')
   const [reload, setReload] = useState(0)
@@ -241,7 +247,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   }
 
   return <>
-    <header className="page-header"><div><h1>Integrations</h1><p>{translate('integrations.intro', { workspace: workspace.name })}</p></div></header>
+    <header className="page-header"><div><h1 id="integrations-heading" tabIndex={-1}>Integrations</h1><p>{translate('integrations.intro', { workspace: workspace.name })}</p></div></header>
     <RecordSections current={section} sections={INTEGRATION_SECTIONS.map((item) => ({
       ...item,
       label: translate(item.label),
@@ -263,14 +269,91 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
         <div className="form-actions"><button type="submit" className="primary-button" disabled={saving}>{translate('integrations.confirmAndSave')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => { setReauthenticationAction(null); setPassword('') }}>{translate('common.cancel')}</button></div>
       </form>}
       <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.recentUpdates')}</h2><p>{translate('integrations.recentUpdatesHelp')}</p></div></div>{jobs.length === 0 ? <p className="empty-state">No updates have run.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.syncJobTable')} tabIndex={0}><table><thead><tr><th>Started</th><th>Connection</th><th>Started by</th><th>Status</th><th>Attempts</th><th>Result</th><th>Actions</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}><td>{new Date(job.created_at).toLocaleString()}</td><td>{job.connection_name}</td><td>{job.trigger}</td><td>{job.state.replace('_', ' ')}</td><td>{job.attempts}</td><td>{job.last_error_code || `${job.result_counts.observations ?? 0} records found`}</td><td>{(job.state === 'pending' || job.state === 'processing') ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void cancelJob(job) }}>{translate('common.cancel')}</button> : '—'}</td></tr>)}</tbody></table></div>}</section>
-      <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.sourceRecords')}</h2><p>{translate('integrations.sourceRecordsHelp')}</p></div></div>{observations.length === 0 ? <p className="empty-state">No records have been found.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Type</th><th>Source record</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th></tr></thead><tbody>{observations.map((observation) => { const conflict = conflicts.find((item) => item.connection_id === observation.connection_id && item.remote_type === observation.remote_type && item.remote_id === observation.remote_id && item.status === 'open'); return <tr key={observation.id}><td>{observation.connection_name}</td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td></tr> })}</tbody></table></div>}</section>
+      <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.sourceRecords')}</h2><p>{translate('integrations.sourceRecordsHelp')}</p></div></div>{observations.length === 0 ? <p className="empty-state">No records have been found.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Type</th><th>Source record</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th><th>Action</th></tr></thead><tbody>{observations.map((observation) => { const conflict = conflicts.find((item) => item.connection_id === observation.connection_id && item.remote_type === observation.remote_type && item.remote_id === observation.remote_id && item.status === 'open'); return <tr key={observation.id}><td>{observation.connection_name}</td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td><td>{conflict?.difference === 'unmatched' && conflict.connection_provider === 'netbox' ? <button className="secondary-button" type="button" onClick={() => setAdopting(conflict)}>{translate('integrations.linkOrCreate')}</button> : '—'}</td></tr> })}</tbody></table></div>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>Operational log</h2><p>Thirty-day structured events contain allowlisted codes and numeric metrics—not provider messages or response bodies.</p></div></div>{logs.length === 0 ? <p className="empty-state">No provider events have been recorded.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.logTable')} tabIndex={0}><table><thead><tr><th>Time</th><th>Connection</th><th>Level</th><th>Code</th><th>Metrics</th></tr></thead><tbody>{logs.map((event) => <tr key={event.id}><td>{new Date(event.occurred_at).toLocaleString()}</td><td>{event.connection_name}</td><td>{event.level}</td><td><code>{event.code}</code></td><td>{Object.entries(event.metrics).map(([key, value]) => `${key}: ${value}`).join(', ') || '—'}</td></tr>)}</tbody></table></div>}</section>
     </>}
     {section === 'imports' && <Imports workspace={workspace} client={importsClient} />}
-    {phase === 'ready' && section === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>{conflicts.filter((item) => item.status === 'open').length === 0 ? <p className="empty-state">{translate('integrations.noDifferences')}</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Source record</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Decision</th></tr></thead><tbody>{conflicts.filter((item) => item.status === 'open').map((conflict) => <tr key={conflict.id}><td>{conflict.connection_name}</td><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr>)}</tbody></table></div>}</section>}
+    {phase === 'ready' && section === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>{conflicts.filter((item) => item.status === 'open').length === 0 ? <p className="empty-state">{translate('integrations.noDifferences')}</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Source record</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Decision</th></tr></thead><tbody>{conflicts.filter((item) => item.status === 'open').map((conflict) => <tr key={conflict.id}><td>{conflict.connection_name}</td><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions">{conflict.difference === 'unmatched' && conflict.connection_provider === 'netbox' ? <button className="primary-button" type="button" disabled={saving} onClick={() => setAdopting(conflict)}>{translate('integrations.linkOrCreate')}</button> : <><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}</>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr>)}</tbody></table></div>}</section>}
     {phase === 'ready' && section === 'exports' && <><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div><button className="primary-button" type="button" disabled={saving || (selected.length === 0 && selectedPublications.length === 0)} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button></div>{documents.length === 0 ? <p className="empty-state">No documents are available in this workspace.</p> : <><h3>Editable documents</h3><div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>{documents.some((document) => document.publications.length > 0) && <><h3>Published copies</h3><div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div></>}</>}</section><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>{exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}><table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table></div>}</section></>}
     {section === 'webhooks' && <Webhooks workspace={workspace} client={client} embedded />}
+    {adopting && <NetBoxAdoptionDrawer workspace={workspace} conflict={adopting} providerClient={providerClient} networksClient={networksClient} onClose={() => setAdopting(null)} onSaved={(updated) => { setConflicts((current) => current.map((item) => item.id === updated.id ? updated : item)); setAdopting(null); setReload((value) => value + 1) }} />}
   </>
+}
+
+const NETBOX_TYPES = new Set<NetBoxObjectType>(['dcim.rack', 'dcim.device', 'dcim.macaddress', 'ipam.vlan', 'ipam.prefix', 'ipam.ipaddress'])
+
+function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksClient, onClose, onSaved }: {
+  workspace: WorkspaceContext; conflict: IntegrationConflict; providerClient: IntegrationsClient; networksClient: NetworksClient
+  onClose: () => void; onSaved: (conflict: IntegrationConflict) => void
+}) {
+  const location = useLocation()
+  const objectType = NETBOX_TYPES.has(conflict.remote_type as NetBoxObjectType) ? conflict.remote_type as NetBoxObjectType : null
+  const projectedName = conflict.provider_values?.name ?? conflict.provider_values?.display
+  const sourceName = typeof projectedName === 'string' || typeof projectedName === 'number'
+    ? String(projectedName)
+    : `${conflict.remote_type} ${conflict.remote_id}`
+  const [mode, setMode] = useState<'link' | 'create'>(conflict.remote_type === 'dcim.rack' ? 'create' : 'link')
+  const [query, setQuery] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [choices, setChoices] = useState<{ results: NetBoxChoice[]; selected: NetBoxChoice | null; count: number; has_more: boolean } | null>(null)
+  const [selectedId, setSelectedId] = useState('')
+  const [name, setName] = useState(sourceName)
+  const [site, setSite] = useState<{ id: string; name: string } | null>(null)
+  const [place, setPlace] = useState<{ id: string; name: string } | null>(null)
+  const [unitCount, setUnitCount] = useState(42)
+  const [status, setStatus] = useState<'planned' | 'active' | 'retired'>('active')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const dirty = Boolean(selectedId || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
+  const attempt = useUnsavedChanges(dirty, busy, () => {}, true)
+
+  useEffect(() => {
+    if (mode !== 'link' || !objectType) return
+    const controller = new AbortController()
+    networksClient.netBoxChoiceCollection(workspace, { q: submittedQuery, object_type: objectType, selected_id: selectedId || undefined, page, page_size: 25 }, controller.signal)
+      .then((value) => { if (!controller.signal.aborted) { setChoices(value); setError('') } })
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('integrations.adoptFailed')) })
+    return () => controller.abort()
+  }, [mode, networksClient, objectType, page, selectedId, submittedQuery, workspace])
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    if (!objectType) return
+    setBusy(true); setError('')
+    try {
+      const updated = mode === 'link'
+        ? await providerClient.adoptNetBoxConflict(workspace, conflict, { entity_id: selectedId })
+        : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
+      onSaved(updated)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : translate('integrations.adoptFailed'))
+    } finally { setBusy(false) }
+  }
+
+  const selected = choices?.selected ?? choices?.results.find((choice) => choice.id === selectedId) ?? null
+  return <QuickDrawer title={translate('integrations.adoptHeading')} returnLabel={translate('integrations.returnToReview')} returnHref={`${location.pathname}${location.search}`} returnFocusId="integrations-heading" onClose={() => attempt(onClose)}>
+    <form onSubmit={(event) => void save(event)}>
+      <p>{translate('integrations.adoptIntro', { source: sourceName, type: conflict.remote_type })}</p>
+      <p className="field-help">{translate('integrations.localSearchHelp')}</p>
+      {error && <p role="alert">{error}</p>}
+      {objectType ? <>
+        {conflict.remote_type === 'dcim.rack' && <fieldset><legend>{translate('integrations.adoptMethod')}</legend><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'create'} onChange={() => { setMode('create'); setSelectedId('') }} /> {translate('integrations.createRack')}</label><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'link'} onChange={() => setMode('link')} /> {translate('integrations.linkExisting')}</label></fieldset>}
+        {mode === 'link' ? <>
+          <label>{translate('integrations.searchLocalRecords')}<span className="collection-search"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} /><button className="secondary-button" type="button" onClick={() => { setSubmittedQuery(query.trim()); setPage(1) }}>{translate('collections.searchAction')}</button></span></label>
+          {choices === null ? <p role="status">{translate('collections.loading')}</p> : choices.results.length === 0 ? <p className="empty-state">{translate('integrations.noLocalMatches')}</p> : <fieldset><legend>{translate('integrations.chooseLocalRecord')}</legend>{choices.results.map((choice) => <label key={choice.id} className="collection-choice"><input type="radio" name="local-record" checked={selectedId === choice.id} onChange={() => setSelectedId(choice.id)} /> <span><strong>{choice.name}</strong></span></label>)}<CollectionPagination label={translate('integrations.chooseLocalRecord')} page={page} pageSize={25} count={choices.count} hasMore={choices.has_more} onPageChange={setPage} /></fieldset>}
+          {selected && <p>{translate('integrations.selectedLocalRecord', { name: selected.name })}</p>}
+        </> : <>
+          <label>{translate('integrations.rackName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <div className="field-grid"><label>{translate('integrations.rackUnits')}<input required type="number" min={1} max={100} value={unitCount} onChange={(event) => setUnitCount(event.target.valueAsNumber)} /></label><label>{translate('collections.status')}<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="planned">{translate('integrations.statusPlanned')}</option><option value="active">{translate('integrations.statusActive')}</option><option value="retired">{translate('integrations.statusRetired')}</option></select></label></div>
+          <RackPlaceChoice kind="site" selected={site} workspace={workspace} client={networksClient} onChange={(value) => { setSite(value); setPlace(null) }} />
+          {site && <RackPlaceChoice kind="location" siteId={site.id} selected={place} workspace={workspace} client={networksClient} onChange={setPlace} />}
+          {!site && <p className="field-help">{translate('integrations.rackSiteRequired')}</p>}
+        </>}
+        <div className="form-actions"><button className="primary-button" disabled={busy || (mode === 'link' ? !selectedId : !name.trim() || !site || Number.isNaN(unitCount))}>{busy ? translate('common.saving') : mode === 'link' ? translate('integrations.linkRecord') : translate('integrations.createAndLink')}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => attempt(onClose)}>{translate('common.cancel')}</button></div>
+      </> : <p role="alert">{translate('integrations.unsupportedNetBoxType')}</p>}
+    </form>
+  </QuickDrawer>
 }
 
 const INTEGRATION_SECTIONS = [

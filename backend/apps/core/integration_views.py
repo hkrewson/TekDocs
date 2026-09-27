@@ -24,6 +24,7 @@ from .integrations import (
     connections_for_workspace,
     create_connection,
     enqueue_sync,
+    adopt_netbox_conflict,
     resolve_conflict,
     resolve_integration_workspace,
     rotate_connection_secret,
@@ -39,7 +40,9 @@ from .models import (
     IntegrationObservation,
     IntegrationProvider,
     IntegrationSyncJob,
+    NetBoxReference,
 )
+from .scoping import DataScope
 from .workspaces import ResolvedWorkspace
 
 IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,159}$")
@@ -208,8 +211,8 @@ class ObservationSerializer(serializers.Serializer):
     accepted = serializers.SerializerMethodField()
     stale = serializers.SerializerMethodField()
 
-    def _mapping(self, observation: IntegrationObservation) -> IntegrationEntityMapping | None:
-        cache: dict[tuple[UUID, str, str], IntegrationEntityMapping | None] | None = getattr(
+    def _mapping(self, observation: IntegrationObservation) -> IntegrationEntityMapping | NetBoxReference | None:
+        cache: dict[tuple[UUID, str, str], IntegrationEntityMapping | NetBoxReference | None] | None = getattr(
             self, "_mapping_cache", None
         )
         if cache is None:
@@ -223,26 +226,40 @@ class ObservationSerializer(serializers.Serializer):
         )
         cache_key = (observation.job.connection_id, remote_type, observation.remote_id)
         if cache_key not in cache:
-            cache[cache_key] = IntegrationEntityMapping.objects.select_related("local_entity").filter(
-                connection_id=observation.job.connection_id,
-                remote_type=remote_type,
-                remote_id=observation.remote_id.split(":", 1)[0] if remote_type == "device" else observation.remote_id,
-            ).first()
+            if observation.job.connection.provider == IntegrationProvider.NETBOX:
+                try:
+                    object_id = int(observation.remote_id)
+                except ValueError:
+                    object_id = 0
+                cache[cache_key] = NetBoxReference.scoped.for_scope(
+                    DataScope(observation.tenant_id, observation.workspace_id, observation.organization_id)
+                ).select_related("entity").filter(
+                    workspace_id=observation.workspace_id,
+                    object_type=remote_type,
+                    object_id=object_id,
+                    archived_at__isnull=True,
+                ).first()
+            else:
+                cache[cache_key] = IntegrationEntityMapping.objects.select_related("local_entity").filter(
+                    connection_id=observation.job.connection_id,
+                    remote_type=remote_type,
+                    remote_id=observation.remote_id.split(":", 1)[0] if remote_type == "device" else observation.remote_id,
+                ).first()
         return cache[cache_key]
 
     def get_linked_local_entity_id(self, observation: IntegrationObservation) -> UUID | None:
         mapping = self._mapping(observation)
-        return mapping.local_entity_id if mapping else None
+        return mapping.entity_id if isinstance(mapping, NetBoxReference) else mapping.local_entity_id if mapping else None
 
     def get_linked_local_entity_name(self, observation: IntegrationObservation) -> str:
         mapping = self._mapping(observation)
-        return mapping.local_entity.display_name if mapping else ""
+        return mapping.entity.display_name if isinstance(mapping, NetBoxReference) else mapping.local_entity.display_name if mapping else ""
 
     def get_accepted(self, observation: IntegrationObservation) -> bool:
         mapping = self._mapping(observation)
         return bool(
             mapping
-            and mapping.remote_type == observation.remote_type
+            and (not isinstance(mapping, IntegrationEntityMapping) or mapping.remote_type == observation.remote_type)
             and mapping.observed_fingerprint == observation.fingerprint
         )
 
@@ -282,6 +299,7 @@ class ConflictSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     connection_id = serializers.UUIDField()
     connection_name = serializers.CharField(source="connection.name")
+    connection_provider = serializers.CharField(source="connection.provider")
     local_entity_id = serializers.SerializerMethodField()
     local_entity_name = serializers.SerializerMethodField()
     provider_values = serializers.SerializerMethodField()
@@ -316,6 +334,24 @@ class ConflictResolutionSerializer(StrictSerializer):
             IntegrationConflictStatus.IGNORED,
         )
     )
+
+
+class NetBoxRackAdoptionSerializer(StrictSerializer):
+    name = serializers.CharField(max_length=240, trim_whitespace=True)
+    site_id = serializers.UUIDField(source="site_entity_id")
+    location_id = serializers.UUIDField(source="location_entity_id", allow_null=True, required=False, default=None)
+    unit_count = serializers.IntegerField(min_value=1, max_value=100, required=False, default=42)
+    status = serializers.ChoiceField(choices=("planned", "active", "retired"), required=False, default="active")
+
+
+class NetBoxAdoptionSerializer(StrictSerializer):
+    entity_id = serializers.UUIDField(required=False)
+    rack = NetBoxRackAdoptionSerializer(required=False)
+
+    def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if ("entity_id" in attrs) == ("rack" in attrs):
+            raise serializers.ValidationError("Choose one existing record or create one rack.")
+        return attrs
 
 
 class GitExportWriteSerializer(StrictSerializer):
@@ -541,6 +577,19 @@ class IntegrationConflictResolveView(APIView):
         serializer = ConflictResolutionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         conflict = resolve_conflict(
+            workspace=workspace, conflict_id=conflict_id, actor=request.user, **serializer.validated_data
+        )
+        return _private(Response(ConflictSerializer(conflict).data))
+
+
+class IntegrationNetBoxAdoptView(APIView):
+    @extend_schema(request=NetBoxAdoptionSerializer, responses={200: ConflictSerializer})
+    def post(self, request, conflict_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_MANAGE)
+        require_permission(request.user, PermissionKey.NETWORKS_EDIT, organization=workspace.organization)
+        serializer = NetBoxAdoptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        conflict = adopt_netbox_conflict(
             workspace=workspace, conflict_id=conflict_id, actor=request.user, **serializer.validated_data
         )
         return _private(Response(ConflictSerializer(conflict).data))

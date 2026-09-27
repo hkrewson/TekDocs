@@ -2822,6 +2822,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/netbox-adopt": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_conflicts_netbox_adopt_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/resolve": {
         readonly parameters: {
             readonly query?: never;
@@ -5913,6 +5929,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/netbox-adopt": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_conflicts_netbox_adopt_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/resolve": {
         readonly parameters: {
             readonly query?: never;
@@ -8872,6 +8904,7 @@ export interface components {
             /** Format: uuid */
             readonly connection_id: string;
             readonly connection_name: string;
+            readonly connection_provider: string;
             /** Format: uuid */
             readonly local_entity_id: string | null;
             readonly local_entity_name: string;
@@ -11804,6 +11837,11 @@ export interface components {
             /** @default  */
             readonly notes: string;
         };
+        readonly NetBoxAdoption: {
+            /** Format: uuid */
+            readonly entity_id?: string;
+            readonly rack?: components["schemas"]["NetBoxRackAdoption"];
+        };
         readonly NetBoxChoice: {
             /** Format: uuid */
             readonly id: string;
@@ -11864,6 +11902,23 @@ export interface components {
         };
         readonly NetBoxPreviewWrite: {
             readonly observations: readonly components["schemas"]["NetBoxObservation"][];
+        };
+        readonly NetBoxRackAdoption: {
+            readonly name: string;
+            /** Format: uuid */
+            readonly site_id: string;
+            /** Format: uuid */
+            readonly location_id?: string | null;
+            /** @default 42 */
+            readonly unit_count: number;
+            /**
+             * @description * `planned` - planned
+             *     * `active` - active
+             *     * `retired` - retired
+             * @default active
+             * @enum {string}
+             */
+            readonly status: "planned" | "active" | "retired";
         };
         readonly NetBoxReference: {
             /** Format: uuid */
@@ -12384,6 +12439,9 @@ export interface components {
         readonly PatchedConnectionUpdate: {
             readonly active?: boolean;
             readonly sync_interval_minutes?: number;
+            readonly name?: string;
+            /** Format: uri */
+            readonly base_url?: string;
         };
         readonly PatchedContractWrite: {
             readonly name?: string;
@@ -22494,6 +22552,35 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_integrations_conflicts_netbox_adopt_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly conflict_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxAdoption"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxAdoption"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxAdoption"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Conflict"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_integrations_conflicts_resolve_create: {
         readonly parameters: {
             readonly query?: never;
@@ -31038,6 +31125,36 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ConflictPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_conflicts_netbox_adopt_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly conflict_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxAdoption"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxAdoption"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxAdoption"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Conflict"];
                 };
             };
         };

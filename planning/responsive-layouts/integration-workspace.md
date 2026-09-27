@@ -24,6 +24,11 @@ authoritative.
   sync interval. Credentials remain a separate replacement workflow. NetBox site
   roots are normalized to the provider's `/api/` endpoint on create, edit and sync,
   including connections saved before this correction.
+- Unmatched NetBox observations expose a direct **Link or create** action. The
+  matching search is explicitly identified as TekDocs-only, carries the remote
+  type and ID without retyping, and permits an existing eligible record to be
+  linked. A NetBox rack can create and link a TekDocs rack in one transaction
+  after the operator selects its required TekDocs site and optional location.
 - Both MSP and organization routes fit 320, 390, 768, 1024, 1280 and 1440px in
   Chromium, Firefox and WebKit without horizontal page overflow or automated
   accessibility violations.
@@ -61,3 +66,22 @@ Version remains 0.8.46.
 NetBox authentication accepts both maintained v2 tokens (`Bearer nbt_…`) and
 legacy v1 tokens (`Token …`). The connection form explains that the complete v2
 value is required, and credential replacement is a labeled connection action.
+
+## NetBox first-run adoption checkpoint — 2026-09-27
+
+The reconciliation and source-record tables no longer leave an unmatched NetBox
+identity as an unexplained dead end. **Not linked** means no TekDocs identity has
+been chosen; **Needs review** means an open reconciliation decision exists. The
+new drawer searches eligible local records of the matching type, explains that
+NetBox records themselves do not appear in that search, and creates a starting
+rack when the workspace has no rack to match. Rack creation still requires a
+canonical TekDocs site, so an entirely empty workspace is directed to create its
+site before adopting the rack.
+
+The API operation requires both `integrations.manage` and `networks.edit`, locks
+the open exact-Workspace conflict, validates the local entity type, creates the
+`NetBoxReference` with the observed fingerprint, and resolves the conflict in
+one transaction. It never writes to NetBox. Direct creation for devices, VLANs,
+prefixes, addresses, and MAC addresses remains a later extension because those
+records require product, addressing, or asset dependencies that cannot be safely
+guessed from the current value-minimized observation.

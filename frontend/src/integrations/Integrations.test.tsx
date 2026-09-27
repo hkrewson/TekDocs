@@ -6,11 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
 import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
+import type { NetworksClient } from '../networks/api'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Integrations } from './Integrations'
 import { IntegrationRequestError } from './providerApi'
-import type { IntegrationConnection, IntegrationsClient } from './providerApi'
+import type { IntegrationConflict, IntegrationConnection, IntegrationsClient } from './providerApi'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: 'client-1', name: 'Acme Dental', classifications: ['client'],
@@ -32,7 +33,7 @@ function providerClient(): IntegrationsClient {
     listLogs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     listObservations: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     listConflicts: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
-    resolveConflict: vi.fn(), listGitExports: vi.fn().mockResolvedValue([]), createGitExport: vi.fn(),
+    resolveConflict: vi.fn(), adoptNetBoxConflict: vi.fn(), listGitExports: vi.fn().mockResolvedValue([]), createGitExport: vi.fn(),
     gitExportDownloadUrl: vi.fn().mockReturnValue('/download'),
     listHaloTickets: vi.fn().mockResolvedValue([]),
   }
@@ -52,10 +53,10 @@ function documentsClient(): DocumentsClient {
   return { list: vi.fn().mockResolvedValue({ results: [runbook], count: 1 }) } as unknown as DocumentsClient
 }
 
-function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }) {
+function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }, networksClient?: NetworksClient) {
   const router = createMemoryRouter([{
     path: '*',
-    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} authClient={authClient} /></NavigationGuardProvider>,
+    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} networksClient={networksClient} authClient={authClient} /></NavigationGuardProvider>,
   }], { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   return router
@@ -181,6 +182,35 @@ describe('Integrations', () => {
     await user.click(screen.getByRole('link', { name: 'Reconciliation' }))
     await user.click(screen.getByRole('button', { name: 'Acknowledge change' }))
     await waitFor(() => expect(provider.resolveConflict).toHaveBeenCalledWith(workspace, conflict, 'accept_remote'))
+    expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
+  })
+
+  it('explains local-only matching and links a discovered NetBox record without retyping its identity', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-unmatched', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 42, name: 'Users' }, remote_type: 'ipam.vlan', remote_id: '42', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts)
+      .mockResolvedValueOnce({ results: [conflict], page: 1, page_size: 50, count: 1, has_more: false })
+      .mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'vlan-1', local_entity_name: 'Users VLAN', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({
+        results: [{ id: 'vlan-1', name: 'Users VLAN', entity_type: 'network_vlan', object_type: 'ipam.vlan', linked: false }],
+        selected: null, page: 1, page_size: 25, count: 1, has_more: false, can_manage: true,
+      }),
+    } as unknown as NetworksClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
+    await user.click(await screen.findByRole('button', { name: 'Link or create' }))
+    expect(screen.getByText(/contains TekDocs records only/i)).toBeInTheDocument()
+    await user.click(await screen.findByRole('radio', { name: /Users VLAN/i }))
+    await user.click(screen.getByRole('button', { name: 'Link record' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'vlan-1' }))
     expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
   })
 

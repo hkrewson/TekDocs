@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 from uuid import UUID as UUIDValue
 
@@ -1083,5 +1083,84 @@ def resolve_conflict(
         action="integration_conflict.resolved",
         entity_id=conflict.id,
         metadata={"resolution": resolution},
+    )
+    return conflict
+
+
+@transaction.atomic
+def adopt_netbox_conflict(
+    *,
+    workspace: ResolvedWorkspace,
+    conflict_id: UUID,
+    actor: Any,
+    entity_id: UUID | None = None,
+    rack: dict[str, object] | None = None,
+) -> IntegrationConflict:
+    """Link an unmatched NetBox observation, optionally creating its TekDocs rack."""
+
+    from .netbox_reconciliation import NetBoxReferenceError, set_reference
+    from .network_inventory import NetworkInventoryError, create_rack
+
+    try:
+        conflict = (
+            IntegrationConflict.scoped.for_scope(workspace.data_scope)
+            .select_for_update()
+            .select_related("connection")
+            .get(workspace_id=workspace.data_scope.workspace_id, pk=conflict_id, status=IntegrationConflictStatus.OPEN)
+        )
+    except IntegrationConflict.DoesNotExist as exc:
+        raise NotFound("The integration conflict is unavailable.") from exc
+    if conflict.connection.provider != IntegrationProvider.NETBOX or conflict.difference != "unmatched":
+        raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
+    if conflict.observation is None:
+        raise ValidationError({"detail": "The source observation is unavailable."})
+    if (entity_id is None) == (rack is None):
+        raise ValidationError({"detail": "Choose one existing record or create one rack."})
+
+    selected_entity_id = entity_id
+    if rack is not None:
+        if conflict.remote_type != "dcim.rack":
+            raise ValidationError({"detail": "Direct creation is currently available for NetBox racks."})
+        try:
+            created = create_rack(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=actor.pk,
+                name=cast(str, rack["name"]),
+                site_entity_id=cast(UUID, rack["site_entity_id"]),
+                location_entity_id=cast(UUID | None, rack.get("location_entity_id")),
+                unit_count=cast(int, rack["unit_count"]),
+                status=cast(str, rack["status"]),
+            )
+        except NetworkInventoryError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        selected_entity_id = created.entity_id
+
+    assert selected_entity_id is not None
+    try:
+        reference = set_reference(
+            tenant=workspace.member.tenant,
+            organization=workspace.organization,
+            actor_id=actor.pk,
+            entity_id=selected_entity_id,
+            object_type=conflict.remote_type,
+            object_id=int(conflict.remote_id),
+            fingerprint=conflict.remote_fingerprint,
+        )
+    except (NetBoxReferenceError, ValueError) as exc:
+        raise ValidationError({"detail": str(exc)}) from exc
+    reference.last_observed_at = conflict.observation.observed_at
+    reference.save(update_fields=("last_observed_at", "updated_at"))
+
+    conflict.status = IntegrationConflictStatus.ACCEPT_REMOTE
+    conflict.resolved_by = actor
+    conflict.resolved_at = timezone.now()
+    conflict.save(update_fields=("status", "resolved_by", "resolved_at", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=actor,
+        action="integration_conflict.adopted",
+        entity_id=conflict.id,
+        metadata={"created": rack is not None, "object_type": conflict.remote_type},
     )
     return conflict

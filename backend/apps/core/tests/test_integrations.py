@@ -33,10 +33,13 @@ from apps.core.models import (
     IntegrationLogEvent,
     IntegrationObservation,
     IntegrationSyncJob,
+    NetBoxReference,
+    NetworkRack,
     OrganizationKind,
     workspace_for_owner,
 )
 from apps.core.organizations import create_organization
+from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
 from apps.core.workspaces import resolve_organization_workspace
 
@@ -448,6 +451,85 @@ def test_sync_job_is_idempotent_value_minimized_and_retryable(installation):
     assert retried.state == IntegrationJobState.PENDING
     assert retried.attempts == 1
     assert retried.last_error_code == "provider_response_invalid"
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_rack_can_create_and_link_a_starting_record(installation):
+    record = organization(installation, "Blank NetBox client")
+    source = connection(installation, record)
+    site = create_site(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Main office",
+        code="MAIN",
+        address_line_1="",
+        address_line_2="",
+        city="",
+        region="",
+        postal_code="",
+        country_code="US",
+        timezone="America/Chicago",
+        phone="",
+    )
+
+    class RackAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(ProviderObservation("dcim.rack", "17", "b" * 64, {"id": 17, "name": "Core rack"}),),
+                next_cursor="",
+                complete_types=("dcim.rack",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="rack:starting-record").id,
+        adapter=RackAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-integration-netbox-adopt",
+            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+        ),
+        data=json.dumps(
+            {
+                "rack": {
+                    "name": "Core rack",
+                    "site_id": str(site.entity_id),
+                    "location_id": None,
+                    "unit_count": 42,
+                    "status": "active",
+                }
+            }
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    rack = NetworkRack.objects.get(entity__display_name="Core rack")
+    reference = NetBoxReference.objects.get(entity=rack.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "dcim.rack",
+        17,
+        "b" * 64,
+    )
+    assert reference.last_observed_at is not None
+    observations = browser.get(
+        reverse(
+            "organization-integration-observation-list",
+            kwargs={"organization_entity_id": record.entity_id},
+        )
+    ).json()["results"]
+    assert observations[0]["linked_local_entity_id"] == str(rack.entity_id)
+    assert observations[0]["linked_local_entity_name"] == "Core rack"
+    assert observations[0]["accepted"] is True
 
 
 @pytest.mark.django_db

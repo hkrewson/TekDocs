@@ -243,6 +243,7 @@ from apps.core.integration_views import (
     HaloTicketSummaryListView,
     IntegrationConflictListView,
     IntegrationConflictResolveView,
+    IntegrationNetBoxAdoptView,
     IntegrationConnectionDetailView,
     IntegrationConnectionListCreateView,
     IntegrationConnectionRotateView,
@@ -945,6 +946,11 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/conflicts/<uuid:conflict_id>/resolve",
         IntegrationConflictResolveView.as_view(),
         name="msp-integration-conflict-resolve",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/conflicts/<uuid:conflict_id>/netbox-adopt",
+        IntegrationNetBoxAdoptView.as_view(),
+        name="msp-integration-netbox-adopt",
     ),
     path(
         "api/v1/workspaces/msp/integrations/git-exports",
@@ -2344,6 +2350,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/conflicts/<uuid:conflict_id>/resolve",
         IntegrationConflictResolveView.as_view(),
         name="organization-integration-conflict-resolve",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/conflicts/<uuid:conflict_id>/netbox-adopt",
+        IntegrationNetBoxAdoptView.as_view(),
+        name="organization-integration-netbox-adopt",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/git-exports",

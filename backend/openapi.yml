@@ -9828,6 +9828,45 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/netbox-adopt:
+    post:
+      operationId: workspaces_msp_integrations_conflicts_netbox_adopt_create
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/integrations/conflicts/{conflict_id}/resolve:
     post:
       operationId: workspaces_msp_integrations_conflicts_resolve_create
@@ -22377,6 +22416,51 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/netbox-adopt:
+    post:
+      operationId: workspaces_organizations_integrations_conflicts_netbox_adopt_create
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxAdoption'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/integrations/conflicts/{conflict_id}/resolve:
     post:
       operationId: workspaces_organizations_integrations_conflicts_resolve_create
@@ -33640,6 +33724,8 @@ components:
           format: uuid
         connection_name:
           type: string
+        connection_provider:
+          type: string
         local_entity_id:
           type: string
           format: uuid
@@ -33670,6 +33756,7 @@ components:
       required:
       - connection_id
       - connection_name
+      - connection_provider
       - created_at
       - difference
       - id
@@ -40549,6 +40636,14 @@ components:
       - name
       - specification_version_id
       - specifications
+    NetBoxAdoption:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        rack:
+          $ref: '#/components/schemas/NetBoxRackAdoption'
     NetBoxChoice:
       type: object
       properties:
@@ -40701,6 +40796,39 @@ components:
             $ref: '#/components/schemas/NetBoxObservation'
       required:
       - observations
+    NetBoxRackAdoption:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        site_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        unit_count:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 42
+        status:
+          enum:
+          - planned
+          - active
+          - retired
+          type: string
+          description: |-
+            * `planned` - planned
+            * `active` - active
+            * `retired` - retired
+          x-spec-enum-id: 5761b434c9a5aca2
+          default: active
+      required:
+      - name
+      - site_id
     NetBoxReference:
       type: object
       properties:

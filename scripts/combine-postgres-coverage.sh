@@ -9,12 +9,21 @@ case "$coverage_directory" in
   *) coverage_directory="$repository_root/$coverage_directory" ;;
 esac
 
-for shard in route-access route-methods route-session accounts core migration-foundation migration-isolation migration-guards; do
+for shard in route-access route-methods route-session accounts migration-foundation migration-isolation migration-guards; do
   test -s "$coverage_directory/coverage.$shard" || {
     echo "Missing coverage data for PostgreSQL shard: $shard" >&2
     exit 1
   }
 done
+
+if [ ! -s "$coverage_directory/coverage.core" ]; then
+  for shard in core-a core-b core-c; do
+    test -s "$coverage_directory/coverage.$shard" || {
+      echo "Missing coverage data for PostgreSQL shard: core or core-a/core-b/core-c" >&2
+      exit 1
+    }
+  done
+fi
 
 rm -f "$coverage_directory/coverage"
 chmod 0777 "$coverage_directory"

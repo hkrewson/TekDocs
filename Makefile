@@ -21,7 +21,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
 	test-browser-artifact-hygiene test-e2e-live
 
-.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal placement-audience-upgrade-rehearsal
+.PHONY: test-notifications test-notification-email test-portal-notification-stabilization test-portal-notification-validation test-postgres-matrix notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal placement-audience-upgrade-rehearsal
 .PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix test-localization check-ui-language check-responsive-route-inventory check-responsive-acceptance test-public-beta-performance test-browser-artifact-hygiene test-automated-security-review-gate assemble-security-evidence assemble-diagram-release-evidence automated-security-review-gate external-security-review-gate wiki-check check-renderer-dependency-contract test-diagram-exports diagram-export-release-gate
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES)
 
@@ -93,6 +93,9 @@ check-renderer-dependency-contract:
 
 test: test-frontend
 	docker compose run --rm migrate pytest --cov
+
+test-postgres-matrix:
+	./tests/rehearsals/rehearse-postgres-test-matrix.sh
 
 test-localization: test-frontend
 	$(MAKE) check-ui-language
@@ -303,7 +306,7 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true sh ./tests/rehearsals/rehearse-production-image.sh
 
-release-gate: check test test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix recurring-invoice-backup-rehearsal
+release-gate: check test-postgres-matrix test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix recurring-invoice-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

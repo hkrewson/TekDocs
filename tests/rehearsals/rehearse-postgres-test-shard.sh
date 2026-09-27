@@ -52,6 +52,23 @@ case "$shard" in
     set -- $core_files "$matrix_file" -k \
       "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
     ;;
+  core-a|core-b|core-c)
+    case "$shard" in
+      core-a) partition=1 ;;
+      core-b) partition=2 ;;
+      core-c) partition=0 ;;
+    esac
+    core_files=$(find "$repository_root/backend/apps/core/tests" -name 'test_*.py' -type f \
+      ! -name 'test_migration_stabilization.py' \
+      ! -name 'test_permission_idor_matrix.py' -print | sort | \
+      awk -v partition="$partition" 'NR % 3 == partition' | sed "s|$repository_root/backend/||")
+    # shellcheck disable=SC2086
+    set -- $core_files
+    if [ "$shard" = "core-c" ]; then
+      set -- "$@" "$matrix_file" -k \
+        "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
+    fi
+    ;;
   migration-foundation)
     set -- \
       apps/core/tests/test_migration_stabilization.py::test_billing_foundation_upgrades_from_document_operations \
@@ -82,10 +99,15 @@ case "$shard" in
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac
+
+if [ "${TEKDOCS_POSTGRES_SHARD_LIST_ONLY:-false}" = "true" ]; then
+  printf '%s\n' "$@"
+  exit 0
+fi
 
 "$repository_root/scripts/bootstrap-env.sh" "$environment_file" >/dev/null
 {

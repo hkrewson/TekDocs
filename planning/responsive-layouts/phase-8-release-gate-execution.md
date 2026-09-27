@@ -30,15 +30,20 @@ Validate this shape with `make -n release-gate`; adding another direct
 `frontend-gate.sh test` or `frontend-gate.sh check` call to a feature recipe
 should be replaced by the shared prerequisite.
 
-The backend plan follows the same rule. The complete coverage suite runs once,
-followed by the two performance selections that require opt-in markers or latency
-enforcement. Focused feature targets remain independently callable during
-development, but the final gate does not rerun selections already contained in
-the complete suite. The assembled Compose boundary verifies service health,
-email, production settings and image provenance against the running stack; it no
-longer launches a second identical coverage suite in a one-off test container.
-The release-script contract checks this three-command pytest shape from
-`make -n release-gate`.
+The backend plan follows the same rule. The complete suite uses the isolated
+PostgreSQL coverage boundaries from CI and divides the large core selection into
+three deterministic local partitions before combining and enforcing coverage.
+Separate databases preserve tests that modify cluster roles or schema without
+requiring an unsafe shared-worker dependency. Hosts with at least 10 Docker CPUs
+and 7 GB of Docker memory run all ten shards together; smaller hosts use two
+five-shard batches. The two performance selections still run afterward because
+they require opt-in markers or latency enforcement. Focused feature targets
+remain independently callable during development, but the final gate does not
+rerun selections already contained in the complete matrix. The assembled Compose
+boundary verifies service health, email, production settings and image provenance
+against the running stack; it no longer launches a second identical coverage
+suite in a one-off test container. Release-script contracts check the complete
+and non-overlapping shard plan plus the dry-run command shape.
 
 ## Current evidence
 
@@ -99,6 +104,16 @@ the final target scheduled dozens of focused backend selections already covered
 by the complete suite and scheduled the complete suite again inside
 `test-compose`. The gate plan was consolidated before another acceptance run;
 the interrupted command is not represented as release evidence.
+
+The consolidated backend boundary passes in both bounded-batch and automatic
+high-resource modes with the same 88.54% combined coverage as the prior serial
+suite. On the 12-CPU, 8-GB Docker development host, the final ten-shard run used
+about 2.4 GB while all workers were active and completed in about seven minutes,
+down from 25 minutes 33 seconds for the serial coverage run. A contract test
+proves that the three local core partitions select every applicable core test
+file exactly once. This performance evidence validates the gate mechanism; the
+full release target must still exit successfully before the acceptance ledger can
+change.
 
 ## Remaining human boundary
 

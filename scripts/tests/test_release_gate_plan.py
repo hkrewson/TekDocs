@@ -22,7 +22,7 @@ class ReleaseGatePlanTests(unittest.TestCase):
         self.assertEqual(commands.count("./scripts/frontend-gate.sh verify"), 1)
         self.assertEqual(commands.count("./scripts/frontend-gate.sh audit"), 1)
 
-    def test_release_gate_runs_backend_coverage_once(self) -> None:
+    def test_release_gate_runs_one_sharded_backend_boundary(self) -> None:
         result = subprocess.run(
             ["make", "-n", "release-gate"],
             cwd=ROOT,
@@ -34,9 +34,10 @@ class ReleaseGatePlanTests(unittest.TestCase):
         pytest_commands = [command for command in commands if " pytest " in command]
 
         self.assertEqual(
-            commands.count("docker compose run --rm migrate pytest --cov"), 1
+            commands.count("./tests/rehearsals/rehearse-postgres-test-matrix.sh"), 1
         )
-        self.assertEqual(len(pytest_commands), 3)
+        self.assertNotIn("docker compose run --rm migrate pytest --cov", commands)
+        self.assertEqual(len(pytest_commands), 2)
         self.assertTrue(
             any("test_public_beta_capacity.py" in command for command in pytest_commands)
         )

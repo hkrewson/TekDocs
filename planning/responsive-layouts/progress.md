@@ -219,11 +219,11 @@ The Assets summary collection and typed browser API client are implemented under
 | 7 — Shell/remaining surfaces | Implemented; acceptance open | Route-level implementations are complete; grouped technician and release acceptance remain |
 | 8 — Acceptance | In progress | Production routes plus Assets, Contracts, and Networks workspace matrices are recorded; Documentation/Files grouping, technician, recovery and release evidence remain |
 
-The Documentation workspace decomposition now includes a focused reusable-content
-panel alongside the history, section-conversion and key panels. Its bounded block
-and document searches, placement choices and record-link results keep the same
-responsive presentation while the route coordinator remains the sole owner of
-mutations and unsaved state.
+The Documentation workspace decomposition now includes focused reusable-content
+and monitored-source panels alongside the history, section-conversion and key
+panels. Their bounded searches, placement choices, source settings and observation
+timeline keep the same responsive presentation while the route coordinator remains
+the sole owner of mutations and unsaved state.
 
 The enforced inventory currently records 51 completed routes and 10 broad workspace routes in acceptance. Assets, Contracts, Networks, Documentation, and Files remain open in both MSP and organization contexts until their final grouped acceptance boundary is met. The shell route inventory uses actual App.tsx declarations; organization areas derive from the capability registry.
 

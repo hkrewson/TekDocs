@@ -30,6 +30,10 @@ insertion presentation. Placement mode, audience selection, record search state
 and every insertion mutation remain coordinator-owned. The existing block and
 document pickers retain their bounded collection requests and error states.
 
+`DocumentRemoteSourcePanel` owns the monitored-source form and observation
+timeline. The coordinator continues to load sources, persist settings, run checks,
+apply reviewed observations and enforce the shared unsaved-change guard.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -37,15 +41,13 @@ weakening the shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Extract the remote-source panel behind the same explicit data/callback
-   boundary.
-2. Move document collection URL/filter state into a focused hook while keeping
+1. Move document collection URL/filter state into a focused hook while keeping
    URL names and browser history behavior unchanged.
-3. Move record-loading and stale-request cancellation into a document-domain
+2. Move record-loading and stale-request cancellation into a document-domain
    hook with coordinator-owned selection.
-4. Split backend document serializers/views by the existing authoring, reuse,
+3. Split backend document serializers/views by the existing authoring, reuse,
    templates, review, publication, attachment, key, source and export domains.
-5. Split Django models only after import/dependency mapping is recorded; retain
+4. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.
 

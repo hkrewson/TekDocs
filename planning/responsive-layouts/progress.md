@@ -3073,8 +3073,9 @@ separate authorized actions.
 ## Documentation coordinator decomposition checkpoint — 2026-09-27
 
 The next pre-1.0 maintainability slice begins #40 without changing the completed
-responsive behavior. Revision history and legacy single-region section conversion
-are now focused typed components beneath the Documentation route coordinator.
+responsive behavior. Revision history, legacy single-region section conversion,
+and document key bindings are now focused typed components beneath the
+Documentation route coordinator.
 The coordinator retains URL state, request cancellation, mutations, record
 selection and dirty-form policy; the extracted panels receive data and explicit
 callbacks and cannot create a competing state or API authority.

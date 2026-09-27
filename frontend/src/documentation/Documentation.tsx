@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Trash2, Type, Unlink, X } from 'lucide-react'
+import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Type, Unlink, X } from 'lucide-react'
 import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
 import type { FilterMenuGroup } from '../FilterMenu'
@@ -21,6 +21,7 @@ import { DocumentLinkPicker } from './DocumentLinkPicker'
 import { DocumentExports } from './DocumentExports'
 import { DocumentOperations } from './DocumentOperations'
 import { DocumentHistoryPanel } from './DocumentHistoryPanel'
+import { DocumentKeysPanel } from './DocumentKeysPanel'
 import { DocumentRestructurePanel } from './DocumentRestructurePanel'
 import { TemplateLibrary } from './TemplateLibrary'
 import { BlockLibrary } from './BlockLibrary'
@@ -1183,41 +1184,25 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         />}
 
 
-        {activePanel === 'keys' && <section className="document-context-panel document-keys" aria-labelledby="document-keys-heading">
-          <div className="section-heading">
-            <div><h2 id="document-keys-heading">{translate('documentation.keysPanel')}</h2></div>
-            <button className="icon-button" type="button" aria-label={translate('documentation.closeKeys')} onClick={() => closeDocumentView()}><X size={16} /></button>
-          </div>
-          <div className="entity-mention-picker">
-            <label><span>{translate('documentation.declareBinding')}</span><input type="text" value={bindingName} onChange={(event) => setBindingName(event.target.value.toLowerCase())} placeholder="subject" aria-label={translate('documentation.declareBinding')} aria-describedby="binding-name-rule" aria-invalid={bindingName.length > 0 && !bindingNameValid} /></label>
-            <p id="binding-name-rule" className="field-hint" role={bindingName.length > 0 && !bindingNameValid ? 'alert' : undefined}>{translate('documentation.bindingNameRule')}</p>
-            <label><Search size={15} /><span>{translate('documentation.tekdocsRecord')}</span><input type="search" value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>
-            {mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" disabled={saving || !bindingNameValid || !bindingTargetable(entity.entity_type)} onClick={() => { void declareBinding(entity) }}><strong>{entity.display_name}</strong><small>{bindingTargetable(entity.entity_type) ? `${entity.entity_type.replaceAll('_', ' ')} · ${entity.workspace_label}` : translate('documentation.recordNotAddressable')}</small></button></li>)}</ul>}
-          </div>
-          {keyBindings.length > 0 && <div className="key-bindings" role="group" aria-label={translate('documentation.keyBindingsTable')}>
-            <ul>{keyBindings.map((binding) => <li key={binding.id}>
-              <span><strong>{binding.name}</strong><small>{binding.target_display_name} · {binding.target_entity_type.replaceAll('_', ' ')}</small>{binding.also_bound_by.length > 0 && <small className="key-where-used">{translate('documentation.alsoUsedBy')}: {binding.also_bound_by.map((item) => item.title).join(', ')}</small>}</span>
-              <div>
-                <label className="sr-only" htmlFor={`key-field-${binding.id}`}>{binding.name}</label>
-                <select id={`key-field-${binding.id}`} defaultValue="" onChange={(event) => { if (event.target.value) { insertKey(binding, event.target.value); event.target.value = '' } }}>
-                  <option value="">{translate('documentation.insertKey')}</option>
-                  {binding.addressable_fields.map((path) => <option key={path} value={path}>{path}</option>)}
-                </select>
-                <button className="icon-button" type="button" aria-label={`${translate('documentation.retireBinding')} ${binding.name}`} disabled={saving} onClick={() => { void retireBinding(binding.id) }}><Trash2 size={15} /></button>
-              </div>
-            </li>)}</ul>
-          </div>}
-          {keyReport && keyReport.count > 0 && <div className="key-report" role="group" aria-label={translate('documentation.keyReportTable')}>
-            <ul>{keyReport.results.map((row) => <li key={row.expression} data-key-state={row.state}>
-              <span><strong>{row.expression}</strong><small>{row.state === 'resolved' ? row.label : `${row.label} · ${row.reason ?? row.state}`}</small></span>
-            </li>)}</ul>
-          </div>}
-          {keyReport && keyReport.count === 0 && <p className="empty-state">{translate('documentation.keysPanel')}</p>}
-          <div className="key-browser">
-            <label><Search size={15} /><span>{translate('documentation.findBindings')}</span><input type="search" value={bindingQuery} onChange={(event) => setBindingQuery(event.target.value)} /></label>
-            {bindingMatches.length > 0 && <ul aria-label={translate('documentation.bindingBrowserTable')}>{bindingMatches.map((match) => <li key={match.id}><span><strong>{match.target_display_name}</strong><small>{match.document_title} · {match.name}</small></span></li>)}</ul>}
-          </div>
-      </section>}
+        {activePanel === 'keys' && <DocumentKeysPanel
+          bindingMatches={bindingMatches}
+          bindingName={bindingName}
+          bindingNameValid={bindingNameValid}
+          bindingQuery={bindingQuery}
+          busy={saving}
+          keyBindings={keyBindings}
+          keyReport={keyReport}
+          mentionOptions={mentionOptions}
+          mentionQuery={mentionQuery}
+          bindingTargetable={bindingTargetable}
+          onBindingNameChange={setBindingName}
+          onBindingQueryChange={setBindingQuery}
+          onClose={closeDocumentView}
+          onDeclareBinding={(entity) => { void declareBinding(entity) }}
+          onInsertKey={insertKey}
+          onMentionQueryChange={(value) => { setMentionQuery(value); if (!value.trim()) setMentionOptions([]) }}
+          onRetireBinding={(bindingId) => { void retireBinding(bindingId) }}
+        />}
 
 
         {activePanel === 'reuse' && <section className="document-context-panel" aria-labelledby="insert-existing-heading"><div className="section-heading"><div><h2 id="insert-existing-heading">{translate('documentation.insertExisting')}</h2><p>{translate('documentation.insertExistingHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.closeExisting')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><div className="reuse-resolution"><label>{translate('documentation.whenSourceChanges')}<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">{translate('documentation.useLatest')}</option><option value="pinned">{translate('documentation.keepThisVersion')}</option></select></label><label>{translate('documentation.audienceLabel')}<select value={placementAudience} onChange={(event) => setPlacementAudience(event.target.value as PlacementAudienceProfile)}><option value="shared">{translate('documentation.audienceShared')}</option><option value="msp_internal">{translate('documentation.audienceMspInternal')}</option><option value="client_visible">{translate('documentation.audienceClientVisible')}</option></select></label></div><BlockLibrary key={selected.id} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(block) => { void reuseLibraryBlock(block) }} /><DocumentLinkPicker key={`document-${selected.id}`} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(document) => { void addDocumentPlacement(document) }} /><div className="entity-mention-picker"><label><Search size={15} /><span>{translate('documentation.linkRecord')}</span><input type="search" placeholder={translate('documentation.searchRecords')} value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div></section>}

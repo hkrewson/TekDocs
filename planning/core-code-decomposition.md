@@ -19,9 +19,11 @@ change public behavior.
 
 `DocumentHistoryPanel` now owns the revision list, retained-revision inspection,
 loading/error treatment and paging controls. `DocumentRestructurePanel` owns the
-review of blockers, warnings and proposed legacy-section boundaries. The
-Documentation coordinator still performs every read and mutation and supplies
-the current result through typed props.
+review of blockers, warnings and proposed legacy-section boundaries.
+`DocumentKeysPanel` owns binding declaration, field insertion, unresolved-key
+reporting and workspace binding results. The Documentation coordinator still
+performs every read and mutation and supplies the current result through typed
+props.
 
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
@@ -30,7 +32,7 @@ weakening the shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Extract the key-binding and reusable-content panels behind the same explicit
+1. Extract the reusable-content and remote-source panels behind the same explicit
    data/callback boundary.
 2. Move document collection URL/filter state into a focused hook while keeping
    URL names and browser history behavior unchanged.

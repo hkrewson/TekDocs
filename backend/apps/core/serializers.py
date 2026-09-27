@@ -30,6 +30,12 @@ from .document_publication_serializers import DocumentPublicationWriteSerializer
 from .document_publication_serializers import PortalDocumentDetailSerializer as PortalDocumentDetailSerializer
 from .document_publication_serializers import PortalDocumentResultSerializer as PortalDocumentResultSerializer
 from .document_publication_serializers import PortalDocumentSerializer as PortalDocumentSerializer
+from .document_review_serializers import (
+    DocumentReviewDecisionWriteSerializer as DocumentReviewDecisionWriteSerializer,
+)
+from .document_review_serializers import (
+    DocumentReviewRequestWriteSerializer as DocumentReviewRequestWriteSerializer,
+)
 from .document_template_serializers import (
     DocumentTemplateInstantiateSerializer as DocumentTemplateInstantiateSerializer,
 )
@@ -1200,16 +1206,6 @@ class DocumentOperationsChoiceSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     display_name = serializers.CharField()
     can_approve = serializers.BooleanField()
-
-
-class DocumentReviewRequestWriteSerializer(serializers.Serializer):
-    reviewer_id = serializers.UUIDField()
-    note = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
-
-
-class DocumentReviewDecisionWriteSerializer(serializers.Serializer):
-    decision = serializers.ChoiceField(choices=(DocumentReviewState.APPROVED, DocumentReviewState.CHANGES_REQUESTED))
-    note = serializers.CharField(max_length=500, allow_blank=False)
 
 
 class DocumentSearchHitSerializer(DocumentSerializer):

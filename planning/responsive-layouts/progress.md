@@ -3128,3 +3128,10 @@ monolithic serializer module. Existing compatibility imports, request fields,
 validation, response shapes, routes and stored data remain unchanged. Six focused
 template workflow tests, Ruff, MyPy across 196 source files and OpenAPI generation
 pass; schema generation retains only its four known operation-ID warnings.
+
+Document review requests and approval/change-request decisions now use a focused
+backend serializer module imported directly by the document views. Existing
+compatibility imports, reviewer and decision validation, notes, routes,
+authorization and stored review state remain unchanged. All ten document-
+operations tests, Ruff, MyPy across 197 source files and OpenAPI generation pass;
+schema generation retains only its four known operation-ID warnings.

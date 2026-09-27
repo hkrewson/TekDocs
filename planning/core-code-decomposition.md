@@ -65,6 +65,11 @@ Template instantiation plus rollout request/result serializers now live in
 directly, while `serializers.py` retains explicit compatibility exports. Template
 category, placement-mode, revision and response validation remain unchanged.
 
+Review-request and approval/change-request serializers now live in
+`document_review_serializers.py`. Document views import them directly and the
+compatibility module preserves their established names. Reviewer identity,
+decision choices and note validation remain unchanged.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -73,7 +78,7 @@ weakening the shared unsaved-change guard.
 ## Remaining sequence
 
 1. Continue splitting backend document serializers/views by the existing
-   authoring, reuse, review, key, source and export domains.
+   authoring, reuse, key, source and export domains.
 2. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.

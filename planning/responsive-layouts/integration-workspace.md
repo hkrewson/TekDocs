@@ -57,3 +57,7 @@ tenant, workspace, organization, provider and creator identity while deliberatel
 allowing the API URL to change. Focused backend and frontend regression suites,
 lint, types, production compilation, bundle budgets and OpenAPI agreement pass.
 Version remains 0.8.46.
+
+NetBox authentication accepts both maintained v2 tokens (`Bearer nbt_…`) and
+legacy v1 tokens (`Token …`). The connection form explains that the complete v2
+value is required, and credential replacement is a labeled connection action.

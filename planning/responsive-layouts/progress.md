@@ -16,6 +16,10 @@ refreshed and existing NetBox site-root data was normalized without replacing it
 credential. Version remains 0.8.46; production deployment and publication remain
 separate.
 
+The follow-up authentication correction selects NetBox's `Bearer` scheme for full
+v2 `nbt_` tokens while retaining the legacy `Token` scheme for v1 installations.
+The UI now labels credential replacement and explains the complete v2 value format.
+
 ## Phase 8 production-image acceptance checkpoint — 2026-09-25
 
 The isolated 0.8.46 production-target image rehearsal passes. The packaged frontend,

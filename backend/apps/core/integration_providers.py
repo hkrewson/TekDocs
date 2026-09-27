@@ -96,6 +96,13 @@ def netbox_api_base_url(value: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, f"{path}/", "", ""))
 
 
+def netbox_authorization(secret: str) -> str:
+    """Use the authentication scheme required by the NetBox token version."""
+
+    scheme = "Bearer" if secret.startswith("nbt_") else "Token"
+    return f"{scheme} {secret}"
+
+
 def _fingerprint(value: object) -> str:
     serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     return hashlib.sha256(serialized).hexdigest()
@@ -109,7 +116,13 @@ class NetBoxProvider:
         label=label,
         version="1.0",
         direction="read_only",
-        credential_fields=(CredentialField("api_token", "API token"),),
+        credential_fields=(
+            CredentialField(
+                "api_token",
+                "API token",
+                help_text="Paste the complete token. NetBox v2 tokens start with nbt_ and include a period.",
+            ),
+        ),
         capabilities=("inventory_observations", "reconciliation"),
         object_types=tuple(str(item[0]) for item in NETBOX_ENDPOINTS),
         pagination="opaque_cursor",
@@ -130,7 +143,7 @@ class NetBoxProvider:
         payload = self._fetcher(
             base_url=netbox_api_base_url(connection.base_url),
             relative_path=path or default_path,
-            authorization=f"Token {secret}",
+            authorization=netbox_authorization(secret),
         )
         results = payload.get("results")
         if not isinstance(results, list) or len(results) > 1000:

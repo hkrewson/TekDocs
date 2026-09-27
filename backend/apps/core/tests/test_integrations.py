@@ -18,6 +18,7 @@ from apps.core.integration_providers import (
     NetBoxProvider,
     ProviderObservation,
     ProviderPage,
+    netbox_authorization,
     provider_catalog,
     validate_provider_adapter,
 )
@@ -61,6 +62,16 @@ def test_static_manifest_credential_metadata_is_not_exportable():
         {"entities": [{"id": str(uuid.uuid4()), "entity_type": "credential_reference"}]}
     )
     assert not _manifest_has_credential_reference({"entities": [{"id": str(uuid.uuid4()), "entity_type": "network"}]})
+
+
+@pytest.mark.parametrize(
+    ("secret", "expected_scheme"),
+    (("nbt_key.plaintext-value", "Bearer"), (TEST_PROVIDER_TOKEN, "Token")),
+)
+def test_netbox_authentication_scheme_matches_token_version(secret, expected_scheme):  # type: ignore[no-untyped-def]
+    authorization = netbox_authorization(secret)
+
+    assert authorization == f"{expected_scheme} {secret}"
 
 
 def organization(installation, name):  # type: ignore[no-untyped-def]
@@ -373,7 +384,7 @@ def test_provider_catalog_is_a_complete_versioned_contract():
             "secret": True,
             "minimum_length": 8,
             "input_type": "password",
-            "help_text": "",
+                "help_text": "Paste the complete token. NetBox v2 tokens start with nbt_ and include a period.",
         }
     ]
 

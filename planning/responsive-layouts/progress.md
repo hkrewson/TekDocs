@@ -1,6 +1,20 @@
 # Progress and verification
 
-Updated 2026-09-25. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+
+## Phase 6 integration connection correction checkpoint — 2026-09-27
+
+Existing integration connections now expose focused editing for their display name,
+provider API URL and sync interval without requiring or rotating the stored
+credential. NetBox accepts either a site root or an API root and stores/uses the
+canonical `/api/` endpoint. A URL change clears stale provider errors and makes the
+connection immediately eligible for another update. The database migration keeps
+scope, provider and creator identity immutable while allowing this explicit URL
+correction. Focused provider/API and browser-client tests, frontend lint/types/build,
+bundle budgets and OpenAPI agreement pass. The local development services were
+refreshed and existing NetBox site-root data was normalized without replacing its
+credential. Version remains 0.8.46; production deployment and publication remain
+separate.
 
 ## Phase 8 production-image acceptance checkpoint — 2026-09-25
 

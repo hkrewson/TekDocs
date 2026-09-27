@@ -166,7 +166,9 @@ describe('Integrations', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(provider.cancelJob).toHaveBeenCalledWith(workspace, expect.objectContaining({ id: 'job-2' })))
     await user.click(screen.getByRole('button', { name: 'Pause' }))
-    await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, false))
+    await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, {
+      active: false, sync_interval_minutes: 60,
+    }))
     await user.click(screen.getByRole('button', { name: /Replace the credential for Primary NetBox/i }))
     const credential = screen.getByRole('alertdialog')
     expect(credential).toHaveTextContent('The current credential will stop working after this change.')
@@ -180,6 +182,37 @@ describe('Integrations', () => {
     await user.click(screen.getByRole('button', { name: 'Acknowledge change' }))
     await waitFor(() => expect(provider.resolveConflict).toHaveBeenCalledWith(workspace, conflict, 'accept_remote'))
     expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
+  })
+
+  it('edits connection details without asking for the credential again', async () => {
+    const provider = providerClient()
+    const connection = {
+      id: 'connection-1', provider: 'netbox', name: 'Primary NetBox', base_url: 'https://netbox.example.com/',
+      provider_details: {}, credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 60,
+      health_status: 'degraded', last_successful_sync_at: null, last_error_code: 'provider_http_error', rate_limit_reset_at: null,
+      reconciliation_counts: {}, next_sync_at: '2026-08-12T01:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    } as IntegrationConnection
+    vi.mocked(provider.listConnections).mockResolvedValue([connection])
+    vi.mocked(provider.updateConnection).mockResolvedValue({
+      ...connection, name: 'Client NetBox', base_url: 'https://netbox.example.com/api/', sync_interval_minutes: 30,
+      health_status: 'unknown', last_error_code: '',
+    })
+    const user = userEvent.setup()
+    setup(provider)
+
+    await user.click(await screen.findByRole('button', { name: 'Edit' }))
+    await user.clear(screen.getByLabelText('Name'))
+    await user.type(screen.getByLabelText('Name'), 'Client NetBox')
+    await user.clear(screen.getByLabelText('API base URL'))
+    await user.type(screen.getByLabelText('API base URL'), 'https://netbox.example.com/')
+    await user.clear(screen.getByLabelText('Sync interval (minutes)'))
+    await user.type(screen.getByLabelText('Sync interval (minutes)'), '30')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, {
+      name: 'Client NetBox', base_url: 'https://netbox.example.com/', active: true, sync_interval_minutes: 30,
+    }))
+    expect(await screen.findByText('https://netbox.example.com/api/')).toBeInTheDocument()
   })
 
   it('creates a read-only provider connection and clears the one-time token field', async () => {

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceContext } from '../workspaces/api'
-import type { IntegrationConflict, IntegrationConnection, IntegrationJob } from './providerApi'
-import { browserIntegrationsClient, IntegrationRequestError } from './providerApi'
+import type { IntegrationConflict, IntegrationConnection, IntegrationJob, IntegrationRequestError } from './providerApi'
+import { browserIntegrationsClient } from './providerApi'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: 'client/one', name: 'Acme Dental', classifications: ['client'],
@@ -56,7 +56,9 @@ describe('provider integrations API', () => {
       provider: 'netbox', name: 'Primary', base_url: 'https://netbox.example.com/api/',
       credentials: { api_token: 'one-time-token' }, sync_interval_minutes: 60,
     })
-    await browserIntegrationsClient.updateConnection(workspace, connection, false)
+    await browserIntegrationsClient.updateConnection(workspace, connection, {
+      name: 'Primary', base_url: 'https://netbox.example.com/', active: false, sync_interval_minutes: 30,
+    })
     await browserIntegrationsClient.rotateConnection(workspace, connection, { api_token: 'replacement-token' })
     await browserIntegrationsClient.startSync(workspace, connection)
     await browserIntegrationsClient.cancelJob(workspace, job)
@@ -69,6 +71,11 @@ describe('provider integrations API', () => {
       expect(new Headers(request?.headers).get('X-CSRFToken')).toBe('integration-csrf')
     }
     expect(requestPath(mutations[2][0])).toContain('/connections/connection%2Fone/rotate')
+    const updateBody = mutations[1]?.[1]?.body
+    expect(typeof updateBody).toBe('string')
+    expect(JSON.parse(updateBody as string)).toEqual({
+      name: 'Primary', base_url: 'https://netbox.example.com/', active: false, sync_interval_minutes: 30,
+    })
     expect(requestPath(mutations[4][0])).toContain('/jobs/job%2Fone/cancel')
     expect(requestPath(mutations[5][0])).toContain('/conflicts/conflict%2Fone/resolve')
     expect(JSON.stringify(mutations[0]?.[1]?.body)).toContain('one-time-token')

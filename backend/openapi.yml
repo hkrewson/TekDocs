@@ -42014,6 +42014,14 @@ components:
           type: integer
           maximum: 10080
           minimum: 5
+        name:
+          type: string
+          maxLength: 100
+          minLength: 1
+        base_url:
+          type: string
+          format: uri
+          maxLength: 500
     PatchedContractWrite:
       type: object
       properties:

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from .integration_egress import (
     get_provider_json,
@@ -86,6 +86,16 @@ NETBOX_ENDPOINTS = (
 )
 
 
+def netbox_api_base_url(value: str) -> str:
+    """Accept a NetBox site or API root and return the canonical API root."""
+
+    parts = urlsplit(value)
+    path = parts.path.rstrip("/")
+    if not path.endswith("/api"):
+        path = f"{path}/api"
+    return urlunsplit((parts.scheme, parts.netloc, f"{path}/", "", ""))
+
+
 def _fingerprint(value: object) -> str:
     serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     return hashlib.sha256(serialized).hexdigest()
@@ -118,7 +128,7 @@ class NetBoxProvider:
             raise ValueError("provider_cursor_invalid")
         remote_type, default_path = NETBOX_ENDPOINTS[index]
         payload = self._fetcher(
-            base_url=connection.base_url,
+            base_url=netbox_api_base_url(connection.base_url),
             relative_path=path or default_path,
             authorization=f"Token {secret}",
         )

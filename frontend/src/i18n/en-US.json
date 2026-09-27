@@ -3295,5 +3295,8 @@
   "documentation.reviewRequestedAt": "Requested by",
   "documentation.reviewDecidedAt": "Decision recorded",
   "documentation.lastApproved": "Last approved",
-  "documentation.latestReviewNote": "Latest review note"
+  "documentation.latestReviewNote": "Latest review note",
+  "integrations.editHeading": "Edit {name}",
+  "integrations.editHelp": "Update the connection details. Credentials are managed separately.",
+  "integrations.saveChanges": "Save changes"
 }

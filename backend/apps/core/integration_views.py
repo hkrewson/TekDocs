@@ -135,6 +135,8 @@ class ConnectionWriteSerializer(StrictSerializer):
 class ConnectionUpdateSerializer(StrictSerializer):
     active = serializers.BooleanField()
     sync_interval_minutes = serializers.IntegerField(min_value=5, max_value=10080)
+    name = serializers.CharField(min_length=1, max_length=100, trim_whitespace=True, required=False)
+    base_url = serializers.URLField(max_length=500, required=False)
 
 
 class CredentialRotationSerializer(StrictSerializer):

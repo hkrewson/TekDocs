@@ -20,6 +20,10 @@ authoritative.
   and support Keep editing or Discard changes.
 - The connection editor remains inline so section navigation stays reachable while
   a draft is active.
+- Existing connections have a focused Edit action for name, provider API URL and
+  sync interval. Credentials remain a separate replacement workflow. NetBox site
+  roots are normalized to the provider's `/api/` endpoint on create, edit and sync,
+  including connections saved before this correction.
 - Both MSP and organization routes fit 320, 390, 768, 1024, 1280 and 1440px in
   Chromium, Firefox and WebKit without horizontal page overflow or automated
   accessibility violations.
@@ -43,3 +47,13 @@ endpoint state. The repository-wide gate passes all 640 frontend tests in 117
 files, the 37-page Wiki contract, API/schema and migration agreement, policy
 checks, the production build and compressed bundle budgets (shell 129173 <=
 131072; shell style 24503 <= 24576).
+
+## Connection correction checkpoint — 2026-09-27
+
+Connection editing now preserves unsaved values, keeps provider credentials
+unchanged, validates provider interval and URL rules on the server, and resets a
+stale provider error after an API URL correction. PostgreSQL continues to protect
+tenant, workspace, organization, provider and creator identity while deliberately
+allowing the API URL to change. Focused backend and frontend regression suites,
+lint, types, production compilation, bundle budgets and OpenAPI agreement pass.
+Version remains 0.8.46.

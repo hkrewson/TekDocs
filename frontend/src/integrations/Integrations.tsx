@@ -1,7 +1,7 @@
 import { browserAuthClient } from '../auth/api'
 import { browserDocumentsClient } from '../documentation/api'
 import { useEffect, useState } from 'react'
-import { Download, Play, Plus, RefreshCw } from 'lucide-react'
+import { Download, Pencil, Play, Plus, RefreshCw } from 'lucide-react'
 import { useLocation, useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
 
@@ -60,17 +60,20 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rotating, setRotating] = useState<{ connection: IntegrationConnection; credentials: Record<string, string> } | null>(null)
+  const [editing, setEditing] = useState<{ connection: IntegrationConnection; name: string; base_url: string; sync_interval_minutes: number } | null>(null)
   const [reauthenticationAction, setReauthenticationAction] = useState<'create' | 'rotate' | null>(null)
   const [password, setPassword] = useState('')
   const [reload, setReload] = useState(0)
   const phase = loadState.section === section ? loadState.value : 'loading'
   const connectionDirty = showForm && JSON.stringify(draft) !== JSON.stringify(EMPTY_CONNECTION)
   const rotationDirty = Boolean(rotating && Object.values(rotating.credentials).some(Boolean))
+  const editingDirty = Boolean(editing && (editing.name !== editing.connection.name || editing.base_url !== editing.connection.base_url || editing.sync_interval_minutes !== editing.connection.sync_interval_minutes))
   const exportDirty = selected.length > 0 || selectedPublications.length > 0
-  useUnsavedChanges(connectionDirty || rotationDirty || exportDirty, saving, () => {
+  useUnsavedChanges(connectionDirty || rotationDirty || editingDirty || exportDirty, saving, () => {
     setShowForm(false)
     setDraft(EMPTY_CONNECTION)
     setRotating(null)
+    setEditing(null)
     setReauthenticationAction(null)
     setPassword('')
     setSelected([])
@@ -169,8 +172,24 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   async function toggle(connection: IntegrationConnection) {
     setSaving(true); setError(null)
     try {
-      const updated = await providerClient.updateConnection(workspace, connection, !connection.active)
+      const updated = await providerClient.updateConnection(workspace, connection, { active: !connection.active, sync_interval_minutes: connection.sync_interval_minutes })
       setConnections((current) => current.map((item) => item.id === updated.id ? updated : item))
+    } catch { setError(translate('integrations.changeFailed')) }
+    finally { setSaving(false) }
+  }
+
+  async function saveConnectionEdit() {
+    if (!editing) return
+    setSaving(true); setError(null)
+    try {
+      const updated = await providerClient.updateConnection(workspace, editing.connection, {
+        name: editing.name,
+        ...(providerFor(editing.connection.provider)?.base_url_editable ? { base_url: editing.base_url } : {}),
+        active: editing.connection.active,
+        sync_interval_minutes: editing.sync_interval_minutes,
+      })
+      setConnections((current) => current.map((item) => item.id === updated.id ? updated : item).sort((a, b) => a.name.localeCompare(b.name)))
+      setEditing(null)
     } catch { setError(translate('integrations.changeFailed')) }
     finally { setSaving(false) }
   }
@@ -195,6 +214,11 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     const provider = providerFor(connection.provider)
     if (!provider) return
     setRotating({ connection, credentials: Object.fromEntries(provider.credential_fields.map((field) => [field.key, field.secret ? '' : connection.provider_details[field.key] ?? ''])) })
+  }
+
+  function beginEdit(connection: IntegrationConnection) {
+    setShowForm(false)
+    setEditing({ connection, name: connection.name, base_url: connection.base_url, sync_interval_minutes: connection.sync_interval_minutes })
   }
 
   async function reconcile(conflict: IntegrationConflict, resolution: 'keep_local' | 'accept_remote' | 'ignored') {
@@ -228,9 +252,10 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     {phase === 'error' && ['connections', 'reconciliation', 'exports'].includes(section) && <section className="content-section" role="alert"><h2>Integrations unavailable</h2><p>{translate('integrations.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => { setLoadState({ section, value: 'loading' }); setReload((current) => current + 1) }}>{translate('collections.retry')}</button></section>}
     {phase === 'ready' && section === 'connections' && <>
       <section className="content-section"><div className="section-heading"><div><h2>Connections</h2><p>{translate('integrations.connectionsHelp')}</p></div><button className="primary-button" type="button" onClick={() => setShowForm(true)}><Plus size={16} />{translate('integrations.newConnection')}</button></div>
-        {connections.length === 0 ? <p className="empty-state">No systems are connected to this workspace.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.connectionTable')} tabIndex={0}><table><thead><tr><th>Name</th><th>System</th><th>Status</th><th>Last completed</th><th>Next update</th><th>Needs review</th><th>Actions</th></tr></thead><tbody>{connections.map((connection) => <tr key={connection.id}><td><strong>{connection.name}</strong><br /><small>{connection.provider_details.tenant_id ? `Tenant ${connection.provider_details.tenant_id}` : connection.base_url}</small></td><td>{providerFor(connection.provider)?.label ?? connection.provider} · read-only<br /><small>{connection.provider_details.permission_status === 'verified' ? translate('integrations.permissionsVerified') : connection.provider_details.permission_status === 'not_validated' ? translate('integrations.permissionsUnchecked') : `Every ${connection.sync_interval_minutes} min`} · {connection.reconciliation_counts.observations ?? 0} records</small></td><td>{connection.active ? connection.health_status : 'paused'}{connection.last_error_code && <><br /><code>{connection.last_error_code}</code></>}</td><td>{connection.last_successful_sync_at ? new Date(connection.last_successful_sync_at).toLocaleString() : 'Not yet'}</td><td>{new Date(connection.next_sync_at).toLocaleString()}{connection.rate_limit_reset_at && <><br /><small>Rate limit resets {new Date(connection.rate_limit_reset_at).toLocaleString()}</small></>}</td><td>{connection.reconciliation_counts.review_required ?? 0}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving || !connection.active} onClick={() => { void sync(connection) }}><Play size={14} />{translate('integrations.sync')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => { void toggle(connection) }}>{connection.active ? 'Pause' : 'Resume'}</button><button className="icon-button" type="button" disabled={saving} aria-label={`Replace the credential for ${connection.name}`} title={`Replace the credential for ${connection.name}`} onClick={() => beginRotate(connection)}><RefreshCw size={15} /></button></div></td></tr>)}</tbody></table></div>}
+        {connections.length === 0 ? <p className="empty-state">No systems are connected to this workspace.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.connectionTable')} tabIndex={0}><table><thead><tr><th>Name</th><th>System</th><th>Status</th><th>Last completed</th><th>Next update</th><th>Needs review</th><th>Actions</th></tr></thead><tbody>{connections.map((connection) => <tr key={connection.id}><td><strong>{connection.name}</strong><br /><small>{connection.provider_details.tenant_id ? `Tenant ${connection.provider_details.tenant_id}` : connection.base_url}</small></td><td>{providerFor(connection.provider)?.label ?? connection.provider} · read-only<br /><small>{connection.provider_details.permission_status === 'verified' ? translate('integrations.permissionsVerified') : connection.provider_details.permission_status === 'not_validated' ? translate('integrations.permissionsUnchecked') : `Every ${connection.sync_interval_minutes} min`} · {connection.reconciliation_counts.observations ?? 0} records</small></td><td>{connection.active ? connection.health_status : 'paused'}{connection.last_error_code && <><br /><code>{connection.last_error_code}</code></>}</td><td>{connection.last_successful_sync_at ? new Date(connection.last_successful_sync_at).toLocaleString() : 'Not yet'}</td><td>{new Date(connection.next_sync_at).toLocaleString()}{connection.rate_limit_reset_at && <><br /><small>Rate limit resets {new Date(connection.rate_limit_reset_at).toLocaleString()}</small></>}</td><td>{connection.reconciliation_counts.review_required ?? 0}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving || !connection.active} onClick={() => { void sync(connection) }}><Play size={14} />{translate('integrations.sync')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => beginEdit(connection)}><Pencil size={14} />{translate('common.edit')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => { void toggle(connection) }}>{connection.active ? 'Pause' : 'Resume'}</button><button className="icon-button" type="button" disabled={saving} aria-label={`Replace the credential for ${connection.name}`} title={`Replace the credential for ${connection.name}`} onClick={() => beginRotate(connection)}><RefreshCw size={15} /></button></div></td></tr>)}</tbody></table></div>}
         {rotating && providerFor(rotating.connection.provider) && <div className="archive-confirmation" role="alertdialog" aria-labelledby="replace-credential-heading" aria-describedby="replace-credential-help"><div><strong id="replace-credential-heading">{translate('integrations.rotateHeading', { name: rotating.connection.name })}</strong><p id="replace-credential-help">{translate('integrations.rotateHelp')}</p><div className="form-grid">{providerFor(rotating.connection.provider)?.credential_fields.map((field) => <label key={field.key}><span>{field.label}</span><input type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={rotating.credentials[field.key] ?? ''} onChange={(event) => setRotating({ ...rotating, credentials: { ...rotating.credentials, [field.key]: event.target.value } })} /></label>)}</div></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving || Boolean(providerFor(rotating.connection.provider)?.credential_fields.some((field) => (rotating.credentials[field.key]?.length ?? 0) < field.minimum_length))} onClick={() => { void rotate(rotating.connection, rotating.credentials) }}>{translate('integrations.rotateAction')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setRotating(null)}>{translate('common.cancel')}</button></div></div>}
       </section>
+      {editing && <section className="content-section integration-connection-form" aria-labelledby="edit-connection-heading"><form onSubmit={(event) => { event.preventDefault(); void saveConnectionEdit() }}><div className="section-heading"><div><h2 id="edit-connection-heading">{translate('integrations.editHeading', { name: editing.connection.name })}</h2><p>{translate('integrations.editHelp')}</p></div></div><div className="form-grid"><label><span>Name</span><input autoFocus required value={editing.name} maxLength={100} onChange={(event) => setEditing({ ...editing, name: event.target.value })} /></label>{providerFor(editing.connection.provider)?.base_url_editable && <label className="wide-field"><span>API base URL</span><input required type="url" value={editing.base_url} onChange={(event) => setEditing({ ...editing, base_url: event.target.value })} /></label>}<label><span>Sync interval (minutes)</span><input required type="number" min={providerFor(editing.connection.provider)?.minimum_sync_interval_minutes ?? 5} max={providerFor(editing.connection.provider)?.maximum_sync_interval_minutes ?? 10080} value={editing.sync_interval_minutes} onChange={(event) => setEditing({ ...editing, sync_interval_minutes: Number(event.target.value) })} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving || !editing.name.trim() || Boolean(providerFor(editing.connection.provider)?.base_url_editable && !editing.base_url)}>{saving ? 'Saving…' : translate('integrations.saveChanges')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setEditing(null)}>{translate('common.cancel')}</button></div></form></section>}
       {showForm && <section className="content-section integration-connection-form" aria-labelledby="connection-form-heading"><form onSubmit={(event) => { event.preventDefault(); void createConnection() }}><div className="section-heading"><h2 id="connection-form-heading">{translate('integrations.newConnection')}</h2></div><div className="form-grid"><label><span>Name</span><input autoFocus value={draft.name} maxLength={100} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label><label><span>Provider</span><select value={draft.provider} onChange={(event) => { const provider = providers.find((item) => item.key === event.target.value); setDraft({ ...draft, provider: event.target.value, base_url: provider?.default_base_url ?? '', credentials: {}, sync_interval_minutes: provider?.minimum_sync_interval_minutes ?? 60 }) }}>{providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>{selectedProvider?.base_url_editable && <label className="wide-field"><span>API base URL</span><input type="url" value={draft.base_url} placeholder="https://provider.example/api/" onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} /></label>}{selectedProvider?.credential_fields.map((field) => <label key={field.key} className={field.secret ? 'wide-field' : undefined}><span>{field.label}</span><input aria-label={field.label} type={field.input_type === 'password' ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={draft.credentials[field.key] ?? ''} onChange={(event) => setDraft({ ...draft, credentials: { ...draft.credentials, [field.key]: event.target.value } })} />{field.help_text && <small>{field.help_text}</small>}</label>)}{selectedProvider?.setup_help_url && <p className="wide-field form-help">{translate('integrations.providerSetupHelp')} <a href={selectedProvider.setup_help_url} target="_blank" rel="noreferrer">{translate('integrations.providerSetupGuidance', { provider: selectedProvider.label })}</a></p>}<label><span>Sync interval (minutes)</span><input type="number" min={selectedProvider?.minimum_sync_interval_minutes ?? 5} max={selectedProvider?.maximum_sync_interval_minutes ?? 10080} value={draft.sync_interval_minutes} onChange={(event) => setDraft({ ...draft, sync_interval_minutes: Number(event.target.value) })} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving || !draft.name || Boolean(selectedProvider?.base_url_editable && !draft.base_url) || Boolean(selectedProvider?.credential_fields.some((field) => (draft.credentials[field.key]?.length ?? 0) < field.minimum_length))}>{saving ? 'Saving…' : 'Save connection'}</button><button className="secondary-button" type="button" onClick={() => setShowForm(false)}>{translate('common.cancel')}</button></div></form></section>}
       {reauthenticationAction && <form className="content-section integration-reauth-form" onSubmit={(event) => { event.preventDefault(); void confirmReauthentication() }}>
         <div><h2>{translate('integrations.reauthenticationHeading')}</h2><p>{translate('integrations.reauthenticationHelp')}</p></div>

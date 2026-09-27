@@ -74,7 +74,9 @@ def organization(installation, name):  # type: ignore[no-untyped-def]
     )
 
 
-def connection(installation, record, *, name="Primary NetBox", token=None):  # type: ignore[no-untyped-def]
+def connection(  # type: ignore[no-untyped-def]
+    installation, record, *, name="Primary NetBox", token=None, base_url="https://netbox.example.com/api/"
+):
     token = token or TEST_PROVIDER_TOKEN
     connection_id = uuid.uuid4()
     return IntegrationConnection.objects.create(
@@ -84,7 +86,7 @@ def connection(installation, record, *, name="Primary NetBox", token=None):  # t
         organization=record,
         provider="netbox",
         name=name,
-        base_url="https://netbox.example.com/api/",
+        base_url=base_url,
         configuration={},
         secret_envelope=encrypt_integration_secret(
             secret=token.encode(),
@@ -111,7 +113,7 @@ def test_connection_api_identifies_expired_reauthentication_without_saving(insta
             {
                 "provider": "netbox",
                 "name": "Production NetBox",
-                "base_url": "https://netbox.example.com/api/",
+                "base_url": "https://netbox.example.com/",
                 "credentials": {"api_token": TEST_PROVIDER_TOKEN},
                 "sync_interval_minutes": 30,
             }
@@ -148,6 +150,7 @@ def test_connection_api_encrypts_token_and_never_returns_it(installation, monkey
         content_type="application/json",
     )
     assert response.status_code == 201
+    assert response.json()["base_url"] == "https://netbox.example.com/api/"
     assert response.json()["credential_configured"] is True
     assert "api_token" not in response.json()
     stored = IntegrationConnection.objects.get()
@@ -162,6 +165,61 @@ def test_connection_api_encrypts_token_and_never_returns_it(installation, monkey
         == b"do-not-return-this-token"
     )
     assert "api_token" not in browser.get(path).content.decode()
+
+
+@pytest.mark.django_db
+def test_netbox_provider_tolerates_a_preexisting_site_root_connection(installation):
+    record = organization(installation, "Root URL client")
+    source = connection(installation, record, base_url="https://netbox.example.com/")
+    request: dict[str, str] = {}
+
+    def fetcher(**kwargs):  # type: ignore[no-untyped-def]
+        request.update(kwargs)
+        return {"results": [], "next": None}
+
+    page = NetBoxProvider(fetcher=fetcher).fetch_page(source, secret=TEST_PROVIDER_TOKEN, cursor="")
+
+    assert request["base_url"] == "https://netbox.example.com/api/"
+    assert request["relative_path"] == "dcim/racks/"
+    assert page.next_cursor == "1|dcim/devices/"
+
+
+@pytest.mark.django_db
+def test_connection_api_edits_details_without_rotating_the_credential(installation):
+    record = organization(installation, "Editable connection client")
+    source = connection(installation, record, base_url="https://netbox.example.com/")
+    source.health_status = "degraded"
+    source.last_error_code = "provider_http_error"
+    source.save(update_fields=("health_status", "last_error_code", "updated_at"))
+    original_envelope = source.secret_envelope
+    original_generation = source.secret_generation
+    browser = Client()
+    browser.force_login(installation.owner)
+
+    response = browser.patch(
+        reverse(
+            "organization-integration-connection-detail",
+            kwargs={"organization_entity_id": record.entity_id, "connection_id": source.id},
+        ),
+        data=json.dumps(
+            {
+                "name": "  Client   NetBox  ",
+                "base_url": "https://netbox.example.com/",
+                "active": True,
+                "sync_interval_minutes": 30,
+            }
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["name"] == "Client NetBox"
+    assert response.json()["base_url"] == "https://netbox.example.com/api/"
+    source.refresh_from_db()
+    assert source.health_status == "unknown"
+    assert source.last_error_code == ""
+    assert source.secret_generation == original_generation
+    assert source.secret_envelope == original_envelope
 
 
 @pytest.mark.django_db

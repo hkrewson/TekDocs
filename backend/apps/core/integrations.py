@@ -16,7 +16,13 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .integration_egress import ProviderRateLimited, validate_integration_base_url
-from .integration_providers import PROVIDERS, ProviderAdapter, validate_provider_adapter, validate_provider_page
+from .integration_providers import (
+    PROVIDERS,
+    ProviderAdapter,
+    netbox_api_base_url,
+    validate_provider_adapter,
+    validate_provider_page,
+)
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
@@ -181,6 +187,9 @@ def create_connection(
     if not selected_base_url:
         raise ValidationError({"base_url": "Enter the provider API base URL."})
     connection_id = uuid4()
+    normalized_base_url = validate_integration_base_url(selected_base_url)
+    if provider == IntegrationProvider.NETBOX:
+        normalized_base_url = netbox_api_base_url(normalized_base_url)
     connection = IntegrationConnection(
         id=connection_id,
         tenant=resolved.member.tenant,
@@ -188,7 +197,7 @@ def create_connection(
         organization=resolved.organization,
         provider=provider,
         name=normalized_name,
-        base_url=validate_integration_base_url(selected_base_url),
+        base_url=normalized_base_url,
         configuration=configuration,
         secret_envelope=encrypt_integration_secret(
             secret=encoded_token, tenant_id=resolved.member.tenant.id, connection_id=connection_id, generation=1
@@ -211,7 +220,14 @@ def create_connection(
 
 @transaction.atomic
 def update_connection(
-    *, request: Any, organization_entity_id: UUID | None, connection_id: UUID, active: bool, sync_interval_minutes: int
+    *,
+    request: Any,
+    organization_entity_id: UUID | None,
+    connection_id: UUID,
+    active: bool,
+    sync_interval_minutes: int,
+    name: str | None = None,
+    base_url: str | None = None,
 ) -> IntegrationConnection:
     resolved = resolve_integration_workspace(
         request.user, organization_entity_id=organization_entity_id, permission=PermissionKey.INTEGRATIONS_MANAGE
@@ -220,8 +236,6 @@ def update_connection(
         connection = connections_for_workspace(resolved).select_for_update().get(pk=connection_id)
     except IntegrationConnection.DoesNotExist as exc:
         raise NotFound("The integration connection is unavailable.") from exc
-    connection.active = active
-    connection.health_status = "unknown" if active else "paused"
     adapter = PROVIDERS[connection.provider]
     if not (
         adapter.contract.minimum_sync_interval_minutes
@@ -229,16 +243,37 @@ def update_connection(
         <= adapter.contract.maximum_sync_interval_minutes
     ):
         raise ValidationError({"sync_interval_minutes": "Choose an interval allowed by this provider."})
+    changed_fields = ["active", "sync_interval_minutes"]
+    connection.active = active
+    connection.health_status = "unknown" if active else "paused"
     connection.sync_interval_minutes = sync_interval_minutes
+    if name is not None:
+        normalized_name = " ".join(name.split())
+        if not normalized_name or any(ord(character) < 32 for character in normalized_name):
+            raise ValidationError({"name": "Enter a visible connection name without control characters."})
+        connection.name = normalized_name
+        changed_fields.append("name")
+    if base_url is not None:
+        if not adapter.contract.base_url_editable:
+            raise ValidationError({"base_url": "The API URL for this provider is managed by TekDocs."})
+        normalized_base_url = validate_integration_base_url(base_url)
+        if connection.provider == IntegrationProvider.NETBOX:
+            normalized_base_url = netbox_api_base_url(normalized_base_url)
+        if normalized_base_url != connection.base_url:
+            connection.base_url = normalized_base_url
+            connection.last_error_code = ""
+            connection.rate_limit_reset_at = None
+            connection.next_sync_at = timezone.now()
+            changed_fields.extend(("base_url", "last_error_code", "rate_limit_reset_at", "next_sync_at"))
     connection.full_clean()
-    connection.save(update_fields=("active", "health_status", "sync_interval_minutes", "updated_at"))
+    connection.save(update_fields=(*changed_fields, "health_status", "updated_at"))
     AuditEvent.objects.create(
         tenant=resolved.member.tenant,
         actor=request.user,
         action="integration_connection.updated",
         entity_id=connection.id,
         request_id=getattr(request, "request_id", None),
-        metadata={"active": active},
+        metadata={"active": active, "changed_fields": sorted(set(changed_fields))},
     )
     return connection
 

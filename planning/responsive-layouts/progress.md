@@ -3141,3 +3141,18 @@ separate from their request handlers. Source URL safeguards, schedules,
 observation evidence and reviewable diffs remain unchanged, and the original view
 module continues to expose the established serializer names. Three focused remote-
 source tests, Ruff and MyPy across 198 source files pass.
+
+## Integration credential reauthentication repair — 2026-09-27
+
+Creating a provider connection after the recent-authentication window expired
+previously returned a generic save failure even though the server had safely
+rejected the request before persistence. Integration credential writes now return
+the stable `recent_authentication_required` error code. The Connections workspace
+keeps the complete draft, requests the current password, and retries the same save
+only after reauthentication succeeds. Credential rotation uses the same bounded
+flow. Failed passwords retain the provider draft and never trigger a write.
+
+Focused backend tests cover the coded denial and absence of a saved connection.
+Fourteen integration component/API tests cover the retained draft, password flow,
+safe retry and existing providers. Frontend lint, type checking, production build
+and bundle budgets, plus backend Ruff and MyPy, pass. Version remains 0.8.46.

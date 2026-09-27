@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { WorkspaceContext } from '../workspaces/api'
 import type { IntegrationConflict, IntegrationConnection, IntegrationJob } from './providerApi'
-import { browserIntegrationsClient } from './providerApi'
+import { browserIntegrationsClient, IntegrationRequestError } from './providerApi'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: 'client/one', name: 'Acme Dental', classifications: ['client'],
@@ -81,14 +81,16 @@ describe('provider integrations API', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify([]), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { message: 'Provider denied.' } }), { status: 403 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'recent_authentication_required', detail: 'Provider denied.' } }), { status: 403 }))
 
     await browserIntegrationsClient.listJobs(workspace)
     await browserIntegrationsClient.listLogs(workspace)
     await browserIntegrationsClient.listConflicts(workspace)
     await browserIntegrationsClient.listGitExports(workspace)
     await browserIntegrationsClient.listHaloTickets(workspace)
-    await expect(browserIntegrationsClient.listConnections(workspace)).rejects.toThrow('Provider denied.')
+    await expect(browserIntegrationsClient.listConnections(workspace)).rejects.toMatchObject({
+      name: 'IntegrationRequestError', status: 403, code: 'recent_authentication_required', message: 'Provider denied.',
+    } satisfies Partial<IntegrationRequestError>)
     expect(fetchMock.mock.calls.map(([path]) => requestPath(path))).toEqual([
       '/api/v1/workspaces/organizations/client%2Fone/integrations/jobs?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/logs?page=1&page_size=50',

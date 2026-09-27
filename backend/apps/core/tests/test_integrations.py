@@ -97,6 +97,34 @@ def connection(installation, record, *, name="Primary NetBox", token=None):  # t
 
 
 @pytest.mark.django_db
+def test_connection_api_identifies_expired_reauthentication_without_saving(installation, monkeypatch):
+    record = organization(installation, "Expired session client")
+    browser = Client()
+    browser.force_login(installation.owner)
+    monkeypatch.setattr("apps.core.integrations.did_recently_authenticate", lambda _request: False)
+    response = browser.post(
+        reverse(
+            "organization-integration-connection-list-create",
+            kwargs={"organization_entity_id": record.entity_id},
+        ),
+        data=json.dumps(
+            {
+                "provider": "netbox",
+                "name": "Production NetBox",
+                "base_url": "https://netbox.example.com/api/",
+                "credentials": {"api_token": TEST_PROVIDER_TOKEN},
+                "sync_interval_minutes": 30,
+            }
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "recent_authentication_required"
+    assert not IntegrationConnection.objects.exists()
+
+
+@pytest.mark.django_db
 def test_connection_api_encrypts_token_and_never_returns_it(installation, monkeypatch):
     record = organization(installation, "Connection client")
     browser = Client()

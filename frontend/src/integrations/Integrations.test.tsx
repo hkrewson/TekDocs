@@ -9,7 +9,8 @@ import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Integrations } from './Integrations'
-import type { IntegrationsClient } from './providerApi'
+import { IntegrationRequestError } from './providerApi'
+import type { IntegrationConnection, IntegrationsClient } from './providerApi'
 
 const workspace: WorkspaceContext = {
   kind: 'organization', id: 'client-1', name: 'Acme Dental', classifications: ['client'],
@@ -51,10 +52,10 @@ function documentsClient(): DocumentsClient {
   return { list: vi.fn().mockResolvedValue({ results: [runbook], count: 1 }) } as unknown as DocumentsClient
 }
 
-function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations') {
+function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }) {
   const router = createMemoryRouter([{
     path: '*',
-    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} /></NavigationGuardProvider>,
+    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} authClient={authClient} /></NavigationGuardProvider>,
   }], { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   return router
@@ -206,6 +207,40 @@ describe('Integrations', () => {
       credentials: { api_token: 'one-time-token' }, sync_interval_minutes: 30,
     }))
     expect(document.querySelector('input[type="password"]')).not.toBeInTheDocument()
+  })
+
+  it('reauthenticates an expired session and safely retries the retained connection draft', async () => {
+    const provider = providerClient()
+    const saved = {
+      id: 'connection-new', provider: 'netbox', name: 'Client NetBox', base_url: 'https://netbox.example.com/api/',
+      provider_details: {}, credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 30,
+      health_status: 'unknown', last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null,
+      reconciliation_counts: {}, next_sync_at: '2026-08-12T00:00:00Z', created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    } as IntegrationConnection
+    vi.mocked(provider.createConnection)
+      .mockRejectedValueOnce(new IntegrationRequestError('Recent authentication required.', 403, 'recent_authentication_required'))
+      .mockResolvedValueOnce(saved)
+    const authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations', authClient)
+    await user.click(await screen.findByRole('button', { name: 'New connection' }))
+    await user.type(screen.getByLabelText('Name'), 'Client NetBox')
+    await user.type(screen.getByLabelText('API base URL'), 'https://netbox.example.com/api/')
+    await user.type(screen.getByLabelText(/API token/), 'one-time-token')
+    await user.clear(screen.getByLabelText('Sync interval (minutes)'))
+    await user.type(screen.getByLabelText('Sync interval (minutes)'), '30')
+    await user.click(screen.getByRole('button', { name: 'Save connection' }))
+
+    expect(await screen.findByRole('heading', { name: 'Confirm this sensitive change' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Name')).toHaveValue('Client NetBox')
+    await user.type(screen.getByLabelText('Current password'), 'current-password')
+    await user.click(screen.getByRole('button', { name: 'Confirm and save' }))
+
+    await waitFor(() => expect(authClient.reauthenticate).toHaveBeenCalledWith('current-password'))
+    await waitFor(() => expect(provider.createConnection).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('Client NetBox')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Confirm this sensitive change' })).not.toBeInTheDocument()
   })
 
   it('uses provider-defined Microsoft fields and never asks for an editable Graph URL', async () => {

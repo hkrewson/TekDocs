@@ -1550,6 +1550,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .asset-create-form .inventory-model-search > div { display: flex; align-items: center; gap: var(--space-2); padding-left: 10px; background: #fff; border: 1px solid var(--border-strong); border-radius: var(--radius-control); }
 .asset-create-form .inventory-model-search input { min-height: 32px; padding: 0; border: 0; outline: 0; }
 .integration-connection-form small, .integration-connection-form .form-help { color: var(--muted); font-size: 11px; font-weight: 400; }
+.integration-reauth-form { width: min(760px, 100%); display: grid; grid-template-columns: minmax(220px, 1fr) minmax(220px, .8fr) auto; align-items: end; gap: 14px 18px; }
+.integration-reauth-form h2 { margin: 0 0 4px; font-size: 15px; }
+.integration-reauth-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.integration-reauth-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.integration-reauth-form input { width: 100%; min-height: var(--field-height); padding: var(--space-2) 10px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: var(--radius-control); }
+
+@media (max-width: 700px) {
+  .integration-reauth-form { grid-template-columns: 1fr; align-items: stretch; }
+  .integration-reauth-form .form-actions { justify-content: flex-start; }
+}
 
 @media (min-width: 900px) {
   .invoice-settings-form .record-form-section > .form-grid,

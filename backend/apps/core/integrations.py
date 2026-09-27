@@ -59,6 +59,11 @@ ALLOWED_LOG_CODES = frozenset(
 )
 
 
+class RecentAuthenticationRequired(PermissionDenied):
+    default_detail = "Recent password or MFA reauthentication is required."
+    default_code = "recent_authentication_required"
+
+
 def _validate_provider_secret(value: str, *, field: str = "api_token") -> bytes:
     encoded = value.encode()
     contains_control_character = any(ord(character) < 32 or ord(character) == 127 for character in value)
@@ -132,7 +137,7 @@ def _recent_session(request: Any) -> None:
     if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
         raise PermissionDenied("API tokens cannot set or rotate provider credentials.")
     if not did_recently_authenticate(request._request):
-        raise PermissionDenied("Recent password or MFA reauthentication is required.")
+        raise RecentAuthenticationRequired()
 
 
 def connections_for_workspace(workspace: ResolvedWorkspace) -> QuerySet[IntegrationConnection]:

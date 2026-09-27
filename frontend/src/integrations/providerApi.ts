@@ -30,9 +30,26 @@ export interface IntegrationsClient {
   listHaloTickets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<HaloTicketSummary[]>
 }
 
+export class IntegrationRequestError extends Error {
+  constructor(message: string, readonly status?: number, readonly code?: string) {
+    super(message)
+    this.name = 'IntegrationRequestError'
+  }
+}
+
 function base(workspace: WorkspaceContext) { return workspace.kind === 'msp' ? '/api/v1/workspaces/msp/integrations' : `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/integrations` }
 function csrfToken() { return document.cookie.split('; ').find((value) => value.startsWith('csrftoken='))?.split('=')[1] ?? '' }
-async function parse<T>(response: Response): Promise<T> { if (!response.ok) { const body = await response.json().catch(() => ({})) as { detail?: string; error?: { message?: string } }; throw new Error(body.error?.message ?? body.detail ?? 'The integration request failed.') } return response.json() as Promise<T> }
+async function parse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { detail?: string; error?: { code?: string; detail?: string; message?: string } }
+    throw new IntegrationRequestError(
+      body.error?.detail ?? body.error?.message ?? body.detail ?? 'The integration request failed.',
+      response.status,
+      body.error?.code,
+    )
+  }
+  return response.json() as Promise<T>
+}
 async function mutate<T>(path: string, method: 'POST' | 'PATCH', body: unknown, extra: Record<string, string> = {}): Promise<T> { await fetch('/_allauth/browser/v1/auth/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } }); return parse(await fetch(path, { method, credentials: 'same-origin', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken(), ...extra }, body: JSON.stringify(body) })) }
 
 export const browserIntegrationsClient: IntegrationsClient = {

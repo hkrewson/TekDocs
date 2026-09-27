@@ -1,3 +1,4 @@
+import { browserAuthClient } from '../auth/api'
 import { browserDocumentsClient } from '../documentation/api'
 import { useEffect, useState } from 'react'
 import { Download, Play, Plus, RefreshCw } from 'lucide-react'
@@ -6,13 +7,14 @@ import { translate } from '../i18n/localization'
 
 import '../collections/collections.css'
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
+import type { AuthClient } from '../auth/api'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Imports } from './Imports'
 import type { ImportsClient } from './importsApi'
-import { browserIntegrationsClient } from './providerApi'
+import { browserIntegrationsClient, IntegrationRequestError } from './providerApi'
 import type {
   GitExportBundle,
   IntegrationConflict,
@@ -30,8 +32,8 @@ const EMPTY_CONNECTION: IntegrationConnectionDraft = {
   provider: 'netbox', name: '', base_url: '', credentials: {}, sync_interval_minutes: 60,
 }
 
-export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, importsClient }: {
-  workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient
+export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, importsClient, authClient = browserAuthClient }: {
+  workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; importsClient?: ImportsClient; authClient?: Pick<AuthClient, 'reauthenticate'>
 }) {
   const [params] = useSearchParams()
   const location = useLocation()
@@ -58,6 +60,8 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rotating, setRotating] = useState<{ connection: IntegrationConnection; credentials: Record<string, string> } | null>(null)
+  const [reauthenticationAction, setReauthenticationAction] = useState<'create' | 'rotate' | null>(null)
+  const [password, setPassword] = useState('')
   const [reload, setReload] = useState(0)
   const phase = loadState.section === section ? loadState.value : 'loading'
   const connectionDirty = showForm && JSON.stringify(draft) !== JSON.stringify(EMPTY_CONNECTION)
@@ -67,6 +71,8 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     setShowForm(false)
     setDraft(EMPTY_CONNECTION)
     setRotating(null)
+    setReauthenticationAction(null)
+    setPassword('')
     setSelected([])
     setSelectedPublications([])
     setError(null)
@@ -112,8 +118,33 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
       const connection = await providerClient.createConnection(workspace, draft)
       setConnections((current) => [...current, connection].sort((a, b) => a.name.localeCompare(b.name)))
       setDraft(EMPTY_CONNECTION); setShowForm(false)
-    } catch { setError(translate('integrations.createFailed')) }
+    } catch (caught) {
+      if (caught instanceof IntegrationRequestError && caught.code === 'recent_authentication_required') {
+        setReauthenticationAction('create')
+      } else {
+        setError(translate('integrations.createFailed'))
+      }
+    }
     finally { setSaving(false) }
+  }
+
+  async function confirmReauthentication() {
+    const action = reauthenticationAction
+    const submittedPassword = password
+    setPassword('')
+    setSaving(true)
+    setError(null)
+    try {
+      await authClient.reauthenticate(submittedPassword)
+      setReauthenticationAction(null)
+    } catch {
+      setError(translate('integrations.reauthenticationFailed'))
+      setSaving(false)
+      return
+    }
+    setSaving(false)
+    if (action === 'rotate' && rotating) await rotate(rotating.connection, rotating.credentials)
+    else if (action === 'create') await createConnection()
   }
 
   const selectedProvider = providers.find((provider) => provider.key === draft.provider)
@@ -150,7 +181,13 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
       const updated = await providerClient.rotateConnection(workspace, connection, credentials)
       setConnections((current) => current.map((item) => item.id === updated.id ? updated : item))
       setRotating(null)
-    } catch { setError(translate('integrations.rotateFailed')) }
+    } catch (caught) {
+      if (caught instanceof IntegrationRequestError && caught.code === 'recent_authentication_required') {
+        setReauthenticationAction('rotate')
+      } else {
+        setError(translate('integrations.rotateFailed'))
+      }
+    }
     finally { setSaving(false) }
   }
 
@@ -195,6 +232,11 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
         {rotating && providerFor(rotating.connection.provider) && <div className="archive-confirmation" role="alertdialog" aria-labelledby="replace-credential-heading" aria-describedby="replace-credential-help"><div><strong id="replace-credential-heading">{translate('integrations.rotateHeading', { name: rotating.connection.name })}</strong><p id="replace-credential-help">{translate('integrations.rotateHelp')}</p><div className="form-grid">{providerFor(rotating.connection.provider)?.credential_fields.map((field) => <label key={field.key}><span>{field.label}</span><input type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={rotating.credentials[field.key] ?? ''} onChange={(event) => setRotating({ ...rotating, credentials: { ...rotating.credentials, [field.key]: event.target.value } })} /></label>)}</div></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving || Boolean(providerFor(rotating.connection.provider)?.credential_fields.some((field) => (rotating.credentials[field.key]?.length ?? 0) < field.minimum_length))} onClick={() => { void rotate(rotating.connection, rotating.credentials) }}>{translate('integrations.rotateAction')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setRotating(null)}>{translate('common.cancel')}</button></div></div>}
       </section>
       {showForm && <section className="content-section integration-connection-form" aria-labelledby="connection-form-heading"><form onSubmit={(event) => { event.preventDefault(); void createConnection() }}><div className="section-heading"><h2 id="connection-form-heading">{translate('integrations.newConnection')}</h2></div><div className="form-grid"><label><span>Name</span><input autoFocus value={draft.name} maxLength={100} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label><label><span>Provider</span><select value={draft.provider} onChange={(event) => { const provider = providers.find((item) => item.key === event.target.value); setDraft({ ...draft, provider: event.target.value, base_url: provider?.default_base_url ?? '', credentials: {}, sync_interval_minutes: provider?.minimum_sync_interval_minutes ?? 60 }) }}>{providers.map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>{selectedProvider?.base_url_editable && <label className="wide-field"><span>API base URL</span><input type="url" value={draft.base_url} placeholder="https://provider.example/api/" onChange={(event) => setDraft({ ...draft, base_url: event.target.value })} /></label>}{selectedProvider?.credential_fields.map((field) => <label key={field.key} className={field.secret ? 'wide-field' : undefined}><span>{field.label}</span><input aria-label={field.label} type={field.input_type === 'password' ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={draft.credentials[field.key] ?? ''} onChange={(event) => setDraft({ ...draft, credentials: { ...draft.credentials, [field.key]: event.target.value } })} />{field.help_text && <small>{field.help_text}</small>}</label>)}{selectedProvider?.setup_help_url && <p className="wide-field form-help">{translate('integrations.providerSetupHelp')} <a href={selectedProvider.setup_help_url} target="_blank" rel="noreferrer">{translate('integrations.providerSetupGuidance', { provider: selectedProvider.label })}</a></p>}<label><span>Sync interval (minutes)</span><input type="number" min={selectedProvider?.minimum_sync_interval_minutes ?? 5} max={selectedProvider?.maximum_sync_interval_minutes ?? 10080} value={draft.sync_interval_minutes} onChange={(event) => setDraft({ ...draft, sync_interval_minutes: Number(event.target.value) })} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving || !draft.name || Boolean(selectedProvider?.base_url_editable && !draft.base_url) || Boolean(selectedProvider?.credential_fields.some((field) => (draft.credentials[field.key]?.length ?? 0) < field.minimum_length))}>{saving ? 'Saving…' : 'Save connection'}</button><button className="secondary-button" type="button" onClick={() => setShowForm(false)}>{translate('common.cancel')}</button></div></form></section>}
+      {reauthenticationAction && <form className="content-section integration-reauth-form" onSubmit={(event) => { event.preventDefault(); void confirmReauthentication() }}>
+        <div><h2>{translate('integrations.reauthenticationHeading')}</h2><p>{translate('integrations.reauthenticationHelp')}</p></div>
+        <label><span>{translate('integrations.currentPassword')}</span><input autoFocus required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <div className="form-actions"><button type="submit" className="primary-button" disabled={saving}>{translate('integrations.confirmAndSave')}</button><button type="button" className="secondary-button" disabled={saving} onClick={() => { setReauthenticationAction(null); setPassword('') }}>{translate('common.cancel')}</button></div>
+      </form>}
       <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.recentUpdates')}</h2><p>{translate('integrations.recentUpdatesHelp')}</p></div></div>{jobs.length === 0 ? <p className="empty-state">No updates have run.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.syncJobTable')} tabIndex={0}><table><thead><tr><th>Started</th><th>Connection</th><th>Started by</th><th>Status</th><th>Attempts</th><th>Result</th><th>Actions</th></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}><td>{new Date(job.created_at).toLocaleString()}</td><td>{job.connection_name}</td><td>{job.trigger}</td><td>{job.state.replace('_', ' ')}</td><td>{job.attempts}</td><td>{job.last_error_code || `${job.result_counts.observations ?? 0} records found`}</td><td>{(job.state === 'pending' || job.state === 'processing') ? <button className="secondary-button" type="button" disabled={saving} onClick={() => { void cancelJob(job) }}>{translate('common.cancel')}</button> : '—'}</td></tr>)}</tbody></table></div>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.sourceRecords')}</h2><p>{translate('integrations.sourceRecordsHelp')}</p></div></div>{observations.length === 0 ? <p className="empty-state">No records have been found.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Connection</th><th>Type</th><th>Source record</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th></tr></thead><tbody>{observations.map((observation) => { const conflict = conflicts.find((item) => item.connection_id === observation.connection_id && item.remote_type === observation.remote_type && item.remote_id === observation.remote_id && item.status === 'open'); return <tr key={observation.id}><td>{observation.connection_name}</td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td></tr> })}</tbody></table></div>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>Operational log</h2><p>Thirty-day structured events contain allowlisted codes and numeric metrics—not provider messages or response bodies.</p></div></div>{logs.length === 0 ? <p className="empty-state">No provider events have been recorded.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.logTable')} tabIndex={0}><table><thead><tr><th>Time</th><th>Connection</th><th>Level</th><th>Code</th><th>Metrics</th></tr></thead><tbody>{logs.map((event) => <tr key={event.id}><td>{new Date(event.occurred_at).toLocaleString()}</td><td>{event.connection_name}</td><td>{event.level}</td><td><code>{event.code}</code></td><td>{Object.entries(event.metrics).map(([key, value]) => `${key}: ${value}`).join(', ') || '—'}</td></tr>)}</tbody></table></div>}</section>

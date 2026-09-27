@@ -60,3 +60,6 @@ Final recurring-feature risk disposition, the applicable security and pilot
 evidence, the full release gate, and Wiki checkout reconciliation remain open.
 No deployment, push, publication, tag, or version change is part of this
 checkpoint.
+
+The subsequent amendment, withdrawal, and correction decisions are recorded in
+[the recurring invoice lifecycle policy](recurring-invoice-lifecycle-policy.md).

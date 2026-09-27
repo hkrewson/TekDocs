@@ -15,7 +15,9 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import User
 from apps.core.billing import create_tax_rate_version
 from apps.core.commercial import create_contract, create_cost
+from apps.core.invoice_recurrence import RecurrenceError
 from apps.core.models import (
+    AuditEvent,
     CommercialContract,
     ContractCost,
     InstallationState,
@@ -30,8 +32,17 @@ from apps.core.models import (
     TaxRate,
 )
 from apps.core.organizations import create_organization
-from apps.core.recurring_invoice_preview import apply_recurring_preview, preview_recurring_drafts
-from apps.core.recurring_invoices import enroll_recurring_schedule, recurring_source_digest
+from apps.core.recurring_invoice_preview import (
+    apply_recurring_preview,
+    discover_recurring_periods,
+    preview_recurring_drafts,
+)
+from apps.core.recurring_invoices import (
+    enroll_recurring_schedule,
+    generate_recurring_draft,
+    recurring_source_digest,
+    stop_recurring_schedule,
+)
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope, rls_scope
 from apps.core.rls_contract import RUNTIME_ROLE
 from apps.core.scoping import DataScope
@@ -49,11 +60,24 @@ MODELS = (
 )
 RECURRING_MODELS = (RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod)
 ANCHOR = date(2025, 1, 31)
+STOP_REASON = "Client ended the recurring service"
 
 
 def snapshot():
     records = [record for model in MODELS for record in model.objects.order_by("pk")]
     return json.loads(serializers.serialize("json", records))
+
+
+def audit_snapshot(event):
+    return {
+        "id": str(event.pk),
+        "tenant_id": str(event.tenant_id),
+        "actor_id": str(event.actor_id),
+        "action": event.action,
+        "entity_id": str(event.entity_id),
+        "metadata": event.metadata,
+        "occurred_at": event.occurred_at.isoformat(),
+    }
 
 
 def review_and_apply(owner, client, schedule, start):
@@ -159,6 +183,57 @@ def create_fixture():
         )
         claim = review_and_apply(result.owner, client, schedule, ANCHOR)
         assert claim.ends_before == date(2025, 2, 28)
+
+        stopped_contract = create_contract(
+            tenant=result.tenant,
+            organization=client,
+            actor_id=result.owner.pk,
+            values={
+                "name": "Stopped recovery support",
+                "provider_id": supplier.entity_id,
+                "kind": "service",
+                "status": "active",
+                "starts_on": date(2025, 1, 1),
+                "ends_on": date(2025, 12, 31),
+            },
+        )
+        create_cost(
+            contract=stopped_contract,
+            actor_id=result.owner.pk,
+            values={
+                "label": "Stopped supplier fee",
+                "amount": Decimal("35.00"),
+                "quantity": Decimal("1.000"),
+                "currency": "USD",
+                "billing_interval": "monthly",
+            },
+        )
+        stopped_cost = ContractCost.objects.get(contract=stopped_contract)
+        stopped_schedule = enroll_recurring_schedule(
+            user=result.owner,
+            organization=client,
+            cost_id=stopped_cost.pk,
+            expected_source_digest=recurring_source_digest(
+                user=result.owner, organization=client, cost_id=stopped_cost.pk
+            ),
+            anchor=ANCHOR,
+            ends_on=date(2025, 12, 31),
+            description="Approved stopped recovery support",
+            quantity=Decimal("1.000"),
+            unit_amount=Decimal("90.00"),
+            currency="USD",
+            due_days=14,
+        )
+        stopped_claim = review_and_apply(result.owner, client, stopped_schedule, ANCHOR)
+        stop_recurring_schedule(
+            user=result.owner,
+            organization=client,
+            schedule_id=stopped_schedule.pk,
+            reason=STOP_REASON,
+        )
+        stop_event = AuditEvent.objects.get(
+            action="invoice.recurring_stopped", metadata__schedule_id=str(stopped_schedule.pk)
+        )
         MANIFEST.write_text(
             json.dumps(
                 {
@@ -167,11 +242,14 @@ def create_fixture():
                     "sibling": str(sibling.pk),
                     "schedule": str(schedule.pk),
                     "claim": str(claim.pk),
+                    "stopped_schedule": str(stopped_schedule.pk),
+                    "stopped_claim": str(stopped_claim.pk),
+                    "stop_event": audit_snapshot(stop_event),
                     "snapshot": snapshot(),
                 }
             )
         )
-    print("Created approved taxed recurring draft and external identity manifest.")
+    print("Created active and stopped recurring drafts with an external identity manifest.")
 
 
 def verify_fixture():
@@ -200,6 +278,16 @@ def verify_fixture():
         assert snapshot() == expected["snapshot"], "Restored billing identities or values differ from backup"
         schedule = RecurringInvoiceSchedule.objects.get(pk=expected["schedule"])
         claim = RecurringInvoicePeriod.objects.select_related("line", "invoice", "terms").get(pk=expected["claim"])
+        stopped_schedule = RecurringInvoiceSchedule.objects.get(pk=expected["stopped_schedule"])
+        stopped_claim = RecurringInvoicePeriod.objects.select_related("line", "invoice", "terms").get(
+            pk=expected["stopped_claim"]
+        )
+        stop_event = AuditEvent.objects.get(pk=expected["stop_event"]["id"])
+        assert audit_snapshot(stop_event) == expected["stop_event"]
+        assert not stopped_schedule.enabled
+        assert stopped_claim.line.unit_amount == Decimal("90.0000")
+        assert stopped_claim.terms.source_snapshot["amount"] == "35.00"
+        assert stopped_claim.invoice.state == "draft" and stopped_claim.invoice.number == ""
         assert claim.line.unit_amount == Decimal("75.0000") and claim.line.quantity == Decimal("2.000")
         assert claim.terms.source_snapshot["amount"] == "20.00"
         assert claim.line.tax_rate_value == Decimal("0.100000")
@@ -230,6 +318,49 @@ def verify_fixture():
         for model in RECURRING_MODELS:
             assert not model.objects.exists(), "Wrong-tenant scope disclosed recurring records"
         bind(tenant, client)
+        stopped_periods = discover_recurring_periods(
+            user=owner,
+            organization=client,
+            schedule_id=stopped_schedule.pk,
+            due_from=ANCHOR,
+            as_of=date(2025, 2, 28),
+        )["periods"]
+        assert stopped_periods[0]["invoice_entity_id"] == str(stopped_claim.invoice.entity_id)
+        assert all(item["blocked_reason"] == "disabled" and not item["can_generate"] for item in stopped_periods)
+        retained_stopped = generate_recurring_draft(
+            user=owner,
+            organization=client,
+            schedule_id=stopped_schedule.pk,
+            starts_on=ANCHOR,
+            as_of=ANCHOR,
+        )
+        assert retained_stopped.pk == stopped_claim.pk and retained_stopped.invoice_id == stopped_claim.invoice_id
+        try:
+            generate_recurring_draft(
+                user=owner,
+                organization=client,
+                schedule_id=stopped_schedule.pk,
+                starts_on=date(2025, 2, 28),
+                as_of=date(2025, 2, 28),
+            )
+        except RecurrenceError as exc:
+            assert str(exc) == "This recurring schedule is disabled"
+        else:
+            raise AssertionError("Restored stopped schedule generated a new draft")
+        stop_recurring_schedule(
+            user=owner,
+            organization=client,
+            schedule_id=stopped_schedule.pk,
+            reason="Retry must not replace retained reason",
+        )
+        assert (
+            AuditEvent.objects.filter(
+                action="invoice.recurring_stopped", metadata__schedule_id=str(stopped_schedule.pk)
+            ).count()
+            == 1
+        )
+        assert audit_snapshot(AuditEvent.objects.get(pk=stop_event.pk)) == expected["stop_event"]
+        assert snapshot() == expected["snapshot"], "Stopped-schedule checks changed the restored baseline"
         # Restore does not rely on an old signed token: obtain a fresh authorized review.
         for _ in range(2):
             retained = review_and_apply(owner, client, schedule, ANCHOR)
@@ -239,8 +370,8 @@ def verify_fixture():
         assert following.ends_before == date(2025, 3, 31), "Restore lost the original month-end anchor"
         assert following.invoice_id != claim.invoice_id
         assert review_and_apply(owner, client, schedule, date(2025, 2, 28)).pk == following.pk
-        assert RecurringInvoicePeriod.objects.count() == Invoice.objects.count() == InvoiceLine.objects.count() == 2
-    print("Verified exact restoration, forced RLS, immutable history, safe retries, and next-period generation.")
+        assert RecurringInvoicePeriod.objects.count() == Invoice.objects.count() == InvoiceLine.objects.count() == 3
+    print("Verified exact restoration, stopped-schedule history, forced RLS, safe retries, and active continuation.")
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

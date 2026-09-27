@@ -30,6 +30,16 @@ Validate this shape with `make -n release-gate`; adding another direct
 `frontend-gate.sh test` or `frontend-gate.sh check` call to a feature recipe
 should be replaced by the shared prerequisite.
 
+The backend plan follows the same rule. The complete coverage suite runs once,
+followed by the two performance selections that require opt-in markers or latency
+enforcement. Focused feature targets remain independently callable during
+development, but the final gate does not rerun selections already contained in
+the complete suite. The assembled Compose boundary verifies service health,
+email, production settings and image provenance against the running stack; it no
+longer launches a second identical coverage suite in a one-off test container.
+The release-script contract checks this three-command pytest shape from
+`make -n release-gate`.
+
 ## Current evidence
 
 On 2026-09-26, commit `279c80d` repaired the constrained-device documentation
@@ -80,6 +90,15 @@ complete Firefox project then passed 490 scenarios with its one intentional skip
 No reproducible product or test defect was found, so assertions and timeout limits
 were not weakened. Because the compound release command still exited nonzero, the
 release gate remains pending and `acceptance.json` remains unchanged.
+
+A subsequent clean attempt from `be4636d` was deliberately stopped after about
+40 minutes. It had passed the frontend boundaries, repository checks, the
+2,410-test backend suite, capacity and constrained-browser performance, then
+entered another overlapping authorization selection. Inspection confirmed that
+the final target scheduled dozens of focused backend selections already covered
+by the complete suite and scheduled the complete suite again inside
+`test-compose`. The gate plan was consolidated before another acceptance run;
+the interrupted command is not represented as release evidence.
 
 ## Remaining human boundary
 

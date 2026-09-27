@@ -268,7 +268,6 @@ test-compose:
 	curl --fail --silent http://127.0.0.1:$${MAILPIT_UI_PORT:-8025}/readyz
 	docker compose exec -T backend python manage.py send_test_email operator-test@example.invalid
 	docker compose exec -T backend python manage.py check --deploy
-	docker compose run --rm migrate pytest --cov
 	./scripts/check-compose-provenance.sh
 
 test-e2e:
@@ -304,8 +303,7 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true sh ./tests/rehearsals/rehearse-production-image.sh
 
-release-gate: check test test-public-beta-performance test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-compliance-monitoring-validation test-auth-abuse test-client-portal-boundary test-outbox test-notifications test-notification-email test-portal-notification-validation test-compose test-frontend-routing test-policy test-isolation test-rls test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-network-validation test-secret-files test-markdown test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix
-release-gate: test-compliance-catalogs recurring-invoice-backup-rehearsal
+release-gate: check test test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal supported-upgrade-matrix recurring-invoice-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

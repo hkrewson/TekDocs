@@ -45,6 +45,12 @@ from .document_operations import (
     update_document_operations,
 )
 from .document_reuse import reuse_impact_for_placement
+from .document_template_serializers import (
+    DocumentTemplateInstantiateSerializer,
+    DocumentTemplateRolloutApplySerializer,
+    DocumentTemplateRolloutPreviewSerializer,
+    DocumentTemplateRolloutResultSerializer,
+)
 from .documents import (
     PlacementConflict,
     RevisionConflict,
@@ -129,10 +135,6 @@ from .serializers import (
     DocumentReviewRequestWriteSerializer,
     DocumentSearchResultSerializer,
     DocumentSerializer,
-    DocumentTemplateInstantiateSerializer,
-    DocumentTemplateRolloutApplySerializer,
-    DocumentTemplateRolloutPreviewSerializer,
-    DocumentTemplateRolloutResultSerializer,
     DocumentTopicConversionPreviewSerializer,
     DocumentTopicConversionSerializer,
     DocumentUpdateSerializer,

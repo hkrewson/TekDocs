@@ -3121,3 +3121,10 @@ Routes, fields, validation, permission behavior, schema component names and stor
 data are unchanged. Ruff, MyPy across 195 source files, the focused document and
 attachment-security suite, and OpenAPI generation all pass; schema generation
 retains only its four known operation-ID warnings.
+
+Template instantiation and staged rollout now use a focused backend serializer
+module, and the document views import that contract without traversing the
+monolithic serializer module. Existing compatibility imports, request fields,
+validation, response shapes, routes and stored data remain unchanged. Six focused
+template workflow tests, Ruff, MyPy across 196 source files and OpenAPI generation
+pass; schema generation retains only its four known operation-ID warnings.

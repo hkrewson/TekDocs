@@ -30,6 +30,18 @@ from .document_publication_serializers import DocumentPublicationWriteSerializer
 from .document_publication_serializers import PortalDocumentDetailSerializer as PortalDocumentDetailSerializer
 from .document_publication_serializers import PortalDocumentResultSerializer as PortalDocumentResultSerializer
 from .document_publication_serializers import PortalDocumentSerializer as PortalDocumentSerializer
+from .document_template_serializers import (
+    DocumentTemplateInstantiateSerializer as DocumentTemplateInstantiateSerializer,
+)
+from .document_template_serializers import (
+    DocumentTemplateRolloutApplySerializer as DocumentTemplateRolloutApplySerializer,
+)
+from .document_template_serializers import (
+    DocumentTemplateRolloutPreviewSerializer as DocumentTemplateRolloutPreviewSerializer,
+)
+from .document_template_serializers import (
+    DocumentTemplateRolloutResultSerializer as DocumentTemplateRolloutResultSerializer,
+)
 from .documents import ResolvedDocument, ResolvedPlacement, resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import (
@@ -573,43 +585,6 @@ class DocumentListQuerySerializer(StrictQuerySerializer):
     )
     page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
-
-
-class DocumentTemplateInstantiateSerializer(serializers.Serializer):
-    source_document_id = serializers.UUIDField()
-    title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
-    category = serializers.ChoiceField(choices=DocumentCategory.choices)
-    placement_rules = serializers.DictField(
-        child=serializers.ChoiceField(choices=("copy", "live", "pinned")),
-        required=False,
-        default=dict,
-    )
-
-
-class DocumentTemplateRolloutPreviewSerializer(serializers.Serializer):
-    enrollment_id = serializers.UUIDField()
-
-
-class DocumentTemplateRolloutApplySerializer(serializers.Serializer):
-    enrollment_id = serializers.UUIDField()
-    expected_applied_revision_id = serializers.UUIDField()
-    placement_rules = serializers.DictField(
-        child=serializers.ChoiceField(choices=("copy", "live", "pinned")),
-        required=False,
-        default=dict,
-    )
-
-
-class DocumentTemplateRolloutResultSerializer(serializers.Serializer):
-    enrollment_id = serializers.UUIDField()
-    applied_revision_id = serializers.UUIDField()
-    current_revision = serializers.IntegerField()
-    available_revision = serializers.IntegerField()
-    up_to_date = serializers.BooleanField()
-    added = serializers.ListField(child=serializers.DictField())
-    changed = serializers.ListField(child=serializers.DictField())
-    removed = serializers.ListField(child=serializers.DictField())
-    conflicts = serializers.ListField(child=serializers.DictField())
 
 
 class MarkdownImportSerializer(serializers.Serializer):

@@ -118,6 +118,8 @@ selection, compatibility notes, and focused verification are recorded in
 complete. The retained withdrawal data, service, and API boundary is recorded in
 [Retained recurring-draft withdrawal](recurring-invoice-draft-withdrawal.md).
 Its focused operator confirmation, recent-authentication recovery, read-only
-record history, and explicit collection-history filter are complete. Recovery
-rehearsal and live responsive browser acceptance remain in the final acceptance
-slice.
+record history, and explicit collection-history filter are complete. The
+[recurring invoice lifecycle acceptance](recurring-invoice-lifecycle-acceptance.md)
+records the completed clean-restore and real browser-to-Django-to-PostgreSQL
+evidence. Only shared pre-1.0 release, security, pilot, risk, and publication
+obligations remain outside the feature boundary.

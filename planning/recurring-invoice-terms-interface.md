@@ -54,7 +54,9 @@ The retained withdrawal service and invoice-screen workflow are complete in
 [recurring-invoice-draft-withdrawal.md](recurring-invoice-draft-withdrawal.md).
 The isolated recovery rehearsal now proves both append-only terms and withdrawn
 draft history survive a clean restore and drive the next generated period.
-Live browser-to-Django-to-PostgreSQL acceptance remains before final closure.
+The real browser-to-Django-to-PostgreSQL lifecycle also passes; its retained
+record assertions are summarized in
+[recurring-invoice-lifecycle-acceptance.md](recurring-invoice-lifecycle-acceptance.md).
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

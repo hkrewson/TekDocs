@@ -92,6 +92,11 @@ async function rehearseRecurringDraft(page: Page) {
   const source = await reviewed.json() as { business_date: string }
   // One starts-in-advance period, bounded by the installation's own date.
   const anchor = source.business_date
+  const [anchorYear, anchorMonth, anchorDay] = anchor.split('-').map(Number)
+  const nextMonth = anchorMonth === 12 ? 1 : anchorMonth + 1
+  const nextYear = anchorMonth === 12 ? anchorYear + 1 : anchorYear
+  const nextMonthLastDay = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate()
+  const nextBoundary = `${nextYear}-${String(nextMonth).padStart(2, '0')}-${String(Math.min(anchorDay, nextMonthLastDay)).padStart(2, '0')}`
   await expect(page.getByLabel('Client unit price')).toHaveValue('')
   await expect(page.getByLabel('Client quantity')).toHaveValue('')
   await page.getByLabel('Client invoice description').fill('Live approved monthly support')
@@ -122,10 +127,32 @@ async function rehearseRecurringDraft(page: Page) {
   await expect(page.getByRole('region', { name: 'Recurring invoices', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
   await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Withdraw draft' }).click()
+  await page.getByLabel('Reason for withdrawal').fill('Live client cancelled before issue')
+  const withdrawalResponse = page.waitForResponse((response) => response.url().endsWith('/withdraw-recurring-draft') && response.request().method() === 'POST')
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Withdraw draft' }).click()
+  expect((await withdrawalResponse).status()).toBe(200)
+  await expect(page.locator('.lifecycle-state')).toHaveText('Withdrawn')
+  await expect(page.getByText('Live client cancelled before issue')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Issue invoice' })).toHaveCount(0)
 
   await page.getByRole('link', { name: 'Back to invoices' }).click()
   await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
   await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
+  await page.getByRole('button', { name: 'Change future terms' }).click()
+  await page.getByLabel('Effective billing period').fill(nextBoundary)
+  await page.getByLabel('Client invoice description').fill('Live amended monthly support')
+  await page.getByLabel('Client unit price').fill('80.00')
+  await page.getByLabel('Client quantity').fill('3.000')
+  await page.getByLabel('Payment due days after period start').fill('45')
+  await page.getByLabel('Approved tax treatment').selectOption('__none__')
+  await page.getByRole('button', { name: 'Review future terms' }).click()
+  await expect(page.getByText('USD 240.00')).toBeVisible()
+  const termsResponse = page.waitForResponse((response) => response.url().endsWith('/terms/apply') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Apply reviewed terms' }).click()
+  expect((await termsResponse).status()).toBe(200)
+  await page.getByText('Retained terms history', { exact: true }).click()
+  await expect(page.getByText(/Version 2, effective/)).toBeVisible()
   await page.getByRole('button', { name: 'Stop future drafts' }).click()
   await page.getByLabel('Reason for stopping').fill('Live service ended')
   await page.getByRole('button', { name: 'Confirm stop', exact: true }).click()
@@ -134,7 +161,7 @@ async function rehearseRecurringDraft(page: Page) {
   // A fresh page must retain the stop and rediscover the same invoice.
   await page.reload()
   await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
-  await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
+  await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live amended monthly support/ }).click()
   await expect(page.getByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')).toBeVisible()
   await page.getByLabel('Period starts from').fill(anchor)
   await page.getByLabel('Due as of').fill(anchor)
@@ -151,6 +178,8 @@ async function rehearseRecurringDraft(page: Page) {
   await expect(page.getByRole('region', { name: 'Recurring invoices', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: /^Draft ·/ })).toBeVisible()
   await expect(page.getByText('Live approved monthly support', { exact: true })).toBeVisible()
+  await expect(page.locator('.lifecycle-state')).toHaveText('Withdrawn')
+  await expect(page.getByText('Live client cancelled before issue')).toBeVisible()
 }
 
 test('real owner creates and enters a PostgreSQL-backed organization workspace', async ({ browser, page }) => {

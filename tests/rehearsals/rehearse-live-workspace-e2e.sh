@@ -69,7 +69,7 @@ from django.urls import reverse
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
 from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
-from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod
+from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod, RecurringInvoiceWithdrawal
 from apps.core.models import DNSZone, DNSRecord, NetworkCircuit, NetworkCircuitHandoff
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
@@ -299,23 +299,42 @@ assert cost.currency == "USD"
 assert cost.reference == "LIVE-PRIVATE-RATE"
 assert cost.billing_interval == "monthly"
 schedule = RecurringInvoiceSchedule.objects.get(contract_cost=cost)
-terms = RecurringInvoiceTerms.objects.get(schedule=schedule)
+terms = list(RecurringInvoiceTerms.objects.filter(schedule=schedule).order_by("version"))
+assert len(terms) == 2
+original_terms, amended_terms = terms
 period = RecurringInvoicePeriod.objects.select_related("invoice", "line").get(schedule=schedule)
 assert schedule.organization == organization
 assert schedule.tenant == organization.tenant
 assert schedule.enabled is False
+owner = User.objects.get(display_name="Live Workspace Owner")
 stop_event = AuditEvent.objects.get(action="invoice.recurring_stopped", entity_id=contract.entity_id)
 assert stop_event.metadata == {"schedule_id": str(schedule.pk), "reason": "Live service ended"}
-assert stop_event.actor_id == User.objects.get(display_name="Live Workspace Owner").pk
+assert stop_event.actor_id == owner.pk
 assert schedule.interval == "monthly"
-assert terms.version == 1
-assert terms.description == "Live approved monthly support"
-assert terms.quantity == Decimal("2.000")
-assert terms.unit_amount == Decimal("75.0000")
-assert terms.currency == "USD"
-assert terms.tax_rate_id is None
-assert terms.due_days == 30
-assert period.terms == terms
+assert original_terms.version == 1
+assert original_terms.description == "Live approved monthly support"
+assert original_terms.quantity == Decimal("2.000")
+assert original_terms.unit_amount == Decimal("75.0000")
+assert original_terms.currency == "USD"
+assert original_terms.tax_rate_id is None
+assert original_terms.due_days == 30
+assert amended_terms.version == 2
+assert amended_terms.description == "Live amended monthly support"
+assert amended_terms.quantity == Decimal("3.000")
+assert amended_terms.unit_amount == Decimal("80.0000")
+assert amended_terms.currency == "USD"
+assert amended_terms.tax_rate_id is None
+assert amended_terms.due_days == 45
+assert amended_terms.effective_from > schedule.anchor
+amendment_event = AuditEvent.objects.get(action="invoice.recurring_terms_amended", entity_id=contract.entity_id)
+assert amendment_event.actor_id == owner.pk
+assert amendment_event.metadata == {
+    "schedule_id": str(schedule.pk),
+    "terms_id": str(amended_terms.pk),
+    "version": 2,
+    "effective_from": amended_terms.effective_from.isoformat(),
+}
+assert period.terms == original_terms
 assert period.starts_on == schedule.anchor
 assert period.ends_before > period.starts_on
 assert period.organization == organization
@@ -332,13 +351,19 @@ assert invoice.issued_at is None
 assert invoice.invoice_date == schedule.anchor
 assert invoice.due_date == schedule.anchor + timedelta(days=30)
 assert line.invoice == invoice
-assert line.description == terms.description
-assert line.quantity == terms.quantity
-assert line.unit_amount == terms.unit_amount
+assert line.description == original_terms.description
+assert line.quantity == original_terms.quantity
+assert line.unit_amount == original_terms.unit_amount
 assert line.currency == "USD"
+withdrawal = RecurringInvoiceWithdrawal.objects.get(period=period)
+assert withdrawal.reason == "Live client cancelled before issue"
+assert withdrawal.withdrawn_by_id == owner.pk
+withdrawal_event = AuditEvent.objects.get(action="invoice.recurring_draft_withdrawn", entity_id=invoice.entity_id)
+assert withdrawal_event.actor_id == owner.pk
+assert withdrawal_event.metadata == {}
 assert not InvoiceArtifact.objects.filter(invoice=invoice).exists()
 assert not InvoiceLifecycleEvent.objects.filter(invoice=invoice).exists()
-print("Live recurring stop retained its audit reason, approved schedule, period claim, and unissued draft.")
+print("Live recurring workflow retained its stop, amendment, withdrawal, period claim, and unissued draft.")
 
 from apps.core.models import NetworkRack
 rack = NetworkRack.objects.select_related("site__entity", "location__entity").get(entity__display_name="Live layout rack")

@@ -75,11 +75,12 @@ withdrawal route.
 
 ## Next slice
 
-The isolated backup/restore fixture now retains the withdrawal, its immutable
+The isolated backup/restore fixture retains the withdrawal, its immutable
 reason/actor/time and audit identity, and the frozen invoice and line alongside
-the amended terms history. Complete the live browser-to-Django-to-PostgreSQL
-journey for amendment and withdrawal, then close the final recurring-invoice
-acceptance matrix alongside the remaining pre-1.0 release evidence.
+the amended terms history. The real browser-to-Django-to-PostgreSQL journey also
+passes and independently verifies these records. See the
+[lifecycle acceptance checkpoint](recurring-invoice-lifecycle-acceptance.md).
+Only shared pre-1.0 release obligations remain outside this feature slice.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

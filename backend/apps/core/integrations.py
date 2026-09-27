@@ -26,6 +26,7 @@ from .integration_providers import (
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
+    CatalogModel,
     ClientHardwareAsset,
     ClientSoftwareInstallation,
     CommercialContract,
@@ -1095,9 +1096,11 @@ def adopt_netbox_conflict(
     actor: Any,
     entity_id: UUID | None = None,
     rack: dict[str, object] | None = None,
+    asset: dict[str, object] | None = None,
 ) -> IntegrationConflict:
-    """Link an unmatched NetBox observation, optionally creating its TekDocs rack."""
+    """Link an unmatched NetBox observation, optionally creating a supported TekDocs record."""
 
+    from .inventory import InventoryError, create_client_asset
     from .netbox_reconciliation import NetBoxReferenceError, set_reference
     from .network_inventory import NetworkInventoryError, create_rack
 
@@ -1114,8 +1117,8 @@ def adopt_netbox_conflict(
         raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
     if conflict.observation is None:
         raise ValidationError({"detail": "The source observation is unavailable."})
-    if (entity_id is None) == (rack is None):
-        raise ValidationError({"detail": "Choose one existing record or create one rack."})
+    if sum(value is not None for value in (entity_id, rack, asset)) != 1:
+        raise ValidationError({"detail": "Choose one existing record or create one supported record."})
 
     selected_entity_id = entity_id
     if rack is not None:
@@ -1135,8 +1138,33 @@ def adopt_netbox_conflict(
         except NetworkInventoryError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         selected_entity_id = created.entity_id
+    elif asset is not None:
+        if conflict.remote_type != "dcim.device":
+            raise ValidationError({"detail": "Direct asset creation is available for NetBox devices."})
+        try:
+            model = CatalogModel.objects.select_related("product").get(
+                tenant=workspace.member.tenant,
+                entity_id=cast(UUID, asset["model_entity_id"]),
+                archived_at__isnull=True,
+                entity__archived_at__isnull=True,
+                product__archived_at__isnull=True,
+            )
+            if model.product.kind != "hardware":
+                raise InventoryError("Choose an active hardware supplier model.")
+            created = create_client_asset(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=actor.pk,
+                model_entity_id=model.entity_id,
+                name=cast(str, asset["name"]),
+            )
+        except (CatalogModel.DoesNotExist, InventoryError) as exc:
+            detail = str(exc) if isinstance(exc, InventoryError) else "Choose an active hardware supplier model."
+            raise ValidationError({"detail": detail}) from exc
+        selected_entity_id = created.entity_id
 
-    assert selected_entity_id is not None
+    if selected_entity_id is None:
+        raise ValidationError({"detail": "Choose a TekDocs record to link."})
     try:
         reference = set_reference(
             tenant=workspace.member.tenant,
@@ -1161,6 +1189,6 @@ def adopt_netbox_conflict(
         actor=actor,
         action="integration_conflict.adopted",
         entity_id=conflict.id,
-        metadata={"created": rack is not None, "object_type": conflict.remote_type},
+        metadata={"created": rack is not None or asset is not None, "object_type": conflict.remote_type},
     )
     return conflict

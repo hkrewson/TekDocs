@@ -11841,6 +11841,12 @@ export interface components {
             /** Format: uuid */
             readonly entity_id?: string;
             readonly rack?: components["schemas"]["NetBoxRackAdoption"];
+            readonly asset?: components["schemas"]["NetBoxAssetAdoption"];
+        };
+        readonly NetBoxAssetAdoption: {
+            readonly name: string;
+            /** Format: uuid */
+            readonly model_id: string;
         };
         readonly NetBoxChoice: {
             /** Format: uuid */
@@ -23206,7 +23212,12 @@ export interface operations {
     };
     readonly workspaces_msp_integrations_observations_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly remote_type?: string;
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -31815,7 +31826,12 @@ export interface operations {
     };
     readonly workspaces_organizations_integrations_observations_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly remote_type?: string;
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

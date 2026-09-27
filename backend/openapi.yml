@@ -10613,6 +10613,35 @@ paths:
   /api/v1/workspaces/msp/integrations/observations:
     get:
       operationId: workspaces_msp_integrations_observations_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+          minLength: 1
+      - in: query
+        name: remote_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 64
+          minLength: 1
       tags:
       - workspaces
       security:
@@ -23350,6 +23379,34 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+          minLength: 1
+      - in: query
+        name: remote_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 64
+          minLength: 1
       tags:
       - workspaces
       security:
@@ -40644,6 +40701,20 @@ components:
           format: uuid
         rack:
           $ref: '#/components/schemas/NetBoxRackAdoption'
+        asset:
+          $ref: '#/components/schemas/NetBoxAssetAdoption'
+    NetBoxAssetAdoption:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        model_id:
+          type: string
+          format: uuid
+      required:
+      - model_id
+      - name
     NetBoxChoice:
       type: object
       properties:

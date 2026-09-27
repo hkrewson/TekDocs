@@ -5,6 +5,7 @@ from datetime import timedelta
 from typing import Any
 from uuid import UUID
 
+from django.db.models import Exists, OuterRef, Q
 from django.http import FileResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
@@ -20,11 +21,11 @@ from .git_exports import create_git_export
 from .halopsa import halo_ticket_summaries
 from .integration_providers import provider_catalog
 from .integrations import (
+    adopt_netbox_conflict,
     cancel_sync_job,
     connections_for_workspace,
     create_connection,
     enqueue_sync,
-    adopt_netbox_conflict,
     resolve_conflict,
     resolve_integration_workspace,
     rotate_connection_secret,
@@ -344,14 +345,25 @@ class NetBoxRackAdoptionSerializer(StrictSerializer):
     status = serializers.ChoiceField(choices=("planned", "active", "retired"), required=False, default="active")
 
 
+class NetBoxAssetAdoptionSerializer(StrictSerializer):
+    name = serializers.CharField(max_length=240, trim_whitespace=True)
+    model_id = serializers.UUIDField(source="model_entity_id")
+
+
 class NetBoxAdoptionSerializer(StrictSerializer):
     entity_id = serializers.UUIDField(required=False)
     rack = NetBoxRackAdoptionSerializer(required=False)
+    asset = NetBoxAssetAdoptionSerializer(required=False)
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if ("entity_id" in attrs) == ("rack" in attrs):
-            raise serializers.ValidationError("Choose one existing record or create one rack.")
+        if sum(key in attrs for key in ("entity_id", "rack", "asset")) != 1:
+            raise serializers.ValidationError("Choose one existing record or create one supported record.")
         return attrs
+
+
+class ObservationCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, default="", trim_whitespace=True)
+    remote_type = serializers.CharField(max_length=64, required=False, default="", trim_whitespace=True)
 
 
 class GitExportWriteSerializer(StrictSerializer):
@@ -520,16 +532,44 @@ class IntegrationLogListView(APIView):
 
 
 class IntegrationObservationListView(APIView):
-    @extend_schema(responses={200: ObservationPageSerializer})
+    @extend_schema(parameters=[ObservationCollectionQuerySerializer], responses={200: ObservationPageSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = ObservationCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(
+        newer = (
+            IntegrationObservation.scoped.for_scope(workspace.data_scope)
+            .filter(
+                workspace_id=workspace.data_scope.workspace_id,
+                job__connection_id=OuterRef("job__connection_id"),
+                remote_type=OuterRef("remote_type"),
+                remote_id=OuterRef("remote_id"),
+            )
+            .filter(
+                Q(observed_at__gt=OuterRef("observed_at"))
+                | Q(observed_at=OuterRef("observed_at"), id__gt=OuterRef("id"))
+            )
+        )
+        records = (
             IntegrationObservation.scoped.for_scope(workspace.data_scope)
             .filter(workspace_id=workspace.data_scope.workspace_id)
+            .annotate(has_newer_observation=Exists(newer))
+            .filter(has_newer_observation=False)
             .select_related("job__connection")
-            .order_by("-observed_at", "id"),
+        )
+        search = query.validated_data.pop("q")
+        remote_type = query.validated_data.pop("remote_type")
+        if search:
+            records = records.filter(
+                Q(remote_id__icontains=search)
+                | Q(safe_projection__name__icontains=search)
+                | Q(safe_projection__display__icontains=search)
+                | Q(safe_projection__display_name__icontains=search)
+            )
+        if remote_type:
+            records = records.filter(remote_type=remote_type)
+        page = paginate(
+            records.order_by("remote_type", "remote_id", "id"),
             **query.validated_data,
         )
         return _private(
@@ -589,6 +629,8 @@ class IntegrationNetBoxAdoptView(APIView):
         require_permission(request.user, PermissionKey.NETWORKS_EDIT, organization=workspace.organization)
         serializer = NetBoxAdoptionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        if "asset" in serializer.validated_data:
+            require_permission(request.user, PermissionKey.ASSETS_EDIT, organization=workspace.organization)
         conflict = adopt_netbox_conflict(
             workspace=workspace, conflict_id=conflict_id, actor=request.user, **serializer.validated_data
         )

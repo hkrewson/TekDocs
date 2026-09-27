@@ -86,9 +86,9 @@ The API operation requires both `integrations.manage` and `networks.edit`, locks
 the open exact-Workspace conflict, validates the local entity type, creates the
 `NetBoxReference` with the observed fingerprint, and resolves the conflict in
 one transaction. It never writes to NetBox. Direct creation for devices, VLANs,
-prefixes, addresses, and MAC addresses remains a later extension because those
-records require product, addressing, or asset dependencies that cannot be safely
-guessed from the current value-minimized observation.
+prefixes, addresses, and MAC addresses initially remained a later extension
+because those records require product, addressing, or asset dependencies that
+cannot be safely guessed from the current value-minimized observation.
 
 ### Linking visibility correction
 
@@ -98,3 +98,22 @@ corrected layout puts **Link to TekDocs** in the visible TekDocs-record cell in
 both Source records and Reconciliation. Racks now start with **Link it to an
 existing TekDocs rack** selected, while **Create a TekDocs rack from this record**
 remains available when no corresponding rack exists.
+
+### Current-record collection and device adoption correction
+
+Source records now collapse repeated sync observations by connection, remote
+type, and remote identity, keeping only the latest immutable observation in the
+operational collection. The retained sync jobs remain the history boundary.
+Current records sort deterministically by type and remote identity, use bounded
+25-row pages, and support full-collection source-name/ID search and type filtering
+through URL state. This keeps NetBox devices visible before the much larger IPAM
+collection and prevents each sync from multiplying apparent records.
+
+An unmatched `dcim.device` can now create and link a TekDocs hardware asset in
+one reviewed transaction. The operator must choose an existing active hardware
+supplier model; TekDocs never guesses the device model from the minimized NetBox
+projection. The operation requires integration, network, and asset edit access,
+creates the ordinary in-stock asset and lifecycle record, then records the
+NetBox identity and resolves the open conflict. Existing-asset linking remains
+the default. No write is sent to NetBox. VLANs, prefixes, addresses, and MAC
+addresses still require their canonical TekDocs dependencies before linking.

@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { DocumentsClient, DocumentRecord } from '../documentation/api'
 import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { NetworksClient } from '../networks/api'
+import type { InventoryClient } from '../inventory/api'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Integrations } from './Integrations'
@@ -53,10 +54,10 @@ function documentsClient(): DocumentsClient {
   return { list: vi.fn().mockResolvedValue({ results: [runbook], count: 1 }) } as unknown as DocumentsClient
 }
 
-function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }, networksClient?: NetworksClient) {
+function setup(provider: IntegrationsClient, documents = documentsClient(), path = '/workspaces/organizations/client-1/integrations', authClient = { reauthenticate: vi.fn().mockResolvedValue(undefined) }, networksClient?: NetworksClient, inventoryClient?: InventoryClient) {
   const router = createMemoryRouter([{
     path: '*',
-    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} networksClient={networksClient} authClient={authClient} /></NavigationGuardProvider>,
+    element: <NavigationGuardProvider><Integrations workspace={workspace} client={webhookClient} documentsClient={documents} providerClient={provider} networksClient={networksClient} inventoryClient={inventoryClient} authClient={authClient} /></NavigationGuardProvider>,
   }], { initialEntries: [path] })
   render(<RouterProvider router={router} />)
   return router
@@ -214,6 +215,34 @@ describe('Integrations', () => {
 
     await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'rack-1' }))
     expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
+  })
+
+  it('creates and links an unmatched NetBox device after choosing its hardware model', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-arrakis', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 23, name: 'arrakis' }, remote_type: 'dcim.device', remote_id: '23', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 50, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'asset-arrakis', local_entity_name: 'arrakis', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
+    } as unknown as NetworksClient
+    const inventory = {
+      listModelChoices: vi.fn().mockResolvedValue({ results: [{ id: 'model-1', name: 'PowerEdge R650', model_number: 'R650', product_id: 'product-1', product_name: 'PowerEdge Server', kind: 'hardware', supplier_id: 'supplier-1', supplier_name: 'Dell', revision: 1, specification_version_id: 'spec-1', specifications: {} }] }),
+    } as unknown as InventoryClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks, inventory)
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs hardware asset from this device' }))
+    await user.click(await screen.findByRole('radio', { name: /Dell · PowerEdge Server · PowerEdge R650/i }))
+    await user.click(screen.getByRole('button', { name: 'Create and link asset' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
+      asset: { name: 'arrakis', model_id: 'model-1' },
+    }))
   })
 
   it('edits connection details without asking for the credential again', async () => {

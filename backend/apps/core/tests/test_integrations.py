@@ -9,8 +9,11 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
+from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.policy import PermissionKey
+from apps.core import integration_views
 from apps.core.documents import create_document
 from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
 from apps.core.integration_providers import (
@@ -25,6 +28,7 @@ from apps.core.integration_providers import (
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
+    ClientAsset,
     GitExportBundle,
     InstallationState,
     IntegrationConflict,
@@ -41,6 +45,7 @@ from apps.core.models import (
 from apps.core.organizations import create_organization
 from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.workspaces import resolve_organization_workspace
 
 
@@ -328,6 +333,60 @@ def test_observation_api_returns_only_safe_exact_workspace_projections(installat
     assert "fingerprint" not in response.content.decode()
 
 
+@pytest.mark.django_db
+def test_observation_api_lists_each_current_source_record_once_and_supports_search(installation):
+    record = organization(installation, "Current observations")
+    source = connection(installation, record, name="Current source")
+    first_job = enqueue_sync(connection=source, trigger="manual", idempotency_key="observation:current:first")
+    second_job = enqueue_sync(connection=source, trigger="manual", idempotency_key="observation:current:second")
+    IntegrationObservation.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        job=first_job,
+        remote_type="dcim.device",
+        remote_id="17",
+        fingerprint="a" * 64,
+        safe_projection={"name": "Old Arrakis"},
+    )
+    current = IntegrationObservation.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        job=second_job,
+        remote_type="dcim.device",
+        remote_id="17",
+        fingerprint="b" * 64,
+        safe_projection={"name": "Arrakis"},
+    )
+    IntegrationObservation.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        job=second_job,
+        remote_type="ipam.ipaddress",
+        remote_id="44",
+        fingerprint="c" * 64,
+        safe_projection={"display": "192.0.2.44/32"},
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-integration-observation-list",
+        kwargs={"organization_entity_id": record.entity_id},
+    )
+
+    response = browser.get(url, {"page": 1, "page_size": 25})
+    assert response.status_code == 200
+    assert response.json()["count"] == 2
+    assert [item["remote_type"] for item in response.json()["results"]] == ["dcim.device", "ipam.ipaddress"]
+    assert response.json()["results"][0]["id"] == str(current.id)
+
+    searched = browser.get(url, {"q": "arrakis", "remote_type": "dcim.device"})
+    assert searched.status_code == 200
+    assert [item["id"] for item in searched.json()["results"]] == [str(current.id)]
+
+
 @pytest.mark.django_db(transaction=True)
 def test_database_rejects_a_cross_workspace_job_connection(installation):
     first = organization(installation, "Job owner")
@@ -530,6 +589,63 @@ def test_unmatched_netbox_rack_can_create_and_link_a_starting_record(installatio
     assert observations[0]["linked_local_entity_id"] == str(rack.entity_id)
     assert observations[0]["linked_local_entity_name"] == "Core rack"
     assert observations[0]["accepted"] is True
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_device_can_create_and_link_a_hardware_asset(installation, monkeypatch):
+    record = organization(installation, "Blank device client")
+    source = connection(installation, record)
+    seed = create_network_hardware_asset(installation=installation, organization=record, name="Seed hardware")
+
+    class DeviceAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(ProviderObservation("dcim.device", "23", "d" * 64, {"id": 23, "name": "arrakis"}),),
+                next_cursor="",
+                complete_types=("dcim.device",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="device:starting-record").id,
+        adapter=DeviceAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-integration-netbox-adopt",
+        kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+    )
+    body = json.dumps({"asset": {"name": "arrakis", "model_id": str(seed.model.entity_id)}})
+    original_require_permission = integration_views.require_permission
+
+    def deny_asset_edit(user, permission, **kwargs):  # type: ignore[no-untyped-def]
+        if permission == PermissionKey.ASSETS_EDIT:
+            raise PermissionDenied("Asset editing denied.")
+        return original_require_permission(user, permission, **kwargs)
+
+    monkeypatch.setattr(integration_views, "require_permission", deny_asset_edit)
+    denied = browser.post(url, data=body, content_type="application/json")
+    assert denied.status_code == 403
+    assert not ClientAsset.objects.filter(entity__display_name="arrakis").exists()
+
+    monkeypatch.setattr(integration_views, "require_permission", original_require_permission)
+    response = browser.post(url, data=body, content_type="application/json")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    asset = ClientAsset.objects.get(entity__display_name="arrakis")
+    assert asset.hardware.lifecycle_state == "in_stock"
+    reference = NetBoxReference.objects.get(entity=asset.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "dcim.device",
+        23,
+        "d" * 64,
+    )
 
 
 @pytest.mark.django_db

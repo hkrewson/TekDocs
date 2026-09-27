@@ -70,6 +70,12 @@ Review-request and approval/change-request serializers now live in
 compatibility module preserves their established names. Reviewer identity,
 decision choices and note validation remain unchanged.
 
+Monitored-source configuration and observation serializers now live in
+`document_source_serializers.py` instead of being declared inside the source view
+module. The views retain request handling and expose the imported serializer names
+for compatibility. URL safety validation, observation diffs and response fields
+remain unchanged.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -78,7 +84,7 @@ weakening the shared unsaved-change guard.
 ## Remaining sequence
 
 1. Continue splitting backend document serializers/views by the existing
-   authoring, reuse, key, source and export domains.
+   authoring, reuse, key and export domains.
 2. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.

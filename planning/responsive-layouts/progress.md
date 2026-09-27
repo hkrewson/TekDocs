@@ -3135,3 +3135,9 @@ compatibility imports, reviewer and decision validation, notes, routes,
 authorization and stored review state remain unchanged. All ten document-
 operations tests, Ruff, MyPy across 197 source files and OpenAPI generation pass;
 schema generation retains only its four known operation-ID warnings.
+
+Monitored document-source configuration and observation contracts are now
+separate from their request handlers. Source URL safeguards, schedules,
+observation evidence and reviewable diffs remain unchanged, and the original view
+module continues to expose the established serializer names. Three focused remote-
+source tests, Ruff and MyPy across 198 source files pass.

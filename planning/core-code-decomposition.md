@@ -15,7 +15,7 @@ change public behavior.
 - CSS and accessible names remain shared until a panel has a distinct visual
   contract. Decomposition alone does not create new containers or styles.
 
-## Frontend checkpoint: history and section conversion
+## Frontend checkpoint: focused document panels
 
 `DocumentHistoryPanel` now owns the revision list, retained-revision inspection,
 loading/error treatment and paging controls. `DocumentRestructurePanel` owns the
@@ -25,6 +25,11 @@ reporting and workspace binding results. The Documentation coordinator still
 performs every read and mutation and supplies the current result through typed
 props.
 
+`DocumentReusePanel` now owns the reusable-block, document-link and record-link
+insertion presentation. Placement mode, audience selection, record search state
+and every insertion mutation remain coordinator-owned. The existing block and
+document pickers retain their bounded collection requests and error states.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -32,8 +37,8 @@ weakening the shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Extract the reusable-content and remote-source panels behind the same explicit
-   data/callback boundary.
+1. Extract the remote-source panel behind the same explicit data/callback
+   boundary.
 2. Move document collection URL/filter state into a focused hook while keeping
    URL names and browser history behavior unchanged.
 3. Move record-loading and stale-request cancellation into a document-domain

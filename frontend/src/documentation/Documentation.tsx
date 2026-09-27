@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router'
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Search, Settings, Share2, ShieldCheck, Table2, Type, Unlink, X } from 'lucide-react'
+import { Archive, ArrowLeft, BookOpenText, CalendarCheck2, Code2, Copy, Download, Ellipsis, ExternalLink, FileCheck2, FileUp, Globe2, Heading, History, Key, Link2, List, ListChecks, ListOrdered, Paperclip, Pencil, Pin, Plus, Quote, RefreshCw, Settings, Share2, ShieldCheck, Table2, Type, Unlink, X } from 'lucide-react'
 import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
 import type { FilterMenuGroup } from '../FilterMenu'
@@ -17,14 +17,13 @@ import type { BlockKind, BlockLibraryItem, BlockRevision, BlockRevisionDetail, D
 import { PublicationViewer } from './PublicationViewer'
 import type { PublicationSection, PublicationView } from './PublicationViewer'
 import { DocumentFiles } from './DocumentFiles'
-import { DocumentLinkPicker } from './DocumentLinkPicker'
 import { DocumentExports } from './DocumentExports'
 import { DocumentOperations } from './DocumentOperations'
 import { DocumentHistoryPanel } from './DocumentHistoryPanel'
 import { DocumentKeysPanel } from './DocumentKeysPanel'
 import { DocumentRestructurePanel } from './DocumentRestructurePanel'
+import { DocumentReusePanel } from './DocumentReusePanel'
 import { TemplateLibrary } from './TemplateLibrary'
-import { BlockLibrary } from './BlockLibrary'
 import { TemplateUpdateReview } from './TemplateUpdateReview'
 import { useNavigationGuard, useUnsavedChanges } from '../navigation/navigationGuard'
 import './documentation.css'
@@ -1205,7 +1204,23 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
         />}
 
 
-        {activePanel === 'reuse' && <section className="document-context-panel" aria-labelledby="insert-existing-heading"><div className="section-heading"><div><h2 id="insert-existing-heading">{translate('documentation.insertExisting')}</h2><p>{translate('documentation.insertExistingHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.closeExisting')} onClick={() => setActivePanel(null)}><X size={16} /></button></div><div className="reuse-resolution"><label>{translate('documentation.whenSourceChanges')}<select value={placementMode} onChange={(event) => setPlacementMode(event.target.value as 'live' | 'pinned')}><option value="live">{translate('documentation.useLatest')}</option><option value="pinned">{translate('documentation.keepThisVersion')}</option></select></label><label>{translate('documentation.audienceLabel')}<select value={placementAudience} onChange={(event) => setPlacementAudience(event.target.value as PlacementAudienceProfile)}><option value="shared">{translate('documentation.audienceShared')}</option><option value="msp_internal">{translate('documentation.audienceMspInternal')}</option><option value="client_visible">{translate('documentation.audienceClientVisible')}</option></select></label></div><BlockLibrary key={selected.id} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(block) => { void reuseLibraryBlock(block) }} /><DocumentLinkPicker key={`document-${selected.id}`} scope={scope} documentId={selected.id} client={client} busy={saving} onInsert={(document) => { void addDocumentPlacement(document) }} /><div className="entity-mention-picker"><label><Search size={15} /><span>{translate('documentation.linkRecord')}</span><input type="search" placeholder={translate('documentation.searchRecords')} value={mentionQuery} onChange={(event) => { setMentionQuery(event.target.value); if (!event.target.value.trim()) setMentionOptions([]) }} /></label>{mentionOptions.length > 0 && <ul>{mentionOptions.map((entity) => <li key={entity.id}><button type="button" onClick={() => insertMention(entity)}><strong>{entity.display_name}</strong><small>{entity.entity_type.replaceAll('_', ' ')} · {entity.workspace_label}</small></button></li>)}</ul>}</div></section>}
+        {activePanel === 'reuse' && <DocumentReusePanel
+          audience={placementAudience}
+          busy={saving}
+          client={client}
+          documentId={selected.id}
+          mentionOptions={mentionOptions}
+          mentionQuery={mentionQuery}
+          mode={placementMode}
+          scope={scope}
+          onAudienceChange={setPlacementAudience}
+          onClose={() => setActivePanel(null)}
+          onDocumentInsert={(document) => { void addDocumentPlacement(document) }}
+          onMentionInsert={insertMention}
+          onMentionQueryChange={(value) => { setMentionQuery(value); if (!value.trim()) setMentionOptions([]) }}
+          onModeChange={setPlacementMode}
+          onReusableBlockInsert={(block) => { void reuseLibraryBlock(block) }}
+        />}
 
         {activePanel === 'history' && <DocumentHistoryPanel
           count={historyCount}

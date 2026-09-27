@@ -115,6 +115,26 @@ file exactly once. This performance evidence validates the gate mechanism; the
 full release target must still exit successfully before the acceptance ledger can
 change.
 
+The next clean attempt from `a6f21e3` exercised the consolidated plan. It passed
+the frontend suite and verification, repository checks, the sharded backend
+matrix at 88.54% coverage, capacity and constrained-browser performance, the
+assembled Compose boundary, and frontend routing. The maintained-browser matrix
+reported 1,477 passed, 3 intentionally skipped, and one Firefox failure in the
+1440-pixel document Files/PDF scenario. That exact scenario then passed alone,
+passed 12 consecutive repetitions under six-worker contention, and passed as
+part of the complete 18-case document-file matrix across Chromium, Firefox, and
+WebKit. The follow-up matrix completed in 16 seconds. No reproducible product or
+test defect was found, so the product behavior and assertion limits remain
+unchanged. The full command exited nonzero and did not reach its later security
+and recovery boundaries; the release gate and acceptance ledger therefore remain
+pending.
+
+The elapsed-time investigation also showed that this final certification target
+is substantially broader than an ordinary development gate. Do not repeatedly
+launch it while diagnosing a focused failure. Reproduce and validate the failed
+boundary first, retain the evidence here, and reserve another complete run for a
+clean closure candidate with a stated expected duration.
+
 ## Remaining human boundary
 
 The automated release gate cannot complete the technician and assistive-

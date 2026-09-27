@@ -68,6 +68,19 @@ The 673-test frontend suite, the frontend verification/build boundary, 50 releas
 script contract tests, and whitespace validation also pass. These focused results
 do not replace the required clean full-gate rerun.
 
+The clean `37fd5ff` release-gate attempt on 2026-09-26 passed every boundary
+through the complete backend, capacity, performance, authorization, integration,
+assembled-Compose, routing, network, secret-file and rendering checks. The
+maintained-browser matrix then reported 1,475 passed, 3 intentionally skipped and
+3 Firefox failures: two document-history widths and one 1024-pixel endpoint
+drawer. Chromium and WebKit passed all applicable scenarios. All three failed
+Firefox scenarios passed immediately in isolation, passed through three
+six-worker repetitions with their surrounding files (60 scenarios), and the
+complete Firefox project then passed 490 scenarios with its one intentional skip.
+No reproducible product or test defect was found, so assertions and timeout limits
+were not weakened. Because the compound release command still exited nonzero, the
+release gate remains pending and `acceptance.json` remains unchanged.
+
 ## Remaining human boundary
 
 The automated release gate cannot complete the technician and assistive-

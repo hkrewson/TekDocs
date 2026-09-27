@@ -24,6 +24,7 @@ import { DocumentKeysPanel } from './DocumentKeysPanel'
 import { DocumentRemoteSourcePanel } from './DocumentRemoteSourcePanel'
 import { DocumentRestructurePanel } from './DocumentRestructurePanel'
 import { DocumentReusePanel } from './DocumentReusePanel'
+import { useDocumentCollectionState } from './useDocumentCollectionState'
 import { TemplateLibrary } from './TemplateLibrary'
 import { TemplateUpdateReview } from './TemplateUpdateReview'
 import { useNavigationGuard, useUnsavedChanges } from '../navigation/navigationGuard'
@@ -104,6 +105,28 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const requestedPublicationSection = publicationSection(urlManaged ? routeParameters.get('publication_section') : null)
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
   const scopeKey = workspace?.id ?? 'msp'
+  const collectionState = useDocumentCollectionState(urlManaged, Boolean(workspace))
+  const {
+    category: categoryFilter,
+    collection: collectionFilter,
+    health: healthFilter,
+    indexMode,
+    ordering: documentOrdering,
+    page: documentPage,
+    query: documentQuery,
+    tag: tagFilter,
+    template: templateFilter,
+    setCategory: setCategoryFilter,
+    setCollection: setCollectionFilter,
+    setHealth: setHealthFilter,
+    setIndexMode,
+    setOrdering: setDocumentOrdering,
+    setPage: setDocumentPage,
+    setQuery: setDocumentQuery,
+    setTag: setTagFilter,
+    setTemplate: setTemplateFilter,
+    clearFilters: clearDocumentFilters,
+  } = collectionState
   const [loaded, setLoaded] = useState<{ key: string; results: DocumentRecord[]; count: number; page: number; pageSize: number; hasMore: boolean; collections: { value: string; count: number }[]; tags: { value: string; count: number }[]; health: { value: string; count: number }[] } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
@@ -117,28 +140,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   const [topicSchemasLoading, setTopicSchemasLoading] = useState(true)
   const [isTemplate, setIsTemplate] = useState(false)
   const [libraryVisible, setLibraryVisible] = useState(false)
-  const [documentQuery, setDocumentQuery] = useState(() => urlManaged ? initialParameters.get('doc_q') ?? '' : '')
-  const [categoryFilter, setCategoryFilter] = useState<DocumentCategory | ''>(() => urlManaged && categories.some((item) => item.value === initialParameters.get('doc_category')) ? initialParameters.get('doc_category') as DocumentCategory : '')
-  const [templateFilter, setTemplateFilter] = useState<'all' | 'documents' | 'templates'>(() => urlManaged && ['documents', 'templates'].includes(initialParameters.get('doc_type') ?? '') ? initialParameters.get('doc_type') as 'documents' | 'templates' : 'all')
-  const [collectionFilter, setCollectionFilter] = useState(() => urlManaged ? initialParameters.get('doc_collection') ?? '' : '')
-  const [tagFilter, setTagFilter] = useState(() => urlManaged ? initialParameters.get('doc_tag') ?? '' : '')
-  const [healthFilter, setHealthFilter] = useState<DocumentHealthStatus | ''>(() => {
-    const value = initialParameters.get('doc_health')
-    return urlManaged && ['current', 'stale', 'unreviewed', 'unowned', 'pending', 'changes_requested'].includes(value ?? '') ? value as DocumentHealthStatus : ''
-  })
-  const [documentOrdering, setDocumentOrdering] = useState<NonNullable<DocumentFilters['ordering']>>(() => {
-    const value = initialParameters.get('doc_order')
-    return urlManaged && ['title', '-title', 'updated_at', '-updated_at', 'category', '-category'].includes(value ?? '') ? value as NonNullable<DocumentFilters['ordering']> : 'title'
-  })
-  const [documentPage, setDocumentPage] = useState(() => {
-    const value = Number(initialParameters.get('doc_page'))
-    return urlManaged && Number.isInteger(value) && value > 0 ? value : 1
-  })
-  const [indexMode, setIndexMode] = useState<'browse' | 'health' | 'templates'>(() => {
-    if (!urlManaged) return 'browse'
-    if (initialParameters.get('doc_library') === 'templates' && workspace) return 'templates'
-    return initialParameters.get('doc_library') === 'health' ? 'health' : 'browse'
-  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -320,24 +321,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       .catch((loadError) => { if (!controller.signal.aborted) { setPhase('error'); setError(errorMessage(loadError)) } })
     return () => controller.abort()
   }, [categoryFilter, client, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, requestedDocumentId, requestedPublicationId, revision, scope, scopeKey, tagFilter, templateFilter])
-
-  useEffect(() => {
-    if (!urlManaged) return
-    const parameters = new URLSearchParams(window.location.search)
-    const values: Record<string, string> = {
-      doc_library: indexMode === 'templates' ? 'templates' : indexMode === 'health' ? 'health' : '',
-      doc_q: documentQuery,
-      doc_category: categoryFilter,
-      doc_type: templateFilter === 'all' ? '' : templateFilter,
-      doc_collection: collectionFilter,
-      doc_tag: tagFilter,
-      doc_health: healthFilter,
-      doc_order: documentOrdering === 'title' ? '' : documentOrdering,
-      doc_page: documentPage === 1 ? '' : String(documentPage),
-    }
-    Object.entries(values).forEach(([key, value]) => value ? parameters.set(key, value) : parameters.delete(key))
-    window.history.replaceState(window.history.state, '', `${window.location.pathname}${parameters.size ? `?${parameters}` : ''}${window.location.hash}`)
-  }, [categoryFilter, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, tagFilter, templateFilter, urlManaged])
 
   useEffect(() => {
     if (!urlManaged || requestedDocumentId) return
@@ -1082,14 +1065,6 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       onChange: (value) => { setTemplateFilter(value as typeof templateFilter); setDocumentPage(1) },
     },
   ]
-  const clearDocumentFilters = () => {
-    setCategoryFilter('')
-    setCollectionFilter('')
-    setTagFilter('')
-    setHealthFilter('')
-    setTemplateFilter('all')
-    setDocumentPage(1)
-  }
   const showLibrary = !selected && !publicationView
 
   return <>

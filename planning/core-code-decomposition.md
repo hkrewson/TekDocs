@@ -34,6 +34,11 @@ document pickers retain their bounded collection requests and error states.
 timeline. The coordinator continues to load sources, persist settings, run checks,
 apply reviewed observations and enforce the shared unsaved-change guard.
 
+`useDocumentCollectionState` now owns initialization, validation and compatible
+URL persistence for document search, filters, ordering, page and library mode.
+It preserves unrelated record, tab and publication parameters while the route
+coordinator continues to decide when collection changes are allowed.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -41,13 +46,11 @@ weakening the shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Move document collection URL/filter state into a focused hook while keeping
-   URL names and browser history behavior unchanged.
-2. Move record-loading and stale-request cancellation into a document-domain
+1. Move record-loading and stale-request cancellation into a document-domain
    hook with coordinator-owned selection.
-3. Split backend document serializers/views by the existing authoring, reuse,
+2. Split backend document serializers/views by the existing authoring, reuse,
    templates, review, publication, attachment, key, source and export domains.
-4. Split Django models only after import/dependency mapping is recorded; retain
+3. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.
 

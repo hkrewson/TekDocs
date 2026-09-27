@@ -3112,3 +3112,12 @@ policy, lint, TypeScript, the production build and existing compressed bundle
 budgets also pass. The Documentation lazy bundle remains within its established
 boundary; no full release-gate repetition was needed for this behavior-preserving
 frontend seam.
+
+The adjacent backend contract split now places retained-publication and
+client-portal projections in `document_publication_serializers.py`, and managed
+attachment/file-register contracts in `document_file_serializers.py`. Existing
+imports continue through explicit compatibility exports from `serializers.py`.
+Routes, fields, validation, permission behavior, schema component names and stored
+data are unchanged. Ruff, MyPy across 195 source files, the focused document and
+attachment-security suite, and OpenAPI generation all pass; schema generation
+retains only its four known operation-ID warnings.

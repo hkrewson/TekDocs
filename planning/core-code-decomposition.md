@@ -53,6 +53,13 @@ serializers now live in `document_publication_serializers.py`. The established
 tests and third-party imports keep the same contract. This extraction changes no
 fields, validation, schema component names, routes or persistence.
 
+Managed attachment writes, attachment reads, primary-file summaries, bounded
+file-register queries, file rows and file-result projections now live in
+`document_file_serializers.py`. The established `serializers` module likewise
+re-exports their existing names. Document serialization keeps its model imports
+for relationship assembly, while file validation and response fields are
+unchanged.
+
 This seam was selected because both panels already have explicit open/close
 boundaries and no independent server state. Their extraction reduces the route
 component without inventing a parallel state authority, changing markup, or
@@ -61,7 +68,7 @@ weakening the shared unsaved-change guard.
 ## Remaining sequence
 
 1. Continue splitting backend document serializers/views by the existing
-   authoring, reuse, templates, review, attachment, key, source and export domains.
+   authoring, reuse, templates, review, key, source and export domains.
 2. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.

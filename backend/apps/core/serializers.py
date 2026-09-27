@@ -9,6 +9,11 @@ from rest_framework import serializers
 
 from .collection_pagination import StrictQuerySerializer
 from .document_attachments import resolve_rendered_attachments
+from .document_file_serializers import DocumentAttachmentSerializer as DocumentAttachmentSerializer
+from .document_file_serializers import DocumentAttachmentWriteSerializer as DocumentAttachmentWriteSerializer
+from .document_file_serializers import DocumentFileQuerySerializer as DocumentFileQuerySerializer
+from .document_file_serializers import DocumentFileResultSerializer as DocumentFileResultSerializer
+from .document_file_serializers import DocumentPrimaryFileSerializer as DocumentPrimaryFileSerializer
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
 from .document_publication_serializers import (
@@ -612,70 +617,6 @@ class MarkdownImportSerializer(serializers.Serializer):
     title = serializers.CharField(min_length=1, max_length=240, trim_whitespace=True, validators=[_clean_name])
     category = serializers.ChoiceField(choices=DocumentCategory.choices, default=DocumentCategory.GENERAL)
     is_template = serializers.BooleanField(default=False)
-
-
-class DocumentAttachmentWriteSerializer(serializers.Serializer):
-    file = serializers.FileField()
-
-
-class DocumentAttachmentSerializer(serializers.Serializer):
-    id = serializers.UUIDField(source="entity_id")
-    filename = serializers.CharField(source="original_filename")
-    media_type = serializers.CharField()
-    size = serializers.IntegerField()
-    checksum = serializers.CharField()
-    scan_status = serializers.CharField()
-    scan_engine = serializers.CharField()
-    scanned_at = serializers.DateTimeField()
-    created_at = serializers.DateTimeField()
-
-
-class DocumentPrimaryFileSerializer(DocumentAttachmentSerializer):
-    version_number = serializers.IntegerField()
-    replaces_id = serializers.UUIDField(source="replaces.entity_id", allow_null=True)
-    is_current = serializers.BooleanField()
-
-
-class DocumentFileQuerySerializer(StrictQuerySerializer):
-    q = serializers.CharField(max_length=120, required=False, allow_blank=True, trim_whitespace=True, default="")
-    kind = serializers.ChoiceField(
-        choices=("", "primary", "attachment"), required=False, allow_blank=True, default=""
-    )
-    ordering = serializers.ChoiceField(
-        choices=(
-            "filename", "-filename", "document", "-document", "kind", "-kind",
-            "type", "-type", "size", "-size", "created_at", "-created_at",
-        ),
-        required=False,
-        default="-created_at",
-    )
-    page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
-    page_size = serializers.ChoiceField(choices=(25, 50, 100), required=False, default=25)
-
-
-class DocumentFileSerializer(serializers.Serializer):
-    id = serializers.UUIDField(source="entity_id")
-    document_id = serializers.UUIDField(source="document.entity_id")
-    document_title = serializers.CharField(source="document.entity.display_name")
-    filename = serializers.CharField(source="original_filename")
-    kind = serializers.SerializerMethodField()
-    version = serializers.IntegerField(source="version_number", allow_null=True)
-    media_type = serializers.CharField()
-    size = serializers.IntegerField()
-    checksum = serializers.CharField()
-    created_at = serializers.DateTimeField()
-
-    @extend_schema_field(serializers.CharField())
-    def get_kind(self, obj):  # type: ignore[no-untyped-def]
-        return "primary" if obj.purpose == DocumentAttachmentPurpose.PRIMARY_FILE else "attachment"
-
-
-class DocumentFileResultSerializer(serializers.Serializer):
-    results = DocumentFileSerializer(many=True)
-    count = serializers.IntegerField()
-    page = serializers.IntegerField()
-    page_size = serializers.IntegerField()
-    has_more = serializers.BooleanField()
 
 
 class DocumentPlacementWriteSerializer(serializers.Serializer):

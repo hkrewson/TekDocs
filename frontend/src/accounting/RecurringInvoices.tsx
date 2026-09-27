@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { RecurringEnrollment } from './RecurringEnrollment'
+import { RecurringTermsEditor } from './RecurringTermsEditor'
 import { browserEnrollmentClient } from './enrollmentApi'
 import type { FormEvent } from 'react'
 import { formatPlainDate, translate as t } from '../i18n/localization'
 import type { WorkspaceContext } from '../workspaces/api'
-import type { RecurringClient, RecurringPage, RecurringSchedule, RecurringDue, RecurringPreview, RecurringClaim } from './recurringApi'
+import type { RecurringClient, RecurringPage, RecurringSchedule, RecurringDue, RecurringPreview, RecurringClaim, RecurringTerms } from './recurringApi'
+
+const newestTerms = (record: RecurringSchedule) => [...record.terms].sort((a, b) => b.version - a.version)[0]
 
 export function RecurringInvoices({ workspace, client, openInvoice }: {
   workspace: WorkspaceContext; client: RecurringClient; openInvoice: (id: string) => Promise<void>
@@ -13,6 +16,7 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
   const [stopReason, setStopReason] = useState('')
   const [stopUncertain, setStopUncertain] = useState(false)
   const [enrolling, setEnrolling] = useState(false)
+  const [amending, setAmending] = useState(false)
   const [page, setPage] = useState(1)
   const [listing, setListing] = useState<RecurringPage | null>(null)
   const [schedule, setSchedule] = useState<RecurringSchedule | null>(null)
@@ -42,11 +46,17 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
     return () => window.clearTimeout(timer)
   }, [preview, expiresAt])
 
-  const locked = busy || stopForm
+  const locked = busy || stopForm || amending
 
   function invalidate() { setPreview(null); setClaims([]); setExpired(false); setError(false) }
   function choose(record: RecurringSchedule) {
-    invalidate(); setSchedule(record); setDue(null); setSelected([]); setFrom(record.anchor)
+    invalidate(); setAmending(false); setSchedule(record); setDue(null); setSelected([]); setFrom(record.anchor)
+  }
+  function termsSaved(terms: RecurringTerms) {
+    if (!schedule) return
+    const record = { ...schedule, terms: [...schedule.terms, terms].sort((a, b) => a.version - b.version) }
+    setSchedule(record); setListing((current) => current && { ...current, results: current.results.map((item) => item.id === record.id ? record : item) })
+    setAmending(false); invalidate(); setDue(null); setSelected([]); setReload((value) => value + 1)
   }
   async function loadDue(event: FormEvent) {
     event.preventDefault()
@@ -118,7 +128,7 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
       {listing.results.length === 0 && <p>{t('recurring.empty')}</p>}
       <ul className="inventory-list">{listing.results.map((record) => <li key={record.id}>
         <button type="button" disabled={locked} aria-pressed={schedule?.id === record.id} onClick={() => choose(record)}>
-          <strong>{record.terms[0]?.description || record.source_label}</strong><span>{record.contract_name} · {record.source_label}{!record.enabled && <> · {t('recurring.stoppedLabel')}</>}</span>
+          <strong>{newestTerms(record)?.description || record.source_label}</strong><span>{record.contract_name} · {record.source_label}{!record.enabled && <> · {t('recurring.stoppedLabel')}</>}</span>
         </button>
       </li>)}</ul>
       <div className="form-actions">
@@ -127,10 +137,12 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
       </div>
     </>}
     {!enrolling && schedule && <>
-      <h3>{schedule.terms[0]?.description}</h3>
-      <p>{t('recurring.approved', { currency: schedule.terms[0]?.currency ?? '', amount: schedule.terms[0]?.unit_amount ?? '', quantity: schedule.terms[0]?.quantity ?? '' })}</p>
+      <h3>{newestTerms(schedule)?.description}</h3>
+      <p>{t('recurring.approved', { currency: newestTerms(schedule)?.currency ?? '', amount: newestTerms(schedule)?.unit_amount ?? '', quantity: newestTerms(schedule)?.quantity ?? '' })}</p>
+      <details><summary>{t('recurring.termsHistory')}</summary><ol>{[...schedule.terms].sort((a, b) => b.version - a.version).map((terms) => <li key={terms.id}>{t('recurring.termsHistoryLine', { version: terms.version, date: formatPlainDate(terms.effective_from), currency: terms.currency, amount: terms.unit_amount, quantity: terms.quantity })}</li>)}</ol></details>
       {!schedule.enabled && <p role="status">{t('recurring.stoppedHelp')}</p>}
-      {schedule.enabled && !stopForm && <button type="button" className="secondary-button" disabled={busy} onClick={beginStop}>{t('recurring.stop')}</button>}
+      {schedule.enabled && !stopForm && !amending && <div className="form-actions"><button type="button" className="secondary-button" disabled={busy} onClick={() => { invalidate(); setDue(null); setSelected([]); setAmending(true) }}>{t('recurring.termsChange')}</button><button type="button" className="secondary-button" disabled={busy} onClick={beginStop}>{t('recurring.stop')}</button></div>}
+      {amending && listing && <RecurringTermsEditor workspace={workspace} schedule={schedule} businessDate={listing.business_date} client={client} saved={termsSaved} cancel={() => setAmending(false)} />}
       {stopForm && <form className="record-form archive-confirmation" aria-labelledby="recurring-stop-title" onSubmit={(event) => { event.preventDefault(); void stop() }}>
         <h4 id="recurring-stop-title">{t('recurring.stopConfirm')}</h4>
         <p>{t('recurring.stopHelp')}</p>
@@ -143,13 +155,13 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
             : <button type="button" className="secondary-button" disabled={busy} onClick={() => { setStopForm(false); setStopReason('') }}>{t('common.cancel')}</button>}
         </div>
       </form>}
-      <form className="record-form" onSubmit={(event) => { void loadDue(event) }}>
+      {!amending && <form className="record-form" onSubmit={(event) => { void loadDue(event) }}>
         <label><span>{t('recurring.from')}</span><input type="date" required disabled={locked} value={from} onChange={(event) => { invalidate(); setDue(null); setSelected([]); setFrom(event.target.value) }} /></label>
         <label><span>{t('recurring.asOf')}</span><input type="date" required disabled={locked} max={listing?.business_date} value={asOf} onChange={(event) => { invalidate(); setDue(null); setSelected([]); setAsOf(event.target.value) }} /></label>
         <p>{t('recurring.windowHelp')}</p>
         <button type="submit" className="secondary-button" disabled={locked}>{t('recurring.find')}</button>
-      </form>
-      {due && <fieldset disabled={locked}><legend>{t('recurring.periods')}</legend>
+      </form>}
+      {!amending && due && <fieldset disabled={locked}><legend>{t('recurring.periods')}</legend>
         {due.periods.length === 0 && <p>{t('recurring.noPeriods')}</p>}
         {due.periods.map((period) => <div key={period.starts_on}>
           <label><input type="checkbox" disabled={!schedule.enabled || !period.can_generate || claims.length > 0} checked={selected.includes(period.starts_on)} onChange={(event) => { invalidate(); setSelected((current) => event.target.checked ? [...current, period.starts_on] : current.filter((start) => start !== period.starts_on)) }} />{formatPlainDate(period.starts_on)}</label>
@@ -157,13 +169,13 @@ export function RecurringInvoices({ workspace, client, openInvoice }: {
         </div>)}
         <button type="button" className="secondary-button" disabled={!schedule.enabled || !selected.length || claims.length > 0} onClick={() => { void review() }}>{t('recurring.review')}</button>
       </fieldset>}
-      {preview && <section aria-labelledby="recurring-review"><h3 id="recurring-review">{t('recurring.reviewTitle')}</h3>
+      {!amending && preview && <section aria-labelledby="recurring-review"><h3 id="recurring-review">{t('recurring.reviewTitle')}</h3>
         <p>{t('recurring.reviewHelp')}</p>
         <ul>{preview.periods.map((period) => <li key={period.starts_on}>{t('recurring.reviewLine', { start: formatPlainDate(period.starts_on), end: formatPlainDate(period.ends_before), due: formatPlainDate(period.due_date), currency: preview.currency, total: period.total })}</li>)}</ul>
         {expired && !claims.length && <p role="status">{t('recurring.expired')}</p>}
         {!claims.length && <button type="button" className="primary-button" disabled={locked || !schedule.enabled || expired} onClick={() => { void apply() }}>{t('recurring.create')}</button>}
       </section>}
-      {claims.length > 0 && <div role="status"><p>{t('recurring.created')}</p>{claims.map((claim) => <button type="button" className="secondary-button" key={claim.id} disabled={locked} onClick={() => { void open(claim.invoice_entity_id) }}>{t('recurring.openDated', { date: formatPlainDate(claim.starts_on) })}</button>)}</div>}
+      {!amending && claims.length > 0 && <div role="status"><p>{t('recurring.created')}</p>{claims.map((claim) => <button type="button" className="secondary-button" key={claim.id} disabled={locked} onClick={() => { void open(claim.invoice_entity_id) }}>{t('recurring.openDated', { date: formatPlainDate(claim.starts_on) })}</button>)}</div>}
     </>}
   </section>
 }

@@ -1,12 +1,18 @@
 import type { components } from '../generated/api-v1'
 import type { WorkspaceContext } from '../workspaces/api'
 import { read, mutate } from './api'
+import { browserInvoiceClient } from './api'
+import type { TaxRateChoice } from './api'
 
 export type RecurringSchedule = components['schemas']['RecurringSchedule']
 export type RecurringPreview = components['schemas']['RecurringPreview']
 export type RecurringDue = components['schemas']['RecurringDue']
 export type RecurringClaim = components['schemas']['RecurringClaim']
 export type RecurringPage = components['schemas']['RecurringSchedulePage']
+export type RecurringSourceReview = components['schemas']['RecurringSource']
+export type RecurringTermsWrite = components['schemas']['RecurringTermsAmendmentWrite']
+export type RecurringTermsPreview = components['schemas']['RecurringTermsAmendmentPreview']
+export type RecurringTerms = components['schemas']['RecurringTerms']
 export interface RecurringClient {
   get(this: void, workspace: WorkspaceContext, id: string): Promise<RecurringSchedule>
   stop(this: void, workspace: WorkspaceContext, id: string, reason: string): Promise<RecurringSchedule>
@@ -14,6 +20,10 @@ export interface RecurringClient {
   due(this: void, workspace: WorkspaceContext, id: string, from: string, asOf: string, signal?: AbortSignal): Promise<RecurringDue>
   preview(this: void, workspace: WorkspaceContext, id: string, starts: string[], asOf: string): Promise<RecurringPreview>
   apply(this: void, workspace: WorkspaceContext, id: string, token: string): Promise<readonly RecurringClaim[]>
+  reviewSource(this: void, workspace: WorkspaceContext, costId: string): Promise<RecurringSourceReview>
+  taxes(this: void, workspace: WorkspaceContext): Promise<TaxRateChoice[]>
+  previewTerms(this: void, workspace: WorkspaceContext, id: string, values: RecurringTermsWrite): Promise<RecurringTermsPreview>
+  applyTerms(this: void, workspace: WorkspaceContext, id: string, token: string): Promise<RecurringTerms>
 }
 const base = (workspace: WorkspaceContext) => `/api/v1/workspaces/organizations/${encodeURIComponent(workspace.id)}/recurring-invoices`
 export const browserRecurringClient: RecurringClient = {
@@ -23,4 +33,8 @@ export const browserRecurringClient: RecurringClient = {
   due: (workspace, id, from, asOf, signal) => read(`${base(workspace)}/${encodeURIComponent(id)}/due?${new URLSearchParams({ due_from: from, as_of: asOf })}`, signal),
   preview: (workspace, id, starts, asOf) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/preview`, 'POST', { starts_on: starts, as_of: asOf }),
   apply: (workspace, id, token) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/apply`, 'POST', { preview_token: token }),
+  reviewSource: (workspace, costId) => read(`${base(workspace)}/sources/${encodeURIComponent(costId)}`),
+  taxes: async (workspace) => (await browserInvoiceClient.choices(workspace)).tax_rates,
+  previewTerms: (workspace, id, values) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/terms/preview`, 'POST', values),
+  applyTerms: (workspace, id, token) => mutate(`${base(workspace)}/${encodeURIComponent(id)}/terms/apply`, 'POST', { preview_token: token }),
 }

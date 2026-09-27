@@ -2,8 +2,8 @@
 
 Issue #76 pre-1.0 implementation checkpoint. The application version remains
 `0.8.46`. This slice establishes the retained data and service boundary for
-future recurring sell-term changes; it does not yet expose the amendment action
-through the operator API or interface.
+future recurring sell-term changes. The later signed API and operator workflow
+are now complete and linked below.
 
 ## Delivered boundary
 
@@ -77,14 +77,14 @@ the lifecycle work is closed.
 
 ## Remaining lifecycle slices
 
-1. Add the operator amendment workflow showing current and proposed terms,
-   source differences, effective period, totals, and retained prior versions.
-2. Add retained recurring-draft withdrawal and its edit/issue restrictions.
-3. Extend recovery, live browser, responsive/accessibility, and final release
+1. Add retained recurring-draft withdrawal and its edit/issue restrictions.
+2. Extend recovery, live browser, responsive/accessibility, and final release
    acceptance across amendments and withdrawals.
 
 The authenticated signed preview/apply API is complete and recorded in
 [recurring-invoice-terms-api.md](recurring-invoice-terms-api.md).
+The operator workflow is complete and recorded in
+[recurring-invoice-terms-interface.md](recurring-invoice-terms-interface.md).
 
 Deployment, external push, Wiki publication, and a version change are outside
 this checkpoint.

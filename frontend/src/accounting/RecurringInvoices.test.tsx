@@ -1,13 +1,20 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { RecurringInvoices } from './RecurringInvoices'
+import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import type { RecurringClient, RecurringSchedule } from './recurringApi'
 import type { WorkspaceContext } from '../workspaces/api'
 
 const workspace: WorkspaceContext = { kind: 'organization', id: 'client', name: 'Client', classifications: ['client'], capabilities: ['invoices'], organization: null }
 const schedule: RecurringSchedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, effective_from: '2025-01-01', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
+function renderRecurring(client: RecurringClient, openInvoice = vi.fn()) {
+  const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><RecurringInvoices workspace={workspace} client={client} openInvoice={openInvoice} /></NavigationGuardProvider> }])
+  render(<RouterProvider router={router} />)
+}
 function fixture() {
   let retained = schedule
+  const amended = { id: 'terms-2', version: 2, effective_from: '2025-04-01', description: 'Revised support', quantity: '3.000', unit_amount: '90.0000', currency: 'USD', due_days: 14, tax_rate_id: null, source_digest: 'digest' }
   const client: RecurringClient = {
     get: vi.fn().mockImplementation(() => Promise.resolve(retained)),
     stop: vi.fn().mockImplementation(() => { retained = { ...schedule, enabled: false }; return Promise.resolve(retained) }),
@@ -19,9 +26,13 @@ function fixture() {
     ] }),
     preview: vi.fn().mockResolvedValue({ preview_id: 'preview', preview_token: 'opaque-review', expires_in_seconds: 900, schedule_id: 'schedule', terms_id: 'terms', source_digest: 'digest', as_of: '2025-03-01', currency: 'USD', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', existing_invoices: [], periods: [{ starts_on: '2025-02-01', ends_before: '2025-03-01', due_date: '2025-03-03', net: '150.00', tax: '0.00', total: '150.00' }] }),
     apply: vi.fn().mockResolvedValue([{ id: 'claim', starts_on: '2025-02-01', ends_before: '2025-03-01', invoice_entity_id: 'new-invoice', line_id: 'line' }]),
+    reviewSource: vi.fn().mockResolvedValue({ source: { cost_id: 'cost', contract_id: 'contract', label: 'Provider fee', amount: '20.00', quantity: '1.000', currency: 'USD', interval: 'monthly', cost_starts_on: '2025-01-01', cost_ends_on: null, contract_starts_on: '2025-01-01', contract_ends_on: null }, source_digest: 'digest', earliest_anchor: '2025-01-01', latest_end: null, business_date: '2025-03-01' }),
+    taxes: vi.fn().mockResolvedValue([]),
+    previewTerms: vi.fn().mockResolvedValue({ preview_id: 'terms-preview', preview_token: 'opaque-terms-review', expires_in_seconds: 900, schedule_id: 'schedule', expected_terms_id: 'terms', expected_source_digest: 'digest', reviewed_on: '2025-03-01', source_changed: false, current: { terms_id: 'terms', version: 1, effective_from: '2025-01-01', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, net: '150.00', tax: '0.00', total: '150.00' }, proposed: { version: 2, effective_from: '2025-04-01', description: 'Revised support', quantity: '3.000', unit_amount: '90.0000', currency: 'USD', due_days: 14, tax_rate_id: null, net: '270.00', tax: '0.00', total: '270.00' } }),
+    applyTerms: vi.fn().mockImplementation(() => { retained = { ...retained, terms: [...retained.terms, amended] }; return Promise.resolve(amended) }),
   }
   const openInvoice = vi.fn().mockResolvedValue(undefined)
-  render(<RecurringInvoices workspace={workspace} client={client} openInvoice={openInvoice} />)
+  renderRecurring(client, openInvoice)
   return { client, openInvoice }
 }
 async function select() {
@@ -89,6 +100,37 @@ describe('recurring review', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Open existing invoice' })); await Promise.resolve() })
     expect(openInvoice).toHaveBeenCalledWith('old-invoice')
   })
+  it('reviews and applies future terms while retaining version history', async () => {
+    const { client } = fixture()
+    fireEvent.click(await screen.findByRole('button', { name: /Managed support/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change future terms' }))
+    await screen.findByText(/Current source: Provider fee/)
+    fireEvent.change(screen.getByLabelText('Effective billing period'), { target: { value: '2025-04-01' } })
+    fireEvent.change(screen.getByLabelText('Client invoice description'), { target: { value: 'Revised support' } })
+    fireEvent.change(screen.getByLabelText('Client unit price'), { target: { value: '90.0000' } })
+    fireEvent.change(screen.getByLabelText('Client quantity'), { target: { value: '3.000' } })
+    fireEvent.change(screen.getByLabelText('Payment due days after period start'), { target: { value: '14' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Review future terms' }))
+    await screen.findByText('USD 270.00')
+    expect(client.previewTerms).toHaveBeenCalledWith(workspace, 'schedule', expect.objectContaining({ effective_from: '2025-04-01', expected_terms_id: 'terms' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply reviewed terms' }))
+    await screen.findByText(/Version 2, effective/)
+    expect(client.applyTerms).toHaveBeenCalledWith(workspace, 'schedule', 'opaque-terms-review')
+    expect(screen.queryByRole('heading', { name: 'Change future client terms' })).not.toBeInTheDocument()
+  })
+  it('guards a dirty terms amendment and preserves it when editing continues', async () => {
+    fixture()
+    fireEvent.click(await screen.findByRole('button', { name: /Managed support/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change future terms' }))
+    await screen.findByText(/Current source: Provider fee/)
+    fireEvent.change(screen.getByLabelText('Client invoice description'), { target: { value: 'Unsaved revision' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByLabelText('Client invoice description')).toHaveValue('Unsaved revision')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard changes' }))
+    expect(screen.queryByRole('heading', { name: 'Change future client terms' })).not.toBeInTheDocument()
+  })
   it('cancels confirmation without sending a stop or retaining the old preview', async () => {
     const { client } = fixture(); await select()
     fireEvent.click(screen.getByRole('button', { name: 'Stop future drafts' }))
@@ -128,7 +170,7 @@ describe('recurring review', () => {
   })
   it('shows a denied discovery request without exposing schedules', async () => {
     const client = { list: vi.fn().mockRejectedValue(new Error('Denied')) } as unknown as RecurringClient
-    render(<RecurringInvoices workspace={workspace} client={client} openInvoice={vi.fn()} />)
+    renderRecurring(client)
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled()
   })

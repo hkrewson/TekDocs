@@ -2,8 +2,8 @@
 
 Issue #76 pre-1.0 implementation checkpoint. Version remains `0.8.46`. This
 slice exposes the retained effective-terms foundation through a reviewed,
-short-lived operator API. It does not yet add the amendment form to the
-Recurring invoices screen.
+short-lived operator API. The completed interface that consumes it is recorded
+in [recurring-invoice-terms-interface.md](recurring-invoice-terms-interface.md).
 
 ## Workflow
 
@@ -71,10 +71,10 @@ remain documented in
 
 ## Next slice
 
-Add the operator workflow to the Recurring invoices surface. It must show the
-current and proposed values side by side, source-change status, exact totals,
-effective period, retained history, preview expiry, uncertain-apply retry, and
-dirty-form navigation protection. Stopped schedules remain history-only.
+The operator workflow is complete. Add retained withdrawal of an unissued
+recurring draft, including the append-only disposition, edit and issue refusal,
+derived display state, focused confirmation, safe retry, and minimized audit
+event.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

@@ -113,5 +113,6 @@ an enable toggle or mutable schedule fields.
 The retained schema, database guards, amendment service boundary, generation
 selection, compatibility notes, and focused verification are recorded in
 [Effective recurring invoice terms](recurring-invoice-terms-versions.md). The
-[signed amendment API](recurring-invoice-terms-api.md) is also complete. The
-operator amendment interface remains the next lifecycle slice.
+[signed amendment API](recurring-invoice-terms-api.md) and
+[operator amendment workflow](recurring-invoice-terms-interface.md) are also
+complete. Retained recurring-draft withdrawal remains the next lifecycle slice.

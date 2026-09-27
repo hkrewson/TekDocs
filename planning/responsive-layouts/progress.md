@@ -3069,3 +3069,25 @@ until one complete `make release-gate` run exits successfully from a clean
 commit. Technician/native zoom, software-keyboard and screen-reader walkthroughs
 also remain open. Version stays 0.8.46; deployment, publication and tagging are
 separate authorized actions.
+
+## Documentation coordinator decomposition checkpoint — 2026-09-27
+
+The next pre-1.0 maintainability slice begins #40 without changing the completed
+responsive behavior. Revision history and legacy single-region section conversion
+are now focused typed components beneath the Documentation route coordinator.
+The coordinator retains URL state, request cancellation, mutations, record
+selection and dirty-form policy; the extracted panels receive data and explicit
+callbacks and cannot create a competing state or API authority.
+
+Markup, accessible names, loading/error states, paging, retained-revision review,
+blocker/warning presentation and section-conversion actions are unchanged. No CSS,
+route, API, schema, permission, recovery format or version changes are introduced.
+The dependency direction and remaining extraction sequence are recorded in
+`planning/core-code-decomposition.md`.
+
+The final frontend validation passes all 677 tests in 120 files at the repository
+coverage thresholds. API/type agreement, localization and hardcoded-button-label
+policy, lint, TypeScript, the production build and existing compressed bundle
+budgets also pass. The Documentation lazy bundle remains within its established
+boundary; no full release-gate repetition was needed for this behavior-preserving
+frontend seam.

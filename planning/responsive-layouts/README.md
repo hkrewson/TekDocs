@@ -35,6 +35,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 
 ## Implementation records
 
+- [Core-code decomposition handoff](../core-code-decomposition.md)
+
 - [Phase 8 release-gate execution](phase-8-release-gate-execution.md)
 
 - [Phase 8 production-image acceptance](phase-8-production-image-acceptance.md)

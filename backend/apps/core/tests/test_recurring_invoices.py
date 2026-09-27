@@ -15,7 +15,16 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core.commercial import create_contract, create_cost, update_cost
 from apps.core.invoice_recurrence import RecurrenceError
-from apps.core.invoicing import InvoiceError, delete_invoice, delete_line
+from apps.core.invoicing import (
+    InvoiceError,
+    create_line,
+    delete_invoice,
+    delete_line,
+    issue_invoice,
+    update_invoice,
+    update_line,
+    withdraw_recurring_draft,
+)
 from apps.core.models import (
     ContractCost,
     Entity,
@@ -25,6 +34,7 @@ from apps.core.models import (
     RecurringInvoicePeriod,
     RecurringInvoiceSchedule,
     RecurringInvoiceTerms,
+    RecurringInvoiceWithdrawal,
 )
 from apps.core.organizations import create_organization
 from apps.core.recurring_invoices import (
@@ -324,6 +334,56 @@ def test_generated_draft_and_line_cannot_be_deleted_or_release_the_period(setup)
     with pytest.raises(ProtectedError):
         claim.line.delete()
     assert generate(setup, schedule).pk == claim.pk
+
+
+@pytest.mark.django_db
+def test_withdrawal_is_retained_idempotent_and_blocks_draft_mutations(setup):
+    from apps.core.models import AuditEvent
+
+    claim = generate(setup, enroll(setup))
+    first = withdraw_recurring_draft(
+        invoice=claim.invoice, actor_id=setup[0].owner.pk, reason="Client cancelled before issue"
+    )
+    retried = withdraw_recurring_draft(
+        invoice=claim.invoice, actor_id=setup[0].owner.pk, reason="A retry cannot replace the reason"
+    )
+    assert retried.pk == first.pk
+    assert retried.reason == "Client cancelled before issue"
+    assert AuditEvent.objects.filter(action="invoice.recurring_draft_withdrawn").count() == 1
+    assert AuditEvent.objects.get(action="invoice.recurring_draft_withdrawn").metadata == {}
+    with pytest.raises(InvoiceError, match="withdrawn"):
+        update_invoice(invoice=claim.invoice, actor_id=setup[0].owner.pk, values={"notes": "changed"})
+    with pytest.raises(InvoiceError, match="withdrawn"):
+        create_line(
+            invoice=claim.invoice,
+            actor_id=setup[0].owner.pk,
+            values={"description": "extra", "quantity": Decimal("1"), "unit_amount": Decimal("1")},
+        )
+    with pytest.raises(InvoiceError, match="withdrawn"):
+        update_line(line=claim.line, actor_id=setup[0].owner.pk, values={"description": "changed"})
+    with pytest.raises(InvoiceError, match="withdrawn"):
+        issue_invoice(invoice=claim.invoice, actor_id=setup[0].owner.pk)
+    assert RecurringInvoiceWithdrawal.objects.count() == 1
+    assert generate(setup, claim.schedule).pk == claim.pk
+
+
+@pytest.mark.django_db
+def test_withdrawal_database_guards_retain_disposition_and_freeze_invoice(setup):
+    claim = generate(setup, enroll(setup))
+    withdrawal = withdraw_recurring_draft(
+        invoice=claim.invoice, actor_id=setup[0].owner.pk, reason="Retain this decision"
+    )
+    attempts = [
+        lambda: RecurringInvoiceWithdrawal.objects.filter(pk=withdrawal.pk).update(reason="rewritten"),
+        lambda: RecurringInvoiceWithdrawal.objects.filter(pk=withdrawal.pk).delete(),
+        lambda: Invoice.objects.filter(pk=claim.invoice_id).update(notes="rewritten"),
+        lambda: InvoiceLine.objects.filter(pk=claim.line_id).update(description="rewritten"),
+    ]
+    for attempt in attempts:
+        with pytest.raises(DatabaseError), transaction.atomic():
+            attempt()
+    withdrawal.refresh_from_db()
+    assert withdrawal.reason == "Retain this decision"
 
 
 @pytest.mark.django_db

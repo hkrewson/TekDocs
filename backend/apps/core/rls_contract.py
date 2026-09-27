@@ -98,6 +98,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_recurringinvoiceschedule",
     "core_recurringinvoiceterms",
     "core_recurringinvoiceperiod",
+    "core_recurringinvoicewithdrawal",
 )
 
 TENANT_SCOPED_TABLES = (

@@ -135,7 +135,7 @@ def _matching_applied_terms(
         quantity = Decimal(str(proposed["quantity"]))
         unit_amount = Decimal(str(proposed["unit_amount"]))
         tax_rate_id = UUID(str(proposed["tax_rate_id"])) if proposed.get("tax_rate_id") else None
-        expected_version = int(plan["expected_terms_version"]) + 1
+        expected_version = int(str(plan["expected_terms_version"])) + 1
         due_days = int(proposed["due_days"])
     except (KeyError, TypeError, ValueError, InvalidOperation):
         return None
@@ -199,17 +199,15 @@ def apply_recurring_terms_preview(
     if not isinstance(proposed, dict):
         raise RecurrenceError("The terms preview is invalid; review the amendment again")
     try:
-        values = {
-            "expected_terms_id": UUID(str(plan["expected_terms_id"])),
-            "expected_source_digest": str(plan["expected_source_digest"]),
-            "effective_from": date.fromisoformat(str(proposed["effective_from"])),
-            "description": str(proposed["description"]),
-            "unit_amount": Decimal(str(proposed["unit_amount"])),
-            "quantity": Decimal(str(proposed["quantity"])),
-            "currency": str(proposed["currency"]),
-            "due_days": int(proposed["due_days"]),
-            "tax_rate_id": UUID(str(proposed["tax_rate_id"])) if proposed.get("tax_rate_id") else None,
-        }
+        expected_terms_id = UUID(str(plan["expected_terms_id"]))
+        expected_source_digest = str(plan["expected_source_digest"])
+        effective_from = date.fromisoformat(str(proposed["effective_from"]))
+        description = str(proposed["description"])
+        unit_amount = Decimal(str(proposed["unit_amount"]))
+        quantity = Decimal(str(proposed["quantity"]))
+        currency = str(proposed["currency"])
+        due_days = int(str(proposed["due_days"]))
+        tax_rate_id = UUID(str(proposed["tax_rate_id"])) if proposed.get("tax_rate_id") else None
     except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
         raise RecurrenceError("The terms preview is invalid; review the amendment again") from exc
     try:
@@ -218,7 +216,15 @@ def apply_recurring_terms_preview(
             organization=organization,
             schedule_id=schedule_id,
             business_date=timezone.localdate(),
-            **values,
+            expected_terms_id=expected_terms_id,
+            expected_source_digest=expected_source_digest,
+            effective_from=effective_from,
+            description=description,
+            unit_amount=unit_amount,
+            quantity=quantity,
+            currency=currency,
+            due_days=due_days,
+            tax_rate_id=tax_rate_id,
         )
     except RecurrenceError:
         existing = _matching_applied_terms(user=user, organization=organization, schedule_id=schedule_id, plan=plan)

@@ -6457,6 +6457,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/withdraw-recurring-draft": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_withdraw_recurring_draft_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/origin-choices": {
         readonly parameters: {
             readonly query?: never;
@@ -11007,6 +11023,7 @@ export interface components {
             readonly bill_to: {
                 readonly [key: string]: string;
             };
+            readonly recurring: components["schemas"]["RecurringInvoiceDisposition"] | null;
         };
         readonly InvoiceCountryChoice: {
             readonly value: string;
@@ -13473,6 +13490,19 @@ export interface components {
             readonly starts_on: string;
             /** Format: uuid */
             readonly invoice_entity_id: string;
+        };
+        readonly RecurringInvoiceDisposition: {
+            /** Format: date */
+            readonly starts_on: string;
+            /** Format: date */
+            readonly ends_before: string;
+            readonly disposition: string;
+            /** Format: date-time */
+            readonly withdrawn_at: string | null;
+            readonly withdrawal_reason: string;
+        };
+        readonly RecurringInvoiceWithdrawalWrite: {
+            readonly reason: string;
         };
         readonly RecurringPeriodPreview: {
             /** Format: date */
@@ -32317,6 +32347,36 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_withdraw_recurring_draft_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RecurringInvoiceWithdrawalWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RecurringInvoiceWithdrawalWrite"];
+                readonly "multipart/form-data": components["schemas"]["RecurringInvoiceWithdrawalWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
                 };
             };
         };

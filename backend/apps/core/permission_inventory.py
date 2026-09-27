@@ -647,6 +647,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-invoice-recurring-withdrawal",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-invoice-pdf",
         ("GET",),
         PermissionKey.INVOICES_VIEW,

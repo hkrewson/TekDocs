@@ -35,6 +35,8 @@ from .models import (
     InvoiceNumberSeries,
     InvoiceState,
     Organization,
+    RecurringInvoicePeriod,
+    RecurringInvoiceWithdrawal,
     ReminderDomain,
     ReminderRecurrence,
     ReminderSchedule,
@@ -58,6 +60,11 @@ class InvoiceError(ValueError):
 
 ISSUED_SIGNATURE_FORMAT = "tekdocs-issued-invoice/v1"
 ACCOUNTING_EXPORT_FORMAT = "tekdocs-accounting-invoice/v1"
+
+
+def _ensure_not_withdrawn(invoice: Invoice) -> None:
+    if RecurringInvoiceWithdrawal.objects.filter(period__invoice=invoice).exists():
+        raise InvoiceError("A withdrawn recurring draft cannot be edited or issued")
 
 
 @dataclass(frozen=True, slots=True)
@@ -355,6 +362,7 @@ def invoices_for_scope(scope: DataScope) -> QuerySet[Invoice]:
     return (
         Invoice.scoped.for_scope(scope)
         .select_related("entity", "organization")
+        .select_related("recurring_period__withdrawal")
         .prefetch_related(
             Prefetch("lines", queryset=InvoiceLine.objects.select_related("catalog_product__entity")),
             Prefetch(
@@ -521,6 +529,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     )
     if locked.state != InvoiceState.DRAFT:
         raise InvoiceError("Only a draft invoice can be issued")
+    _ensure_not_withdrawn(locked)
     lines = list(locked.lines.all())
     if not lines:
         raise InvoiceError("Add at least one line before issuing the invoice")
@@ -748,6 +757,7 @@ def update_invoice(*, invoice: Invoice, actor_id: UUID, values: dict[str, object
     locked = Invoice.objects.select_for_update().select_related("entity", "organization").get(pk=invoice.pk)
     if locked.state != "draft":
         raise InvoiceError("Only draft invoices can be edited")
+    _ensure_not_withdrawn(locked)
     next_currency = str(values.get("currency", locked.currency))
     if next_currency != locked.currency and InvoiceLine.objects.filter(invoice=locked).exists():
         raise InvoiceError("Remove draft lines before changing invoice currency")
@@ -899,6 +909,7 @@ def create_line(
     locked = Invoice.objects.select_for_update().select_related("organization").get(pk=invoice.pk)
     if locked.state != "draft":
         raise InvoiceError("Only draft invoices can be edited")
+    _ensure_not_withdrawn(locked)
     origin_fields, snapshot = _origin_snapshot(invoice=locked, origin_type=origin_type, origin_id=origin_id)
     snapshot.update({key: value for key, value in values.items() if value is not None})
     required = {"description", "quantity", "unit_amount"}
@@ -944,6 +955,7 @@ def update_line(*, line: InvoiceLine, actor_id: UUID, values: dict[str, object])
     locked = InvoiceLine.objects.select_for_update().select_related("invoice", "organization").get(pk=line.pk)
     if locked.invoice.state != "draft":
         raise InvoiceError("Only draft invoice lines can be edited")
+    _ensure_not_withdrawn(locked.invoice)
     for field in ("description", "quantity", "unit", "unit_amount", "tax_rate_name", "tax_rate_value", "tax_inclusive"):
         if field in values:
             setattr(locked, field, values[field])
@@ -967,6 +979,7 @@ def delete_line(*, line: InvoiceLine, actor_id: UUID) -> None:
     locked = InvoiceLine.objects.select_for_update().select_related("invoice", "organization").get(pk=line.pk)
     if locked.invoice.state != "draft":
         raise InvoiceError("Only draft invoice lines can be deleted")
+    _ensure_not_withdrawn(locked.invoice)
     tenant = locked.tenant
     entity_id = locked.invoice.entity_id
     _sync_stock_consumption(line=locked, actor_id=actor_id, desired_quantity=Decimal("0"))
@@ -974,3 +987,35 @@ def delete_line(*, line: InvoiceLine, actor_id: UUID) -> None:
     AuditEvent.objects.create(
         tenant=tenant, actor_id=actor_id, action="invoice.draft_line_deleted", entity_id=entity_id, metadata={}
     )
+
+
+@transaction.atomic
+def withdraw_recurring_draft(*, invoice: Invoice, actor_id: UUID, reason: str) -> RecurringInvoiceWithdrawal:
+    locked = Invoice.objects.select_for_update().select_related("entity").get(pk=invoice.pk)
+    try:
+        period = RecurringInvoicePeriod.objects.select_for_update().get(invoice=locked)
+    except RecurringInvoicePeriod.DoesNotExist as exc:
+        raise InvoiceError("Only a generated recurring draft can be withdrawn") from exc
+    existing = RecurringInvoiceWithdrawal.objects.filter(period=period).first()
+    if existing is not None:
+        return existing
+    if locked.state != InvoiceState.DRAFT:
+        raise InvoiceError("Only an unissued recurring draft can be withdrawn")
+    normalized_reason = reason.strip()
+    if not normalized_reason:
+        raise InvoiceError("A withdrawal reason is required")
+    withdrawal = RecurringInvoiceWithdrawal.objects.create(
+        tenant=locked.tenant,
+        organization=locked.organization,
+        period=period,
+        reason=normalized_reason,
+        withdrawn_by_id=actor_id,
+    )
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="invoice.recurring_draft_withdrawn",
+        entity_id=locked.entity_id,
+        metadata={},
+    )
+    return withdrawal

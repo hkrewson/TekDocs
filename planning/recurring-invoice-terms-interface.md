@@ -50,12 +50,11 @@ field invalidates an earlier preview.
 
 ## Next lifecycle slice
 
-Add retained withdrawal of an unissued recurring draft. The disposition must be
-append-only and one-per-claim, preserve the invoice, line, and period claim,
-refuse later editing or issuance, remove the draft from ordinary actionable
-counts, require a reason and focused confirmation, support idempotent retry, and
-emit a value-minimized audit event. Recovery and live browser acceptance then
-need to cover both amendments and withdrawals.
+The retained withdrawal data, service, and API boundary is complete in
+[recurring-invoice-draft-withdrawal.md](recurring-invoice-draft-withdrawal.md).
+Add its focused invoice-screen confirmation and retained-history presentation,
+then extend recovery and live browser acceptance across both amendments and
+withdrawals.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

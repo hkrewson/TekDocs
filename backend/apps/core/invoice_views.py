@@ -42,6 +42,7 @@ from .invoicing import (
     record_invoice_event,
     update_invoice,
     update_line,
+    withdraw_recurring_draft,
 )
 from .models import (
     CatalogProduct,
@@ -215,6 +216,18 @@ class InvoiceLifecycleEventWriteSerializer(StrictSerializer):
     note = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
 
 
+class RecurringInvoiceDispositionSerializer(serializers.Serializer):
+    starts_on = serializers.DateField()
+    ends_before = serializers.DateField()
+    disposition = serializers.CharField()
+    withdrawn_at = serializers.DateTimeField(allow_null=True)
+    withdrawal_reason = serializers.CharField(allow_blank=True)
+
+
+class RecurringInvoiceWithdrawalWriteSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=1000, trim_whitespace=True)
+
+
 class InvoiceSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     state = serializers.CharField()
@@ -243,6 +256,21 @@ class InvoiceSerializer(serializers.Serializer):
     last_event_at = serializers.SerializerMethodField()
     lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
     bill_to = serializers.SerializerMethodField()
+    recurring = serializers.SerializerMethodField()
+
+    @extend_schema_field(RecurringInvoiceDispositionSerializer(allow_null=True))
+    def get_recurring(self, item):  # type: ignore[no-untyped-def]
+        period = getattr(item, "recurring_period", None)
+        if period is None:
+            return None
+        withdrawal = getattr(period, "withdrawal", None)
+        return {
+            "starts_on": period.starts_on,
+            "ends_before": period.ends_before,
+            "disposition": "withdrawn" if withdrawal is not None else "active",
+            "withdrawn_at": withdrawal.withdrawn_at if withdrawal is not None else None,
+            "withdrawal_reason": withdrawal.reason if withdrawal is not None else "",
+        }
 
     def get_fields(self):  # type: ignore[no-untyped-def]
         fields = super().get_fields()
@@ -650,6 +678,24 @@ class InvoiceIssueView(APIView):
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
+
+
+class InvoiceRecurringWithdrawalView(APIView):
+    @extend_schema(request=RecurringInvoiceWithdrawalWriteSerializer, responses={200: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_EDIT)
+        _require_recent_session(request)
+        serializer = RecurringInvoiceWithdrawalWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            withdraw_recurring_draft(
+                invoice=_invoice(workspace, invoice_entity_id),
+                actor_id=request.user.pk,
+                reason=serializer.validated_data["reason"],
+            )
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
 
 
 def _invoice_download_response(invoice: Invoice, export_format: str) -> HttpResponse:

@@ -2322,6 +2322,38 @@ class RecurringInvoicePeriod(models.Model):
         return f"Recurring period {self.starts_on}"
 
 
+class RecurringInvoiceWithdrawal(models.Model):
+    """Append-only disposition of an unissued recurring draft."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="recurring_invoice_withdrawals")
+    organization = models.ForeignKey(
+        "Organization", on_delete=models.PROTECT, related_name="recurring_invoice_withdrawals"
+    )
+    period = models.OneToOneField(
+        RecurringInvoicePeriod, on_delete=models.PROTECT, related_name="withdrawal"
+    )
+    reason = models.TextField(max_length=1000)
+    withdrawn_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="withdrawn_recurring_drafts"
+    )
+    withdrawn_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    def __str__(self) -> str:
+        return f"Withdrawn recurring period {self.period_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Recurring draft withdrawals are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Recurring draft withdrawals are retained")
+
+
 class ClientAssetDocumentProvenance(models.Model):
     """Append-only client projection of one exact supplier STATIC publication."""
 

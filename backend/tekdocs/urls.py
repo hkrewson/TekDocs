@@ -287,6 +287,7 @@ from apps.core.invoice_views import (
     InvoiceListCreateView,
     InvoiceOriginChoiceView,
     InvoicePDFDownloadView,
+    InvoiceRecurringWithdrawalView,
     MSPInvoiceSettingsView,
     ServiceRateDetailView,
     ServiceRateListCreateView,
@@ -1597,6 +1598,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/issue",
         InvoiceIssueView.as_view(),
         name="organization-invoice-issue",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/withdraw-recurring-draft",
+        InvoiceRecurringWithdrawalView.as_view(),
+        name="organization-invoice-recurring-withdrawal",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/pdf",

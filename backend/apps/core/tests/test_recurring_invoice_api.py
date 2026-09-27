@@ -130,6 +130,30 @@ def test_source_enrollment_preview_apply_and_retry(browser, setup):
 
 
 @pytest.mark.django_db
+def test_generated_draft_withdrawal_is_idempotent_and_visible(browser, setup, monkeypatch):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    schedule = enroll(setup)
+    claim = recurrence_fixtures.generate(setup, schedule)
+    endpoint = reverse(
+        "organization-invoice-recurring-withdrawal",
+        kwargs={"organization_entity_id": setup[1].entity_id, "invoice_entity_id": claim.invoice.entity_id},
+    )
+    first = browser.post(endpoint, {"reason": "Client cancelled before issue"}, content_type="application/json")
+    assert first.status_code == 200, first.content
+    assert first.json()["recurring"] == {
+        "starts_on": "2025-01-01",
+        "ends_before": "2025-02-01",
+        "disposition": "withdrawn",
+        "withdrawn_at": first.json()["recurring"]["withdrawn_at"],
+        "withdrawal_reason": "Client cancelled before issue",
+    }
+    retried = browser.post(endpoint, {"reason": "Retry reason"}, content_type="application/json")
+    assert retried.status_code == 200
+    assert retried.json()["recurring"]["withdrawal_reason"] == "Client cancelled before issue"
+    assert AuditEvent.objects.filter(action="invoice.recurring_draft_withdrawn").count() == 1
+
+
+@pytest.mark.django_db
 def test_preview_requires_separate_review_across_terms_versions(browser, setup):
     schedule = enroll(setup)
     amended = recurrence_fixtures.amend(setup, schedule)

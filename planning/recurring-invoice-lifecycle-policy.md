@@ -115,4 +115,6 @@ selection, compatibility notes, and focused verification are recorded in
 [Effective recurring invoice terms](recurring-invoice-terms-versions.md). The
 [signed amendment API](recurring-invoice-terms-api.md) and
 [operator amendment workflow](recurring-invoice-terms-interface.md) are also
-complete. Retained recurring-draft withdrawal remains the next lifecycle slice.
+complete. The retained withdrawal data, service, and API boundary is recorded in
+[Retained recurring-draft withdrawal](recurring-invoice-draft-withdrawal.md).
+Its focused operator confirmation and history presentation remain next.

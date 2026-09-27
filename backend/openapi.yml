@@ -24228,6 +24228,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/withdraw-recurring-draft:
+    post:
+      operationId: workspaces_organizations_invoices_withdraw_recurring_draft_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecurringInvoiceWithdrawalWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecurringInvoiceWithdrawalWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecurringInvoiceWithdrawalWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/origin-choices:
     get:
       operationId: workspaces_organizations_invoices_origin_choices_retrieve
@@ -38727,6 +38773,11 @@ components:
           additionalProperties:
             type: string
           readOnly: true
+        recurring:
+          allOf:
+          - $ref: '#/components/schemas/RecurringInvoiceDisposition'
+          nullable: true
+          readOnly: true
       required:
       - balance_amount
       - bill_to
@@ -38748,6 +38799,7 @@ components:
       - number
       - paid_amount
       - reconciliation_state
+      - recurring
       - reference
       - signature_algorithm
       - state
@@ -44273,6 +44325,37 @@ components:
       required:
       - invoice_entity_id
       - starts_on
+    RecurringInvoiceDisposition:
+      type: object
+      properties:
+        starts_on:
+          type: string
+          format: date
+        ends_before:
+          type: string
+          format: date
+        disposition:
+          type: string
+        withdrawn_at:
+          type: string
+          format: date-time
+          nullable: true
+        withdrawal_reason:
+          type: string
+      required:
+      - disposition
+      - ends_before
+      - starts_on
+      - withdrawal_reason
+      - withdrawn_at
+    RecurringInvoiceWithdrawalWrite:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 1000
+      required:
+      - reason
     RecurringPeriodPreview:
       type: object
       properties:

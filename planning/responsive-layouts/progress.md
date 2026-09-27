@@ -235,6 +235,10 @@ domain hook with abort-based stale-request protection. The page coordinator stil
 owns the selected record and editor values, so this extraction does not create a
 second document authority or change direct-link behavior.
 
+The backend decomposition has begun with publication and portal serializers moved
+behind compatibility exports. Publication validation, retained artifacts, portal
+projection fields and OpenAPI output remain unchanged.
+
 The enforced inventory currently records 51 completed routes and 10 broad workspace routes in acceptance. Assets, Contracts, Networks, Documentation, and Files remain open in both MSP and organization contexts until their final grouped acceptance boundary is met. The shell route inventory uses actual App.tsx declarations; organization areas derive from the capability registry.
 
 ## People record workspace checkpoint — 2026-09-17

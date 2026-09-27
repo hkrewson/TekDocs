@@ -2255,13 +2255,14 @@ class RecurringInvoiceSchedule(TimestampedModel):
 
 
 class RecurringInvoiceTerms(models.Model):
-    """Immutable approved sell terms; the first slice permits only version one."""
+    """Immutable approved sell terms effective from one anchored period."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="recurring_invoice_terms")
     organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="recurring_invoice_terms")
     schedule = models.ForeignKey(RecurringInvoiceSchedule, on_delete=models.PROTECT, related_name="terms")
     version = models.PositiveIntegerField(default=1)
+    effective_from = models.DateField()
     description = models.CharField(max_length=1000)
     quantity = models.DecimalField(max_digits=12, decimal_places=3)
     unit_amount = models.DecimalField(max_digits=18, decimal_places=4)
@@ -2279,7 +2280,10 @@ class RecurringInvoiceTerms(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("schedule", "version"), name="recurring_terms_version_unique"),
-            models.CheckConstraint(condition=models.Q(version=1), name="recurring_terms_initial_version_only"),
+            models.UniqueConstraint(
+                fields=("schedule", "effective_from"), name="recurring_terms_effective_from_unique"
+            ),
+            models.CheckConstraint(condition=models.Q(version__gte=1), name="recurring_terms_version_positive"),
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name="recurring_terms_quantity_positive"),
             models.CheckConstraint(condition=models.Q(unit_amount__gte=0), name="recurring_terms_amount_nonnegative"),
             models.CheckConstraint(condition=models.Q(due_days__lte=3650), name="recurring_terms_due_days_bounded"),

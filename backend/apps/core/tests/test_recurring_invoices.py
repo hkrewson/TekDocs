@@ -28,6 +28,7 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.recurring_invoices import (
+    amend_recurring_terms,
     enroll_recurring_schedule,
     generate_recurring_draft,
     recurring_source_digest,
@@ -121,6 +122,28 @@ def generate(setup, schedule, starts_on=date(2025, 1, 1), **overrides):
     return generate_recurring_draft(**values)
 
 
+def amend(setup, schedule, effective_from=date(2025, 2, 1), **overrides):
+    installation, client, _, _, cost = setup
+    latest = schedule.terms.order_by("-version").first()
+    assert latest is not None
+    values = dict(
+        user=installation.owner,
+        organization=client,
+        schedule_id=schedule.pk,
+        expected_terms_id=latest.pk,
+        expected_source_digest=recurring_source_digest(user=installation.owner, organization=client, cost_id=cost.pk),
+        effective_from=effective_from,
+        business_date=date(2025, 1, 15),
+        description="Amended client service",
+        unit_amount=Decimal("90.00"),
+        quantity=Decimal("3.000"),
+        currency="USD",
+        due_days=14,
+    )
+    values.update(overrides)
+    return amend_recurring_terms(**values)
+
+
 @pytest.mark.django_db
 def test_approved_sell_terms_generate_separate_drafts_and_retries_keep_one_claim(setup):
     schedule = enroll(setup)
@@ -139,6 +162,122 @@ def test_approved_sell_terms_generate_separate_drafts_and_retries_keep_one_claim
     assert first.ends_before == date(2025, 2, 1)
     with pytest.raises(RecurrenceError, match="already has"):
         enroll(setup)
+
+
+@pytest.mark.django_db
+def test_future_terms_are_append_only_and_generation_selects_the_effective_version(setup):
+    from apps.core.models import AuditEvent
+
+    schedule = enroll(setup)
+    first = generate(setup, schedule)
+    amended = amend(setup, schedule)
+    second = generate(setup, schedule, date(2025, 2, 1))
+
+    assert amended.version == 2 and amended.effective_from == date(2025, 2, 1)
+    assert first.terms.version == 1 and first.line.unit_amount == Decimal("75.00")
+    assert second.terms_id == amended.pk
+    assert second.line.unit_amount == Decimal("90.00") and second.line.quantity == Decimal("3.000")
+    assert second.invoice.due_date == date(2025, 2, 15)
+    assert generate(setup, schedule).terms_id == first.terms_id
+    event = AuditEvent.objects.get(action="invoice.recurring_terms_amended")
+    assert event.metadata == {
+        "schedule_id": str(schedule.pk),
+        "terms_id": str(amended.pk),
+        "version": 2,
+        "effective_from": "2025-02-01",
+    }
+
+
+@pytest.mark.django_db
+def test_amendment_rejects_stale_claimed_unaligned_past_and_stopped_boundaries(setup):
+    from apps.core.recurring_invoices import stop_recurring_schedule
+
+    schedule = enroll(setup)
+    initial = schedule.terms.get(version=1)
+    with pytest.raises(RecurrenceError, match="current business date"):
+        amend(setup, schedule, effective_from=date(2025, 1, 1))
+    with pytest.raises(RecurrenceError, match="full billing-period"):
+        amend(setup, schedule, effective_from=date(2025, 2, 2))
+    generate(setup, schedule, date(2025, 2, 1))
+    with pytest.raises(RecurrenceError, match="claimed period"):
+        amend(setup, schedule)
+    amended = amend(setup, schedule, effective_from=date(2025, 3, 1))
+    with pytest.raises(RecurrenceError, match="approved terms changed"):
+        amend(
+            setup,
+            schedule,
+            effective_from=date(2025, 4, 1),
+            expected_terms_id=initial.pk,
+        )
+    assert amended.version == 2
+    stop_recurring_schedule(
+        user=setup[0].owner,
+        organization=setup[1],
+        schedule_id=schedule.pk,
+        reason="Service ended",
+    )
+    with pytest.raises(RecurrenceError, match="disabled"):
+        amend(setup, schedule, effective_from=date(2025, 4, 1))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_amendment_and_generation_never_mix_approved_terms(setup):
+    schedule = enroll(setup)
+    user_id, organization_id = setup[0].owner.pk, setup[1].pk
+    initial = schedule.terms.get(version=1)
+
+    def revise():
+        close_old_connections()
+        try:
+            from apps.core.models import Organization
+
+            return amend_recurring_terms(
+                user=User.objects.get(pk=user_id),
+                organization=Organization.objects.get(pk=organization_id),
+                schedule_id=schedule.pk,
+                expected_terms_id=initial.pk,
+                expected_source_digest=initial.source_digest,
+                effective_from=date(2025, 2, 1),
+                business_date=date(2025, 1, 15),
+                description="Concurrent amendment",
+                unit_amount=Decimal("90.00"),
+                quantity=Decimal("3.000"),
+                currency="USD",
+                due_days=14,
+            ).pk
+        except RecurrenceError:
+            return None
+        finally:
+            close_old_connections()
+
+    def generate_period():
+        close_old_connections()
+        try:
+            from apps.core.models import Organization
+
+            return generate_recurring_draft(
+                user=User.objects.get(pk=user_id),
+                organization=Organization.objects.get(pk=organization_id),
+                schedule_id=schedule.pk,
+                starts_on=date(2025, 2, 1),
+                as_of=date(2025, 2, 1),
+            ).pk
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        amendment_result = executor.submit(revise)
+        generation_result = executor.submit(generate_period)
+        amendment_result.result()
+        generation_result.result()
+
+    claim = RecurringInvoicePeriod.objects.select_related("terms", "line").get()
+    assert (claim.terms.version, claim.line.unit_amount, claim.line.quantity) in {
+        (1, Decimal("75.0000"), Decimal("2.000")),
+        (2, Decimal("90.0000"), Decimal("3.000")),
+    }
+    assert claim.line.unit_amount == claim.terms.unit_amount
+    assert claim.line.quantity == claim.terms.quantity
 
 
 @pytest.mark.django_db
@@ -207,6 +346,33 @@ def test_guards_retain_calendar_terms_and_claims_below_the_service(setup):
 
 
 @pytest.mark.django_db
+def test_database_guard_rejects_skipped_and_unaligned_terms_versions(setup):
+    schedule = enroll(setup)
+    initial = schedule.terms.get(version=1)
+    values = {
+        "tenant_id": initial.tenant_id,
+        "organization_id": initial.organization_id,
+        "schedule_id": schedule.pk,
+        "description": "Unreviewed terms",
+        "quantity": Decimal("1.000"),
+        "unit_amount": Decimal("80.00"),
+        "currency": initial.currency,
+        "due_days": 30,
+        "source_snapshot": initial.source_snapshot,
+        "source_digest": initial.source_digest,
+        "approved_by_id": initial.approved_by_id,
+    }
+    for version, effective_from in ((3, date(2025, 2, 1)), (2, date(2025, 2, 2))):
+        with pytest.raises(DatabaseError), transaction.atomic():
+            RecurringInvoiceTerms.objects.create(
+                **values,
+                version=version,
+                effective_from=effective_from,
+            )
+    assert list(schedule.terms.values_list("version", flat=True)) == [1]
+
+
+@pytest.mark.django_db
 def test_client_scope_and_read_only_membership_are_enforced_before_data_is_returned(setup):
     installation, client, sibling, _, cost = setup
     schedule = enroll(setup)
@@ -226,6 +392,8 @@ def test_client_scope_and_read_only_membership_are_enforced_before_data_is_retur
             tenant=installation.tenant,
             organization=sibling,
             schedule=schedule,
+            version=2,
+            effective_from=date(2025, 2, 1),
             description="Wrong scope",
             quantity=1,
             unit_amount=1,
@@ -300,6 +468,7 @@ def test_guard_rollback_reapply_preserves_records_and_restores_rls(setup):
     schedule = enroll(setup)
     claim = generate(setup, schedule)
     migration = import_module("apps.core.migrations.0148_recurring_invoice_guards")
+    terms_migration = import_module("apps.core.migrations.0152_recurring_terms_versions")
     try:
         with connection.cursor() as cursor:
             cursor.execute(migration.REVERSE_SQL)
@@ -308,6 +477,7 @@ def test_guard_rollback_reapply_preserves_records_and_restores_rls(setup):
     finally:
         with connection.cursor() as cursor:
             cursor.execute(migration.FORWARD_SQL)
+            cursor.execute(terms_migration.FORWARD_GUARD_SQL)
     claim.refresh_from_db()
     assert claim.invoice.state == "draft" and claim.terms.unit_amount == Decimal("75.00")
     call_command("migrate", interactive=False, verbosity=0)
@@ -407,6 +577,24 @@ def test_upgrade_from_previous_schema_preserves_existing_invoice_and_adds_enroll
     assert generate(setup, enroll(setup)).invoice_id != invoice.pk
 
 
+@pytest.mark.django_db(transaction=True)
+def test_terms_upgrade_backfills_existing_version_from_schedule_anchor(setup):
+    schedule = enroll(setup, anchor=date(2025, 1, 31))
+    terms_id = schedule.terms.get(version=1).pk
+    try:
+        call_command("migrate", "core", "0151", interactive=False, verbosity=0)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name='core_recurringinvoiceterms' AND column_name='effective_from'"
+            )
+            assert cursor.fetchone() == (0,)
+    finally:
+        call_command("migrate", interactive=False, verbosity=0)
+    terms = RecurringInvoiceTerms.objects.get(pk=terms_id)
+    assert terms.version == 1 and terms.effective_from == date(2025, 1, 31)
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("interval", "anchor", "period_start", "period_end"),
@@ -443,6 +631,8 @@ def test_foreign_tenant_cannot_reuse_enrollment_or_terms(setup):
             tenant=foreign_tenant,
             organization=foreign_client,
             schedule=schedule,
+            version=2,
+            effective_from=date(2025, 2, 1),
             description="Foreign terms",
             quantity=1,
             unit_amount=1,

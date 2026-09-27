@@ -84,6 +84,20 @@ def recurring_source_digest(*, user: User, organization: Organization, cost_id: 
     return _digest(_snapshot(_source(_scope(user, organization), cost_id)))
 
 
+def _terms_for_start(
+    scope: DataScope, schedule: RecurringInvoiceSchedule, starts_on: date, *, lock: bool = False
+) -> RecurringInvoiceTerms:
+    terms = RecurringInvoiceTerms.scoped.for_scope(scope).select_related("tax_rate")
+    if lock:
+        terms = terms.select_for_update(of=("self",))
+    selected = (
+        terms.filter(schedule=schedule, effective_from__lte=starts_on).order_by("-effective_from", "-version").first()
+    )
+    if selected is None:
+        raise RecurrenceError("The approved recurring terms are unavailable for this period")
+    return selected
+
+
 def _save(record: models.Model) -> None:
     try:
         record.full_clean()
@@ -147,6 +161,7 @@ def enroll_recurring_schedule(
         tenant_id=scope.tenant_id,
         organization=organization,
         schedule=schedule,
+        effective_from=anchor,
         description=description,
         unit_amount=unit_amount,
         quantity=quantity,
@@ -166,6 +181,113 @@ def enroll_recurring_schedule(
         metadata={"schedule_id": str(schedule.pk)},
     )
     return schedule
+
+
+@transaction.atomic
+def amend_recurring_terms(
+    *,
+    user: User,
+    organization: Organization,
+    schedule_id: UUID,
+    expected_terms_id: UUID,
+    expected_source_digest: str,
+    effective_from: date,
+    business_date: date,
+    description: str,
+    unit_amount: Decimal,
+    quantity: Decimal,
+    currency: str,
+    due_days: int,
+    tax_rate_id: UUID | None = None,
+) -> RecurringInvoiceTerms:
+    """Append approved sell terms at a future full-period boundary."""
+    if type(effective_from) is not date or type(business_date) is not date:
+        raise RecurrenceError("Amendment requires explicit business dates")
+    if effective_from < business_date:
+        raise RecurrenceError("The amended terms cannot begin before the current business date")
+    scope = _scope(user, organization)
+    found = RecurringInvoiceSchedule.scoped.for_scope(scope).filter(pk=schedule_id).first()
+    if found is None:
+        raise RecurrenceError("The recurring schedule is unavailable in this Workspace")
+    cost = _source(scope, found.contract_cost_id, lock=True)
+    schedule = RecurringInvoiceSchedule.scoped.for_scope(scope).select_for_update().get(pk=schedule_id)
+    if not schedule.enabled:
+        raise RecurrenceError("This recurring schedule is disabled")
+    snapshot = _snapshot(cost)
+    if _digest(snapshot) != expected_source_digest:
+        raise RecurrenceError("The source terms changed; review them before amending")
+    latest = (
+        RecurringInvoiceTerms.scoped.for_scope(scope)
+        .select_for_update()
+        .filter(schedule=schedule)
+        .order_by("-version")
+        .first()
+    )
+    if latest is None or latest.pk != expected_terms_id:
+        raise RecurrenceError("The approved terms changed; review the schedule again")
+    if effective_from <= latest.effective_from:
+        raise RecurrenceError("The amended terms must begin after the current terms")
+    latest_claim = (
+        RecurringInvoicePeriod.scoped.for_scope(scope)
+        .select_for_update()
+        .filter(schedule=schedule)
+        .order_by("-starts_on")
+        .first()
+    )
+    if latest_claim is not None and effective_from <= latest_claim.starts_on:
+        raise RecurrenceError("The amended terms must begin after every claimed period")
+    periods = recurring_periods_due(
+        anchor=schedule.anchor,
+        interval=schedule.interval,
+        due_from=effective_from,
+        as_of=effective_from,
+        ends_on=schedule.ends_on,
+    )
+    if not periods or periods[0].starts_on != effective_from:
+        raise RecurrenceError("Choose a full billing-period start for the amended terms")
+    if periods[0].requires_proration_review:
+        raise RecurrenceError("Partial periods cannot begin amended recurring terms")
+    currency = normalize_currency(currency)
+    if currency != cost.currency or currency != latest.currency:
+        raise RecurrenceError("Amended sell terms must retain the schedule currency")
+    validate_amount(unit_amount, currency)
+    calculate_line(quantity=quantity, unit_amount=unit_amount, currency=currency)
+    tax_rate = None
+    if tax_rate_id is not None:
+        tax_rate = TaxRate.objects.filter(tenant_id=scope.tenant_id, pk=tax_rate_id).first()
+        if tax_rate is None:
+            raise RecurrenceError("The selected tax rate is unavailable")
+        _tax_date(tax_rate, effective_from)
+    terms = RecurringInvoiceTerms(
+        tenant_id=scope.tenant_id,
+        organization=organization,
+        schedule=schedule,
+        version=latest.version + 1,
+        effective_from=effective_from,
+        description=description,
+        unit_amount=unit_amount,
+        quantity=quantity,
+        currency=currency,
+        due_days=due_days,
+        tax_rate=tax_rate,
+        source_snapshot=snapshot,
+        source_digest=expected_source_digest,
+        approved_by=user,
+    )
+    _save(terms)
+    AuditEvent.objects.create(
+        tenant_id=scope.tenant_id,
+        actor=user,
+        action="invoice.recurring_terms_amended",
+        entity_id=cost.contract.entity_id,
+        metadata={
+            "schedule_id": str(schedule.pk),
+            "terms_id": str(terms.pk),
+            "version": terms.version,
+            "effective_from": terms.effective_from.isoformat(),
+        },
+    )
+    return terms
 
 
 def _tax_date(tax_rate: TaxRate, starts_on: date) -> None:
@@ -198,7 +320,7 @@ def generate_recurring_draft(
         return existing
     if not schedule.enabled:
         raise RecurrenceError("This recurring schedule is disabled")
-    terms = RecurringInvoiceTerms.scoped.for_scope(scope).select_related("tax_rate").get(schedule=schedule, version=1)
+    terms = _terms_for_start(scope, schedule, starts_on, lock=True)
     if _digest(_snapshot(cost)) != terms.source_digest:
         raise RecurrenceError("The source terms changed; review the schedule before generating more drafts")
     periods = recurring_periods_due(

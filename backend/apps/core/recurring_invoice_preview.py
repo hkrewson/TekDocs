@@ -13,9 +13,17 @@ from django.utils import timezone
 from apps.accounts.models import User
 
 from .invoice_recurrence import MAX_RECURRING_PERIODS, RecurrenceError, recurring_periods_due
-from .models import Organization, RecurringInvoicePeriod, RecurringInvoiceSchedule, RecurringInvoiceTerms
+from .models import Organization, RecurringInvoicePeriod, RecurringInvoiceSchedule
 from .money import calculate_line, render_amount
-from .recurring_invoices import _digest, _scope, _snapshot, _source, _tax_date, generate_recurring_draft
+from .recurring_invoices import (
+    _digest,
+    _scope,
+    _snapshot,
+    _source,
+    _tax_date,
+    _terms_for_start,
+    generate_recurring_draft,
+)
 
 PREVIEW_SALT = "tekdocs.recurring-invoices.preview.v1"
 PREVIEW_MAX_AGE = 15 * 60
@@ -50,7 +58,11 @@ def _plan(
     schedule = RecurringInvoiceSchedule.scoped.for_scope(scope).select_for_update().get(pk=schedule_id)
     if not schedule.enabled:
         raise RecurrenceError("This recurring schedule is disabled")
-    terms = RecurringInvoiceTerms.scoped.for_scope(scope).select_related("tax_rate").get(schedule=schedule, version=1)
+    ordered_starts = sorted(starts_on)
+    selected_terms = [_terms_for_start(scope, schedule, start, lock=True) for start in ordered_starts]
+    if len({terms.pk for terms in selected_terms}) != 1:
+        raise RecurrenceError("Review periods with different approved terms separately")
+    terms = selected_terms[0]
     if _digest(_snapshot(cost)) != terms.source_digest:
         raise RecurrenceError("The source terms changed; review the schedule before generating more drafts")
     amounts = calculate_line(
@@ -61,7 +73,7 @@ def _plan(
         tax_inclusive=terms.tax_rate.inclusive if terms.tax_rate else False,
     )
     periods = []
-    for start in sorted(starts_on):
+    for start in ordered_starts:
         if start > as_of:
             raise RecurrenceError("Future billing periods are not yet due")
         due = recurring_periods_due(
@@ -180,15 +192,14 @@ def discover_recurring_periods(
     """Read-only discovery; apply independently rechecks every condition under locks."""
     scope = _scope(user, organization)
     schedule = RecurringInvoiceSchedule.scoped.for_scope(scope).get(pk=schedule_id)
-    terms = RecurringInvoiceTerms.scoped.for_scope(scope).select_related("tax_rate").get(schedule=schedule, version=1)
     reason = ""
+    source_digest = ""
     if not schedule.enabled:
         reason = "disabled"
     else:
         try:
             cost = _source(scope, schedule.contract_cost_id)
-            if _digest(_snapshot(cost)) != terms.source_digest:
-                reason = "source_changed"
+            source_digest = _digest(_snapshot(cost))
         except RecurrenceError:
             reason = "source_unavailable"
     periods = recurring_periods_due(
@@ -207,6 +218,9 @@ def discover_recurring_periods(
     results = []
     for period in periods:
         blocked = reason
+        terms = _terms_for_start(scope, schedule, period.starts_on)
+        if not blocked and source_digest != terms.source_digest:
+            blocked = "source_changed"
         if period.requires_proration_review:
             blocked = "partial"
         if terms.tax_rate and not blocked:

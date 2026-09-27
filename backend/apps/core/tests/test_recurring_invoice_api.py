@@ -87,6 +87,30 @@ def test_source_enrollment_preview_apply_and_retry(browser, setup):
 
 
 @pytest.mark.django_db
+def test_preview_requires_separate_review_across_terms_versions(browser, setup):
+    schedule = enroll(setup)
+    amended = recurrence_fixtures.amend(setup, schedule)
+    detail = browser.get(url(setup, "detail", schedule))
+    assert detail.status_code == 200
+    assert [(terms["version"], terms["effective_from"]) for terms in detail.json()["terms"]] == [
+        (1, "2025-01-01"),
+        (2, "2025-02-01"),
+    ]
+    crossing = preview(browser, setup, schedule)
+    assert crossing.status_code == 409 and Invoice.objects.count() == 0
+    reviewed = preview(
+        browser,
+        setup,
+        schedule,
+        starts_on=["2025-02-01"],
+        as_of="2025-02-01",
+    )
+    assert reviewed.status_code == 200, reviewed.content
+    assert reviewed.json()["terms_id"] == str(amended.pk)
+    assert reviewed.json()["periods"][0]["total"] == "270.00"
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize("change", ["source", "disabled", "tampered", "expired", "other_actor"])
 def test_changed_or_invalid_previews_do_not_generate(browser, setup, change):
     schedule = enroll(setup)

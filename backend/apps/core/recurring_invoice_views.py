@@ -64,6 +64,7 @@ class RecurringEnrollmentSerializer(StrictSerializer):
 class RecurringTermsSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     version = serializers.IntegerField()
+    effective_from = serializers.DateField()
     description = serializers.CharField()
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
     unit_amount = serializers.DecimalField(max_digits=18, decimal_places=4)

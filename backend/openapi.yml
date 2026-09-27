@@ -44386,6 +44386,9 @@ components:
           format: uuid
         version:
           type: integer
+        effective_from:
+          type: string
+          format: date
         description:
           type: string
         quantity:
@@ -44410,6 +44413,7 @@ components:
       - currency
       - description
       - due_days
+      - effective_from
       - id
       - quantity
       - source_digest

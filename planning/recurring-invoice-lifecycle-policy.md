@@ -107,3 +107,10 @@ future schedule terms.
 These exclusions preserve the current append-only financial boundary. They may
 be reconsidered only with an explicit lineage and correction design rather than
 an enable toggle or mutable schedule fields.
+
+## Implementation checkpoints
+
+The retained schema, database guards, amendment service boundary, generation
+selection, compatibility notes, and focused verification are recorded in
+[Effective recurring invoice terms](recurring-invoice-terms-versions.md). The
+operator amendment API and interface remain the next lifecycle slice.

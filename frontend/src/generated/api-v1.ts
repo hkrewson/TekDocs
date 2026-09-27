@@ -13559,6 +13559,8 @@ export interface components {
             /** Format: uuid */
             readonly id: string;
             readonly version: number;
+            /** Format: date */
+            readonly effective_from: string;
             readonly description: string;
             /** Format: decimal */
             readonly quantity: string;

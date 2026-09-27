@@ -50,11 +50,11 @@ field invalidates an earlier preview.
 
 ## Next lifecycle slice
 
-The retained withdrawal data, service, and API boundary is complete in
+The retained withdrawal service and invoice-screen workflow are complete in
 [recurring-invoice-draft-withdrawal.md](recurring-invoice-draft-withdrawal.md).
-Add its focused invoice-screen confirmation and retained-history presentation,
-then extend recovery and live browser acceptance across both amendments and
-withdrawals.
+The isolated recovery rehearsal now proves both append-only terms and withdrawn
+draft history survive a clean restore and drive the next generated period.
+Live browser-to-Django-to-PostgreSQL acceptance remains before final closure.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

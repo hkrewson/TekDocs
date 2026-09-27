@@ -75,10 +75,11 @@ withdrawal route.
 
 ## Next slice
 
-Extend recovery fixtures and live browser acceptance across terms amendments
-and withdrawals, including narrow-screen and keyboard checks. Close the final
-recurring-invoice acceptance matrix alongside the remaining pre-1.0 release
-evidence.
+The isolated backup/restore fixture now retains the withdrawal, its immutable
+reason/actor/time and audit identity, and the frozen invoice and line alongside
+the amended terms history. Complete the live browser-to-Django-to-PostgreSQL
+journey for amendment and withdrawal, then close the final recurring-invoice
+acceptance matrix alongside the remaining pre-1.0 release evidence.
 
 Deployment, external push, Wiki publication, and a version change remain outside
 this checkpoint.

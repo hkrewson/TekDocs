@@ -1,9 +1,10 @@
-# Stopped recurring schedule recovery
+# Recurring invoice lifecycle recovery
 
 Issue #76 continuation after the operator stop workflow. Version remains
 `0.8.46`. This checkpoint extends the existing recurring-invoice recovery
-rehearsal; it does not change the application schema, API, authorization policy,
-invoice lifecycle, or deployment state.
+rehearsal. It now covers stopped schedules, effective terms amendments, and
+retained draft withdrawals without changing the application schema, API,
+authorization policy, invoice lifecycle, or deployment state.
 
 ## Recovery boundary
 
@@ -34,14 +35,30 @@ forced-RLS, sibling-client and wrong-tenant isolation, immutable-history, runtim
 role, retained provenance, unissued-draft, and Django system checks remain in the
 same rehearsal.
 
+The active schedule now also retains a second approved terms version effective
+on the February 28 boundary. Its description, quantity, price, tax, due days,
+source snapshot, approver, amendment audit identity, and effective date are part
+of the external manifest. The January draft is withdrawn before backup. The
+withdrawal identifier, first reason, actor, time, related period/invoice, and
+value-minimized audit event are independently recorded.
+
+After restore, direct database attempts to rewrite or delete the withdrawal, or
+to change its retained invoice and line, must fail. Sibling and wrong-tenant
+scopes must not see the withdrawal. Retrying the January generation continues
+to return the same withdrawn claim without reopening it. The February 28 draft
+must use the restored second terms version at quantity 3 and USD 80, proving the
+effective-boundary selection survived recovery.
+
 ## Verification
 
 **Verified:** `make recurring-invoice-backup-rehearsal` passed with disposable
 source and restore stacks. The independently serialized baseline matched before
 post-restore actions. The stopped schedule retained its exact audit and invoice,
 refused future generation, and produced no duplicate event on retry. The active
-schedule retained month-end continuation and idempotent claims. Both stacks,
-their volumes, and temporary artifacts were cleaned up.
+schedule retained month-end continuation, its append-only terms amendment, the
+withdrawn first claim, immutable reason and audit identity, idempotent claims,
+and amended generation. Both stacks, their volumes, images, and temporary
+artifacts were cleaned up.
 
 The fixture passes the backend Ruff configuration and formatting check, Python
 compilation, shell syntax from the unchanged rehearsal, and `git diff --check`.
@@ -50,11 +67,10 @@ recovery fixture and its evidence.
 
 ## Remaining decisions
 
-Effective schedule amendments, replacement and any restart workflow remain
-unsupported. Before adding them, define effective dates, overlap and gap
-handling, treatment of permanently claimed periods, source-term reapproval, and
-the relationship to invoice cancellation or credit. Partial-period charging also
-remains a manual refusal rather than an automatic calculation.
+Replacement and restart workflows remain unsupported. Effective amendments and
+retained withdrawal now follow the decisions in the lifecycle policy. Automatic
+proration remains refused, and issued-invoice corrections continue through the
+separate void/credit lifecycle.
 
 Final recurring-feature risk disposition, the applicable security and pilot
 evidence, the full release gate, and Wiki checkout reconciliation remain open.

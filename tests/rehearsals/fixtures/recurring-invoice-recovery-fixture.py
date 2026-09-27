@@ -16,6 +16,7 @@ from apps.accounts.models import User
 from apps.core.billing import create_tax_rate_version
 from apps.core.commercial import create_contract, create_cost
 from apps.core.invoice_recurrence import RecurrenceError
+from apps.core.invoicing import withdraw_recurring_draft
 from apps.core.models import (
     AuditEvent,
     CommercialContract,
@@ -29,6 +30,7 @@ from apps.core.models import (
     RecurringInvoicePeriod,
     RecurringInvoiceSchedule,
     RecurringInvoiceTerms,
+    RecurringInvoiceWithdrawal,
     TaxRate,
 )
 from apps.core.organizations import create_organization
@@ -38,6 +40,7 @@ from apps.core.recurring_invoice_preview import (
     preview_recurring_drafts,
 )
 from apps.core.recurring_invoices import (
+    amend_recurring_terms,
     enroll_recurring_schedule,
     generate_recurring_draft,
     recurring_source_digest,
@@ -55,12 +58,19 @@ MODELS = (
     RecurringInvoiceSchedule,
     RecurringInvoiceTerms,
     RecurringInvoicePeriod,
+    RecurringInvoiceWithdrawal,
     Invoice,
     InvoiceLine,
 )
-RECURRING_MODELS = (RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod)
+RECURRING_MODELS = (
+    RecurringInvoiceSchedule,
+    RecurringInvoiceTerms,
+    RecurringInvoicePeriod,
+    RecurringInvoiceWithdrawal,
+)
 ANCHOR = date(2025, 1, 31)
 STOP_REASON = "Client ended the recurring service"
+WITHDRAWAL_REASON = "Client cancelled this recovered billing period"
 
 
 def snapshot():
@@ -183,6 +193,33 @@ def create_fixture():
         )
         claim = review_and_apply(result.owner, client, schedule, ANCHOR)
         assert claim.ends_before == date(2025, 2, 28)
+        first_terms = RecurringInvoiceTerms.objects.get(schedule=schedule, version=1)
+        amended_terms = amend_recurring_terms(
+            user=result.owner,
+            organization=client,
+            schedule_id=schedule.pk,
+            expected_terms_id=first_terms.pk,
+            expected_source_digest=recurring_source_digest(user=result.owner, organization=client, cost_id=cost.pk),
+            effective_from=date(2025, 2, 28),
+            business_date=date(2025, 2, 1),
+            description="Amended recovery support",
+            quantity=Decimal("3.000"),
+            unit_amount=Decimal("80.00"),
+            currency="USD",
+            due_days=45,
+            tax_rate_id=tax.pk,
+        )
+        withdrawal = withdraw_recurring_draft(
+            invoice=claim.invoice,
+            actor_id=result.owner.pk,
+            reason=WITHDRAWAL_REASON,
+        )
+        amendment_event = AuditEvent.objects.get(
+            action="invoice.recurring_terms_amended", metadata__terms_id=str(amended_terms.pk)
+        )
+        withdrawal_event = AuditEvent.objects.get(
+            action="invoice.recurring_draft_withdrawn", entity_id=claim.invoice.entity_id
+        )
 
         stopped_contract = create_contract(
             tenant=result.tenant,
@@ -242,6 +279,10 @@ def create_fixture():
                     "sibling": str(sibling.pk),
                     "schedule": str(schedule.pk),
                     "claim": str(claim.pk),
+                    "amended_terms": str(amended_terms.pk),
+                    "withdrawal": str(withdrawal.pk),
+                    "amendment_event": audit_snapshot(amendment_event),
+                    "withdrawal_event": audit_snapshot(withdrawal_event),
                     "stopped_schedule": str(stopped_schedule.pk),
                     "stopped_claim": str(stopped_claim.pk),
                     "stop_event": audit_snapshot(stop_event),
@@ -249,7 +290,7 @@ def create_fixture():
                 }
             )
         )
-    print("Created active and stopped recurring drafts with an external identity manifest.")
+    print("Created amended, withdrawn, active, and stopped recurring history with an external identity manifest.")
 
 
 def verify_fixture():
@@ -278,12 +319,23 @@ def verify_fixture():
         assert snapshot() == expected["snapshot"], "Restored billing identities or values differ from backup"
         schedule = RecurringInvoiceSchedule.objects.get(pk=expected["schedule"])
         claim = RecurringInvoicePeriod.objects.select_related("line", "invoice", "terms").get(pk=expected["claim"])
+        amended_terms = RecurringInvoiceTerms.objects.get(pk=expected["amended_terms"])
+        withdrawal = RecurringInvoiceWithdrawal.objects.select_related("period__invoice").get(pk=expected["withdrawal"])
         stopped_schedule = RecurringInvoiceSchedule.objects.get(pk=expected["stopped_schedule"])
         stopped_claim = RecurringInvoicePeriod.objects.select_related("line", "invoice", "terms").get(
             pk=expected["stopped_claim"]
         )
         stop_event = AuditEvent.objects.get(pk=expected["stop_event"]["id"])
+        amendment_event = AuditEvent.objects.get(pk=expected["amendment_event"]["id"])
+        withdrawal_event = AuditEvent.objects.get(pk=expected["withdrawal_event"]["id"])
         assert audit_snapshot(stop_event) == expected["stop_event"]
+        assert audit_snapshot(amendment_event) == expected["amendment_event"]
+        assert audit_snapshot(withdrawal_event) == expected["withdrawal_event"]
+        assert amended_terms.version == 2 and amended_terms.effective_from == date(2025, 2, 28)
+        assert amended_terms.quantity == Decimal("3.000") and amended_terms.unit_amount == Decimal("80.0000")
+        assert amended_terms.source_snapshot["amount"] == "20.00"
+        assert withdrawal.period_id == claim.pk and withdrawal.reason == WITHDRAWAL_REASON
+        assert withdrawal.withdrawn_by_id == owner.pk
         assert not stopped_schedule.enabled
         assert stopped_claim.line.unit_amount == Decimal("90.0000")
         assert stopped_claim.terms.source_snapshot["amount"] == "35.00"
@@ -298,6 +350,10 @@ def verify_fixture():
             lambda: RecurringInvoiceTerms.objects.filter(pk=claim.terms_id).update(unit_amount=Decimal("1.00")),
             lambda: RecurringInvoicePeriod.objects.filter(pk=claim.pk).update(starts_on=date(2025, 2, 1)),
             lambda: RecurringInvoicePeriod.objects.filter(pk=claim.pk).delete(),
+            lambda: RecurringInvoiceWithdrawal.objects.filter(pk=withdrawal.pk).update(reason="rewritten"),
+            lambda: RecurringInvoiceWithdrawal.objects.filter(pk=withdrawal.pk).delete(),
+            lambda: Invoice.objects.filter(pk=claim.invoice_id).update(notes="rewritten"),
+            lambda: InvoiceLine.objects.filter(pk=claim.line_id).update(description="rewritten"),
         ):
             try:
                 with transaction.atomic():
@@ -369,9 +425,16 @@ def verify_fixture():
         following = review_and_apply(owner, client, schedule, date(2025, 2, 28))
         assert following.ends_before == date(2025, 3, 31), "Restore lost the original month-end anchor"
         assert following.invoice_id != claim.invoice_id
+        assert following.terms_id == amended_terms.pk
+        assert following.line.quantity == Decimal("3.000")
+        assert following.line.unit_amount == Decimal("80.0000")
         assert review_and_apply(owner, client, schedule, date(2025, 2, 28)).pk == following.pk
         assert RecurringInvoicePeriod.objects.count() == Invoice.objects.count() == InvoiceLine.objects.count() == 3
-    print("Verified exact restoration, stopped-schedule history, forced RLS, safe retries, and active continuation.")
+        assert RecurringInvoiceWithdrawal.objects.count() == 1
+    print(
+        "Verified exact restoration, amendments, withdrawal retention, stopped-schedule history, forced RLS, "
+        "safe retries, and active continuation."
+    )
 
 
 mode = os.environ.get("TEKDOCS_FIXTURE_MODE")

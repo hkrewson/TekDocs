@@ -24,11 +24,15 @@ authoritative.
   sync interval. Credentials remain a separate replacement workflow. NetBox site
   roots are normalized to the provider's `/api/` endpoint on create, edit and sync,
   including connections saved before this correction.
-- Unmatched NetBox observations expose a direct **Link or create** action. The
+- Unmatched NetBox observations expose a direct **Link to TekDocs** action in
+  the TekDocs-record column, beside the missing relationship instead of in a
+  far-right action column. The
   matching search is explicitly identified as TekDocs-only, carries the remote
   type and ID without retyping, and permits an existing eligible record to be
   linked. A NetBox rack can create and link a TekDocs rack in one transaction
-  after the operator selects its required TekDocs site and optional location.
+  after the operator selects its required TekDocs site and optional location;
+  the drawer opens on existing-record linking and presents creation as a clear
+  alternative.
 - Both MSP and organization routes fit 320, 390, 768, 1024, 1280 and 1440px in
   Chromium, Firefox and WebKit without horizontal page overflow or automated
   accessibility violations.
@@ -85,3 +89,12 @@ one transaction. It never writes to NetBox. Direct creation for devices, VLANs,
 prefixes, addresses, and MAC addresses remains a later extension because those
 records require product, addressing, or asset dependencies that cannot be safely
 guessed from the current value-minimized observation.
+
+### Linking visibility correction
+
+The original action was technically available but placed beyond the core record
+state in a wide table, and unmatched racks opened with creation preselected. The
+corrected layout puts **Link to TekDocs** in the visible TekDocs-record cell in
+both Source records and Reconciliation. Racks now start with **Link it to an
+existing TekDocs rack** selected, while **Create a TekDocs rack from this record**
+remains available when no corresponding rack exists.

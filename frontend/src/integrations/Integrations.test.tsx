@@ -189,28 +189,30 @@ describe('Integrations', () => {
     const provider = providerClient()
     const conflict: IntegrationConflict = {
       id: 'conflict-unmatched', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 42, name: 'Users' }, remote_type: 'ipam.vlan', remote_id: '42', difference: 'unmatched',
+      local_entity_id: null, provider_values: { id: 42, name: 'Rack 1' }, remote_type: 'dcim.rack', remote_id: '42', difference: 'unmatched',
       status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
     }
     vi.mocked(provider.listConflicts)
       .mockResolvedValueOnce({ results: [conflict], page: 1, page_size: 50, count: 1, has_more: false })
       .mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'vlan-1', local_entity_name: 'Users VLAN', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'rack-1', local_entity_name: 'Main rack', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
     const networks = {
       netBoxChoiceCollection: vi.fn().mockResolvedValue({
-        results: [{ id: 'vlan-1', name: 'Users VLAN', entity_type: 'network_vlan', object_type: 'ipam.vlan', linked: false }],
+        results: [{ id: 'rack-1', name: 'Main rack', entity_type: 'network_rack', object_type: 'dcim.rack', linked: false }],
         selected: null, page: 1, page_size: 25, count: 1, has_more: false, can_manage: true,
       }),
     } as unknown as NetworksClient
     const user = userEvent.setup()
 
     setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
-    await user.click(await screen.findByRole('button', { name: 'Link or create' }))
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    expect(screen.getByRole('heading', { name: 'Link NetBox record' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'Link it to an existing TekDocs rack' })).toBeChecked()
     expect(screen.getByText(/contains TekDocs records only/i)).toBeInTheDocument()
-    await user.click(await screen.findByRole('radio', { name: /Users VLAN/i }))
+    await user.click(await screen.findByRole('radio', { name: /Main rack/i }))
     await user.click(screen.getByRole('button', { name: 'Link record' }))
 
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'vlan-1' }))
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'rack-1' }))
     expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
   })
 

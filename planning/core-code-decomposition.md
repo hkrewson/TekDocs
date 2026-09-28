@@ -76,15 +76,24 @@ module. The views retain request handling and expose the imported serializer nam
 for compatibility. URL safety validation, observation diffs and response fields
 remain unchanged.
 
-This seam was selected because both panels already have explicit open/close
-boundaries and no independent server state. Their extraction reduces the route
-component without inventing a parallel state authority, changing markup, or
-weakening the shared unsaved-change guard.
+Document creation and update, file-backed creation, Markdown import, bounded
+collection queries, topic conversion, preflight and legacy-section restructure
+contracts now live in `document_authoring_serializers.py`. Document views import
+that focused contract directly. The established `serializers` module re-exports
+every prior name so internal and third-party imports retain the same class
+identity. Validation, schema component names, routes, permissions and persistence
+remain unchanged.
+
+These seams follow existing interaction and request boundaries. The frontend
+panels keep state authority in the route coordinator, while backend request
+handlers import focused contracts and the compatibility module retains public
+names. No extraction introduces competing state, changes markup, or weakens the
+shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Continue splitting backend document serializers/views by the existing
-   authoring, reuse, key and export domains.
+1. Continue splitting backend document serializers/views by the existing reuse,
+   key and export domains.
 2. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.

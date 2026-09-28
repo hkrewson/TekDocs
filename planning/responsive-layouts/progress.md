@@ -3250,3 +3250,20 @@ Focused backend tests cover the coded denial and absence of a saved connection.
 Fourteen integration component/API tests cover the retained draft, password flow,
 safe retry and existing providers. Frontend lint, type checking, production build
 and bundle budgets, plus backend Ruff and MyPy, pass. Version remains 0.8.46.
+
+## Document authoring serializer decomposition — 2026-09-27
+
+The next #40 maintainability slice moves document creation and update,
+file-backed creation, Markdown import, bounded collection queries, topic
+conversion, preflight, and legacy-section restructure contracts into
+`document_authoring_serializers.py`. Document request handlers import the focused
+module directly, while `serializers.py` retains explicit compatibility exports
+with the same class identities.
+
+The extraction changes no route, field, validation rule, schema component,
+permission, stored data, migration, recovery format, interface behavior, or
+version. The focused document, operations, attachment-security and topic-schema
+workflow suite passes, as do Ruff on the changed modules, MyPy across all 199
+backend source files, compatibility-export identity checks and OpenAPI agreement.
+Schema generation retains only its four known operation-ID warnings. The broader
+serializer/view sequence now continues with reuse, key and export domains.

@@ -96,7 +96,7 @@ describe('provider integrations API', () => {
     await browserIntegrationsClient.listJobs(workspace)
     await browserIntegrationsClient.listLogs(workspace)
     await browserIntegrationsClient.listObservations(workspace, { page: 2, page_size: 25, q: 'arrakis', remote_type: 'dcim.device' })
-    await browserIntegrationsClient.listConflicts(workspace)
+    await browserIntegrationsClient.listConflicts(workspace, { page: 2, page_size: 25, q: 'arrakis', remote_type: 'dcim.device', status: 'open' })
     await browserIntegrationsClient.listGitExports(workspace)
     await browserIntegrationsClient.listHaloTickets(workspace)
     await expect(browserIntegrationsClient.listConnections(workspace)).rejects.toMatchObject({
@@ -106,7 +106,7 @@ describe('provider integrations API', () => {
       '/api/v1/workspaces/organizations/client%2Fone/integrations/jobs?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/logs?page=1&page_size=50',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/observations?page=2&page_size=25&q=arrakis&remote_type=dcim.device',
-      '/api/v1/workspaces/organizations/client%2Fone/integrations/conflicts?page=1&page_size=50',
+      '/api/v1/workspaces/organizations/client%2Fone/integrations/conflicts?page=2&page_size=25&q=arrakis&remote_type=dcim.device&status=open',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/git-exports',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/halo/tickets',
       '/api/v1/workspaces/organizations/client%2Fone/integrations/connections',

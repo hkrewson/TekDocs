@@ -2,6 +2,22 @@
 
 Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 6 bounded integration review checkpoint — 2026-09-27
+
+Current source rows now receive their exact open reconciliation summary from the
+bounded observation API, so **Link to TekDocs** cannot disappear when conflict
+history exceeds a first page. Reconciliation filters to open work on the server
+before applying deterministic 25-row paging, full-collection search and source-type
+filters; those controls persist in the page URL. The unfiltered conflict API remains
+compatible for existing consumers and resolved decisions remain retained.
+
+Focused PostgreSQL tests cover current-record review summaries and prove that thirty
+resolved items cannot displace later open NetBox work. The integration component and
+browser-client suites cover open-only requests, durable search and explicit review
+actions. OpenAPI/generated types, frontend lint/types/build and bundle budgets pass.
+The local 0.8.46 services were refreshed. Production deployment, publication and the
+Phase 8 human walkthrough remain separate.
+
 ## Phase 6 integration connection correction checkpoint — 2026-09-27
 
 Existing integration connections now expose focused editing for their display name,

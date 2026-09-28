@@ -12240,6 +12240,7 @@ export interface components {
             readonly linked_local_entity_name: string;
             readonly accepted: boolean;
             readonly stale: boolean;
+            readonly open_conflict: components["schemas"]["Conflict"] | null;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
         readonly ObservationPage: {
@@ -22539,7 +22540,19 @@ export interface operations {
     };
     readonly workspaces_msp_integrations_conflicts_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly remote_type?: string;
+                /**
+                 * @description * `open` - Open
+                 *     * `keep_local` - Keep local
+                 *     * `accept_remote` - Accept remote identity
+                 *     * `ignored` - Ignored
+                 */
+                readonly status?: "open" | "keep_local" | "accept_remote" | "ignored" | "";
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -31119,7 +31132,19 @@ export interface operations {
     };
     readonly workspaces_organizations_integrations_conflicts_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly q?: string;
+                readonly remote_type?: string;
+                /**
+                 * @description * `open` - Open
+                 *     * `keep_local` - Keep local
+                 *     * `accept_remote` - Accept remote identity
+                 *     * `ignored` - Ignored
+                 */
+                readonly status?: "open" | "keep_local" | "accept_remote" | "ignored" | "";
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

@@ -9,6 +9,7 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -359,6 +360,16 @@ def test_observation_api_lists_each_current_source_record_once_and_supports_sear
         fingerprint="b" * 64,
         safe_projection={"name": "Arrakis"},
     )
+    conflict = IntegrationConflict.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        connection=source,
+        observation=current,
+        remote_type="dcim.device",
+        remote_id="17",
+        difference="unmatched",
+    )
     IntegrationObservation.objects.create(
         tenant=source.tenant,
         workspace=source.workspace,
@@ -381,10 +392,68 @@ def test_observation_api_lists_each_current_source_record_once_and_supports_sear
     assert response.json()["count"] == 2
     assert [item["remote_type"] for item in response.json()["results"]] == ["dcim.device", "ipam.ipaddress"]
     assert response.json()["results"][0]["id"] == str(current.id)
+    assert response.json()["results"][0]["open_conflict"]["id"] == str(conflict.id)
+    assert response.json()["results"][0]["open_conflict"]["provider_values"] == {"name": "Arrakis"}
+    assert response.json()["results"][1]["open_conflict"] is None
 
     searched = browser.get(url, {"q": "arrakis", "remote_type": "dcim.device"})
     assert searched.status_code == 200
     assert [item["id"] for item in searched.json()["results"]] == [str(current.id)]
+
+
+@pytest.mark.django_db
+def test_conflict_api_filters_open_review_queue_before_paging(installation):
+    record = organization(installation, "Bounded review client")
+    source = connection(installation, record, name="Review source")
+    for number in range(30):
+        IntegrationConflict.objects.create(
+            tenant=source.tenant,
+            workspace=source.workspace,
+            organization=source.organization,
+            connection=source,
+            remote_type="ipam.ipaddress",
+            remote_id=f"resolved-{number}",
+            difference="unmatched",
+            status="ignored",
+            resolved_by=installation.owner,
+            resolved_at=timezone.now(),
+        )
+    expected = IntegrationConflict.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        connection=source,
+        remote_type="dcim.device",
+        remote_id="arrakis-23",
+        difference="unmatched",
+    )
+    IntegrationConflict.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        connection=source,
+        remote_type="dcim.rack",
+        remote_id="rack-24",
+        difference="unmatched",
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-integration-conflict-list",
+        kwargs={"organization_entity_id": record.entity_id},
+    )
+
+    open_queue = browser.get(url, {"page": 1, "page_size": 25, "status": "open"})
+    assert open_queue.status_code == 200
+    assert open_queue.json()["count"] == 2
+
+    searched = browser.get(
+        url,
+        {"page": 1, "page_size": 25, "status": "open", "remote_type": "dcim.device", "q": "arrakis"},
+    )
+    assert searched.status_code == 200
+    assert searched.json()["count"] == 1
+    assert searched.json()["results"][0]["id"] == str(expected.id)
 
 
 @pytest.mark.django_db(transaction=True)

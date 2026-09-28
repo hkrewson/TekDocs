@@ -1125,7 +1125,7 @@ def adopt_netbox_conflict(
         if conflict.remote_type != "dcim.rack":
             raise ValidationError({"detail": "Direct creation is currently available for NetBox racks."})
         try:
-            created = create_rack(
+            created_rack = create_rack(
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=actor.pk,
@@ -1137,7 +1137,7 @@ def adopt_netbox_conflict(
             )
         except NetworkInventoryError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created.entity_id
+        selected_entity_id = created_rack.entity_id
     elif asset is not None:
         if conflict.remote_type != "dcim.device":
             raise ValidationError({"detail": "Direct asset creation is available for NetBox devices."})
@@ -1151,7 +1151,7 @@ def adopt_netbox_conflict(
             )
             if model.product.kind != "hardware":
                 raise InventoryError("Choose an active hardware supplier model.")
-            created = create_client_asset(
+            created_asset = create_client_asset(
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 actor_id=actor.pk,
@@ -1161,7 +1161,7 @@ def adopt_netbox_conflict(
         except (CatalogModel.DoesNotExist, InventoryError) as exc:
             detail = str(exc) if isinstance(exc, InventoryError) else "Choose an active hardware supplier model."
             raise ValidationError({"detail": detail}) from exc
-        selected_entity_id = created.entity_id
+        selected_entity_id = created_asset.entity_id
 
     if selected_entity_id is None:
         raise ValidationError({"detail": "Choose a TekDocs record to link."})

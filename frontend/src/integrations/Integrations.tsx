@@ -58,6 +58,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [observations, setObservations] = useState<IntegrationObservation[]>([])
   const [observationPage, setObservationPage] = useState({ page: 1, page_size: 25, count: 0, has_more: false })
   const [conflicts, setConflicts] = useState<IntegrationConflict[]>([])
+  const [conflictPage, setConflictPage] = useState({ page: 1, page_size: 25, count: 0, has_more: false })
   const [exports, setExports] = useState<GitExportBundle[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
   const [selected, setSelected] = useState<string[]>([])
@@ -77,6 +78,12 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const sourceSearch = params.get('source_search') ?? ''
   const sourceType = params.get('source_type') ?? ''
   const [sourceSearchDraft, setSourceSearchDraft] = useState(sourceSearch)
+  const [sourceSearchParam, setSourceSearchParam] = useState(sourceSearch)
+  const reviewPage = Math.max(1, Number(params.get('review_page')) || 1)
+  const reviewSearch = params.get('review_search') ?? ''
+  const reviewType = params.get('review_type') ?? ''
+  const [reviewSearchDraft, setReviewSearchDraft] = useState(reviewSearch)
+  const [reviewSearchParam, setReviewSearchParam] = useState(reviewSearch)
   const phase = loadState.section === section ? loadState.value : 'loading'
   const connectionDirty = showForm && JSON.stringify(draft) !== JSON.stringify(EMPTY_CONNECTION)
   const rotationDirty = Boolean(rotating && Object.values(rotating.credentials).some(Boolean))
@@ -94,7 +101,14 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     setError(null)
   })
 
-  useEffect(() => setSourceSearchDraft(sourceSearch), [sourceSearch])
+  if (sourceSearchParam !== sourceSearch) {
+    setSourceSearchParam(sourceSearch)
+    setSourceSearchDraft(sourceSearch)
+  }
+  if (reviewSearchParam !== reviewSearch) {
+    setReviewSearchParam(reviewSearch)
+    setReviewSearchDraft(reviewSearch)
+  }
 
   useEffect(() => {
     if (!['connections', 'reconciliation', 'exports'].includes(section)) return
@@ -106,18 +120,23 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
         providerClient.listJobs(workspace, controller.signal),
         providerClient.listLogs(workspace, controller.signal),
         providerClient.listObservations(workspace, { page: sourcePage, page_size: 25, q: sourceSearch, remote_type: sourceType }, controller.signal),
-        providerClient.listConflicts(workspace, controller.signal),
-      ]).then(([nextProviders, nextConnections, nextJobs, nextLogs, nextObservations, nextConflicts]) => {
+      ]).then(([nextProviders, nextConnections, nextJobs, nextLogs, nextObservations]) => {
         setProviders(nextProviders)
         setConnections(nextConnections)
         setJobs(nextJobs?.results ?? [])
         setLogs(nextLogs?.results ?? [])
         setObservations(nextObservations?.results ?? [])
         setObservationPage(nextObservations ?? { page: 1, page_size: 25, count: 0, has_more: false })
-        setConflicts(nextConflicts?.results ?? [])
       })
       : section === 'reconciliation'
-        ? providerClient.listConflicts(workspace, controller.signal).then((next) => setConflicts(next?.results ?? []))
+        ? Promise.all([
+          providerClient.listProviders(workspace, controller.signal),
+          providerClient.listConflicts(workspace, { page: reviewPage, page_size: 25, q: reviewSearch, remote_type: reviewType, status: 'open' }, controller.signal),
+        ]).then(([nextProviders, nextConflicts]) => {
+          setProviders(nextProviders)
+          setConflicts(nextConflicts?.results ?? [])
+          setConflictPage(nextConflicts ?? { page: 1, page_size: 25, count: 0, has_more: false })
+        })
         : Promise.all([
           providerClient.listGitExports(workspace, controller.signal),
           documentsClient.list({ organizationId: workspace.kind === 'organization' ? workspace.id : undefined }, controller.signal),
@@ -129,7 +148,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
       setLoadState({ section, value: 'ready' })
     }).catch(() => { if (!controller.signal.aborted) setLoadState({ section, value: 'error' }) })
     return () => controller.abort()
-  }, [documentsClient, providerClient, reload, section, sourcePage, sourceSearch, sourceType, workspace])
+  }, [documentsClient, providerClient, reload, reviewPage, reviewSearch, reviewType, section, sourcePage, sourceSearch, sourceType, workspace])
 
   function updateSourceCollection(values: { page?: number; search?: string; type?: string }) {
     const next = new URLSearchParams(params)
@@ -139,6 +158,17 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     if (page > 1) next.set('source_page', String(page)); else next.delete('source_page')
     if (search) next.set('source_search', search); else next.delete('source_search')
     if (type) next.set('source_type', type); else next.delete('source_type')
+    setParams(next)
+  }
+
+  function updateReviewCollection(values: { page?: number; search?: string; type?: string }) {
+    const next = new URLSearchParams(params)
+    const page = values.page ?? reviewPage
+    const search = values.search ?? reviewSearch
+    const type = values.type ?? reviewType
+    if (page > 1) next.set('review_page', String(page)); else next.delete('review_page')
+    if (search) next.set('review_search', search); else next.delete('review_search')
+    if (type) next.set('review_type', type); else next.delete('review_type')
     setParams(next)
   }
 
@@ -252,7 +282,8 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     setSaving(true); setError(null)
     try {
       const updated = await providerClient.resolveConflict(workspace, conflict, resolution)
-      setConflicts((current) => current.map((item) => item.id === updated.id ? updated : item))
+      setConflicts((current) => current.filter((item) => item.id !== updated.id))
+      setConflictPage((current) => ({ ...current, count: Math.max(0, current.count - 1) }))
     } catch { setError(translate('integrations.reviewFailed')) }
     finally { setSaving(false) }
   }
@@ -297,14 +328,21 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
           <button className="secondary-button" type="submit">{translate('collections.searchAction')}</button>
           {(sourceSearch || sourceType) && <button className="row-action" type="button" onClick={() => { setSourceSearchDraft(''); updateSourceCollection({ page: 1, search: '', type: '' }) }}>{translate('collections.clearFilters')}</button>}
         </form>
-        {observations.length === 0 ? <p className="empty-state">{sourceSearch || sourceType ? translate('integrations.noFilteredSourceRecords') : translate('integrations.noSourceRecords')}</p> : <><div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Source record</th><th>Type</th><th>Connection</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th></tr></thead><tbody>{observations.map((observation) => { const conflict = conflicts.find((item) => item.connection_id === observation.connection_id && item.remote_type === observation.remote_type && item.remote_id === observation.remote_id && item.status === 'open'); const canAdopt = conflict?.difference === 'unmatched' && conflict.connection_provider === 'netbox'; return <tr key={observation.id}><td><strong>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</strong></td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{observation.connection_name}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{canAdopt ? <button className="secondary-button" type="button" onClick={() => setAdopting(conflict)}>{translate('integrations.linkToTekDocs')}</button> : observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td></tr> })}</tbody></table></div><CollectionPagination label={translate('integrations.sourceRecords')} page={observationPage.page} pageSize={observationPage.page_size} count={observationPage.count} hasMore={observationPage.has_more} onPageChange={(page) => updateSourceCollection({ page })} /></>}</section>
+        {observations.length === 0 ? <p className="empty-state">{sourceSearch || sourceType ? translate('integrations.noFilteredSourceRecords') : translate('integrations.noSourceRecords')}</p> : <><div className="table-scroll" role="group" aria-label={translate('integrations.observationTable')} tabIndex={0}><table><thead><tr><th>Source record</th><th>Type</th><th>Connection</th><th>Updated at source</th><th>TekDocs record</th><th>Status</th></tr></thead><tbody>{observations.map((observation) => { const conflict = observation.open_conflict; const canAdopt = conflict?.difference === 'unmatched' && conflict.connection_provider === 'netbox'; return <tr key={observation.id}><td><strong>{Object.values(observation.safe_projection).filter((value) => value !== null && value !== '').slice(0, 3).map(String).join(' · ') || observation.remote_id}</strong></td><td>{observation.remote_type.replaceAll('_', ' ')}</td><td>{observation.connection_name}</td><td>{observation.stale ? translate('integrations.staleSource', { date: new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString() }) : new Date(observation.source_timestamp ?? observation.observed_at).toLocaleString()}</td><td>{canAdopt ? <button className="secondary-button" type="button" onClick={() => setAdopting(conflict)}>{translate('integrations.linkToTekDocs')}</button> : observation.linked_local_entity_name || conflict?.local_entity_name || observation.linked_local_entity_id || conflict?.local_entity_id || translate('integrations.notLinked')}</td><td>{conflict ? translate('integrations.needsReview') : observation.accepted ? translate('integrations.accepted') : observation.linked_local_entity_id ? translate('integrations.linkedObservation') : translate('integrations.observedOnly')}</td></tr> })}</tbody></table></div><CollectionPagination label={translate('integrations.sourceRecords')} page={observationPage.page} pageSize={observationPage.page_size} count={observationPage.count} hasMore={observationPage.has_more} onPageChange={(page) => updateSourceCollection({ page })} /></>}</section>
       <section className="content-section"><div className="section-heading"><div><h2>Operational log</h2><p>Thirty-day structured events contain allowlisted codes and numeric metrics—not provider messages or response bodies.</p></div></div>{logs.length === 0 ? <p className="empty-state">No provider events have been recorded.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.logTable')} tabIndex={0}><table><thead><tr><th>Time</th><th>Connection</th><th>Level</th><th>Code</th><th>Metrics</th></tr></thead><tbody>{logs.map((event) => <tr key={event.id}><td>{new Date(event.occurred_at).toLocaleString()}</td><td>{event.connection_name}</td><td>{event.level}</td><td><code>{event.code}</code></td><td>{Object.entries(event.metrics).map(([key, value]) => `${key}: ${value}`).join(', ') || '—'}</td></tr>)}</tbody></table></div>}</section>
     </>}
     {section === 'imports' && <Imports workspace={workspace} client={importsClient} />}
-    {phase === 'ready' && section === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>{conflicts.filter((item) => item.status === 'open').length === 0 ? <p className="empty-state">{translate('integrations.noDifferences')}</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Source record</th><th>Connection</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Other actions</th></tr></thead><tbody>{conflicts.filter((item) => item.status === 'open').map((conflict) => { const canAdopt = conflict.difference === 'unmatched' && conflict.connection_provider === 'netbox'; return <tr key={conflict.id}><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{conflict.connection_name}</td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{canAdopt ? <button className="primary-button" type="button" disabled={saving} onClick={() => setAdopting(conflict)}>{translate('integrations.linkToTekDocs')}</button> : conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions">{!canAdopt && <><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}</>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr> })}</tbody></table></div>}</section>}
+    {phase === 'ready' && section === 'reconciliation' && <section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.reviewDifferences')}</h2><p>{translate('integrations.reviewDifferencesHelp')}</p></div></div>
+      <form className="collection-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); updateReviewCollection({ page: 1, search: reviewSearchDraft.trim() }) }}>
+        <label><span>{translate('integrations.searchReviewQueue')}</span><input type="search" value={reviewSearchDraft} onChange={(event) => setReviewSearchDraft(event.target.value)} /></label>
+        <label><span>{translate('integrations.sourceType')}</span><select value={reviewType} onChange={(event) => updateReviewCollection({ page: 1, type: event.target.value })}><option value="">{translate('integrations.allSourceTypes')}</option>{Array.from(new Set(providers.flatMap((provider) => provider.object_types))).sort().map((type) => <option key={type} value={type}>{type.replaceAll('_', ' ')}</option>)}</select></label>
+        <button className="secondary-button" type="submit">{translate('collections.searchAction')}</button>
+        {(reviewSearch || reviewType) && <button className="row-action" type="button" onClick={() => { setReviewSearchDraft(''); updateReviewCollection({ page: 1, search: '', type: '' }) }}>{translate('collections.clearFilters')}</button>}
+      </form>
+      {conflicts.length === 0 ? <p className="empty-state">{reviewSearch || reviewType ? translate('integrations.noFilteredDifferences') : translate('integrations.noDifferences')}</p> : <><div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Source record</th><th>Connection</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Other actions</th></tr></thead><tbody>{conflicts.map((conflict) => { const canAdopt = conflict.difference === 'unmatched' && conflict.connection_provider === 'netbox'; return <tr key={conflict.id}><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{conflict.connection_name}</td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{canAdopt ? <button className="primary-button" type="button" disabled={saving} onClick={() => setAdopting(conflict)}>{translate('integrations.linkToTekDocs')}</button> : conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions">{!canAdopt && <><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}</>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr> })}</tbody></table></div><CollectionPagination label={translate('integrations.reviewDifferences')} page={conflictPage.page} pageSize={conflictPage.page_size} count={conflictPage.count} hasMore={conflictPage.has_more} onPageChange={(page) => updateReviewCollection({ page })} /></>}</section>}
     {phase === 'ready' && section === 'exports' && <><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div><button className="primary-button" type="button" disabled={saving || (selected.length === 0 && selectedPublications.length === 0)} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button></div>{documents.length === 0 ? <p className="empty-state">No documents are available in this workspace.</p> : <><h3>Editable documents</h3><div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>{documents.some((document) => document.publications.length > 0) && <><h3>Published copies</h3><div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div></>}</>}</section><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>{exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}><table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table></div>}</section></>}
     {section === 'webhooks' && <Webhooks workspace={workspace} client={client} embedded />}
-    {adopting && <NetBoxAdoptionDrawer workspace={workspace} conflict={adopting} providerClient={providerClient} networksClient={networksClient} inventoryClient={inventoryClient} onClose={() => setAdopting(null)} onSaved={(updated) => { setConflicts((current) => current.map((item) => item.id === updated.id ? updated : item)); setAdopting(null); setReload((value) => value + 1) }} />}
+    {adopting && <NetBoxAdoptionDrawer workspace={workspace} conflict={adopting} providerClient={providerClient} networksClient={networksClient} inventoryClient={inventoryClient} onClose={() => setAdopting(null)} onSaved={(updated) => { setConflicts((current) => current.filter((item) => item.id !== updated.id)); setConflictPage((current) => ({ ...current, count: Math.max(0, current.count - 1) })); setAdopting(null); if (section === 'connections') setReload((value) => value + 1) }} />}
   </>
 }
 

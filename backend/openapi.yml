@@ -9810,6 +9810,52 @@ paths:
   /api/v1/workspaces/msp/integrations/conflicts:
     get:
       operationId: workspaces_msp_integrations_conflicts_retrieve
+      parameters:
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+          minLength: 1
+      - in: query
+        name: remote_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 64
+          minLength: 1
+      - in: query
+        name: status
+        schema:
+          enum:
+          - open
+          - keep_local
+          - accept_remote
+          - ignored
+          - ''
+          type: string
+          x-spec-enum-id: 5b5a7e2f5582edb0
+          default: ''
+        description: |-
+          * `open` - Open
+          * `keep_local` - Keep local
+          * `accept_remote` - Accept remote identity
+          * `ignored` - Ignored
       tags:
       - workspaces
       security:
@@ -22427,6 +22473,51 @@ paths:
           type: string
           format: uuid
         required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          maximum: 100000
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 50
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 240
+          minLength: 1
+      - in: query
+        name: remote_type
+        schema:
+          type: string
+          default: ''
+          maxLength: 64
+          minLength: 1
+      - in: query
+        name: status
+        schema:
+          enum:
+          - open
+          - keep_local
+          - accept_remote
+          - ignored
+          - ''
+          type: string
+          x-spec-enum-id: 5b5a7e2f5582edb0
+          default: ''
+        description: |-
+          * `open` - Open
+          * `keep_local` - Keep local
+          * `accept_remote` - Accept remote identity
+          * `ignored` - Ignored
       tags:
       - workspaces
       security:
@@ -41695,6 +41786,11 @@ components:
         stale:
           type: boolean
           readOnly: true
+        open_conflict:
+          allOf:
+          - $ref: '#/components/schemas/Conflict'
+          nullable: true
+          readOnly: true
       required:
       - accepted
       - connection_id
@@ -41703,6 +41799,7 @@ components:
       - linked_local_entity_id
       - linked_local_entity_name
       - observed_at
+      - open_conflict
       - remote_id
       - remote_type
       - safe_projection

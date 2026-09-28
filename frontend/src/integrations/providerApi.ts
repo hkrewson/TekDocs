@@ -6,13 +6,14 @@ export type IntegrationConnectionDraft = { provider: string; name: string; base_
 export type IntegrationConnectionUpdate = { name?: string; base_url?: string; active: boolean; sync_interval_minutes: number }
 export type IntegrationJob = { id: string; connection_id: string; connection_name: string; trigger: 'manual' | 'scheduled'; state: 'pending' | 'processing' | 'succeeded' | 'dead_letter' | 'cancelled'; attempts: number; cursor_present: boolean; last_error_code: string; result_counts: Record<string, number>; available_at: string; started_at: string | null; finished_at: string | null; created_at: string }
 export type IntegrationLog = { id: string; connection_id: string; connection_name: string; job_id: string | null; level: 'info' | 'warning' | 'error'; code: string; metrics: Record<string, number>; occurred_at: string }
-export type IntegrationObservation = { id: string; connection_id: string; connection_name: string; remote_type: string; remote_id: string; safe_projection: Record<string, string | number | boolean | null>; source_timestamp: string | null; state: 'observed' | 'retired'; observed_at: string; linked_local_entity_id?: string | null; linked_local_entity_name?: string; accepted?: boolean; stale?: boolean }
+export type IntegrationObservation = { id: string; connection_id: string; connection_name: string; remote_type: string; remote_id: string; safe_projection: Record<string, string | number | boolean | null>; source_timestamp: string | null; state: 'observed' | 'retired'; observed_at: string; linked_local_entity_id?: string | null; linked_local_entity_name?: string; accepted?: boolean; stale?: boolean; open_conflict?: IntegrationConflict | null }
 export type IntegrationConflict = { id: string; connection_id: string; connection_name: string; connection_provider?: string; local_entity_id: string | null; local_entity_name?: string; provider_values?: Record<string, unknown>; remote_type: string; remote_id: string; difference: string; status: 'open' | 'keep_local' | 'accept_remote' | 'ignored'; created_at: string; resolved_at: string | null }
 export type NetBoxAdoption =
   | { entity_id: string }
   | { rack: { name: string; site_id: string; location_id: string | null; unit_count: number; status: 'planned' | 'active' | 'retired' } }
   | { asset: { name: string; model_id: string } }
 export type ObservationQuery = { page: number; page_size: number; q?: string; remote_type?: string }
+export type ConflictQuery = { page: number; page_size: number; q?: string; remote_type?: string; status?: IntegrationConflict['status'] }
 export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }
 export type IntegrationPage<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean }
 export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[] }; content_digest: string; byte_size: number; created_at: string }
@@ -28,7 +29,7 @@ export interface IntegrationsClient {
   cancelJob(workspace: WorkspaceContext, job: IntegrationJob): Promise<IntegrationJob>
   listLogs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationPage<IntegrationLog>>
   listObservations(workspace: WorkspaceContext, query?: ObservationQuery, signal?: AbortSignal): Promise<IntegrationPage<IntegrationObservation>>
-  listConflicts(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationPage<IntegrationConflict>>
+  listConflicts(workspace: WorkspaceContext, query?: ConflictQuery, signal?: AbortSignal): Promise<IntegrationPage<IntegrationConflict>>
   resolveConflict(workspace: WorkspaceContext, conflict: IntegrationConflict, resolution: 'keep_local' | 'accept_remote' | 'ignored'): Promise<IntegrationConflict>
   adoptNetBoxConflict(workspace: WorkspaceContext, conflict: IntegrationConflict, adoption: NetBoxAdoption): Promise<IntegrationConflict>
   listGitExports(workspace: WorkspaceContext, signal?: AbortSignal): Promise<GitExportBundle[]>
@@ -75,7 +76,13 @@ export const browserIntegrationsClient: IntegrationsClient = {
     if (query.remote_type) parameters.set('remote_type', query.remote_type)
     return parse(await fetch(`${base(workspace)}/observations?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
-  listConflicts: async (workspace, signal) => parse(await fetch(`${base(workspace)}/conflicts?page=1&page_size=50`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
+  listConflicts: async (workspace, query = { page: 1, page_size: 25 }, signal) => {
+    const parameters = new URLSearchParams({ page: String(query.page), page_size: String(query.page_size) })
+    if (query.q) parameters.set('q', query.q)
+    if (query.remote_type) parameters.set('remote_type', query.remote_type)
+    if (query.status) parameters.set('status', query.status)
+    return parse(await fetch(`${base(workspace)}/conflicts?${parameters}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
   resolveConflict: (workspace, conflict, resolution) => mutate(`${base(workspace)}/conflicts/${encodeURIComponent(conflict.id)}/resolve`, 'POST', { resolution }),
   adoptNetBoxConflict: (workspace, conflict, adoption) => mutate(`${base(workspace)}/conflicts/${encodeURIComponent(conflict.id)}/netbox-adopt`, 'POST', adoption),
   listGitExports: async (workspace, signal) => parse(await fetch(`${base(workspace)}/git-exports`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),

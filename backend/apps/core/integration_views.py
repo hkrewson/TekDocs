@@ -197,6 +197,33 @@ class LogPageSerializer(OffsetPageSerializer):
     results = LogSerializer(many=True)
 
 
+class ConflictSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    connection_id = serializers.UUIDField()
+    connection_name = serializers.CharField(source="connection.name")
+    connection_provider = serializers.CharField(source="connection.provider")
+    local_entity_id = serializers.SerializerMethodField()
+    local_entity_name = serializers.SerializerMethodField()
+    provider_values = serializers.SerializerMethodField()
+    remote_type = serializers.CharField()
+    remote_id = serializers.CharField()
+    difference = serializers.CharField()
+    status = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    resolved_at = serializers.DateTimeField(allow_null=True)
+
+    def get_local_entity_id(self, conflict: IntegrationConflict) -> UUID | None:
+        return conflict.local_entity_id or conflict.suggested_local_entity_id
+
+    def get_local_entity_name(self, conflict: IntegrationConflict) -> str:
+        entity = conflict.local_entity or conflict.suggested_local_entity
+        return entity.display_name if entity else ""
+
+    @extend_schema_field(serializers.DictField(child=serializers.JSONField()))
+    def get_provider_values(self, conflict: IntegrationConflict) -> dict[str, object]:
+        return conflict.observation.safe_projection if conflict.observation else {}
+
+
 class ObservationSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     connection_id = serializers.UUIDField(source="job.connection_id")
@@ -211,6 +238,7 @@ class ObservationSerializer(serializers.Serializer):
     linked_local_entity_name = serializers.SerializerMethodField()
     accepted = serializers.SerializerMethodField()
     stale = serializers.SerializerMethodField()
+    open_conflict = serializers.SerializerMethodField()
 
     def _mapping(self, observation: IntegrationObservation) -> IntegrationEntityMapping | NetBoxReference | None:
         cache: dict[tuple[UUID, str, str], IntegrationEntityMapping | NetBoxReference | None] | None = getattr(
@@ -244,17 +272,33 @@ class ObservationSerializer(serializers.Serializer):
                 cache[cache_key] = IntegrationEntityMapping.objects.select_related("local_entity").filter(
                     connection_id=observation.job.connection_id,
                     remote_type=remote_type,
-                    remote_id=observation.remote_id.split(":", 1)[0] if remote_type == "device" else observation.remote_id,
+                    remote_id=(
+                        observation.remote_id.split(":", 1)[0]
+                        if remote_type == "device"
+                        else observation.remote_id
+                    ),
                 ).first()
         return cache[cache_key]
 
     def get_linked_local_entity_id(self, observation: IntegrationObservation) -> UUID | None:
         mapping = self._mapping(observation)
-        return mapping.entity_id if isinstance(mapping, NetBoxReference) else mapping.local_entity_id if mapping else None
+        return (
+            mapping.entity_id
+            if isinstance(mapping, NetBoxReference)
+            else mapping.local_entity_id
+            if mapping
+            else None
+        )
 
     def get_linked_local_entity_name(self, observation: IntegrationObservation) -> str:
         mapping = self._mapping(observation)
-        return mapping.entity.display_name if isinstance(mapping, NetBoxReference) else mapping.local_entity.display_name if mapping else ""
+        return (
+            mapping.entity.display_name
+            if isinstance(mapping, NetBoxReference)
+            else mapping.local_entity.display_name
+            if mapping
+            else ""
+        )
 
     def get_accepted(self, observation: IntegrationObservation) -> bool:
         mapping = self._mapping(observation)
@@ -272,6 +316,11 @@ class ObservationSerializer(serializers.Serializer):
             or connection.last_successful_sync_at
             < timezone.now() - timedelta(minutes=connection.sync_interval_minutes * 2)
         )
+
+    @extend_schema_field(ConflictSerializer(allow_null=True))
+    def get_open_conflict(self, observation: IntegrationObservation) -> dict[str, object] | None:
+        conflict = self.context.get("open_conflicts", {}).get(observation.id)
+        return ConflictSerializer(conflict).data if conflict else None
 
 
 class ObservationPageSerializer(OffsetPageSerializer):
@@ -294,33 +343,6 @@ class HaloTicketSummarySerializer(serializers.Serializer):
     source_last_synced_at = serializers.DateTimeField(allow_null=True)
     stale = serializers.BooleanField()
     external_url = serializers.URLField(allow_blank=True)
-
-
-class ConflictSerializer(serializers.Serializer):
-    id = serializers.UUIDField()
-    connection_id = serializers.UUIDField()
-    connection_name = serializers.CharField(source="connection.name")
-    connection_provider = serializers.CharField(source="connection.provider")
-    local_entity_id = serializers.SerializerMethodField()
-    local_entity_name = serializers.SerializerMethodField()
-    provider_values = serializers.SerializerMethodField()
-    remote_type = serializers.CharField()
-    remote_id = serializers.CharField()
-    difference = serializers.CharField()
-    status = serializers.CharField()
-    created_at = serializers.DateTimeField()
-    resolved_at = serializers.DateTimeField(allow_null=True)
-
-    def get_local_entity_id(self, conflict: IntegrationConflict) -> UUID | None:
-        return conflict.local_entity_id or conflict.suggested_local_entity_id
-
-    def get_local_entity_name(self, conflict: IntegrationConflict) -> str:
-        entity = conflict.local_entity or conflict.suggested_local_entity
-        return entity.display_name if entity else ""
-
-    @extend_schema_field(serializers.DictField(child=serializers.JSONField()))
-    def get_provider_values(self, conflict: IntegrationConflict) -> dict[str, object]:
-        return conflict.observation.safe_projection if conflict.observation else {}
 
 
 class ConflictPageSerializer(OffsetPageSerializer):
@@ -364,6 +386,17 @@ class NetBoxAdoptionSerializer(StrictSerializer):
 class ObservationCollectionQuerySerializer(BoundedCollectionQuerySerializer):
     q = serializers.CharField(max_length=240, required=False, default="", trim_whitespace=True)
     remote_type = serializers.CharField(max_length=64, required=False, default="", trim_whitespace=True)
+
+
+class ConflictCollectionQuerySerializer(BoundedCollectionQuerySerializer):
+    q = serializers.CharField(max_length=240, required=False, default="", trim_whitespace=True)
+    remote_type = serializers.CharField(max_length=64, required=False, default="", trim_whitespace=True)
+    status = serializers.ChoiceField(
+        choices=IntegrationConflictStatus.choices,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
 
 
 class GitExportWriteSerializer(StrictSerializer):
@@ -572,10 +605,24 @@ class IntegrationObservationListView(APIView):
             records.order_by("remote_type", "remote_id", "id"),
             **query.validated_data,
         )
+        open_conflicts = {
+            conflict.observation_id: conflict
+            for conflict in IntegrationConflict.scoped.for_scope(workspace.data_scope)
+            .filter(
+                workspace_id=workspace.data_scope.workspace_id,
+                observation_id__in=[record.id for record in page.records],
+                status=IntegrationConflictStatus.OPEN,
+            )
+            .select_related("connection", "local_entity", "suggested_local_entity", "observation")
+        }
         return _private(
             Response(
                 {
-                    "results": ObservationSerializer(page.records, many=True).data,
+                    "results": ObservationSerializer(
+                        page.records,
+                        many=True,
+                        context={"open_conflicts": open_conflicts},
+                    ).data,
                     "page": page.page,
                     "page_size": page.page_size,
                     "count": page.count,
@@ -586,15 +633,34 @@ class IntegrationObservationListView(APIView):
 
 
 class IntegrationConflictListView(APIView):
-    @extend_schema(responses={200: ConflictPageSerializer})
+    @extend_schema(parameters=[ConflictCollectionQuerySerializer], responses={200: ConflictPageSerializer})
     def get(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_VIEW)
-        query = BoundedCollectionQuerySerializer(data=request.query_params)
+        query = ConflictCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(
+        records = (
             IntegrationConflict.scoped.for_scope(workspace.data_scope)
             .filter(workspace_id=workspace.data_scope.workspace_id)
-            .select_related("connection", "local_entity", "suggested_local_entity", "observation"),
+            .select_related("connection", "local_entity", "suggested_local_entity", "observation")
+        )
+        search = query.validated_data.pop("q")
+        remote_type = query.validated_data.pop("remote_type")
+        status = query.validated_data.pop("status")
+        if search:
+            records = records.filter(
+                Q(remote_id__icontains=search)
+                | Q(observation__safe_projection__name__icontains=search)
+                | Q(observation__safe_projection__display__icontains=search)
+                | Q(observation__safe_projection__display_name__icontains=search)
+                | Q(local_entity__display_name__icontains=search)
+                | Q(suggested_local_entity__display_name__icontains=search)
+            )
+        if remote_type:
+            records = records.filter(remote_type=remote_type)
+        if status:
+            records = records.filter(status=status)
+        page = paginate(
+            records.order_by("status", "remote_type", "remote_id", "id"),
             **query.validated_data,
         )
         return _private(

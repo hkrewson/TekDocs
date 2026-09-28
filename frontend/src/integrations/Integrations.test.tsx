@@ -161,7 +161,7 @@ describe('Integrations', () => {
     vi.mocked(provider.resolveConflict).mockResolvedValue({ ...conflict, status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
     const user = userEvent.setup()
 
-    setup(provider)
+    const router = setup(provider)
 
     await user.click(await screen.findByRole('button', { name: 'Sync' }))
     await waitFor(() => expect(provider.startSync).toHaveBeenCalledWith(workspace, connection))
@@ -181,9 +181,18 @@ describe('Integrations', () => {
     ))
 
     await user.click(screen.getByRole('link', { name: 'Reconciliation' }))
+    await waitFor(() => expect(provider.listConflicts).toHaveBeenCalledWith(workspace, {
+      page: 1, page_size: 25, q: '', remote_type: '', status: 'open',
+    }, expect.any(AbortSignal)))
+    await user.type(screen.getByRole('searchbox', { name: 'Search records needing review' }), 'arrakis')
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(provider.listConflicts).toHaveBeenLastCalledWith(workspace, {
+      page: 1, page_size: 25, q: 'arrakis', remote_type: '', status: 'open',
+    }, expect.any(AbortSignal)))
+    expect(router.state.location.search).toContain('review_search=arrakis')
     await user.click(screen.getByRole('button', { name: 'Acknowledge change' }))
     await waitFor(() => expect(provider.resolveConflict).toHaveBeenCalledWith(workspace, conflict, 'accept_remote'))
-    expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
+    expect(screen.getByText(/No differences match these filters/i)).toBeInTheDocument()
   })
 
   it('explains local-only matching and links a discovered NetBox record without retyping its identity', async () => {
@@ -425,15 +434,15 @@ describe('Integrations', () => {
 
   it('separates observed, linked, accepted, review, and stale provider states', async () => {
     const provider = providerClient()
+    const reviewConflict: IntegrationConflict = { id: 'conflict-3', connection_id: 'ninja', connection_name: 'NinjaOne', local_entity_id: 'asset-3', local_entity_name: 'Candidate laptop', remote_type: 'device', remote_id: '3', difference: 'changed', status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null }
     vi.mocked(provider.listObservations).mockResolvedValue({
       results: [
         { id: 'observed', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '1', safe_projection: { name: 'Observed device' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: null, accepted: false, stale: false },
         { id: 'linked', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'health', remote_id: '2', safe_projection: { healthStatus: 'Good' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: 'asset-2', linked_local_entity_name: 'Reception laptop', accepted: false, stale: false },
         { id: 'accepted', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'software', remote_id: '2:agent', safe_projection: { name: 'Agent' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: 'software-2', linked_local_entity_name: 'Agent install', accepted: true, stale: false },
-        { id: 'review', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '3', safe_projection: { name: 'Candidate device' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: null, accepted: false, stale: true },
+        { id: 'review', connection_id: 'ninja', connection_name: 'NinjaOne', remote_type: 'device', remote_id: '3', safe_projection: { name: 'Candidate device' }, source_timestamp: null, state: 'observed', observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: null, accepted: false, stale: true, open_conflict: reviewConflict },
       ], page: 1, page_size: 50, count: 4, has_more: false,
     })
-    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [{ id: 'conflict-3', connection_id: 'ninja', connection_name: 'NinjaOne', local_entity_id: 'asset-3', local_entity_name: 'Candidate laptop', remote_type: 'device', remote_id: '3', difference: 'changed', status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null }], page: 1, page_size: 50, count: 1, has_more: false })
 
     setup(provider)
 

@@ -117,3 +117,20 @@ creates the ordinary in-stock asset and lifecycle record, then records the
 NetBox identity and resolves the open conflict. Existing-asset linking remains
 the default. No write is sent to NetBox. VLANs, prefixes, addresses, and MAC
 addresses still require their canonical TekDocs dependencies before linking.
+
+### Bounded review queue correction
+
+Every current source-record response now includes its own open reconciliation
+summary. The visible **Link to TekDocs** action therefore remains available even
+when more than one page of conflicts exists; it no longer depends on a separate
+mixed-status conflict request or the position of that conflict in a first-page
+result.
+
+Reconciliation now requests open items on the server before pagination and adds
+URL-backed full-collection search and record-type filtering. It uses deterministic
+25-row pages and keeps the count/paging state aligned after a decision. Resolved
+history remains retained in the database and compatible API consumers can still
+request all statuses by omitting the new status filter. Focused API coverage proves
+that thirty older resolved conflicts cannot hide a later open device or rack, and
+the frontend coverage verifies the open-only query, durable search URL and explicit
+decision workflow.

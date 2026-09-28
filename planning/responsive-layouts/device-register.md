@@ -1,105 +1,51 @@
-# Devices register and complete record workspace
+# Devices documentation register
 
-Phase 3 (#80), required pre-1.0 under #60/#75. Version remains 0.8.46.
+Phase 3/8 (#80/#60), required pre-1.0 under #75. Version remains 0.8.46.
+The product boundary is [the 2026-09-28 network documentation decision](../network-documentation-boundary.md).
 
-## Implemented boundary
+## Supported projection
 
-Devices is a Networks view in both MSP and organization workspaces. Its shared
-register uses bounded server search, status/role filters, deterministic ordering,
-25/50/100-row pages, and personal columns/reset. Defaults: name, role, status, site,
-rack, starting unit. Mobile rows prioritize identity, role, status and rack; site
-and unit details remain in the drawer. No page-spanning selection is introduced.
+Devices is a read-only Networks view backed by existing asset and NetBox identity
+records. It is documentation of imported equipment, not a second device-management
+system. The register's curated columns are device name, NetBox ID, rack, starting
+position, height in U, serial number and model. Search covers those asset facts,
+manufacturer/product/model names and numeric NetBox IDs across the authorized
+collection. Personal column and page-size preferences remain bounded to this set.
 
-Record names open the complete Overview/Hardware/Placement/Interfaces/Relationships/
-History drawer. Overview shows operational facts and the permitted hardware identity.
-Hardware provides a focused replacement workflow. Placement includes site, location,
-rack and unit occupancy. History loads entity-filtered activity on demand.
-The optional full-page link, direct record/section URLs, refresh and browser history
-retain context. Drawers close through backdrop/Escape or mobile Back, with one
-scrolling body and a labeled mobile Sections selector. Dirty/busy protection applies
-to section changes, navigation and dismissal. Failed requests preserve drafts and
-never automatically retry uncertain writes.
+A rack is displayed only as an imported fact. There is no rack collection, rack
+editor or rack-placement workflow in the supported interface. The Devices view
+also has no New device, edit, hardware-replacement, placement, interface, MAC,
+relationship or status-management controls. Existing backend records and APIs are
+retained temporarily for compatibility and controlled migration, but their former
+UI is outside the product boundary.
 
-Ordinary detail edits PATCH exactly name/role/status. They do not resend a hidden
-hardware asset ID or replace physical placement. Placement edits send only placement
-fields. Outside a rack, site/location are optional and changing site clears location.
-Inside a rack, site/location follow the server's selected rack. Capacity and overlap
-rules remain authoritative. A failed move retains rack choice and unit values.
-Hardware replacement is isolated from ordinary edits in its own permission-aware
-section. It uses bounded available-asset search and requires the expected current
-binding so stale requests cannot silently replace a newer assignment. Details are
-recorded in [device-hardware.md](device-hardware.md).
+Names open the shared quick drawer. Overview shows NetBox ID, rack, position,
+height, serial, manufacturer, product, model and the most recent source observation.
+History remains available as evidence. The full-record URL, direct section URL,
+refresh, Back/Forward behavior, focus restoration, mobile section selector and
+backdrop/Escape dismissal follow the shared layout contract.
 
-Creation chooses an authorized, unlinked hardware asset from a bounded search by
-name. New records start unplaced; placement is set in the dedicated section after
-save. The New device action requires both network-edit and asset-view permission.
-Asset-denied network editors may still edit existing facts or placement without
-receiving or overwriting the protected hardware identity.
+Asset permission remains authoritative. A user without asset visibility receives
+no hardware identity, serial, manufacturer, product or model values, and those
+values are excluded from search. Network facts that are safe under Networks view
+permission remain visible.
 
-A rack's selected-device view now links to the full device record, without opening
-a nested drawer. Browser Back restores the rack's selected child and list context.
+## Source and adoption boundary
 
-## API and persistence
+NetBox sync is responsible for automatically adopting a NetBox device as the
+necessary hardware Asset plus its Devices projection when an eligible source
+record has not already been linked. Model and manufacturer are reused or created
+from the provider facts only through that reviewed import service. Repeated syncs
+must update the same linked identities and must not create duplicates. Automatic
+adoption is the next implementation slice; this checkpoint establishes the
+read-only destination it will populate.
 
-Existing assignment-choice routes accept `kind=hardware_asset`: exact-workspace,
-active hardware assets without a device binding, name search, name/entity-ID ordering,
-default 25 and maximum 100 results. Asset-view permission is explicitly required.
-Focused hardware replacement PATCHes only the replacement and expected current asset;
-the service locks the device, rejects stale and same-asset requests and retains the
-device's placement, interfaces and other facts.
-Other kinds and legacy unpaginated choice behavior are retained. Device collection
-responses add `can_create`, computed by the existing policy service. Existing write
-services revalidate authorization, binding uniqueness and physical placement.
+## Verification
 
-The `network-devices` preference definition reuses the installation/user ownership
-and RLS model; no new model, migration, route or permission grant. No protected asset
-column is offered. Existing device API search also respects asset-view permission.
-OpenAPI and generated types include the additive choice and capability metadata.
-Frontend device PATCH typing is partial to match the existing public API contract.
-
-## Verification and next boundary
-
-Focused tests cover 31 available choices, off-page lookup, sibling-workspace exclusion,
-claimed-asset removal, permission-denied choices, ordinary edits with hidden bindings,
-preferences/reset, dirty failed placement and creation. Browser coverage includes all
-six widths, keyboard/focus, touch, short heights, 200% zoom, accessibility scans,
-refresh/Back/Forward, unavailable records, saved columns, status/role filters and
-immediate post-save dismissal. The isolated live journey creates a device, edits its
-status, installs it in a rack, follows the rack-to-device link and independently
-verifies hardware identity, derived location, occupancy and audit events in PostgreSQL.
-Executed outcomes are recorded in progress.md.
-
-This is the device register/core editing checkpoint, not full network acceptance.
-Interfaces and their addresses/MAC records are implemented in the linked follow-up
-records. Device relationship editing is implemented in
-[device-relationships.md](device-relationships.md), and hardware replacement is
-implemented in [device-hardware.md](device-hardware.md). Other surfaces, technician
-validation and final release/recovery obligations remain open. No production
-publication or version bump.
-
-### Handoff for the next interface slice
-
-The existing endpoint implementation is `backend/apps/core/network_endpoint_views.py`:
-`InterfaceListCreateView` currently accepts only the common bounded page parameters;
-`InterfaceDetailView` already supports selected GET and partial PATCH. The frontend
-`listInterfaces` helper in `networks/api.ts` hardcodes page 1/100 and has no selected
-detail helper. Do not use it to populate the device drawer or silently treat its
-first page as the complete collection.
-
-Add explicit authorized `device_id`, search, kind/status and deterministic ordering
-to a bounded interface collection contract, with matching OpenAPI/types. Introduce
-an Interfaces section under the selected device; load only that parent's requested
-page. Create within that device and omit unchanged parent identity from ordinary
-edits. Selected interface state must have a URL and revalidate parent membership;
-reuse the current drawer for child content rather than opening another overlay.
-Keep device Overview as the default. Decide and document the interface child return
-and section URLs before editing so browser Back and dirty protection remain coherent.
-
-Cover more than 25 interfaces, an off-page search hit, another device's interface,
-sibling-workspace denial, failed partial saves, refresh and parent return. Interface
-IP/MAC children need their own bounded retrieval and binding checks; do not preload
-all addresses or expand the new section into the old stacked workspace. Existing
-IP assignment, MAC uniqueness, permissions and audit services remain authoritative.
-Rack placement and hardware replacement stay separate from interface edits.
-
-Interface collection/core editing is now implemented in [device-interfaces.md](device-interfaces.md). The handoff above records the prior starting point; IP/MAC children and reassignment remain open.
+Focused Django tests cover projection fields, serial/NetBox search, stable ordering,
+permission redaction, preferences and workspace isolation. Component and browser
+coverage exercises the seven curated columns, quick drawer, History, direct URLs,
+legacy-section fallback, keyboard/touch use, 320/390/768/1024/1280/1440 widths,
+short heights, 200% zoom and no horizontal page overflow. The live workspace
+rehearsal confirms that manual device creation and the removed network-management
+surfaces are absent.

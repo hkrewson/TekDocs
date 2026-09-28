@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, cast
 from uuid import UUID
 
-from django.db.models import Count, Q, QuerySet
+from django.db.models import BigIntegerField, Count, DateTimeField, OuterRef, Q, QuerySet, Subquery
 from drf_spectacular.utils import extend_schema, extend_schema_field
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -14,7 +14,16 @@ from apps.accounts.policy import PermissionKey, context_has_permission, require_
 
 from .collection_pagination import BoundedCollectionQuerySerializer, CollectionPage, paginate
 from .inventory import InventoryError, assets_for_scope, require_operational_owner
-from .models import NetworkDevice, NetworkDeviceRole, NetworkDeviceStatus, NetworkRack, NetworkRackStatus, NetworkVLAN
+from .models import (
+    NetBoxObjectType,
+    NetBoxReference,
+    NetworkDevice,
+    NetworkDeviceRole,
+    NetworkDeviceStatus,
+    NetworkRack,
+    NetworkRackStatus,
+    NetworkVLAN,
+)
 from .network_inventory import (
     NetworkInventoryConflict,
     NetworkInventoryError,
@@ -118,6 +127,64 @@ class NetworkDeviceSerializer(serializers.Serializer):
     rack_name = serializers.CharField(source="rack.entity.display_name", allow_null=True)
     rack_unit = serializers.IntegerField(allow_null=True)
     rack_units = serializers.IntegerField()
+    netbox_id = serializers.SerializerMethodField()
+    serial_number = serializers.SerializerMethodField()
+    manufacturer_name = serializers.SerializerMethodField()
+    product_name = serializers.SerializerMethodField()
+    model_name = serializers.SerializerMethodField()
+    source_observed_at = serializers.SerializerMethodField()
+
+    def _asset(self, device: NetworkDevice):  # type: ignore[no-untyped-def]
+        return device.hardware_asset if self.context.get("can_view_assets") and device.hardware_asset_id else None
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_netbox_id(self, device: NetworkDevice) -> int | None:
+        annotated = getattr(device, "netbox_object_id", None)
+        if annotated is not None:
+            return int(annotated)
+        asset = device.hardware_asset if device.hardware_asset_id else None
+        if asset is None:
+            return None
+        value = NetBoxReference.objects.filter(
+            entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
+        ).values_list("object_id", flat=True).first()
+        return int(value) if value is not None else None
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_source_observed_at(self, device: NetworkDevice):  # type: ignore[no-untyped-def]
+        annotated = getattr(device, "netbox_observed_at", None)
+        if annotated is not None:
+            return annotated
+        asset = device.hardware_asset if device.hardware_asset_id else None
+        if asset is None:
+            return None
+        return NetBoxReference.objects.filter(
+            entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
+        ).values_list("last_observed_at", flat=True).first()
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_serial_number(self, device: NetworkDevice) -> str | None:
+        asset = self._asset(device)
+        hardware = getattr(asset, "hardware", None) if asset is not None else None
+        return (hardware.serial_number or None) if hardware is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_manufacturer_name(self, device: NetworkDevice) -> str | None:
+        asset = self._asset(device)
+        supplier = asset.supplier if asset is not None else None
+        return supplier.entity.display_name if supplier is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_product_name(self, device: NetworkDevice) -> str | None:
+        asset = self._asset(device)
+        product = asset.product if asset is not None else None
+        return product.entity.display_name if product is not None else None
+
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_model_name(self, device: NetworkDevice) -> str | None:
+        asset = self._asset(device)
+        model = asset.model if asset is not None else None
+        return model.entity.display_name if model is not None else None
 
     @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_hardware_asset_id(self, device: NetworkDevice) -> UUID | None:
@@ -223,6 +290,10 @@ DEVICE_ORDERING = {
     "role": "role",
     "rack": "rack__entity__display_name",
     "rack_unit": "rack_unit",
+    "rack_units": "rack_units",
+    "netbox_id": "netbox_object_id",
+    "serial_number": "hardware_asset__hardware__serial_number",
+    "model_name": "hardware_asset__model__entity__display_name",
 }
 
 
@@ -250,7 +321,20 @@ def _inventory_collection(
 ) -> CollectionPage[Any]:
     records: QuerySet[Any]
     if devices:
-        records = cast(QuerySet[Any], devices_for_scope(workspace.data_scope))
+        references = NetBoxReference.objects.filter(
+            entity_id=OuterRef("hardware_asset__entity_id"),
+            object_type=NetBoxObjectType.DEVICE,
+            archived_at__isnull=True,
+        ).order_by("id")
+        records = cast(
+            QuerySet[Any],
+            devices_for_scope(workspace.data_scope).annotate(
+                netbox_object_id=Subquery(references.values("object_id")[:1], output_field=BigIntegerField()),
+                netbox_observed_at=Subquery(
+                    references.values("last_observed_at")[:1], output_field=DateTimeField()
+                ),
+            ),
+        )
     else:
         # A register needs a count, not every installed device's full row.
         records = cast(
@@ -280,7 +364,15 @@ def _inventory_collection(
             search |= Q(rack__entity__display_name__icontains=text)
             # Hidden asset names must not become a search/count side channel.
             if can_view_assets:
-                search |= Q(hardware_asset__entity__display_name__icontains=text)
+                search |= (
+                    Q(hardware_asset__entity__display_name__icontains=text)
+                    | Q(hardware_asset__hardware__serial_number__icontains=text)
+                    | Q(hardware_asset__supplier__entity__display_name__icontains=text)
+                    | Q(hardware_asset__product__entity__display_name__icontains=text)
+                    | Q(hardware_asset__model__entity__display_name__icontains=text)
+                )
+            if text.isdigit():
+                search |= Q(netbox_object_id=int(text))
         records = records.filter(search)
     ordering = values["ordering"]
     fields = DEVICE_ORDERING if devices else RACK_ORDERING

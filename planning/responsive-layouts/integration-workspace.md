@@ -1,5 +1,7 @@
 # Integration workspace
 
+> **Boundary correction — 2026-09-28:** The NetBox adoption notes below are historical implementation evidence. The supported Networks product is limited to Networks (CIDRs), Devices, DNS, Wireless and NetBox evidence. TekDocs no longer presents VLAN, VRF, rack, circuit, interface or MAC records as independently managed network surfaces. New adoption work must follow `planning/network-documentation-boundary.md` and create only the asset-backed device or CIDR documentation needed by that boundary.
+
 ## Scope
 
 Phase 6 separates the MSP and organization Integrations routes into focused

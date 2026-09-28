@@ -36,13 +36,18 @@ staged data reduction.
 
 ## Current evidence and remaining work
 
-Focused Django network tests, collection-preference tests, frontend component
-tests, lint and type checking cover this boundary. The maintained browser suite
-must continue to verify drawers, direct links, address assignment, dirty-change
-guards, failed writes, focus restoration, personal columns, touch input and
-responsive sections.
+Focused Django network tests, collection-preference tests, all 685 frontend tests,
+lint, type checking and the production build cover this boundary. Seven focused
+Device and nine Networks-workspace Chromium scenarios cover the maintained
+responsive layouts. The isolated real browser-to-Django-to-PostgreSQL rehearsal
+passes and retains the CIDR, DHCP/DNS server facts, its IP address, Wireless and
+DNS records while omitting rack, circuit, interface and MAC creation.
 
-The route remains `in_progress`. NetBox device/prefix auto-adoption, the
-asset-side address action, final device projection, DNS-provider projection,
-wireless field decision, controlled legacy-data removal, technician walkthroughs
-and the applicable upgrade/recovery gates remain open.
+The maintained browser suite must continue to verify drawers, direct links,
+address assignment, dirty-change guards, failed writes, focus restoration,
+personal columns, touch input and responsive sections.
+
+The route remains `in_progress`. The final read-only device projection is implemented. NetBox device/prefix
+auto-adoption, the IP-only asset-side address action, DNS-provider projection, wireless
+field decision, controlled legacy-data removal, technician walkthroughs and the
+applicable upgrade/recovery gates remain open.

@@ -46,7 +46,10 @@ def devices_for_scope(scope: DataScope) -> QuerySet[NetworkDevice]:
         "location__entity",
         "rack__entity",
         "hardware_asset__entity",
-        "hardware_asset__product",
+        "hardware_asset__hardware",
+        "hardware_asset__supplier__entity",
+        "hardware_asset__product__entity",
+        "hardware_asset__model__entity",
     )
 
 

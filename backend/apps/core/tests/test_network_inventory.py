@@ -15,12 +15,15 @@ from apps.core.models import (
     AuditEvent,
     Entity,
     InstallationState,
+    NetBoxObjectType,
+    NetBoxReference,
     NetworkDevice,
     NetworkRack,
     Organization,
     OrganizationClassification,
     Site,
     Tenant,
+    workspace_for_owner,
 )
 from apps.core.network_inventory import NetworkInventoryError, create_device
 from apps.core.network_inventory_views import NetworkDeviceSerializer
@@ -133,6 +136,26 @@ def test_racks_devices_placement_relationships_and_workspace_idor(owner_client, 
         reverse("organization-network-devices", kwargs={"organization_entity_id": client.entity_id})
     )
     assert [item["name"] for item in client_list.json()["results"]] == ["Core switch", "Distribution switch"]
+    device = NetworkDevice.objects.select_related("hardware_asset__hardware").get(entity_id=first.json()["id"])
+    device.hardware_asset.hardware.serial_number = "CORE-SERIAL-10"
+    device.hardware_asset.hardware.save(update_fields=["serial_number"])
+    NetBoxReference.objects.create(
+        tenant=installation.tenant,
+        workspace=workspace_for_owner(tenant=installation.tenant, organization=client),
+        organization=client,
+        entity=device.hardware_asset.entity,
+        object_type=NetBoxObjectType.DEVICE,
+        object_id=417,
+    )
+    projected = owner_client.get(
+        reverse("organization-network-devices", kwargs={"organization_entity_id": client.entity_id}),
+        {"q": "CORE-SERIAL-10"},
+    ).json()["results"][0]
+    assert projected["netbox_id"] == 417
+    assert projected["serial_number"] == "CORE-SERIAL-10"
+    assert projected["manufacturer_name"].startswith("Network fixture supplier")
+    assert projected["product_name"].startswith("Network device")
+    assert projected["model_name"].startswith("Network model")
     assert owner_client.get(reverse("msp-network-devices")).json()["results"] == []
     guessed = owner_client.get(
         reverse(
@@ -366,7 +389,10 @@ def test_inventory_collections_search_paging_order_and_parent_boundaries(owner_c
         assert first["count"] == 31 and first["has_more"] and len(first["results"]) == 25
         assert len(second["results"]) == 6 and not second["has_more"]
         assert not ({r["id"] for r in first["results"]} & {r["id"] for r in second["results"]})
-        found = owner_client.get(url, {"q": "30", "status": "active"}).json()
+        found = owner_client.get(
+            url,
+            {"q": f"{'Device' if kind == 'devices' else 'Rack'} 30", "status": "active"},
+        ).json()
         assert found["count"] == 1 and found["results"][0]["name"].endswith("30")
         assert owner_client.get(url).json()["page_size"] == 50  # Existing public default.
         assert owner_client.get(url, {"q": "COLLECTION-SITE"}).json()["count"] == 31
@@ -421,6 +447,10 @@ def test_device_collection_asset_search_respects_asset_permission(owner_client, 
     assert owner_client.get(url, {"q": "Restricted asset"}).json()["count"] == 0
     result = owner_client.get(url, {"q": "Visible device"}).json()["results"][0]
     assert result["hardware_asset_name"] is None and result["hardware_asset_id"] is None
+    assert result["serial_number"] is None
+    assert result["manufacturer_name"] is None
+    assert result["product_name"] is None
+    assert result["model_name"] is None
 
 
 @pytest.mark.django_db
@@ -494,14 +524,16 @@ def test_device_creation_choices_and_preferences_are_scoped(owner_client, instal
     assert created.status_code == 201, created.content
     assert owner_client.get(url, {"kind": "hardware_asset", "q": "Available 30"}).json()["count"] == 0
     pref = reverse("organization-collection-preferences", kwargs={**kwargs, "feature": "network-devices"})
-    assert owner_client.get(pref).json()["columns"] == ["name", "role", "status", "site", "rack", "rack_unit"]
+    assert owner_client.get(pref).json()["columns"] == [
+        "name", "netbox_id", "rack", "rack_unit", "rack_units", "serial_number", "model_name"
+    ]
     assert (
         owner_client.put(
-            pref, {"columns": ["name", "status"], "page_size": 50}, content_type="application/json"
+            pref, {"columns": ["name", "serial_number"], "page_size": 50}, content_type="application/json"
         ).status_code
         == 200
     )
-    assert owner_client.get(pref).json()["columns"] == ["name", "status"]
+    assert owner_client.get(pref).json()["columns"] == ["name", "serial_number"]
     assert owner_client.delete(pref).json()["page_size"] == 25
 
 

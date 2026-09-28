@@ -11879,6 +11879,10 @@ paths:
           - role
           - rack
           - rack_unit
+          - rack_units
+          - netbox_id
+          - serial_number
+          - model_name
           - -name
           - -site
           - -location
@@ -11886,8 +11890,12 @@ paths:
           - -role
           - -rack
           - -rack_unit
+          - -rack_units
+          - -netbox_id
+          - -serial_number
+          - -model_name
           type: string
-          x-spec-enum-id: 147a7e1c6fbe9b7c
+          x-spec-enum-id: e167237cc33d50c5
           default: name
           minLength: 1
         description: |-
@@ -11898,6 +11906,10 @@ paths:
           * `role` - role
           * `rack` - rack
           * `rack_unit` - rack_unit
+          * `rack_units` - rack_units
+          * `netbox_id` - netbox_id
+          * `serial_number` - serial_number
+          * `model_name` - model_name
           * `-name` - -name
           * `-site` - -site
           * `-location` - -location
@@ -11905,6 +11917,10 @@ paths:
           * `-role` - -role
           * `-rack` - -rack
           * `-rack_unit` - -rack_unit
+          * `-rack_units` - -rack_units
+          * `-netbox_id` - -netbox_id
+          * `-serial_number` - -serial_number
+          * `-model_name` - -model_name
       - in: query
         name: page
         schema:
@@ -25804,6 +25820,10 @@ paths:
           - role
           - rack
           - rack_unit
+          - rack_units
+          - netbox_id
+          - serial_number
+          - model_name
           - -name
           - -site
           - -location
@@ -25811,8 +25831,12 @@ paths:
           - -role
           - -rack
           - -rack_unit
+          - -rack_units
+          - -netbox_id
+          - -serial_number
+          - -model_name
           type: string
-          x-spec-enum-id: 147a7e1c6fbe9b7c
+          x-spec-enum-id: e167237cc33d50c5
           default: name
           minLength: 1
         description: |-
@@ -25823,6 +25847,10 @@ paths:
           * `role` - role
           * `rack` - rack
           * `rack_unit` - rack_unit
+          * `rack_units` - rack_units
+          * `netbox_id` - netbox_id
+          * `serial_number` - serial_number
+          * `model_name` - model_name
           * `-name` - -name
           * `-site` - -site
           * `-location` - -location
@@ -25830,6 +25858,10 @@ paths:
           * `-role` - -role
           * `-rack` - -rack
           * `-rack_unit` - -rack_unit
+          * `-rack_units` - -rack_units
+          * `-netbox_id` - -netbox_id
+          * `-serial_number` - -serial_number
+          * `-model_name` - -model_name
       - in: path
         name: organization_entity_id
         schema:
@@ -41294,20 +41326,51 @@ components:
           nullable: true
         rack_units:
           type: integer
+        netbox_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        serial_number:
+          type: string
+          nullable: true
+          readOnly: true
+        manufacturer_name:
+          type: string
+          nullable: true
+          readOnly: true
+        product_name:
+          type: string
+          nullable: true
+          readOnly: true
+        model_name:
+          type: string
+          nullable: true
+          readOnly: true
+        source_observed_at:
+          type: string
+          format: date-time
+          nullable: true
+          readOnly: true
       required:
       - hardware_asset_id
       - hardware_asset_name
       - id
       - location_id
       - location_name
+      - manufacturer_name
+      - model_name
       - name
+      - netbox_id
+      - product_name
       - rack_id
       - rack_name
       - rack_unit
       - rack_units
       - role
+      - serial_number
       - site_id
       - site_name
+      - source_observed_at
       - status
     NetworkDeviceResult:
       type: object

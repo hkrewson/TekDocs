@@ -3417,3 +3417,32 @@ work is NetBox auto-adoption for prefixes and
 asset-backed devices, the asset-side address action, the final device/DNS/wireless
 projections, controlled legacy removal, and complete responsive/live-stack and
 upgrade/recovery acceptance.
+
+## Read-only asset-backed Devices projection — 2026-09-28
+
+The supported Devices view is now a read-only projection of asset identity and
+NetBox evidence. Its collection displays name, NetBox ID, rack, position, height
+in U, serial number and model; the drawer adds manufacturer, product and last
+source observation plus retained History. Full-collection search and deterministic
+ordering cover the displayed asset and NetBox facts while asset permission still
+redacts protected identity and excludes it from search.
+
+The interface no longer offers device creation, editing, placement, hardware
+replacement, relationships, interfaces or MAC management. Rack remains a displayed
+source fact rather than a separately managed TekDocs surface. Browser acceptance
+for rack, circuit, interface and endpoint management was removed, and the live
+PostgreSQL rehearsal now follows only the five supported Networks views. Existing
+backend records and write routes remain temporarily for API compatibility and the
+controlled data-reduction rehearsal.
+
+Focused device/CIDR component tests, all 11 network-inventory PostgreSQL tests,
+all 685 frontend tests across 122 files, frontend lint and TypeScript checks pass.
+The seven focused Device and nine Networks-workspace Chromium scenarios pass,
+along with the production frontend build and bundle budgets. The isolated real
+browser-to-Django-to-PostgreSQL rehearsal passes with retained CIDR, DHCP, DNS
+server, IP-address, Wireless and DNS evidence; it no longer creates or verifies
+the removed rack, circuit, interface or MAC workflows. OpenAPI and generated
+client types include the enriched device projection. The next implementation
+boundary is automatic NetBox device adoption into the hardware Asset and this
+read-only projection, followed by an IP-only asset assignment surface. Version
+remains 0.8.46.

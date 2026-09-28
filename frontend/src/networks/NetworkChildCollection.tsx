@@ -25,6 +25,7 @@ export type ChildRecordProps<D> = {
 export type ChildCollectionConfig<S extends ChildRecord, D extends S> = {
   parentField?: 'circuit_id' | 'zone_id' | 'subnet_id' | 'device_id' | 'interface_id'; childSelectionKeys?: string[];
   key: string; feature: string; columns: readonly string[]; labels: Record<string, string>
+  allowCreate?: boolean
   title: string; back: string; create: string; search: string; order: string; failed: string; empty: string
   count: (count: number) => string
   association?: { label: string; choices: { value: string; label: string }[] }
@@ -108,7 +109,7 @@ export function NetworkChildCollection<S extends ChildRecord, D extends S>({ wor
   </>
   const collectionContent = <>
       <Heading id={`network-child-${config.key}`} ref={heading} tabIndex={-1}>{config.title}</Heading>
-      {result?.can_manage && result.can_create !== false && <button type="button" className="primary-button" onClick={() => browse({ [config.key]: 'new' })}>{config.create}</button>}
+      {config.allowCreate !== false && result?.can_manage && result.can_create !== false && <button type="button" className="primary-button" onClick={() => browse({ [config.key]: 'new' })}>{config.create}</button>}
       <div className="collection-toolbar">
         <form key={query.q} className="address-search collection-search" onSubmit={(event) => { event.preventDefault(); const value = new FormData(event.currentTarget).get('q'); browse({ [`${config.key}_q`]: typeof value === 'string' ? value : '' }) }}><input type="search" name="q" defaultValue={query.q} aria-label={config.search} /><button type="submit" className="secondary-button">{translate('collections.searchAction')}</button></form>
         {(config.statuses.length > 0 || config.association) && <FilterMenu groups={[...(config.statuses.length ? [{ kind: 'choices' as const, label: translate('collections.status'), value: query.status ?? '', choices: [{ value: '', label: translate('collections.all') }, ...config.statuses], onChange: (value: string) => browse({ [`${config.key}_status`]: value || null }) }] : []), ...(config.association ? [{ kind: 'choices' as const, label: config.association.label, value: association, choices: [{ value: '', label: translate('collections.all') }, ...config.association.choices], onChange: (value: string) => browse({ [`${config.key}_association`]: value || null }) }] : [])]} activeCount={Number(Boolean(query.status)) + Number(Boolean(association))} onClear={() => browse({ [`${config.key}_status`]: null, [`${config.key}_association`]: null })} />}

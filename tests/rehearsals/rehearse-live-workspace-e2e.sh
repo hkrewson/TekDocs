@@ -68,9 +68,9 @@ from django.test import Client
 from django.urls import reverse
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.documents import resolve_document
-from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkMACAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat
+from apps.core.models import AuditEvent, Block, CatalogModel, CatalogModelRevision, CatalogProduct, CatalogProductDocument, CatalogSpecificationDefinition, CatalogSpecificationDefinitionVersion, CertificateEndpoint, ClientAsset, ClientAssetDocumentProvenance, ClientAssetLifecycleEvent, ClientHardwareAsset, ClientSoftwareInstallation, CommercialContract, ComplianceEvidenceBundle, ComplianceFramework, ContractCost, CustomFieldDefinition, CustomFieldDefinitionVersion, Document, DocumentAttachment, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, DocumentationListingReference, EntityLink, InboxNotification, Location, NetworkIPAddress, NetworkSubnet, NotificationPreference, Organization, OutboxDeliveryReceipt, OutboxEvent, PersonAssociation, RegisteredDomain, ReminderSchedule, Site, SoftwareLicense, SoftwareLicenseEvent, SoftwareLicenseInstallation, SoftwareLicenseSeat, WirelessNetwork
 from apps.core.models import Invoice, InvoiceArtifact, InvoiceLifecycleEvent, InvoiceLine, RecurringInvoiceSchedule, RecurringInvoiceTerms, RecurringInvoicePeriod, RecurringInvoiceWithdrawal
-from apps.core.models import DNSZone, DNSRecord, NetworkCircuit, NetworkCircuitHandoff
+from apps.core.models import DNSZone, DNSRecord
 from apps.core.compliance_bundles import verify_bundle
 from apps.core.publications import read_publication_artifact, verify_publication
 organization = Organization.objects.select_related("entity").get(entity__display_name="Live Acme Client")
@@ -136,37 +136,20 @@ assert envelope == {
     "version": 1,
     "value": "Priority",
 }
-network_asset = ClientAsset.objects.get(entity__display_name="Live core switch")
-network_record = NetworkSubnet.objects.get(entity__display_name="Live management LAN")
-network_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:10")
+network_record = NetworkSubnet.objects.get(cidr="192.0.2.0/24")
 assert network_record.organization == organization
-assert network_record.location == location.parent
 assert network_record.cidr == "192.0.2.0/24"
 assert network_record.vlan_number == 20
 assert network_record.use_full_range is True
 assert network_record.assignable_start is None
 assert network_record.assignable_end is None
-circuit = NetworkCircuit.objects.get(entity__display_name="Live layout circuit")
-assert circuit.organization == organization
-assert circuit.tenant == organization.tenant
-assert circuit.description == "Verified live circuit service"
-assert circuit.service_identifier == "LIVE-CIRCUIT-01"
-assert circuit.kind == "wan"
-assert circuit.status == "suspended"
-assert circuit.provider.entity.display_name == "Live Northwind Vendor"
-assert circuit.contract_id is None
-handoff = NetworkCircuitHandoff.objects.get(circuit=circuit, entity__display_name="Live circuit demarc")
-assert handoff.organization == organization
-assert handoff.tenant == organization.tenant
-assert handoff.provider_reference == "LIVE-DEMARC-01"
-assert handoff.interface.entity.display_name == "Live uplink"
-assert handoff.device.entity.display_name == "Live network switch"
-assert handoff.site.entity.display_name == "Live Main Campus"
-assert handoff.location.entity.display_name == "Building A"
-assert handoff.description == "Verified live demarc"
-assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_created").count() == 1
-assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.handoff_updated").count() == 2
-assert AuditEvent.objects.filter(entity_id=circuit.entity_id, action="network_circuit.updated").count() == 3
+assert str(network_record.dhcp_server) == "192.0.2.2"
+network_address = NetworkIPAddress.objects.get(subnet=network_record, address="192.0.2.10")
+assert network_address.dns_name == "live-switch.example.invalid"
+wireless = WirelessNetwork.objects.get(ssid="Live Guest Wi-Fi")
+assert wireless.organization == organization
+assert wireless.purpose == "guest"
+assert wireless.security == "owe"
 dns_zone = DNSZone.objects.get(name="live-transfer.example.invalid")
 dns_record = DNSRecord.objects.get(zone=dns_zone, owner_name="host.live-transfer.example.invalid")
 assert dns_zone.organization == organization
@@ -183,9 +166,6 @@ assert sorted(AuditEvent.objects.filter(entity_id=dns_record.entity_id).values_l
 ]
 assert str(network_record.primary_dns) == "9.9.9.9"
 assert str(network_record.secondary_dns) == "1.1.1.1"
-assert network_mac.interface_id is None
-assert network_mac.hardware_asset == network_asset
-assert network_mac.description == "Ethernet"
 vendor = Organization.objects.get(entity__display_name="Live Northwind Vendor")
 link = EntityLink.objects.get(source=organization.entity, target=vendor.entity, link_type="supplied_by")
 assert link.archived_at is None
@@ -364,59 +344,6 @@ assert withdrawal_event.metadata == {}
 assert not InvoiceArtifact.objects.filter(invoice=invoice).exists()
 assert not InvoiceLifecycleEvent.objects.filter(invoice=invoice).exists()
 print("Live recurring workflow retained its stop, amendment, withdrawal, period claim, and unissued draft.")
-
-from apps.core.models import NetworkRack
-rack = NetworkRack.objects.select_related("site__entity", "location__entity").get(entity__display_name="Live layout rack")
-assert rack.organization == organization
-assert rack.status == "planned" and rack.unit_count == 42
-assert rack.site.entity.display_name == "Live Main Campus"
-assert rack.location.entity.display_name == "Building A"
-assert AuditEvent.objects.filter(entity_id=rack.entity_id, action="network_rack.updated").exists()
-print("Live rack creation and update retained its exact site, location and audit history.")
-from apps.core.models import NetworkDevice
-device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity__display_name="Live network switch")
-backup_device = NetworkDevice.objects.select_related("hardware_asset__entity").get(entity__display_name="Live backup network switch")
-assert device.organization == organization and device.rack == rack
-assert device.site_id == rack.site_id and device.location_id == rack.location_id
-assert device.rack_unit == 5 and device.rack_units == 2 and device.status == "offline"
-assert device.hardware_asset.entity.display_name == "Live replacement chassis"
-assert backup_device.organization == organization and backup_device.hardware_asset.entity.display_name == "Live backup core switch"
-assert not NetworkDevice.objects.filter(hardware_asset__entity__display_name="Live core switch").exists()
-assert AuditEvent.objects.filter(entity_id=device.entity_id, action="network_device.updated").count() == 3
-from django.db.models import Q
-from apps.core.models import EntityLink
-device_link = EntityLink.objects.get(
-    Q(source_id=device.entity_id, target_id=backup_device.entity_id)
-    | Q(source_id=backup_device.entity_id, target_id=device.entity_id),
-    link_type="connected_to",
-    archived_at__isnull=True,
-)
-assert device_link.tenant_id == device.tenant_id
-assert AuditEvent.objects.filter(entity_id=device.entity_id, action="entity_link.created").count() == 1
-print("Live device retained placement, interfaces and relationships through conflict-safe hardware replacement.")
-from apps.core.models import NetworkInterface
-interface = NetworkInterface.objects.get(entity__display_name="Live uplink")
-destination_interface = NetworkInterface.objects.get(entity__display_name="Live backup uplink")
-assert interface.organization == organization and interface.device_id == device.pk
-assert destination_interface.organization == organization and destination_interface.device_id == backup_device.pk
-assert interface.status == "disabled" and interface.kind == "physical"
-assert interface.description == "Uplink to the core rack"
-assert destination_interface.description == "Transfer destination"
-assert AuditEvent.objects.filter(entity_id=interface.entity_id, action="network_interface.updated").count() == 1
-assert AuditEvent.objects.filter(entity_id=destination_interface.entity_id, action="network_interface.updated").count() == 1
-print("Live interfaces retained their details and conflict-safe device assignments.")
-from apps.core.models import NetworkIPAddress
-interface_ip = NetworkIPAddress.objects.get(address="192.0.2.11", organization=organization)
-assert interface_ip.interface_id == destination_interface.pk and interface_ip.hardware_asset_id is None
-assert interface_ip.description == "Live interface IP address" and interface_ip.status == "reserved"
-interface_mac = NetworkMACAddress.objects.get(address="02:00:00:00:00:71", organization=organization)
-assert interface_mac.interface_id is None and interface_mac.hardware_asset_id is None
-assert interface_mac.description == "Live interface MAC address"
-assert AuditEvent.objects.filter(entity_id=interface_ip.entity_id, action="network_ip_address.created").count() == 1
-assert AuditEvent.objects.filter(entity_id=interface_ip.entity_id, action="network_ip_address.updated").count() == 2
-assert AuditEvent.objects.filter(entity_id=interface_mac.entity_id, action="network_mac_address.created").count() == 1
-assert AuditEvent.objects.filter(entity_id=interface_mac.entity_id, action="network_mac_address.updated").count() == 2
-print("Live endpoint creation retains transferred interface bindings, ordinary edits and removed MAC history.")
 
 client_document = Document.objects.get(entity__display_name="Live Acme onboarding")
 assert client_document.organization == organization

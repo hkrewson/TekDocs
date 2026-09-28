@@ -12051,6 +12051,13 @@ export interface components {
             readonly rack_name: string | null;
             readonly rack_unit: number | null;
             readonly rack_units: number;
+            readonly netbox_id: number | null;
+            readonly serial_number: string | null;
+            readonly manufacturer_name: string | null;
+            readonly product_name: string | null;
+            readonly model_name: string | null;
+            /** Format: date-time */
+            readonly source_observed_at: string | null;
         };
         readonly NetworkDeviceResult: {
             readonly can_create: boolean;
@@ -24075,6 +24082,10 @@ export interface operations {
                  *     * `role` - role
                  *     * `rack` - rack
                  *     * `rack_unit` - rack_unit
+                 *     * `rack_units` - rack_units
+                 *     * `netbox_id` - netbox_id
+                 *     * `serial_number` - serial_number
+                 *     * `model_name` - model_name
                  *     * `-name` - -name
                  *     * `-site` - -site
                  *     * `-location` - -location
@@ -24082,8 +24093,12 @@ export interface operations {
                  *     * `-role` - -role
                  *     * `-rack` - -rack
                  *     * `-rack_unit` - -rack_unit
+                 *     * `-rack_units` - -rack_units
+                 *     * `-netbox_id` - -netbox_id
+                 *     * `-serial_number` - -serial_number
+                 *     * `-model_name` - -model_name
                  */
-                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit";
+                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "rack_units" | "netbox_id" | "serial_number" | "model_name" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit" | "-rack_units" | "-netbox_id" | "-serial_number" | "-model_name";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;
@@ -33376,6 +33391,10 @@ export interface operations {
                  *     * `role` - role
                  *     * `rack` - rack
                  *     * `rack_unit` - rack_unit
+                 *     * `rack_units` - rack_units
+                 *     * `netbox_id` - netbox_id
+                 *     * `serial_number` - serial_number
+                 *     * `model_name` - model_name
                  *     * `-name` - -name
                  *     * `-site` - -site
                  *     * `-location` - -location
@@ -33383,8 +33402,12 @@ export interface operations {
                  *     * `-role` - -role
                  *     * `-rack` - -rack
                  *     * `-rack_unit` - -rack_unit
+                 *     * `-rack_units` - -rack_units
+                 *     * `-netbox_id` - -netbox_id
+                 *     * `-serial_number` - -serial_number
+                 *     * `-model_name` - -model_name
                  */
-                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit";
+                readonly ordering?: "name" | "site" | "location" | "status" | "role" | "rack" | "rack_unit" | "rack_units" | "netbox_id" | "serial_number" | "model_name" | "-name" | "-site" | "-location" | "-status" | "-role" | "-rack" | "-rack_unit" | "-rack_units" | "-netbox_id" | "-serial_number" | "-model_name";
                 readonly page?: number;
                 readonly page_size?: number;
                 readonly q?: string;

@@ -70,9 +70,10 @@ COLLECTIONS = {
     "network-devices": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
         tuple(
-            (column, PermissionKey.NETWORKS_VIEW) for column in ("name", "role", "status", "site", "rack", "rack_unit")
+            (column, PermissionKey.NETWORKS_VIEW)
+            for column in ("name", "netbox_id", "rack", "rack_unit", "rack_units", "serial_number", "model_name")
         ),
-        ("name", "role", "status", "site", "rack", "rack_unit"),
+        ("name", "netbox_id", "rack", "rack_unit", "rack_units", "serial_number", "model_name"),
     ),
     "network-racks": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,

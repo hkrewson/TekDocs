@@ -28,6 +28,12 @@ export type NetworkDevice = {
   rack_name: string | null
   rack_unit: number | null
   rack_units: number
+  netbox_id: number | null
+  serial_number: string | null
+  manufacturer_name: string | null
+  product_name: string | null
+  model_name: string | null
+  source_observed_at: string | null
 }
 
 export type NetworkChoices = {

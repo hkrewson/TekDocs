@@ -3287,3 +3287,21 @@ backend source files, compatibility-export identity checks, migration checks and
 OpenAPI agreement also pass. Schema generation retains only its four known
 operation-ID warnings. The serializer/view sequence now continues with key and
 export domains.
+
+## Document key serializer decomposition — 2026-09-27
+
+The next #40 maintainability slice moves binding writes, binding summaries,
+where-used projections, unresolved-key reports and bounded workspace-browser rows
+into `document_key_serializers.py`. The key views retain query construction,
+workspace authorization, value resolution, audit events and archive mutations,
+and explicitly preserve their established serializer names and binding-name help
+text for compatible imports.
+
+No route, field, validation message, addressable-record registry, schema
+component, permission, stored data, migration, recovery format, interface
+behavior, or version changes. All focused key binding, resolution, rendering,
+visibility and grammar tests pass. Repository-wide Ruff, MyPy across all 201
+backend source files, compatibility-export identity checks, migration checks and
+OpenAPI agreement also pass. Schema generation retains only its four known
+operation-ID warnings. The serializer/view sequence now continues with the export
+domain.

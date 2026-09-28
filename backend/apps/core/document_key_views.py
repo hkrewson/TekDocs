@@ -15,24 +15,49 @@ nothing a rendered marker would not already show the same reader.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from uuid import UUID
 
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
-from rest_framework import serializers
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, entity_visible_to_audience
 
-from .document_key_fields import ADDRESSABLE_ENTITY_TYPES, addressable_fields
+from .document_key_fields import ADDRESSABLE_ENTITY_TYPES
 from .document_key_resolution import ResolutionState, audience_for, resolve_markdown_keys
-from .document_keys import BINDING_NAME_PATTERN
+from .document_key_serializers import (
+    BINDING_NAME_HELP as BINDING_NAME_HELP,
+)
+from .document_key_serializers import (
+    BoundDocumentSerializer as BoundDocumentSerializer,
+)
+from .document_key_serializers import (
+    DocumentKeyReportSerializer as DocumentKeyReportSerializer,
+)
+from .document_key_serializers import (
+    DocumentKeySerializer as DocumentKeySerializer,
+)
+from .document_key_serializers import (
+    KeyBindingListSerializer as KeyBindingListSerializer,
+)
+from .document_key_serializers import (
+    KeyBindingResultSerializer as KeyBindingResultSerializer,
+)
+from .document_key_serializers import (
+    KeyBindingWriteSerializer as KeyBindingWriteSerializer,
+)
+from .document_key_serializers import (
+    WorkspaceKeyBindingListSerializer as WorkspaceKeyBindingListSerializer,
+)
+from .document_key_serializers import (
+    WorkspaceKeyBindingSerializer as WorkspaceKeyBindingSerializer,
+)
 from .document_views import _document, _msp_workspace, _organization_workspace
 from .documents import documents_for_scope, resolve_document
 from .models import AuditEvent, DocumentKeyBinding, Entity, workspace_for_owner
@@ -44,74 +69,6 @@ MAXIMUM_RELATED_DOCUMENTS = 50
 
 #: Bounded browser page, matching the collection convention elsewhere.
 BROWSER_PAGE_SIZE = 100
-
-
-#: Rejecting a name is common — an author types a capitalised word before knowing the
-#: grammar — so the refusal states the rule rather than reporting a pattern mismatch.
-BINDING_NAME_HELP = (
-    "A binding name uses lowercase letters, digits and underscores, and starts with a "
-    "letter. For example: subject, primary_switch."
-)
-
-
-class KeyBindingWriteSerializer(serializers.Serializer):
-    name = serializers.RegexField(BINDING_NAME_PATTERN, max_length=40, error_messages={"invalid": BINDING_NAME_HELP})
-    target_entity_id = serializers.UUIDField()
-
-
-class BoundDocumentSerializer(serializers.Serializer):
-    id = serializers.UUIDField()
-    title = serializers.CharField()
-
-
-class KeyBindingResultSerializer(serializers.Serializer):
-    id = serializers.UUIDField()
-    name = serializers.CharField()
-    target_entity_id = serializers.UUIDField(source="target_entity.id")
-    target_display_name = serializers.CharField(source="target_entity.display_name")
-    target_entity_type = serializers.CharField(source="target_entity.entity_type")
-    addressable_fields = serializers.SerializerMethodField()
-    also_bound_by = serializers.SerializerMethodField()
-    created_at = serializers.DateTimeField()
-
-    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
-    def get_addressable_fields(self, binding: DocumentKeyBinding) -> list[str]:
-        """Every key path this binding can resolve, so an author need not guess."""
-        return addressable_fields(binding.target_entity.entity_type)
-
-    @extend_schema_field(BoundDocumentSerializer(many=True))
-    def get_also_bound_by(self, binding: DocumentKeyBinding) -> list[dict[str, str]]:
-        """Other documents that resolve values from the same record.
-
-        This is where-used, shown where the decision is made. Once documentation
-        derives from inventory, editing one asset silently rewrites every document
-        that quotes it, so the blast radius has to be visible while binding rather
-        than discovered afterwards.
-        """
-        usage: Mapping[UUID, list[dict[str, str]]] = self.context.get("also_bound_by", {})
-        return usage.get(binding.target_entity_id, [])
-
-
-class KeyBindingListSerializer(serializers.Serializer):
-    results = KeyBindingResultSerializer(many=True)
-    count = serializers.IntegerField()
-    #: The record kinds a binding may target. The authoring surface reads this rather
-    #: than carrying its own copy of the registry, so adding a resolvable record kind
-    #: stays a single change on the server.
-    addressable_entity_types = serializers.ListField(child=serializers.CharField())
-
-
-class DocumentKeySerializer(serializers.Serializer):
-    expression = serializers.CharField()
-    state = serializers.CharField()
-    label = serializers.CharField()
-    reason = serializers.CharField(allow_null=True)
-
-
-class DocumentKeyReportSerializer(serializers.Serializer):
-    results = DocumentKeySerializer(many=True)
-    count = serializers.IntegerField()
-    unresolved_count = serializers.IntegerField()
 
 
 def _live_bindings(workspace: ResolvedWorkspace, document_entity_id: UUID):  # type: ignore[no-untyped-def]
@@ -327,22 +284,6 @@ class OrganizationDocumentKeyReportView(APIView):
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW),
             document_entity_id,
         )
-
-
-class WorkspaceKeyBindingSerializer(serializers.Serializer):
-    id = serializers.UUIDField()
-    name = serializers.CharField()
-    document_id = serializers.UUIDField(source="document.entity_id")
-    document_title = serializers.CharField(source="document.entity.display_name")
-    target_entity_id = serializers.UUIDField(source="target_entity.id")
-    target_display_name = serializers.CharField(source="target_entity.display_name")
-    target_entity_type = serializers.CharField(source="target_entity.entity_type")
-
-
-class WorkspaceKeyBindingListSerializer(serializers.Serializer):
-    results = WorkspaceKeyBindingSerializer(many=True)
-    count = serializers.IntegerField()
-    has_more = serializers.BooleanField()
 
 
 def _binding_browser(workspace: ResolvedWorkspace, request: Request) -> Response:

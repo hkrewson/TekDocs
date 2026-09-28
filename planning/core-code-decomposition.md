@@ -118,8 +118,8 @@ relationship, migration and consumer boundaries are now recorded in
 [document-model-dependency-map.md](document-model-dependency-map.md). Model
 splits must retain the `core` app label, table names, class identities and root
 compatibility imports with zero schema drift. The monitored-source pair and its
-source-kind choice are now the first completed move. Template rollout and stable
-key bindings follow.
+source-kind choice and the template rollout pair are now complete. Stable key
+bindings follow.
 
 ## Backend checkpoint: document source models
 
@@ -132,6 +132,18 @@ imports remain compatible.
 The shared abstract `TimestampedModel` now lives in `model_support.py`, avoiding
 a circular dependency as focused model modules are loaded. The root model module
 continues to export it. This changes no concrete model field or table.
+
+## Backend checkpoint: document template models
+
+`DocumentTemplateRevision` and `DocumentTemplateEnrollment` now live together in
+`document_template_models.py`. Document composition and request handling import
+the focused model boundary directly, while `models.py` preserves the established
+names and class identities.
+
+The paired extraction keeps the revision-to-template and enrollment-to-source,
+destination and applied-revision relationships together. Append-only revision
+guards, client workspace validation, ordering, indexes and uniqueness constraints
+remain unchanged.
 
 Each slice must pass type/lint/component behavior checks. URL, browser, OpenAPI,
 migration, production-image and recovery gates recur when the affected boundary

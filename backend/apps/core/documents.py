@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Max, Prefetch, Q, QuerySet
 from django.utils import timezone
 
+from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
 from .models import (
     AuditEvent,
     Block,
@@ -23,8 +24,6 @@ from .models import (
     DocumentPlacement,
     DocumentPublication,
     DocumentReviewState,
-    DocumentTemplateEnrollment,
-    DocumentTemplateRevision,
     DocumentTopicType,
     Entity,
     Organization,

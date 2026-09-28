@@ -76,6 +76,7 @@ from .document_review_serializers import (
     DocumentReviewDecisionWriteSerializer,
     DocumentReviewRequestWriteSerializer,
 )
+from .document_template_models import DocumentTemplateEnrollment
 from .document_template_serializers import (
     DocumentTemplateInstantiateSerializer,
     DocumentTemplateRolloutApplySerializer,
@@ -117,7 +118,6 @@ from .models import (
     DocumentAttachmentPurpose,
     DocumentPublication,
     DocumentPublicationArtifact,
-    DocumentTemplateEnrollment,
 )
 from .preflight import catalog as preflight_catalog
 from .preflight import run_document_preflight

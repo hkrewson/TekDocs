@@ -3357,3 +3357,19 @@ system checks, repository-wide Ruff and MyPy across 204 backend source files.
 No route, API schema, permission, RLS policy, stored data, recovery format,
 interface behavior or version changes. The next bounded model slice is template
 revision and enrollment.
+
+## Document template model decomposition — 2026-09-27
+
+The second model slice from the dependency map moves immutable template revisions
+and client template enrollments into `document_template_models.py`. Document
+composition and request handling now use the focused boundary, while `models.py`
+retains identity-preserving exports for existing callers and tests.
+
+Django reports no migration and retains both `core` model labels, table names,
+document relationships, account relationships, ordering, indexes and uniqueness
+constraints. Append-only revision behavior and enrollment workspace validation
+are unchanged. Template creation, independent-copy, attachment-copy, versioned
+rollout and runtime-scope workflows pass, along with repository-wide Ruff, MyPy
+across 205 backend source files and the focused import-identity contract. No API,
+schema, permission, stored data, recovery, interface or version change is
+introduced. The next bounded model slice is stable document key bindings.

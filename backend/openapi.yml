@@ -40798,6 +40798,8 @@ components:
           $ref: '#/components/schemas/NetBoxVLANAdoption'
         prefix:
           $ref: '#/components/schemas/NetBoxPrefixAdoption'
+        ip_address:
+          $ref: '#/components/schemas/NetBoxIPAddressAdoption'
     NetBoxAssetAdoption:
       type: object
       properties:
@@ -40871,6 +40873,40 @@ components:
       required:
       - can_manage
       - results
+    NetBoxIPAddressAdoption:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 45
+        subnet_id:
+          type: string
+          format: uuid
+        status:
+          enum:
+          - active
+          - reserved
+          - dhcp
+          - deprecated
+          type: string
+          description: |-
+            * `active` - active
+            * `reserved` - reserved
+            * `dhcp` - dhcp
+            * `deprecated` - deprecated
+          x-spec-enum-id: 31948ed0ed6806be
+          default: active
+        dns_name:
+          type: string
+          default: ''
+          maxLength: 253
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - address
+      - subnet_id
     NetBoxObservation:
       type: object
       properties:

@@ -11844,6 +11844,7 @@ export interface components {
             readonly asset?: components["schemas"]["NetBoxAssetAdoption"];
             readonly vlan?: components["schemas"]["NetBoxVLANAdoption"];
             readonly prefix?: components["schemas"]["NetBoxPrefixAdoption"];
+            readonly ip_address?: components["schemas"]["NetBoxIPAddressAdoption"];
         };
         readonly NetBoxAssetAdoption: {
             readonly name: string;
@@ -11870,6 +11871,24 @@ export interface components {
         readonly NetBoxChoiceResult: {
             readonly results: readonly components["schemas"]["NetBoxChoice"][];
             readonly can_manage: boolean;
+        };
+        readonly NetBoxIPAddressAdoption: {
+            readonly address: string;
+            /** Format: uuid */
+            readonly subnet_id: string;
+            /**
+             * @description * `active` - active
+             *     * `reserved` - reserved
+             *     * `dhcp` - dhcp
+             *     * `deprecated` - deprecated
+             * @default active
+             * @enum {string}
+             */
+            readonly status: "active" | "reserved" | "dhcp" | "deprecated";
+            /** @default  */
+            readonly dns_name: string;
+            /** @default  */
+            readonly description: string;
         };
         readonly NetBoxObservation: {
             /**

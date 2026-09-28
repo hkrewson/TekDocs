@@ -2,6 +2,20 @@
 
 Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 6 NetBox IP-address adoption checkpoint — 2026-09-27
+
+An unmatched NetBox IP address can now create and link a canonical TekDocs address
+from the integration review drawer. The safe observation projection retains only
+the primitive address needed for the reviewed form. The drawer converts NetBox's
+address-with-prefix display into a host address, requires an explicitly chosen
+TekDocs subnet from a bounded searchable collection, and exposes status, DNS name
+and description. TekDocs validates containment, routing uniqueness and Workspace
+ownership through the ordinary endpoint service before atomically creating the
+address, linking the observed identity and resolving the conflict.
+
+MAC-address adoption remains the final direct-adoption slice. Version remains
+0.8.46; production deployment and publication remain separately authorized.
+
 ## Phase 6 NetBox prefix adoption checkpoint — 2026-09-27
 
 An unmatched NetBox prefix can now create and link a canonical TekDocs subnet from
@@ -13,7 +27,7 @@ identity and resolves the conflict in the same transaction. Existing-record link
 remains the default. The new subnet starts in the default routing table; optional
 VRF and VLAN associations remain available on the network record.
 
-IP-address and MAC-address adoption remain separate dependency-aware slices.
+MAC-address adoption remains a separate dependency-aware slice.
 Version remains 0.8.46; production deployment and publication remain separately
 authorized.
 
@@ -29,8 +43,8 @@ remains read-only.
 
 Focused PostgreSQL and frontend tests cover creation, linking and the reviewed form.
 OpenAPI/generated types, lint, type checks, production compilation and bundle
-budgets pass. The local 0.8.46 services were refreshed. IP-address and MAC
-adoption remain separate dependency-aware slices; production deployment and
+budgets pass. The local 0.8.46 services were refreshed. MAC adoption remains a
+separate dependency-aware slice; production deployment and
 publication remain separately authorized.
 
 ## Phase 6 bounded integration review checkpoint — 2026-09-27

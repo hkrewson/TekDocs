@@ -29,7 +29,7 @@ authoritative.
   far-right action column. The
   matching search is explicitly identified as TekDocs-only, carries the remote
   type and ID without retyping, and permits an existing eligible record to be
-  linked. NetBox racks, hardware devices, VLANs and prefixes can create and link
+  linked. NetBox racks, hardware devices, VLANs, prefixes and IP addresses can create and link
   their canonical TekDocs records in one transaction after the operator supplies
   the required TekDocs context;
   the drawer opens on existing-record linking and presents creation as a clear
@@ -104,8 +104,23 @@ service in one transaction. The new subnet begins in the default routing table;
 optional VRF and VLAN associations can be added from its network record.
 
 Focused backend and frontend coverage verifies the safe projection and atomic
-create-and-link workflow. IP-address and MAC-address creation remain separate
-dependency-aware slices. Version remains 0.8.46.
+create-and-link workflow. MAC-address creation remains a separate dependency-aware
+slice. Version remains 0.8.46.
+
+## NetBox IP-address adoption checkpoint — 2026-09-27
+
+An unmatched NetBox IP address can now create and link a canonical TekDocs address
+from the review drawer. The provider boundary retains the primitive address value
+needed for review while continuing to discard nested NetBox tenant, interface and
+assignment objects. NetBox's display prefix length is removed from the editable host
+field, and the operator must choose a containing TekDocs subnet from a bounded,
+searchable 25-record collection. Status, DNS name and description remain explicit.
+
+The ordinary endpoint service validates canonical host form, subnet containment,
+routing namespace uniqueness and exact Workspace ownership. Address creation,
+audit, reference fingerprinting and conflict resolution complete in one transaction,
+without assigning an interface or asset and without writing to NetBox. MAC-address
+creation remains the final direct-adoption slice. Version remains 0.8.46.
 
 ### Linking visibility correction
 
@@ -132,8 +147,8 @@ supplier model; TekDocs never guesses the device model from the minimized NetBox
 projection. The operation requires integration, network, and asset edit access,
 creates the ordinary in-stock asset and lifecycle record, then records the
 NetBox identity and resolves the open conflict. Existing-asset linking remains
-the default. No write is sent to NetBox. Prefixes, addresses, and MAC addresses
-still require their canonical TekDocs dependencies before linking.
+the default. No write is sent to NetBox. Prefixes and addresses now have reviewed
+creation paths; MAC addresses still require their canonical TekDocs record before linking.
 
 ### VLAN adoption correction
 
@@ -147,9 +162,9 @@ the NetBox object's unrelated remote database ID.
 The backend uses the existing VLAN domain service, validates uniqueness and range,
 creates the `NetBoxReference` from the exact reviewed observation, and resolves the
 conflict in one transaction under integration-manage and network-edit permissions.
-No write is sent to NetBox. Prefixes, addresses, and MAC addresses remain later
-slices because their routing, subnet, device, or interface relationships require
-separate reviewed input.
+No write is sent to NetBox. Prefixes and addresses now have separate reviewed
+creation paths; MAC addresses remain a later slice because their device or
+interface relationships require explicit handling.
 
 ### Bounded review queue correction
 

@@ -1100,12 +1100,14 @@ def adopt_netbox_conflict(
     asset: dict[str, object] | None = None,
     vlan: dict[str, object] | None = None,
     prefix: dict[str, object] | None = None,
+    ip_address: dict[str, object] | None = None,
 ) -> IntegrationConflict:
     """Link an unmatched NetBox observation, optionally creating a supported TekDocs record."""
 
     from .inventory import InventoryError, create_client_asset
     from .netbox_reconciliation import NetBoxReferenceError, set_reference
     from .network_addressing import NetworkAddressingError, create_subnet, create_vlan
+    from .network_endpoints import NetworkEndpointError, create_ip_address
     from .network_inventory import NetworkInventoryError, create_rack
 
     try:
@@ -1121,7 +1123,7 @@ def adopt_netbox_conflict(
         raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
     if conflict.observation is None:
         raise ValidationError({"detail": "The source observation is unavailable."})
-    if sum(value is not None for value in (entity_id, rack, asset, vlan, prefix)) != 1:
+    if sum(value is not None for value in (entity_id, rack, asset, vlan, prefix, ip_address)) != 1:
         raise ValidationError({"detail": "Choose one existing record or create one supported record."})
 
     selected_entity_id = entity_id
@@ -1198,6 +1200,25 @@ def adopt_netbox_conflict(
         except (NetworkAddressingError, DjangoValidationError, IntegrityError, ValueError) as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         selected_entity_id = created_subnet.entity_id
+    elif ip_address is not None:
+        if conflict.remote_type != "ipam.ipaddress":
+            raise ValidationError({"detail": "Direct IP address creation is available for NetBox IP addresses."})
+        try:
+            created_ip_address = create_ip_address(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=actor.pk,
+                address=cast(str, ip_address["address"]),
+                subnet_entity_id=cast(UUID, ip_address["subnet_entity_id"]),
+                interface_entity_id=None,
+                hardware_asset_entity_id=None,
+                status=cast(str, ip_address["status"]),
+                dns_name=cast(str, ip_address.get("dns_name", "")),
+                description=cast(str, ip_address.get("description", "")),
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError, ValueError) as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        selected_entity_id = created_ip_address.entity_id
 
     if selected_entity_id is None:
         raise ValidationError({"detail": "Choose a TekDocs record to link."})

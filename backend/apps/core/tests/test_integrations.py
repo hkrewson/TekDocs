@@ -39,12 +39,14 @@ from apps.core.models import (
     IntegrationObservation,
     IntegrationSyncJob,
     NetBoxReference,
+    NetworkIPAddress,
     NetworkRack,
     NetworkSubnet,
     NetworkVLAN,
     OrganizationKind,
     workspace_for_owner,
 )
+from apps.core.network_addressing import create_subnet
 from apps.core.organizations import create_organization
 from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
@@ -232,6 +234,35 @@ def test_netbox_provider_projects_prefix_for_review_without_nested_provider_data
         "id": 41,
         "display": "10.42.0.0/24",
         "prefix": "10.42.0.0/24",
+    }
+
+
+@pytest.mark.django_db
+def test_netbox_provider_projects_ip_address_for_review_without_nested_provider_data(installation):
+    record = organization(installation, "Address projection client")
+    source = connection(installation, record)
+
+    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
+        return {
+            "results": [
+                {
+                    "id": 51,
+                    "display": "10.42.0.10/24",
+                    "address": "10.42.0.10/24",
+                    "tenant": {"id": 9, "name": "Private provider tenant"},
+                }
+            ],
+            "next": None,
+        }
+
+    page = NetBoxProvider(fetcher=fetcher).fetch_page(
+        source, secret=TEST_PROVIDER_TOKEN, cursor="5|ipam/ip-addresses/"
+    )
+
+    assert page.observations[0].safe_projection == {
+        "id": 51,
+        "display": "10.42.0.10/24",
+        "address": "10.42.0.10/24",
     }
 
 
@@ -845,6 +876,83 @@ def test_unmatched_netbox_prefix_can_create_and_link_a_subnet(installation):
         "ipam.prefix",
         41,
         "f" * 64,
+    )
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_ip_address_can_create_and_link_an_address(installation):
+    record = organization(installation, "Blank address client")
+    source = connection(installation, record)
+    subnet = create_subnet(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="User network",
+        cidr="10.42.0.0/24",
+        vrf_entity_id=None,
+        vlan_entity_id=None,
+        description="",
+    )
+
+    class IPAddressAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(
+                    ProviderObservation(
+                        "ipam.ipaddress",
+                        "51",
+                        "9" * 64,
+                        {"id": 51, "display": "10.42.0.10/24", "address": "10.42.0.10/24"},
+                    ),
+                ),
+                next_cursor="",
+                complete_types=("ipam.ipaddress",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="address:starting-record").id,
+        adapter=IPAddressAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-integration-netbox-adopt",
+            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+        ),
+        data=json.dumps(
+            {
+                "ip_address": {
+                    "address": "10.42.0.10",
+                    "subnet_id": str(subnet.entity_id),
+                    "status": "reserved",
+                    "dns_name": "printer.example.invalid",
+                    "description": "Imported from NetBox",
+                }
+            }
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    address = NetworkIPAddress.objects.get(address="10.42.0.10")
+    assert (address.subnet_id, address.status, address.dns_name, address.description) == (
+        subnet.id,
+        "reserved",
+        "printer.example.invalid",
+        "Imported from NetBox",
+    )
+    reference = NetBoxReference.objects.get(entity=address.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "ipam.ipaddress",
+        51,
+        "9" * 64,
     )
 
 

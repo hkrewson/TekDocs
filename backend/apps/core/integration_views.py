@@ -384,15 +384,24 @@ class NetBoxPrefixAdoptionSerializer(StrictSerializer):
     description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
 
 
+class NetBoxIPAddressAdoptionSerializer(StrictSerializer):
+    address = serializers.CharField(max_length=45, trim_whitespace=True)
+    subnet_id = serializers.UUIDField(source="subnet_entity_id")
+    status = serializers.ChoiceField(choices=("active", "reserved", "dhcp", "deprecated"), default="active")
+    dns_name = serializers.CharField(max_length=253, required=False, allow_blank=True, default="")
+    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+
+
 class NetBoxAdoptionSerializer(StrictSerializer):
     entity_id = serializers.UUIDField(required=False)
     rack = NetBoxRackAdoptionSerializer(required=False)
     asset = NetBoxAssetAdoptionSerializer(required=False)
     vlan = NetBoxVLANAdoptionSerializer(required=False)
     prefix = NetBoxPrefixAdoptionSerializer(required=False)
+    ip_address = NetBoxIPAddressAdoptionSerializer(required=False)
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if sum(key in attrs for key in ("entity_id", "rack", "asset", "vlan", "prefix")) != 1:
+        if sum(key in attrs for key in ("entity_id", "rack", "asset", "vlan", "prefix", "ip_address")) != 1:
             raise serializers.ValidationError("Choose one existing record or create one supported record.")
         return attrs
 

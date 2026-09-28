@@ -308,6 +308,36 @@ describe('Integrations', () => {
     }))
   })
 
+  it('creates and links an unmatched NetBox IP address within a chosen subnet', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-address', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 51, display: '10.42.0.10/24', address: '10.42.0.10/24' }, remote_type: 'ipam.ipaddress', remote_id: '51', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'address-printer', local_entity_name: '10.42.0.10', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
+      subnetCollection: vi.fn().mockResolvedValue({ results: [{ id: 'subnet-users', name: 'User network', cidr: '10.42.0.0/24', address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null }], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true }),
+    } as unknown as NetworksClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs IP address from this record' }))
+    expect(screen.getByLabelText('IP address')).toHaveValue('10.42.0.10')
+    await user.click(await screen.findByRole('radio', { name: /User network/i }))
+    await user.selectOptions(screen.getByLabelText('Status'), 'reserved')
+    await user.type(screen.getByLabelText('DNS name'), 'printer.example.invalid')
+    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
+    await user.click(screen.getByRole('button', { name: 'Create and link IP address' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
+      ip_address: { address: '10.42.0.10', subnet_id: 'subnet-users', status: 'reserved', dns_name: 'printer.example.invalid', description: 'Imported from NetBox' },
+    }))
+  })
+
   it('edits connection details without asking for the credential again', async () => {
     const provider = providerClient()
     const connection = {

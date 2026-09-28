@@ -12,7 +12,7 @@ import type { DocumentsClient, DocumentRecord } from '../documentation/api'
 import type { AuthClient } from '../auth/api'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { browserNetworksClient } from '../networks/api'
-import type { NetBoxChoice, NetBoxObjectType, NetworksClient } from '../networks/api'
+import type { NetBoxChoice, NetBoxObjectType, NetworkSubnet, NetworksClient } from '../networks/api'
 import { browserInventoryClient } from '../inventory/api'
 import type { InventoryClient, ModelChoice } from '../inventory/api'
 import { RackPlaceChoice } from '../networks/RackPlaceChoice'
@@ -377,10 +377,21 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   const projectedPrefix = conflict.provider_values?.prefix
   const sourceCidr = typeof projectedPrefix === 'string' ? projectedPrefix : conflict.remote_type === 'ipam.prefix' ? sourceName : ''
   const [cidr, setCidr] = useState(sourceCidr)
+  const projectedAddress = conflict.provider_values?.address
+  const sourceAddressWithMask = typeof projectedAddress === 'string' ? projectedAddress : conflict.remote_type === 'ipam.ipaddress' ? sourceName : ''
+  const sourceAddress = sourceAddressWithMask.split('/')[0]
+  const [address, setAddress] = useState(sourceAddress)
+  const [subnetQuery, setSubnetQuery] = useState('')
+  const [submittedSubnetQuery, setSubmittedSubnetQuery] = useState('')
+  const [subnetPage, setSubnetPage] = useState(1)
+  const [subnetChoices, setSubnetChoices] = useState<{ results: Omit<NetworkSubnet, 'description'>[]; count: number; has_more: boolean } | null>(null)
+  const [selectedSubnet, setSelectedSubnet] = useState<Omit<NetworkSubnet, 'description'> | null>(null)
+  const [ipStatus, setIpStatus] = useState<'active' | 'reserved' | 'dhcp' | 'deprecated'>('active')
+  const [dnsName, setDnsName] = useState('')
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dirty = Boolean(selectedId || selectedModelId || vlanId || cidr !== sourceCidr || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
+  const dirty = Boolean(selectedId || selectedModelId || vlanId || cidr !== sourceCidr || address !== sourceAddress || selectedSubnet || ipStatus !== 'active' || dnsName || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
   const attempt = useUnsavedChanges(dirty, busy, () => {}, true)
 
   useEffect(() => {
@@ -401,6 +412,15 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
     return () => controller.abort()
   }, [conflict.remote_type, inventoryClient, mode, submittedModelQuery, workspace])
 
+  useEffect(() => {
+    if (mode !== 'create' || conflict.remote_type !== 'ipam.ipaddress') return
+    const controller = new AbortController()
+    networksClient.subnetCollection(workspace, { q: submittedSubnetQuery, page: subnetPage, page_size: 25, ordering: 'name' }, controller.signal)
+      .then((value) => { if (!controller.signal.aborted) { setSubnetChoices(value); setError('') } })
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('integrations.subnetLoadFailed')) })
+    return () => controller.abort()
+  }, [conflict.remote_type, mode, networksClient, submittedSubnetQuery, subnetPage, workspace])
+
   async function save(event: React.FormEvent) {
     event.preventDefault()
     if (!objectType) return
@@ -414,6 +434,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
             ? await providerClient.adoptNetBoxConflict(workspace, conflict, { vlan: { name: name.trim(), vlan_id: Number(vlanId), description: description.trim() } })
             : conflict.remote_type === 'ipam.prefix'
               ? await providerClient.adoptNetBoxConflict(workspace, conflict, { prefix: { name: name.trim(), cidr: cidr.trim(), description: description.trim() } })
+            : conflict.remote_type === 'ipam.ipaddress'
+              ? await providerClient.adoptNetBoxConflict(workspace, conflict, { ip_address: { address: address.trim(), subnet_id: selectedSubnet?.id ?? '', status: ipStatus, dns_name: dnsName.trim(), description: description.trim() } })
             : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
       onSaved(updated)
     } catch (caught) {
@@ -422,13 +444,15 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   }
 
   const selected = choices?.selected ?? choices?.results.find((choice) => choice.id === selectedId) ?? null
-  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan' || conflict.remote_type === 'ipam.prefix'
+  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan' || conflict.remote_type === 'ipam.prefix' || conflict.remote_type === 'ipam.ipaddress'
   const createDisabled = conflict.remote_type === 'dcim.device'
     ? !name.trim() || !selectedModelId
     : conflict.remote_type === 'ipam.vlan'
       ? !name.trim() || !vlanId || Number(vlanId) < 1 || Number(vlanId) > 4094
       : conflict.remote_type === 'ipam.prefix'
         ? !name.trim() || !cidr.trim()
+      : conflict.remote_type === 'ipam.ipaddress'
+        ? !address.trim() || !selectedSubnet
       : !name.trim() || !site || Number.isNaN(unitCount)
   const linkLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.linkExistingAsset'
@@ -436,6 +460,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
       ? 'integrations.linkExistingVLAN'
       : conflict.remote_type === 'ipam.prefix'
         ? 'integrations.linkExistingPrefix'
+      : conflict.remote_type === 'ipam.ipaddress'
+        ? 'integrations.linkExistingIPAddress'
       : 'integrations.linkExisting'
   const createLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAsset'
@@ -443,6 +469,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
       ? 'integrations.createVLAN'
       : conflict.remote_type === 'ipam.prefix'
         ? 'integrations.createPrefix'
+      : conflict.remote_type === 'ipam.ipaddress'
+        ? 'integrations.createIPAddress'
       : 'integrations.createRack'
   const saveLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAndLinkAsset'
@@ -450,6 +478,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
       ? 'integrations.createAndLinkVLAN'
       : conflict.remote_type === 'ipam.prefix'
         ? 'integrations.createAndLinkPrefix'
+      : conflict.remote_type === 'ipam.ipaddress'
+        ? 'integrations.createAndLinkIPAddress'
       : 'integrations.createAndLink'
   return <QuickDrawer title={translate('integrations.adoptHeading')} returnLabel={translate('integrations.returnToReview')} returnHref={`${location.pathname}${location.search}`} returnFocusId="integrations-heading" onClose={() => attempt(onClose)}>
     <form onSubmit={(event) => void save(event)}>
@@ -476,6 +506,15 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           <label>{translate('integrations.prefixCidr')}<input required maxLength={49} value={cidr} onChange={(event) => setCidr(event.target.value)} /></label>
           <label>{translate('integrations.prefixDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
           <p className="field-help">{translate('integrations.prefixHelp')}</p>
+        </> : conflict.remote_type === 'ipam.ipaddress' ? <>
+          <label>{translate('integrations.ipAddress')}<input required maxLength={45} value={address} onChange={(event) => setAddress(event.target.value)} /></label>
+          <label>{translate('integrations.searchSubnets')}<span className="collection-search"><input type="search" value={subnetQuery} onChange={(event) => setSubnetQuery(event.target.value)} /><button className="secondary-button" type="button" onClick={() => { setSubmittedSubnetQuery(subnetQuery.trim()); setSubnetPage(1) }}>{translate('collections.searchAction')}</button></span></label>
+          {subnetChoices === null ? <p role="status">{translate('collections.loading')}</p> : subnetChoices.results.length === 0 ? <p className="empty-state">{translate('integrations.noSubnets')}</p> : <fieldset><legend>{translate('integrations.chooseSubnet')}</legend>{subnetChoices.results.map((subnet) => <label key={subnet.id} className="collection-choice"><input type="radio" name="ip-subnet" checked={selectedSubnet?.id === subnet.id} onChange={() => setSelectedSubnet(subnet)} /> <span><strong>{subnet.name}</strong><small>{subnet.cidr}</small></span></label>)}<CollectionPagination label={translate('integrations.chooseSubnet')} page={subnetPage} pageSize={25} count={subnetChoices.count} hasMore={subnetChoices.has_more} onPageChange={setSubnetPage} /></fieldset>}
+          {selectedSubnet && <p>{translate('integrations.selectedSubnet', { name: selectedSubnet.name, cidr: selectedSubnet.cidr })}</p>}
+          <label>{translate('integrations.ipStatus')}<select value={ipStatus} onChange={(event) => setIpStatus(event.target.value as typeof ipStatus)}><option value="active">{translate('integrations.ipStatusActive')}</option><option value="reserved">{translate('integrations.ipStatusReserved')}</option><option value="dhcp">{translate('integrations.ipStatusDhcp')}</option><option value="deprecated">{translate('integrations.ipStatusDeprecated')}</option></select></label>
+          <label>{translate('integrations.ipDnsName')}<input maxLength={253} value={dnsName} onChange={(event) => setDnsName(event.target.value)} /></label>
+          <label>{translate('integrations.ipDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+          <p className="field-help">{translate('integrations.ipAddressHelp')}</p>
         </> : <>
           <label>{translate('integrations.rackName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <div className="field-grid"><label>{translate('integrations.rackUnits')}<input required type="number" min={1} max={100} value={unitCount} onChange={(event) => setUnitCount(event.target.valueAsNumber)} /></label><label>{translate('collections.status')}<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="planned">{translate('integrations.statusPlanned')}</option><option value="active">{translate('integrations.statusActive')}</option><option value="retired">{translate('integrations.statusRetired')}</option></select></label></div>

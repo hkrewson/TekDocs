@@ -155,7 +155,7 @@ class NetBoxProvider:
             # The digest covers the provider record, but only the digest and identity leave this boundary.
             projection = {
                 key: record[key]
-                for key in ("id", "name", "display", "url", "prefix")
+                for key in ("id", "name", "display", "url", "prefix", "address")
                 if key in record and isinstance(record[key], str | int | float | bool | type(None))
             }
             observations.append(

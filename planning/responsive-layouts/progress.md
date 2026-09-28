@@ -3267,3 +3267,23 @@ workflow suite passes, as do Ruff on the changed modules, MyPy across all 199
 backend source files, compatibility-export identity checks and OpenAPI agreement.
 Schema generation retains only its four known operation-ID warnings. The broader
 serializer/view sequence now continues with reuse, key and export domains.
+
+## Document reuse serializer decomposition — 2026-09-27
+
+The next #40 maintainability slice moves document placement writes and updates,
+block-library queries and summaries, shared-block updates, reuse-impact
+projections and resolved placement rendering into
+`document_reuse_serializers.py`. Document request handlers now import the focused
+contract directly. The established `serializers.py` module preserves every prior
+name and class identity, including the placement projection consumed by the main
+document response.
+
+No route, field, validation rule, render context, schema component, permission,
+stored data, migration, recovery format, interface behavior, or version changes.
+The complete document workflow suite passes, including nested composition,
+cross-workspace reuse, live and pinned semantics, shared updates, detach flows,
+cycles and transaction rollback. Repository-wide Ruff, MyPy across all 200
+backend source files, compatibility-export identity checks, migration checks and
+OpenAPI agreement also pass. Schema generation retains only its four known
+operation-ID warnings. The serializer/view sequence now continues with key and
+export domains.

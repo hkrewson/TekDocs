@@ -59,6 +59,14 @@ from .document_operations import (
     update_document_operations,
 )
 from .document_reuse import reuse_impact_for_placement
+from .document_reuse_serializers import (
+    BlockLibraryQuerySerializer,
+    BlockLibraryResultSerializer,
+    DocumentPlacementUpdateSerializer,
+    DocumentPlacementWriteSerializer,
+    ReuseImpactSerializer,
+    SharedBlockUpdateSerializer,
+)
 from .document_review_serializers import (
     DocumentReviewDecisionWriteSerializer,
     DocumentReviewRequestWriteSerializer,
@@ -121,8 +129,6 @@ from .relationships import search_entities
 from .rendering import split_markdown_sections
 from .scoping import DataScope
 from .serializers import (
-    BlockLibraryQuerySerializer,
-    BlockLibraryResultSerializer,
     BlockRevisionDetailSerializer,
     BlockRevisionListQuerySerializer,
     BlockRevisionResultSerializer,
@@ -134,8 +140,6 @@ from .serializers import (
     DocumentFileResultSerializer,
     DocumentOperationsChoiceSerializer,
     DocumentOperationsWriteSerializer,
-    DocumentPlacementUpdateSerializer,
-    DocumentPlacementWriteSerializer,
     DocumentPrimaryFileSerializer,
     DocumentPublicationControlWriteSerializer,
     DocumentPublicationDetailSerializer,
@@ -147,9 +151,7 @@ from .serializers import (
     DocumentSerializer,
     EntityMentionResultSerializer,
     EntityMentionSearchQuerySerializer,
-    ReuseImpactSerializer,
     RevisionConflictSerializer,
-    SharedBlockUpdateSerializer,
     TemplateLibraryQuerySerializer,
     TemplateLibraryResultSerializer,
 )

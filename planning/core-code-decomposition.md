@@ -84,6 +84,14 @@ every prior name so internal and third-party imports retain the same class
 identity. Validation, schema component names, routes, permissions and persistence
 remain unchanged.
 
+Document placement writes and updates, block-library queries and summaries,
+shared-block updates, reuse-impact projections and resolved placement rendering
+now live in `document_reuse_serializers.py`. Document views import the focused
+request/response contract directly, while `DocumentSerializer` consumes the
+focused placement projection through the compatibility module. Existing class
+identities, render context, validation, schema names and API behavior remain
+unchanged.
+
 These seams follow existing interaction and request boundaries. The frontend
 panels keep state authority in the route coordinator, while backend request
 handlers import focused contracts and the compatibility module retains public
@@ -92,8 +100,8 @@ shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Continue splitting backend document serializers/views by the existing reuse,
-   key and export domains.
+1. Continue splitting backend document serializers/views by the existing key and
+   export domains.
 2. Split Django models only after import/dependency mapping is recorded; retain
    the `core` app label, table names and compatibility imports with zero schema
    drift.

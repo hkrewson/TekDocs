@@ -99,6 +99,12 @@ resolution, audit and archival authority and explicitly re-export the establishe
 serializer names and binding-name help text. Addressable-field discovery,
 validation messages, schema names and response shapes remain unchanged.
 
+Live-document and retained-publication export query contracts now live in
+`document_export_serializers.py`. The document views explicitly re-export both
+established names while retaining snapshot locking, artifact generation, audit,
+download headers and retained-publication handling. Bundle-only file selection,
+duplicate-file rejection and supported-format validation remain unchanged.
+
 These seams follow existing interaction and request boundaries. The frontend
 panels keep state authority in the route coordinator, while backend request
 handlers import focused contracts and the compatibility module retains public
@@ -107,11 +113,10 @@ shared unsaved-change guard.
 
 ## Remaining sequence
 
-1. Continue splitting backend document serializers/views by the existing export
-   domain.
-2. Split Django models only after import/dependency mapping is recorded; retain
-   the `core` app label, table names and compatibility imports with zero schema
-   drift.
+The planned serializer-domain sequence is complete. The next slice records the
+Django model import and relationship map before moving any model. Model splits
+must retain the `core` app label, table names and compatibility imports with zero
+schema drift.
 
 Each slice must pass type/lint/component behavior checks. URL, browser, OpenAPI,
 migration, production-image and recovery gates recur when the affected boundary

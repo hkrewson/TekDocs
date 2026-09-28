@@ -42,8 +42,13 @@ from .document_authoring_serializers import (
     MarkdownImportSerializer,
     TopicSchemaCatalogSerializer,
 )
+from .document_export_serializers import (
+    DocumentExportQuerySerializer as DocumentExportQuerySerializer,
+)
+from .document_export_serializers import (
+    DocumentPublicationExportQuerySerializer as DocumentPublicationExportQuerySerializer,
+)
 from .document_exports import (
-    EXPORT_FORMATS,
     DocumentExportSnapshot,
     ExportConflict,
     export_bundle,
@@ -787,28 +792,6 @@ def _import_markdown(workspace: ResolvedWorkspace, request: Request) -> Response
         DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
         status=201,
     )
-
-
-class DocumentExportQuerySerializer(serializers.Serializer):
-    export_format = serializers.ChoiceField(choices=sorted(EXPORT_FORMATS), default="md")
-    attachment_ids = serializers.ListField(
-        child=serializers.UUIDField(),
-        required=False,
-        default=list,
-        max_length=50,
-    )
-
-    def validate(self, attrs):  # type: ignore[no-untyped-def]
-        attachment_ids = attrs["attachment_ids"]
-        if attrs["export_format"] != "bundle" and attachment_ids:
-            raise serializers.ValidationError("Files may be selected only for a portable bundle.")
-        if len(set(attachment_ids)) != len(attachment_ids):
-            raise serializers.ValidationError("Each selected file may appear only once.")
-        return attrs
-
-
-class DocumentPublicationExportQuerySerializer(serializers.Serializer):
-    export_format = serializers.ChoiceField(choices=sorted(EXPORT_FORMATS - {"bundle"}), default="md")
 
 
 def _export_response(

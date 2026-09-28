@@ -3305,3 +3305,22 @@ backend source files, compatibility-export identity checks, migration checks and
 OpenAPI agreement also pass. Schema generation retains only its four known
 operation-ID warnings. The serializer/view sequence now continues with the export
 domain.
+
+## Document export serializer decomposition — 2026-09-27
+
+The final planned serializer-domain slice moves live-document and retained-
+publication export query contracts into `document_export_serializers.py`.
+Document views explicitly preserve both established names while snapshot locking,
+artifact generation, auditing, content headers, retained evidence and download
+responses remain in their existing service and handler boundaries.
+
+No route, format, field, validation message, schema component, permission, stored
+data, migration, recovery format, interface behavior, or version changes. Focused
+live and retained export checks pass for Markdown, sanitized HTML, PDF, DOCX,
+deterministic portable bundles, selected-file validation, storage failures,
+foreign-file rejection, concurrent edits and resolved-key provenance.
+Repository-wide Ruff, MyPy across all 202 backend source files,
+compatibility-export identity checks, migration checks and OpenAPI agreement also
+pass. Schema generation retains only its four known operation-ID warnings. The
+serializer-domain sequence is complete; #40 now proceeds to a documented Django
+model dependency map before any model is moved.

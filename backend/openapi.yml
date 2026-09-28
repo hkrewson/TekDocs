@@ -40800,6 +40800,8 @@ components:
           $ref: '#/components/schemas/NetBoxPrefixAdoption'
         ip_address:
           $ref: '#/components/schemas/NetBoxIPAddressAdoption'
+        mac_address:
+          $ref: '#/components/schemas/NetBoxMACAddressAdoption'
     NetBoxAssetAdoption:
       type: object
       properties:
@@ -40907,6 +40909,18 @@ components:
       required:
       - address
       - subnet_id
+    NetBoxMACAddressAdoption:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - address
     NetBoxObservation:
       type: object
       properties:

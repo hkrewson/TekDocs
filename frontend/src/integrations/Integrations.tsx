@@ -388,10 +388,13 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   const [selectedSubnet, setSelectedSubnet] = useState<Omit<NetworkSubnet, 'description'> | null>(null)
   const [ipStatus, setIpStatus] = useState<'active' | 'reserved' | 'dhcp' | 'deprecated'>('active')
   const [dnsName, setDnsName] = useState('')
+  const projectedMacAddress = conflict.provider_values?.mac_address
+  const sourceMacAddress = (typeof projectedMacAddress === 'string' ? projectedMacAddress : conflict.remote_type === 'dcim.macaddress' ? sourceName : '').toLowerCase()
+  const [macAddress, setMacAddress] = useState(sourceMacAddress)
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dirty = Boolean(selectedId || selectedModelId || vlanId || cidr !== sourceCidr || address !== sourceAddress || selectedSubnet || ipStatus !== 'active' || dnsName || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
+  const dirty = Boolean(selectedId || selectedModelId || vlanId || cidr !== sourceCidr || address !== sourceAddress || selectedSubnet || ipStatus !== 'active' || dnsName || macAddress !== sourceMacAddress || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
   const attempt = useUnsavedChanges(dirty, busy, () => {}, true)
 
   useEffect(() => {
@@ -436,6 +439,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
               ? await providerClient.adoptNetBoxConflict(workspace, conflict, { prefix: { name: name.trim(), cidr: cidr.trim(), description: description.trim() } })
             : conflict.remote_type === 'ipam.ipaddress'
               ? await providerClient.adoptNetBoxConflict(workspace, conflict, { ip_address: { address: address.trim(), subnet_id: selectedSubnet?.id ?? '', status: ipStatus, dns_name: dnsName.trim(), description: description.trim() } })
+            : conflict.remote_type === 'dcim.macaddress'
+              ? await providerClient.adoptNetBoxConflict(workspace, conflict, { mac_address: { address: macAddress.trim(), description: description.trim() } })
             : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
       onSaved(updated)
     } catch (caught) {
@@ -444,7 +449,7 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   }
 
   const selected = choices?.selected ?? choices?.results.find((choice) => choice.id === selectedId) ?? null
-  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan' || conflict.remote_type === 'ipam.prefix' || conflict.remote_type === 'ipam.ipaddress'
+  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'dcim.macaddress' || conflict.remote_type === 'ipam.vlan' || conflict.remote_type === 'ipam.prefix' || conflict.remote_type === 'ipam.ipaddress'
   const createDisabled = conflict.remote_type === 'dcim.device'
     ? !name.trim() || !selectedModelId
     : conflict.remote_type === 'ipam.vlan'
@@ -453,6 +458,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
         ? !name.trim() || !cidr.trim()
       : conflict.remote_type === 'ipam.ipaddress'
         ? !address.trim() || !selectedSubnet
+      : conflict.remote_type === 'dcim.macaddress'
+        ? !macAddress.trim()
       : !name.trim() || !site || Number.isNaN(unitCount)
   const linkLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.linkExistingAsset'
@@ -462,6 +469,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
         ? 'integrations.linkExistingPrefix'
       : conflict.remote_type === 'ipam.ipaddress'
         ? 'integrations.linkExistingIPAddress'
+      : conflict.remote_type === 'dcim.macaddress'
+        ? 'integrations.linkExistingMACAddress'
       : 'integrations.linkExisting'
   const createLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAsset'
@@ -471,6 +480,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
         ? 'integrations.createPrefix'
       : conflict.remote_type === 'ipam.ipaddress'
         ? 'integrations.createIPAddress'
+      : conflict.remote_type === 'dcim.macaddress'
+        ? 'integrations.createMACAddress'
       : 'integrations.createRack'
   const saveLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAndLinkAsset'
@@ -480,6 +491,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
         ? 'integrations.createAndLinkPrefix'
       : conflict.remote_type === 'ipam.ipaddress'
         ? 'integrations.createAndLinkIPAddress'
+      : conflict.remote_type === 'dcim.macaddress'
+        ? 'integrations.createAndLinkMACAddress'
       : 'integrations.createAndLink'
   return <QuickDrawer title={translate('integrations.adoptHeading')} returnLabel={translate('integrations.returnToReview')} returnHref={`${location.pathname}${location.search}`} returnFocusId="integrations-heading" onClose={() => attempt(onClose)}>
     <form onSubmit={(event) => void save(event)}>
@@ -515,6 +528,10 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           <label>{translate('integrations.ipDnsName')}<input maxLength={253} value={dnsName} onChange={(event) => setDnsName(event.target.value)} /></label>
           <label>{translate('integrations.ipDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
           <p className="field-help">{translate('integrations.ipAddressHelp')}</p>
+        </> : conflict.remote_type === 'dcim.macaddress' ? <>
+          <label>{translate('integrations.macAddress')}<input required maxLength={32} value={macAddress} onChange={(event) => setMacAddress(event.target.value)} /></label>
+          <label>{translate('integrations.macDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+          <p className="field-help">{translate('integrations.macAddressHelp')}</p>
         </> : <>
           <label>{translate('integrations.rackName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <div className="field-grid"><label>{translate('integrations.rackUnits')}<input required type="number" min={1} max={100} value={unitCount} onChange={(event) => setUnitCount(event.target.valueAsNumber)} /></label><label>{translate('collections.status')}<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="planned">{translate('integrations.statusPlanned')}</option><option value="active">{translate('integrations.statusActive')}</option><option value="retired">{translate('integrations.statusRetired')}</option></select></label></div>

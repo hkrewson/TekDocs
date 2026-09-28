@@ -40,6 +40,7 @@ from apps.core.models import (
     IntegrationSyncJob,
     NetBoxReference,
     NetworkIPAddress,
+    NetworkMACAddress,
     NetworkRack,
     NetworkSubnet,
     NetworkVLAN,
@@ -263,6 +264,35 @@ def test_netbox_provider_projects_ip_address_for_review_without_nested_provider_
         "id": 51,
         "display": "10.42.0.10/24",
         "address": "10.42.0.10/24",
+    }
+
+
+@pytest.mark.django_db
+def test_netbox_provider_projects_mac_address_for_review_without_nested_provider_data(installation):
+    record = organization(installation, "MAC projection client")
+    source = connection(installation, record)
+
+    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
+        return {
+            "results": [
+                {
+                    "id": 61,
+                    "display": "00:11:22:33:44:55",
+                    "mac_address": "00:11:22:33:44:55",
+                    "assigned_object": {"id": 17, "name": "eth0"},
+                }
+            ],
+            "next": None,
+        }
+
+    page = NetBoxProvider(fetcher=fetcher).fetch_page(
+        source, secret=TEST_PROVIDER_TOKEN, cursor="2|dcim/mac-addresses/"
+    )
+
+    assert page.observations[0].safe_projection == {
+        "id": 61,
+        "display": "00:11:22:33:44:55",
+        "mac_address": "00:11:22:33:44:55",
     }
 
 
@@ -953,6 +983,68 @@ def test_unmatched_netbox_ip_address_can_create_and_link_an_address(installation
         "ipam.ipaddress",
         51,
         "9" * 64,
+    )
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_mac_address_can_create_and_link_an_address(installation):
+    record = organization(installation, "Blank MAC client")
+    source = connection(installation, record)
+
+    class MACAddressAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(
+                    ProviderObservation(
+                        "dcim.macaddress",
+                        "61",
+                        "8" * 64,
+                        {
+                            "id": 61,
+                            "display": "00:11:22:33:44:55",
+                            "mac_address": "00:11:22:33:44:55",
+                        },
+                    ),
+                ),
+                next_cursor="",
+                complete_types=("dcim.macaddress",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="mac:starting-record").id,
+        adapter=MACAddressAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-integration-netbox-adopt",
+            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+        ),
+        data=json.dumps(
+            {"mac_address": {"address": "00:11:22:33:44:55", "description": "Imported from NetBox"}}
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    address = NetworkMACAddress.objects.get(address="00:11:22:33:44:55")
+    assert (address.interface_id, address.hardware_asset_id, address.description) == (
+        None,
+        None,
+        "Imported from NetBox",
+    )
+    reference = NetBoxReference.objects.get(entity=address.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "dcim.macaddress",
+        61,
+        "8" * 64,
     )
 
 

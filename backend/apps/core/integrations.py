@@ -1101,13 +1101,14 @@ def adopt_netbox_conflict(
     vlan: dict[str, object] | None = None,
     prefix: dict[str, object] | None = None,
     ip_address: dict[str, object] | None = None,
+    mac_address: dict[str, object] | None = None,
 ) -> IntegrationConflict:
     """Link an unmatched NetBox observation, optionally creating a supported TekDocs record."""
 
     from .inventory import InventoryError, create_client_asset
     from .netbox_reconciliation import NetBoxReferenceError, set_reference
     from .network_addressing import NetworkAddressingError, create_subnet, create_vlan
-    from .network_endpoints import NetworkEndpointError, create_ip_address
+    from .network_endpoints import NetworkEndpointError, create_ip_address, create_mac_address
     from .network_inventory import NetworkInventoryError, create_rack
 
     try:
@@ -1123,7 +1124,7 @@ def adopt_netbox_conflict(
         raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
     if conflict.observation is None:
         raise ValidationError({"detail": "The source observation is unavailable."})
-    if sum(value is not None for value in (entity_id, rack, asset, vlan, prefix, ip_address)) != 1:
+    if sum(value is not None for value in (entity_id, rack, asset, vlan, prefix, ip_address, mac_address)) != 1:
         raise ValidationError({"detail": "Choose one existing record or create one supported record."})
 
     selected_entity_id = entity_id
@@ -1219,6 +1220,22 @@ def adopt_netbox_conflict(
         except (NetworkEndpointError, DjangoValidationError, IntegrityError, ValueError) as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         selected_entity_id = created_ip_address.entity_id
+    elif mac_address is not None:
+        if conflict.remote_type != "dcim.macaddress":
+            raise ValidationError({"detail": "Direct MAC address creation is available for NetBox MAC addresses."})
+        try:
+            created_mac_address = create_mac_address(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=actor.pk,
+                address=cast(str, mac_address["address"]),
+                interface_entity_id=None,
+                hardware_asset_entity_id=None,
+                description=cast(str, mac_address.get("description", "")),
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError, ValueError) as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        selected_entity_id = created_mac_address.entity_id
 
     if selected_entity_id is None:
         raise ValidationError({"detail": "Choose a TekDocs record to link."})

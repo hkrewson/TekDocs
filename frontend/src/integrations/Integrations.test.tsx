@@ -338,6 +338,32 @@ describe('Integrations', () => {
     }))
   })
 
+  it('creates and links an unmatched NetBox MAC address as an unassigned record', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-mac', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 61, display: '00:11:22:33:44:55', mac_address: '00:11:22:33:44:55' }, remote_type: 'dcim.macaddress', remote_id: '61', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'mac-printer', local_entity_name: '00:11:22:33:44:55', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
+    } as unknown as NetworksClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs MAC address from this record' }))
+    expect(screen.getByLabelText('MAC address')).toHaveValue('00:11:22:33:44:55')
+    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
+    await user.click(screen.getByRole('button', { name: 'Create and link MAC address' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
+      mac_address: { address: '00:11:22:33:44:55', description: 'Imported from NetBox' },
+    }))
+  })
+
   it('edits connection details without asking for the credential again', async () => {
     const provider = providerClient()
     const connection = {

@@ -15,6 +15,7 @@ export type NetBoxAdoption =
   | { vlan: { name: string; vlan_id: number; description: string } }
   | { prefix: { name: string; cidr: string; description: string } }
   | { ip_address: { address: string; subnet_id: string; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string } }
+  | { mac_address: { address: string; description: string } }
 export type ObservationQuery = { page: number; page_size: number; q?: string; remote_type?: string }
 export type ConflictQuery = { page: number; page_size: number; q?: string; remote_type?: string; status?: IntegrationConflict['status'] }
 export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }

@@ -11845,6 +11845,7 @@ export interface components {
             readonly vlan?: components["schemas"]["NetBoxVLANAdoption"];
             readonly prefix?: components["schemas"]["NetBoxPrefixAdoption"];
             readonly ip_address?: components["schemas"]["NetBoxIPAddressAdoption"];
+            readonly mac_address?: components["schemas"]["NetBoxMACAddressAdoption"];
         };
         readonly NetBoxAssetAdoption: {
             readonly name: string;
@@ -11887,6 +11888,11 @@ export interface components {
             readonly status: "active" | "reserved" | "dhcp" | "deprecated";
             /** @default  */
             readonly dns_name: string;
+            /** @default  */
+            readonly description: string;
+        };
+        readonly NetBoxMACAddressAdoption: {
+            readonly address: string;
             /** @default  */
             readonly description: string;
         };

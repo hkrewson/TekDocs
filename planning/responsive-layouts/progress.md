@@ -2,6 +2,21 @@
 
 Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 6 NetBox MAC-address adoption checkpoint — 2026-09-27
+
+An unmatched NetBox MAC address can now create and link a canonical TekDocs EUI-48
+record from the integration review drawer. The safe projection retains only the
+primitive MAC value needed for the reviewed form and discards nested NetBox
+assignment objects. Existing-record linking remains the default. Direct creation
+records the address and optional description as an unassigned endpoint, then links
+the observed identity and resolves the conflict in the same transaction. Hardware
+or retained-interface assignment remains an explicit follow-up on the network
+record.
+
+This completes direct reviewed creation for all six NetBox object types in the
+supported integration boundary. Version remains 0.8.46; production deployment and
+publication remain separately authorized.
+
 ## Phase 6 NetBox IP-address adoption checkpoint — 2026-09-27
 
 An unmatched NetBox IP address can now create and link a canonical TekDocs address
@@ -13,8 +28,8 @@ and description. TekDocs validates containment, routing uniqueness and Workspace
 ownership through the ordinary endpoint service before atomically creating the
 address, linking the observed identity and resolving the conflict.
 
-MAC-address adoption remains the final direct-adoption slice. Version remains
-0.8.46; production deployment and publication remain separately authorized.
+Version remains 0.8.46; production deployment and publication remain separately
+authorized.
 
 ## Phase 6 NetBox prefix adoption checkpoint — 2026-09-27
 
@@ -27,7 +42,7 @@ identity and resolves the conflict in the same transaction. Existing-record link
 remains the default. The new subnet starts in the default routing table; optional
 VRF and VLAN associations remain available on the network record.
 
-MAC-address adoption remains a separate dependency-aware slice.
+MAC-address adoption is now available through its own reviewed unassigned-record flow.
 Version remains 0.8.46; production deployment and publication remain separately
 authorized.
 

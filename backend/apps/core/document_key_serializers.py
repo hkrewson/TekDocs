@@ -7,8 +7,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .document_key_fields import addressable_fields
+from .document_key_models import DocumentKeyBinding
 from .document_keys import BINDING_NAME_PATTERN
-from .models import DocumentKeyBinding
 
 #: Rejecting a name is common — an author types a capitalised word before knowing
 #: the grammar — so the refusal states the rule rather than reporting a pattern

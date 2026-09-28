@@ -30,6 +30,7 @@ from rest_framework.views import APIView
 from apps.accounts.policy import PermissionKey, entity_visible_to_audience
 
 from .document_key_fields import ADDRESSABLE_ENTITY_TYPES
+from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import ResolutionState, audience_for, resolve_markdown_keys
 from .document_key_serializers import (
     BINDING_NAME_HELP as BINDING_NAME_HELP,
@@ -60,7 +61,7 @@ from .document_key_serializers import (
 )
 from .document_views import _document, _msp_workspace, _organization_workspace
 from .documents import documents_for_scope, resolve_document
-from .models import AuditEvent, DocumentKeyBinding, Entity, workspace_for_owner
+from .models import AuditEvent, Entity, workspace_for_owner
 from .workspaces import ResolvedWorkspace
 
 #: Bound on related documents reported per record, so one heavily reused asset

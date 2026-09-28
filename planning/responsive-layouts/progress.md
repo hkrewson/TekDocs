@@ -3373,3 +3373,19 @@ rollout and runtime-scope workflows pass, along with repository-wide Ruff, MyPy
 across 205 backend source files and the focused import-identity contract. No API,
 schema, permission, stored data, recovery, interface or version change is
 introduced. The next bounded model slice is stable document key bindings.
+
+## Document key model decomposition — 2026-09-27
+
+The third model slice from the dependency map moves `DocumentKeyBinding` into
+`document_key_models.py`, colocated with its binding grammar dependency rather
+than remaining near the end of the root model monolith. Key serializers,
+resolution and request handling now use the focused boundary. `models.py` keeps
+the same class object available to existing callers.
+
+Django reports no migration and retains the `core.documentkeybinding` label and
+table, all workspace/document/entity relations, ordering and both named database
+constraints. The focused key grammar, database, API, resolution, authorization,
+publication and export suite passes, along with repository-wide Ruff and MyPy
+across 206 backend source files. No route, API schema, permission, stored data,
+recovery, interface or version change is introduced. The next bounded model slice
+is managed document attachments.

@@ -119,7 +119,7 @@ relationship, migration and consumer boundaries are now recorded in
 splits must retain the `core` app label, table names, class identities and root
 compatibility imports with zero schema drift. The monitored-source pair and its
 source-kind choice and the template rollout pair are now complete. Stable key
-bindings follow.
+bindings are now complete. Managed attachments follow.
 
 ## Backend checkpoint: document source models
 
@@ -144,6 +144,18 @@ The paired extraction keeps the revision-to-template and enrollment-to-source,
 destination and applied-revision relationships together. Append-only revision
 guards, client workspace validation, ordering, indexes and uniqueness constraints
 remain unchanged.
+
+## Backend checkpoint: document key model
+
+`DocumentKeyBinding` now lives in `document_key_models.py` beside its stable
+binding grammar dependency. Key serializers, resolution and request handling use
+the focused model boundary directly. `models.py` preserves the established class
+identity for compatibility.
+
+The extraction retains the workspace, document and target-entity authorization
+path, the live-name uniqueness rule, database grammar constraint and archive-only
+retention behavior. Its former noncontiguous declaration is removed from the end
+of the root model module.
 
 Each slice must pass type/lint/component behavior checks. URL, browser, OpenAPI,
 migration, production-image and recovery gates recur when the affected boundary

@@ -62,8 +62,9 @@ from .document_key_fields import (
     ResolvableField,
     resolvable_field,
 )
+from .document_key_models import DocumentKeyBinding
 from .document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT, DocumentKey, keys_in_markdown
-from .models import Block, BlockRevision, Document, DocumentKeyBinding, Entity, NetBoxReference, Organization
+from .models import Block, BlockRevision, Document, Entity, NetBoxReference, Organization
 from .rendering import RenderedKey
 from .workspaces import ResolvedWorkspace
 

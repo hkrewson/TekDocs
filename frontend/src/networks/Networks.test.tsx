@@ -14,8 +14,8 @@ const workspace: WorkspaceContext = {
 }
 const network: NetworkRecord = {
   id: 'network-1', name: 'Office LAN', location_id: 'location-1', location_name: 'Server room', site_name: 'Headquarters',
-  description: 'Primary office network', vlan: 20, cidr: '192.0.2.0/24', gateway: '192.0.2.1', use_full_range: true,
-  range_start: '192.0.2.1', range_end: '192.0.2.254', primary_dns: '9.9.9.9', secondary_dns: '1.1.1.1', notes: '',
+  description: 'Primary office network', vlan: 20, cidr: '192.0.2.0/24', subnet_mask: '255.255.255.0', broadcast_ip: '192.0.2.255', gateway: '192.0.2.1', use_full_range: true,
+  range_start: '192.0.2.1', range_end: '192.0.2.254', primary_dns: '9.9.9.9', secondary_dns: '1.1.1.1', dhcp_server: '192.0.2.2', notes: '',
 }
 
 function networkClient(overrides: Partial<NetworksClient> = {}): NetworksClient {
@@ -33,56 +33,65 @@ const relationshipsClient = {
   list: vi.fn(), search: vi.fn(), create: vi.fn(), archive: vi.fn(), linkTypes: vi.fn(),
 } as RelationshipsClient
 
-const preferenceClient = { load: vi.fn().mockResolvedValue(defaultPreferences(['name', 'location', 'vlan', 'cidr'])), save: vi.fn(), reset: vi.fn() }
+const preferenceClient = { load: vi.fn().mockResolvedValue(defaultPreferences(['cidr', 'vlan', 'subnet_mask'])), save: vi.fn(), reset: vi.fn() }
 function render(children: ReactNode) { return rawRender(<ApplicationRouter>{children}</ApplicationRouter>) }
 
 describe('Networks', () => {
   it('shows the network collection and exposes the separate NetBox register', async () => {
     render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
-    expect(await screen.findByText('Office LAN')).toBeInTheDocument()
-    expect(screen.getByText('Headquarters · Server room')).toBeInTheDocument()
-    expect(screen.getByText('192.0.2.0/24')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '192.0.2.0/24' })).toBeInTheDocument()
+    expect(screen.getByText('255.255.255.0')).toBeInTheDocument()
+    expect(screen.queryByText('Headquarters · Server room')).not.toBeInTheDocument()
     expect(screen.queryByText('192.0.2.1–192.0.2.254')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'NetBox' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Racks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Racks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VLANs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'VRFs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Circuits' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'IP addresses' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'MAC addresses' })).not.toBeInTheDocument()
   })
 
-  it('creates one network and lets the server calculate gateway and range', async () => {
+  it('returns removed network views to the CIDR collection', async () => {
+    window.history.replaceState({}, '', '/networks?view=vrfs')
+    render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
+    expect(await screen.findByRole('button', { name: '192.0.2.0/24' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Networks' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByText('New VRF')).not.toBeInTheDocument()
+  })
+
+  it('creates one CIDR record and leaves mask and broadcast calculation to the server', async () => {
     const createNetwork = vi.fn().mockResolvedValue({ ...network, id: 'network-2', name: 'Guest Wi-Fi', vlan: 30, cidr: '198.51.100.0/24' })
     const user = userEvent.setup()
     render(<Networks workspace={workspace} client={networkClient({ createNetwork })} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
-    await screen.findByText('Office LAN')
+    await screen.findByRole('button', { name: '192.0.2.0/24' })
     await user.click(screen.getByRole('button', { name: 'New network' }))
-    await user.type(screen.getByLabelText('Name'), 'Guest Wi-Fi')
-    await user.selectOptions(screen.getByLabelText('Location'), 'location-1')
     await user.type(screen.getByLabelText('VLAN'), '30')
     await user.type(screen.getByLabelText(/^Network \(CIDR\)/), '198.51.100.0/24')
-    await user.type(screen.getByLabelText('Primary DNS'), '9.9.9.9')
-    expect(screen.queryByLabelText('Gateway')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText('DHCP server IP'), '198.51.100.2')
+    await user.type(screen.getByLabelText('DNS server 1'), '9.9.9.9')
     await user.click(screen.getByRole('button', { name: 'Save network' }))
     await waitFor(() => expect(createNetwork).toHaveBeenCalledWith(workspace, expect.objectContaining({
-      name: 'Guest Wi-Fi', location_id: 'location-1', vlan: 30, cidr: '198.51.100.0/24', use_full_range: true,
-      range_start: null, range_end: null,
+      name: '198.51.100.0/24', location_id: null, vlan: 30, cidr: '198.51.100.0/24', dhcp_server: '198.51.100.2',
     })))
   })
 
-  it('reveals a bounded manual assignable range only when requested', async () => {
+  it('does not expose legacy location, gateway, notes, or assignable-range fields', async () => {
     const user = userEvent.setup()
     render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
-    await screen.findByText('Office LAN')
+    await screen.findByRole('button', { name: '192.0.2.0/24' })
     await user.click(screen.getByRole('button', { name: 'New network' }))
+    expect(screen.queryByLabelText('Name')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Location')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Assignable range start')).not.toBeInTheDocument()
-    await user.click(screen.getByLabelText('Use the full usable address range'))
-    expect(screen.getByLabelText('Assignable range start')).toBeRequired()
-    expect(screen.getByLabelText('Assignable range end')).toBeRequired()
+    expect(screen.queryByLabelText('Gateway')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Notes')).not.toBeInTheDocument()
   })
 
   it('searches only the simple network records and reports request failures', async () => {
     const user = userEvent.setup()
     const { rerender } = render(<Networks workspace={workspace} client={networkClient()} relationshipsClient={relationshipsClient} preferenceClient={preferenceClient} />)
-    await screen.findByText('Office LAN')
+    await screen.findByRole('button', { name: '192.0.2.0/24' })
     await user.type(screen.getByLabelText('Search networks'), 'missing')
     await user.click(screen.getByRole('button', { name: 'Search' }))
 

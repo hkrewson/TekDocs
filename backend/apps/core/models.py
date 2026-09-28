@@ -3111,6 +3111,7 @@ class NetworkSubnet(TimestampedModel):
     assignable_end = models.GenericIPAddressField(null=True, blank=True)
     primary_dns = models.GenericIPAddressField(null=True, blank=True)
     secondary_dns = models.GenericIPAddressField(null=True, blank=True)
+    dhcp_server = models.GenericIPAddressField(null=True, blank=True)
     description = models.TextField(blank=True)
     notes = models.TextField(blank=True)
 

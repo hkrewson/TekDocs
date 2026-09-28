@@ -216,6 +216,7 @@ def test_simple_network_record_calculates_gateway_range_and_isolates_workspace(o
             "use_full_range": True,
             "primary_dns": "9.9.9.9",
             "secondary_dns": "1.1.1.1",
+            "dhcp_server": "192.0.2.2",
             "notes": "Managed by the firewall.",
         },
     )
@@ -226,6 +227,9 @@ def test_simple_network_record_calculates_gateway_range_and_isolates_workspace(o
     assert response.json()["location_name"] == "Server room"
     assert response.json()["site_name"] == "Main office"
     assert response.json()["vlan"] == 20
+    assert response.json()["subnet_mask"] == "255.255.255.0"
+    assert response.json()["broadcast_ip"] == "192.0.2.255"
+    assert response.json()["dhcp_server"] == "192.0.2.2"
 
     sibling_list = owner_client.get(
         reverse("organization-networks", kwargs={"organization_entity_id": sibling.entity_id})

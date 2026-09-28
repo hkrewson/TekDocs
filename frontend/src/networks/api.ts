@@ -48,17 +48,20 @@ export type NetworkRecord = {
   description: string
   vlan: number | null
   cidr: string
+  subnet_mask: string
+  broadcast_ip: string | null
   gateway: string
   use_full_range: boolean
   range_start: string
   range_end: string
   primary_dns: string | null
   secondary_dns: string | null
+  dhcp_server: string | null
   notes: string
 }
 export type NetworkSummary = Omit<NetworkRecord, 'notes' | 'description'>
 
-export type NetworkRecordWrite = Pick<NetworkRecord, 'name' | 'description' | 'cidr' | 'use_full_range' | 'primary_dns' | 'secondary_dns' | 'notes'> & {
+export type NetworkRecordWrite = Pick<NetworkRecord, 'name' | 'description' | 'cidr' | 'use_full_range' | 'primary_dns' | 'secondary_dns' | 'dhcp_server' | 'notes'> & {
   location_id: string | null
   vlan: number | null
   range_start: string | null

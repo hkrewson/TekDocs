@@ -3389,3 +3389,31 @@ publication and export suite passes, along with repository-wide Ruff and MyPy
 across 206 backend source files. No route, API schema, permission, stored data,
 recovery, interface or version change is introduced. The next bounded model slice
 is managed document attachments.
+
+## Network documentation boundary correction and CIDR projection — 2026-09-28
+
+The pre-1.0 Networks workspace is narrowed to five supported views: Networks,
+Devices, DNS, Wireless and NetBox. VLAN, VRF, rack and circuit navigation and
+creation paths are removed; legacy view URLs return to the CIDR collection. The
+authoritative boundary is recorded in `planning/network-documentation-boundary.md`
+so earlier Phase 3 implementation evidence cannot silently re-expand the product
+into NetBox or an IPAM.
+
+The CIDR collection now leads with CIDR, VLAN ID and derived subnet mask. Its
+record displays the derived mask and IPv4 broadcast address, an explicit DHCP
+server IP, and two bounded DNS server IPs. CIDR creation/editing no longer exposes
+name, location, gateway, description, notes, custom assignable ranges or the
+relationship map. DHCP is validated as an address inside the CIDR. Existing IP
+rows remain a CIDR child and retain direct asset assignment. A schema migration
+adds the DHCP server value; legacy columns and rows are intentionally retained
+until the approved backfill/deletion rehearsal reports exactly what survives.
+
+Focused network API and preference tests, migration drift checks, repository-wide
+Mypy across 206 backend files, all 690 frontend tests across 122 files, frontend
+lint and TypeScript checks pass. All 65 focused Chromium layout scenarios pass at
+the maintained widths, including zoom and touch states. The production frontend
+build and bundle budgets pass; OpenAPI and generated types are updated. Remaining
+work is NetBox auto-adoption for prefixes and
+asset-backed devices, the asset-side address action, the final device/DNS/wireless
+projections, controlled legacy removal, and complete responsive/live-stack and
+upgrade/recovery acceptance.

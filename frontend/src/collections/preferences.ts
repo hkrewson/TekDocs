@@ -37,8 +37,9 @@ export const browserCollectionPreferences = {
         credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
       }))
       const available = allowed.filter((column) => value.available_columns.includes(column))
+      const identity = feature === 'networks' ? 'cidr' : 'name'
       return {
-        columns: available.filter((column) => column === 'name' || value.columns.includes(column)),
+        columns: available.filter((column) => column === identity || value.columns.includes(column)),
         default_columns: available.filter((column) => value.default_columns.includes(column)),
         available_columns: available,
         page_size: value.page_size,

@@ -109,8 +109,8 @@ COLLECTIONS = {
     ),
     "networks": CollectionDefinition(
         PermissionKey.NETWORKS_VIEW,
-        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("name", "location", "vlan", "cidr")),
-        ("name", "location", "vlan", "cidr"),
+        tuple((column, PermissionKey.NETWORKS_VIEW) for column in ("cidr", "vlan", "subnet_mask")),
+        ("cidr", "vlan", "subnet_mask"),
     ),
     "contracts": CollectionDefinition(
         PermissionKey.ASSETS_VIEW,
@@ -187,8 +187,11 @@ class CollectionPreferenceView(APIView):
             serializer.is_valid(raise_exception=True)
             values = serializer.validated_data
             selected = values["columns"]
-            if "name" not in selected or len(set(selected)) != len(selected) or set(selected) - set(allowed):
-                raise serializers.ValidationError({"columns": "Choose available columns once and retain name."})
+            identity = "cidr" if feature == "networks" else "name"
+            if identity not in selected or len(set(selected)) != len(selected) or set(selected) - set(allowed):
+                raise serializers.ValidationError(
+                    {"columns": f"Choose available columns once and retain {identity}."}
+                )
             preferences.update_or_create(
                 **owner,
                 defaults={"columns": [key for key in allowed if key in selected], "page_size": values["page_size"]},
@@ -200,7 +203,8 @@ class CollectionPreferenceView(APIView):
         preference = preferences.filter(**owner).first()
         selected = preference.columns if preference else defaults
         # Reapply current policy and curated order, even for old preferences.
-        columns = [key for key in allowed if key == "name" or key in selected]
+        identity = "cidr" if feature == "networks" else "name"
+        columns = [key for key in allowed if key == identity or key in selected]
         response = Response(
             CollectionPreferenceSerializer(
                 {

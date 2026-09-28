@@ -58,11 +58,11 @@ archive confirmation.
 
 ### Networks
 
-Move through Networks, Wireless, VLANs, VRFs, Racks, Devices, DNS, Circuits, and
-NetBox using direct links on desktop and Network views on mobile. Open at least one
-parent/child path: network/address, rack/device, device/interface/IP or MAC, DNS
-zone/record, and circuit/handoff. Confirm the child remains inside its parent record,
-direct URLs restore the same section, and topology remains optional.
+Move through Networks, Devices, DNS, Wireless and NetBox using direct links on
+desktop and Network views on mobile. Open a CIDR and assign one explicit IP to an
+asset, then confirm the same assignment from the asset. Open an imported device
+and verify its asset, model, serial and rack placement plus its NetBox source. Open
+a DNS record and confirm its source. Direct URLs must restore the same section.
 
 ### Documentation and Files
 

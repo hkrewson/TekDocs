@@ -37,6 +37,7 @@ class NetworkRecordWriteSerializer(StrictSerializer):
     secondary_dns = serializers.CharField(
         max_length=45, required=False, allow_blank=True, allow_null=True, default=None
     )
+    dhcp_server = serializers.CharField(max_length=45, required=False, allow_blank=True, allow_null=True, default=None)
     notes = serializers.CharField(max_length=8000, required=False, allow_blank=True, default="")
 
 
@@ -55,6 +56,9 @@ class NetworkRecordSerializer(serializers.Serializer):
     range_end = serializers.CharField()
     primary_dns = serializers.CharField(allow_null=True)
     secondary_dns = serializers.CharField(allow_null=True)
+    dhcp_server = serializers.CharField(allow_null=True)
+    subnet_mask = serializers.CharField()
+    broadcast_ip = serializers.CharField(allow_null=True)
     notes = serializers.CharField(required=False)
 
 
@@ -101,6 +105,7 @@ class NetworkRecordListCreateView(APIView):
                 | Q(location__site__entity__display_name__icontains=term)
                 | Q(primary_dns__icontains=term)
                 | Q(secondary_dns__icontains=term)
+                | Q(dhcp_server__icontains=term)
             )
         if "vlan" in values:
             records = records.filter(display_vlan=values["vlan"])

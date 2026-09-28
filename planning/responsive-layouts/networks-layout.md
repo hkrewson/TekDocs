@@ -1,5 +1,12 @@
 # Networks collection and full record workspace
 
+> Superseded product boundary: the 2026-09-28 decision in
+> [../network-documentation-boundary.md](../network-documentation-boundary.md)
+> reduces Networks to CIDRs, asset-backed devices, DNS, Wireless and NetBox
+> evidence. The implementation history below remains evidence for behavior that
+> existed before that correction; it is not authority to retain the broader
+> object registers.
+
 Phase 3 (#80), required pre-1.0 under #60/#75. Version remains 0.8.46.
 
 ## Supported route boundary

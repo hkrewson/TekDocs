@@ -12157,6 +12157,9 @@ export interface components {
             readonly range_end: string;
             readonly primary_dns: string | null;
             readonly secondary_dns: string | null;
+            readonly dhcp_server: string | null;
+            readonly subnet_mask: string;
+            readonly broadcast_ip: string | null;
             readonly notes?: string;
         };
         /** @description Canonical metadata shared by offset-paginated public collections. */
@@ -12182,6 +12185,7 @@ export interface components {
             readonly range_end?: string | null;
             readonly primary_dns?: string | null;
             readonly secondary_dns?: string | null;
+            readonly dhcp_server?: string | null;
             /** @default  */
             readonly notes: string;
         };
@@ -12971,6 +12975,7 @@ export interface components {
             readonly range_end?: string | null;
             readonly primary_dns?: string | null;
             readonly secondary_dns?: string | null;
+            readonly dhcp_server?: string | null;
             /** @default  */
             readonly notes: string;
         };

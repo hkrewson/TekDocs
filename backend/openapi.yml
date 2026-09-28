@@ -41553,10 +41553,20 @@ components:
         secondary_dns:
           type: string
           nullable: true
+        dhcp_server:
+          type: string
+          nullable: true
+        subnet_mask:
+          type: string
+        broadcast_ip:
+          type: string
+          nullable: true
         notes:
           type: string
       required:
+      - broadcast_ip
       - cidr
+      - dhcp_server
       - gateway
       - id
       - location_id
@@ -41567,6 +41577,7 @@ components:
       - range_start
       - secondary_dns
       - site_name
+      - subnet_mask
       - use_full_range
       - vlan
     NetworkRecordResult:
@@ -41636,6 +41647,10 @@ components:
           nullable: true
           maxLength: 45
         secondary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        dhcp_server:
           type: string
           nullable: true
           maxLength: 45
@@ -43303,6 +43318,10 @@ components:
           nullable: true
           maxLength: 45
         secondary_dns:
+          type: string
+          nullable: true
+          maxLength: 45
+        dhcp_server:
           type: string
           nullable: true
           maxLength: 45

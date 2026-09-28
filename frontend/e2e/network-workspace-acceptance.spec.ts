@@ -5,13 +5,9 @@ import type { Page } from '@playwright/test'
 const organizationId = '00000000-0000-4000-8000-000000000092'
 const views = [
   { id: 'networks', label: 'Networks', expected: '0 networks' },
-  { id: 'wireless', label: 'Wireless', expected: '0 wireless networks' },
-  { id: 'vlans', label: 'VLANs', expected: '0 VLANs' },
-  { id: 'vrfs', label: 'VRFs', expected: '0 VRFs' },
-  { id: 'racks', label: 'Racks', expected: '0 racks' },
   { id: 'devices', label: 'Devices', expected: '0 devices' },
   { id: 'dns', label: 'DNS', expected: '0 DNS zones' },
-  { id: 'circuits', label: 'Circuits', expected: '0 circuits' },
+  { id: 'wireless', label: 'Wireless', expected: '0 wireless networks' },
   { id: 'netbox', label: 'NetBox', expected: '0 NetBox identities' },
 ] as const
 
@@ -47,7 +43,7 @@ async function chooseView(page: Page, id: string, label: string, mobile: boolean
 }
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
-  test(`all network registers remain usable at ${width}px`, async ({ page }) => {
+  test(`all supported network views remain usable at ${width}px`, async ({ page }) => {
     await fixtures(page)
     await page.setViewportSize({ width, height: 520 })
     await page.goto('/networks')
@@ -71,7 +67,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
 }
 
 for (const width of [390, 1280]) {
-  test(`client workspace keeps every network register in scope at ${width}px`, async ({ page }) => {
+  test(`client workspace keeps every supported network view in scope at ${width}px`, async ({ page }) => {
     const requests = await fixtures(page, true)
     await page.setViewportSize({ width, height: 520 })
     const path = `/workspaces/organizations/${organizationId}/networks`
@@ -96,7 +92,7 @@ test('network register selector remains usable at 200 percent zoom', async ({ pa
   await page.goto('/networks')
   const selector = page.getByRole('combobox', { name: 'Network views', exact: true })
   await expect(selector).toBeVisible()
-  await selector.selectOption('circuits')
-  await expect(page.getByText('0 circuits', { exact: true })).toBeVisible()
+  await selector.selectOption('netbox')
+  await expect(page.getByText('0 NetBox identities', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

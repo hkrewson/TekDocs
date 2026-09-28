@@ -1,8 +1,5 @@
-import { CircuitRegister } from './CircuitRegister'
 import { DNSRegister } from './DNSRegister'
 import { DeviceRegister } from './DeviceRegister'
-import { RackRegister } from './RackRegister'
-import { AddressingRegister } from './AddressingRegister'
 import { WirelessWorkspace } from './NetworkWireless'
 import { NetworkNetBox } from './NetworkNetBox'
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
@@ -21,14 +18,13 @@ import type { CollectionPreferences } from '../collections/preferences'
 import { FilterMenu } from '../FilterMenu'
 import { NetworkRecordView } from './NetworkRecordView'
 import type { RelationshipsClient } from '../relationships/api'
-import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import { networkText as t } from './networkText'
 import '../collections/collections.css'
 import './network-layout.css'
 
 type NetworkResult = Awaited<ReturnType<NetworksClient['collection']>>
-const networkColumns = ['name', 'location', 'vlan', 'cidr'] as const
-const labels = { name: t('name'), location: t('location'), vlan: t('vlan'), cidr: t('cidr') }
+const networkColumns = ['cidr', 'vlan', 'subnet_mask'] as const
+const labels = { cidr: t('cidr'), vlan: t('vlan'), subnet_mask: t('subnetMask') }
 
 type NetworksProps = { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }
 export function Networks(props: NetworksProps) {
@@ -42,7 +38,7 @@ export function Networks(props: NetworksProps) {
     if (view !== 'networks') next.set('view', view); else next.delete('view')
     return `${location.pathname}${next.size ? `?${next}` : ''}`
   }
-  const viewIds = ['networks', 'wireless', 'vlans', 'vrfs', 'racks', 'devices', 'dns', 'circuits', 'netbox'] as const
+  const viewIds = ['networks', 'devices', 'dns', 'wireless', 'netbox'] as const
   const requestedView = params.get('view')
   const currentView = viewIds.includes(requestedView as typeof viewIds[number]) ? requestedView as typeof viewIds[number] : 'networks'
   const views = viewIds.map((id) => ({ id, label: id === 'netbox' ? translate('netbox.nav') : id === 'networks' ? t('heading') : t(id), href: href(id) }))
@@ -54,11 +50,11 @@ export function Networks(props: NetworksProps) {
       const target = views.find((view) => view.id === event.target.value)
       if (target) void navigate(target.href, { state: location.state as unknown })
     }}>{views.map((view) => <option key={view.id} value={view.id}>{view.label}</option>)}</select></label>
-    {params.get('view') === 'netbox' ? <NetworkNetBox workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'circuits' ? <CircuitRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'dns' ? <DNSRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'devices' ? <DeviceRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} relationshipsClient={props.relationshipsClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'racks' ? <RackRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : params.get('view') === 'vlans' || params.get('view') === 'vrfs' ? <AddressingRegister kind={params.get('view') as 'vlans' | 'vrfs'} workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
+    {currentView === 'netbox' ? <NetworkNetBox workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : currentView === 'dns' ? <DNSRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : currentView === 'devices' ? <DeviceRegister workspace={props.workspace} client={props.client ?? browserNetworksClient} relationshipsClient={props.relationshipsClient} preferenceClient={props.preferenceClient} /> : wireless ? <WirelessWorkspace workspace={props.workspace} client={props.client ?? browserNetworksClient} preferenceClient={props.preferenceClient} /> : <NetworkCollection {...props} />}
   </>
 }
 
-function NetworkCollection({ workspace, client = browserNetworksClient, preferenceClient = browserCollectionPreferences, relationshipsClient }: { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }) {
+function NetworkCollection({ workspace, client = browserNetworksClient, preferenceClient = browserCollectionPreferences }: { workspace: WorkspaceContext; client?: NetworksClient; preferenceClient?: typeof browserCollectionPreferences; relationshipsClient: RelationshipsClient }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -67,8 +63,6 @@ function NetworkCollection({ workspace, client = browserNetworksClient, preferen
   const [response, setResponse] = useState<{ key: string; result?: NetworkResult } | null>(null)
   const [detail, setDetail] = useState<{ key: string; record?: NetworkRecord } | null>(null)
   const [reload, setReload] = useState(0)
-  const [showMap, setShowMap] = useState(false)
-  const relationshipScope = useMemo(() => workspace.kind === 'organization' ? { organizationId: workspace.id } : {}, [workspace])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [pending, setPending] = useState<string | null>(null)
@@ -84,7 +78,7 @@ function NetworkCollection({ workspace, client = browserNetworksClient, preferen
   const requestedPage = Number(params.get('page') ?? 1)
   const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const pageSize = [25, 50, 100].includes(Number(params.get('page_size'))) ? Number(params.get('page_size')) : preferences?.page_size ?? 25
-  const queryText = JSON.stringify({ q: params.get('q') ?? '', page, page_size: pageSize, ordering: params.get('ordering') ?? 'name', ...(params.get('vlan') ? { vlan: params.get('vlan') } : {}) })
+  const queryText = JSON.stringify({ q: params.get('q') ?? '', page, page_size: pageSize, ordering: params.get('ordering') ?? 'cidr', ...(params.get('vlan') ? { vlan: params.get('vlan') } : {}) })
   const query = useMemo(() => JSON.parse(queryText) as NetworkQuery, [queryText])
   const key = `${workspace.kind}:${workspace.id}:${queryText}`
   const detailKey = `${workspace.kind}:${workspace.id}:${activeId}`
@@ -137,15 +131,14 @@ function NetworkCollection({ workspace, client = browserNetworksClient, preferen
         <label className="collection-page-size">{translate('collections.pageSize')}<select disabled={guarded} value={pageSize} onChange={(event) => { const size = Number(event.target.value) as 25 | 50 | 100; browse({ page_size: String(size) }); void preferenceClient.save(workspace, 'networks', { columns: preferences?.columns ?? [...networkColumns], page_size: size }).then(setPreferences).catch(() => setError(translate('collections.preferenceFailed'))) }}>{[25, 50, 100].map((size) => <option key={size}>{size}</option>)}</select></label>
       </div>
       <div className="collection-active-filters">{query.vlan && <button type="button" className="row-action" onClick={() => browse({ vlan: null })}>{t('vlan')}: {query.vlan} ×</button>}</div>
-      <label className="collection-mobile-order">{t('ordering')}<select value={query.ordering} onChange={(event) => browse({ ordering: event.target.value })}>{networkColumns.flatMap((column) => [<option key={column} value={column}>{labels[column]} ↑</option>, <option key={`-${column}`} value={`-${column}`}>{labels[column]} ↓</option>])}</select></label>
+      <label className="collection-mobile-order">{t('ordering')}<select value={query.ordering} onChange={(event) => browse({ ordering: event.target.value })}>{(['cidr', 'vlan'] as const).flatMap((column) => [<option key={column} value={column}>{labels[column]} ↑</option>, <option key={`-${column}`} value={`-${column}`}>{labels[column]} ↓</option>])}</select></label>
       {!response || response.key !== key ? <p role="status">{translate('collections.loading')}</p> : !result ? <p role="alert">{t('loadFailed')} <button type="button" onClick={() => setReload(reload + 1)}>{translate('collections.retry')}</button></p> : <>
         <p>{t('count', { count: result.count })}</p>
-        {result.results.length ? <CollectionTable<NetworkSummary> label={t('heading')} rows={result.results} selectable={false} selected={new Set()} onSelection={() => {}} ordering={query.ordering} onOrder={(ordering) => browse({ ordering })} columns={(preferences?.columns ?? networkColumns).map((column) => ({ id: column, label: labels[column as keyof typeof labels], render: (row) => column === 'name' ? <button type="button" id={`network-name-${row.id}`} className="collection-name" onClick={() => { position.current = { y: window.scrollY, focus: `network-name-${row.id}` }; void navigate(href(row.id, 'overview', true), { state: { networkPosition: position.current } }) }}>{row.name}</button> : column === 'location' ? [row.site_name, row.location_name].filter(Boolean).join(' · ') || t('unassigned') : String(row[column as 'vlan' | 'cidr'] ?? translate('collections.missing')) }))} /> : <p>{t('empty')}</p>}
+        {result.results.length ? <CollectionTable<NetworkSummary> label={t('heading')} rows={result.results} selectable={false} selected={new Set()} onSelection={() => {}} ordering={query.ordering} onOrder={(ordering) => browse({ ordering })} columns={(preferences?.columns ?? networkColumns).map((column) => ({ id: column, label: labels[column as keyof typeof labels], identity: column === 'cidr', sortable: column !== 'subnet_mask', render: (row) => column === 'cidr' ? <button type="button" id={`network-cidr-${row.id}`} className="collection-name" onClick={() => { position.current = { y: window.scrollY, focus: `network-cidr-${row.id}` }; void navigate(href(row.id, 'overview', true), { state: { networkPosition: position.current } }) }}>{row.cidr}</button> : String(row[column as 'vlan' | 'subnet_mask'] ?? translate('collections.missing')) }))} /> : <p>{t('empty')}</p>}
         <CollectionPagination label={t('heading')} page={page} pageSize={pageSize} count={result.count} hasMore={result.has_more} onPageChange={(next) => browse({ page: String(next) })} />
       </>}
     </>}
-    {previewId && <QuickDrawer title={current?.name ?? t('heading')} returnLabel={t('return')} returnHref={href(null)} returnFocusId={result?.results.some((record) => record.id === previewId) ? `network-name-${previewId}` : 'networks-heading'} onClose={() => void navigate(href(null), { replace: true, state: navigationState })}><Link className="collection-record-link" to={href(activeId, section)} state={navigationState}>{translate('collections.openFullPage')}</Link>{recordContent}</QuickDrawer>}
+    {previewId && <QuickDrawer title={current?.cidr ?? t('heading')} returnLabel={t('return')} returnHref={href(null)} returnFocusId={result?.results.some((record) => record.id === previewId) ? `network-cidr-${previewId}` : 'networks-heading'} onClose={() => void navigate(href(null), { replace: true, state: navigationState })}><Link className="collection-record-link" to={href(activeId, section)} state={navigationState}>{translate('collections.openFullPage')}</Link>{recordContent}</QuickDrawer>}
     {creating && <QuickDrawer title={t('new')} returnLabel={t('return')} returnHref={href(null)} returnFocusId="networks-heading" onClose={() => void navigate(href(null), { replace: true, state: navigationState })}><NetworkRecordView record={null} workspace={workspace} client={client} canManage={Boolean(result?.can_manage)} embedded section="overview" href={() => href(null)} onCancel={() => void navigate(href(null), { replace: true, state: navigationState })} onSaved={(record) => { setDetail({ key: `${workspace.kind}:${workspace.id}:${record.id}`, record }); setPending(href(record.id, 'overview', true)); setReload(reload + 1) }} /></QuickDrawer>}
-    {!recordId && <><button className="secondary-button" type="button" onClick={() => setShowMap(!showMap)}>{t(showMap ? 'hideMap' : 'showMap')}</button>{showMap && <RelationshipGraph scope={relationshipScope} family="network" client={relationshipsClient} heading={t('map')} />}</>}
   </>
 }

@@ -1,41 +1,48 @@
-# Networks combined workspace acceptance
+# Networks workspace acceptance
 
 Phase 3/8 (#80/#60), required pre-1.0 under #75. Version remains 0.8.46.
+The product boundary is [the 2026-09-28 network documentation decision](../network-documentation-boundary.md).
 
-## Accepted automated boundary
+## Supported navigation
 
-The Networks entry point now treats Networks, Wireless, VLANs, VRFs, Racks,
-Devices, DNS, Circuits, and NetBox as one responsive set of workspace views. At
-768 CSS pixels and above, the views remain direct links with an indicated current
-view. Below 768 pixels, the nine-link strip becomes one labeled Network views
-selector. Each choice retains its direct `?view=` URL, browser navigation, and
-MSP or organization path. This removes a tall, wrapping navigation block from
-phone layouts without hiding any register.
+The Networks entry point has five views: Networks, Devices, DNS, Wireless and
+NetBox. At 768 CSS pixels and above they are direct links. Below 768 pixels they
+become one labeled selector. Each view retains its direct URL, browser navigation
+and MSP or organization workspace. Legacy `view=vlans`, `view=vrfs`,
+`view=racks` and `view=circuits` URLs resolve to the CIDR collection and expose no
+creation control for the removed record type.
 
-`network-workspace-acceptance.spec.ts` traverses every view instead of inferring
-route readiness from isolated register tests. It covers 320, 390, 768, 1024,
-1280, and 1440 CSS-pixel widths; a short 520-pixel viewport; the 640-CSS-pixel
-viewport exposed by a 1280-pixel display at 200% browser zoom; and MSP plus
-organization routes. Every view must load a bounded collection state, preserve
-its URL, avoid page-level horizontal overflow, and pass an accessibility scan.
-Organization checks assert that all nine data requests stay inside the exact
-client workspace and that no MSP collection request is made.
+`network-workspace-acceptance.spec.ts` traverses all five views at 320, 390, 768,
+1024, 1280 and 1440 CSS pixels, a short 520-pixel viewport, and the 640-CSS-pixel
+viewport produced by 200% zoom on a 1280-pixel display. MSP and organization
+routes must preserve scope, avoid page-level horizontal overflow and pass an
+accessibility scan.
 
-The complete existing `network-layout.spec.ts` suite remains part of this
-checkpoint. It continues to verify network and wireless record drawers, full-page
-links, child addresses, assignment changes, dirty-change guards, failed writes,
-focus restoration, personal columns, touch input, and responsive record sections.
+## CIDR collection and record
 
-## Evidence and remaining work
+The collection leads with canonical CIDR and displays VLAN ID and derived subnet
+mask. CIDR opens the shared quick drawer. Overview displays CIDR, VLAN ID, subnet
+mask, IPv4 broadcast address when applicable, DHCP server IP and two bounded DNS
+server IP fields. Mask and broadcast are calculated by the server. The editor
+accepts only CIDR, optional VLAN ID, optional DHCP server IP and optional DNS
+server IPs. DHCP must belong to the CIDR.
 
-All 195 combined layout cases pass in Chromium, Firefox, and WebKit: 168 existing
-network/record cases and 27 whole-workspace cases. Focused lint, TypeScript, and
-Networks component checks pass. The local 0.8.46 frontend image was rebuilt so
-the selector can be reviewed at `http://localhost:3200`.
+Addresses remain a child section of the CIDR. An address can point directly to an
+asset, and this is the same assignment that the asset view must edit. Wireless
+and History remain lazy record sections. Name, location, gateway, description,
+notes, custom assignable range and relationship-map controls are absent from the
+supported interface even while their legacy columns remain temporarily for the
+staged data reduction.
 
-The MSP and organization Networks routes remain `in_progress` in the route
-inventory because human technician and assistive-technology walkthroughs, final
-recovery/release gates, and release approval are still outstanding. The
-production-image refresh boundary is already covered separately by
-[production-route-acceptance.md](production-route-acceptance.md). No API, schema,
-migration, permission, domain-data, deployment, or version change is included.
+## Current evidence and remaining work
+
+Focused Django network tests, collection-preference tests, frontend component
+tests, lint and type checking cover this boundary. The maintained browser suite
+must continue to verify drawers, direct links, address assignment, dirty-change
+guards, failed writes, focus restoration, personal columns, touch input and
+responsive sections.
+
+The route remains `in_progress`. NetBox device/prefix auto-adoption, the
+asset-side address action, final device projection, DNS-provider projection,
+wireless field decision, controlled legacy-data removal, technician walkthroughs
+and the applicable upgrade/recovery gates remain open.

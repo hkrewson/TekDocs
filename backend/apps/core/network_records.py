@@ -73,6 +73,18 @@ def _range(
     return first.compressed, last.compressed
 
 
+def _dhcp_server(
+    network: ipaddress.IPv4Network | ipaddress.IPv6Network, value: object | None
+) -> str | None:
+    clean = _address(value)
+    if clean is None:
+        return None
+    address = ipaddress.ip_address(clean)
+    if address.version != network.version or address not in network:
+        raise NetworkAddressingError("The DHCP server IP must be inside the network CIDR.")
+    return address.compressed
+
+
 def network_projection(record: NetworkSubnet) -> dict[str, object]:
     network = ipaddress.ip_network(record.cidr, strict=True)
     usable_start: ipaddress.IPv4Address | ipaddress.IPv6Address
@@ -101,12 +113,15 @@ def network_projection(record: NetworkSubnet) -> dict[str, object]:
             record.vlan_number if record.vlan_number is not None else (legacy_vlan.vlan_id if legacy_vlan else None)
         ),
         "cidr": record.cidr,
+        "subnet_mask": str(network.netmask),
+        "broadcast_ip": network.broadcast_address.compressed if isinstance(network, ipaddress.IPv4Network) else None,
         "gateway": usable_start.compressed,
         "use_full_range": record.use_full_range,
         "range_start": range_start.compressed,
         "range_end": range_end.compressed,
         "primary_dns": record.primary_dns,
         "secondary_dns": record.secondary_dns,
+        "dhcp_server": record.dhcp_server,
         "notes": record.notes,
     }
 
@@ -127,6 +142,7 @@ def create_network_record(
     range_end: object | None,
     primary_dns: object | None,
     secondary_dns: object | None,
+    dhcp_server: object | None,
     notes: str,
 ) -> NetworkSubnet:
     scope = DataScope.owner(tenant, organization)
@@ -150,6 +166,7 @@ def create_network_record(
         assignable_end=end,
         primary_dns=_address(primary_dns),
         secondary_dns=_address(secondary_dns),
+        dhcp_server=_dhcp_server(network, dhcp_server),
         notes=notes.strip(),
     )
     record.full_clean()
@@ -199,6 +216,7 @@ def update_network_record(*, record: NetworkSubnet, actor_id: UUID, values: dict
     locked.assignable_end = end
     locked.primary_dns = _address(values.get("primary_dns", locked.primary_dns))
     locked.secondary_dns = _address(values.get("secondary_dns", locked.secondary_dns))
+    locked.dhcp_server = _dhcp_server(network, values.get("dhcp_server", locked.dhcp_server))
     locked.notes = str(values.get("notes", locked.notes)).strip()
     locked.full_clean()
     locked.save()

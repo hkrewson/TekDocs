@@ -11,7 +11,12 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.core.integration_egress import MAX_INTEGRATION_RESPONSE_BYTES, ProviderRateLimited, get_provider_json
+from apps.core.integration_egress import (
+    MAX_INTEGRATION_RESPONSE_BYTES,
+    ProviderRateLimited,
+    get_provider_json,
+    get_provider_json_api_key,
+)
 from apps.core.integration_providers import ProviderObservation, ProviderPage
 from apps.core.integrations import JOB_LEASE, cancel_sync_job, enqueue_sync, process_sync_job
 from apps.core.models import IntegrationConflict, IntegrationJobState, IntegrationObservation
@@ -86,6 +91,24 @@ def test_provider_egress_pins_tls_hostname_disables_redirects_and_bounds_body(mo
         "Host": "provider.example",
         "Accept": "application/json",
         "Authorization": "Token value",
+    }
+
+
+def test_provider_egress_keeps_unifi_api_key_at_the_request_boundary(monkeypatch):
+    _mock_egress(monkeypatch)
+
+    payload = get_provider_json_api_key(
+        base_url="https://provider.example/proxy/network/integration/",
+        relative_path="v1/sites?offset=0&limit=200",
+        api_key="private-unifi-key",
+    )
+
+    assert payload == {}
+    request = FakePool.requests[0]
+    assert request[1]["headers"] == {
+        "Host": "provider.example",
+        "Accept": "application/json",
+        "X-API-Key": "private-unifi-key",
     }
 
 

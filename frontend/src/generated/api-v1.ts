@@ -8967,12 +8967,13 @@ export interface components {
         readonly ConnectionWrite: {
             /**
              * @description * `netbox` - netbox
+             *     * `unifi` - unifi
              *     * `microsoft_graph` - microsoft_graph
              *     * `halopsa` - halopsa
              *     * `ninjaone` - ninjaone
              * @enum {string}
              */
-            readonly provider: "netbox" | "microsoft_graph" | "halopsa" | "ninjaone";
+            readonly provider: "netbox" | "unifi" | "microsoft_graph" | "halopsa" | "ninjaone";
             readonly name: string;
             /**
              * Format: uri

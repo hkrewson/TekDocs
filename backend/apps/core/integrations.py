@@ -21,6 +21,7 @@ from .integration_providers import (
     PROVIDERS,
     ProviderAdapter,
     netbox_api_base_url,
+    unifi_api_base_url,
     validate_provider_adapter,
     validate_provider_page,
 )
@@ -50,6 +51,7 @@ from .models import (
 )
 from .rls import OrganizationRLSMode, bind_local_rls_scope, system_rls_scope_if_postgresql
 from .scoping import DataScope
+from .unifi import project_unifi_observations
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
 
 MAX_CONNECTIONS_PER_WORKSPACE = 20
@@ -123,7 +125,8 @@ def _secret_for_provider(connection: IntegrationConnection, payload: bytes) -> s
         raise ValueError("provider_credential_invalid") from exc
     if not isinstance(values, dict):
         raise ValueError("provider_credential_invalid")
-    client_secret = values.get("client_secret")
+    secret_key = "api_key" if connection.provider == IntegrationProvider.UNIFI else "client_secret"
+    client_secret = values.get(secret_key)
     if not isinstance(client_secret, str):
         raise ValueError("provider_credential_invalid")
     return client_secret
@@ -192,6 +195,8 @@ def create_connection(
     normalized_base_url = validate_integration_base_url(selected_base_url)
     if provider == IntegrationProvider.NETBOX:
         normalized_base_url = netbox_api_base_url(normalized_base_url)
+    elif provider == IntegrationProvider.UNIFI:
+        normalized_base_url = unifi_api_base_url(normalized_base_url)
     connection = IntegrationConnection(
         id=connection_id,
         tenant=resolved.member.tenant,
@@ -261,6 +266,8 @@ def update_connection(
         normalized_base_url = validate_integration_base_url(base_url)
         if connection.provider == IntegrationProvider.NETBOX:
             normalized_base_url = netbox_api_base_url(normalized_base_url)
+        elif connection.provider == IntegrationProvider.UNIFI:
+            normalized_base_url = unifi_api_base_url(normalized_base_url)
         if normalized_base_url != connection.base_url:
             connection.base_url = normalized_base_url
             connection.last_error_code = ""
@@ -891,6 +898,8 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     raise ValueError("provider_configuration_invalid")
                 job.connection.configuration = {**job.connection.configuration, **page.configuration_updates}
                 job.connection.save(update_fields=("configuration", "updated_at"))
+            if job.connection.provider == IntegrationProvider.UNIFI:
+                project_unifi_observations(job, created)
             _conflicts_for_observations(job, created)
             job.cursor_after = page.next_cursor
             job.state = IntegrationJobState.SUCCEEDED

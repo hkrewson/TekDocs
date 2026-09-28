@@ -402,7 +402,7 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
     const controller = new AbortController()
     networksClient.netBoxChoiceCollection(workspace, { q: submittedQuery, object_type: objectType, selected_id: selectedId || undefined, page, page_size: 25 }, controller.signal)
       .then((value) => { if (!controller.signal.aborted) { setChoices(value); setError('') } })
-      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('integrations.adoptFailed')) })
+      .catch(() => { if (!controller.signal.aborted) setError(translate('integrations.adoptFailed')) })
     return () => controller.abort()
   }, [mode, networksClient, objectType, page, selectedId, submittedQuery, workspace])
 
@@ -411,7 +411,7 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
     const controller = new AbortController()
     inventoryClient.listModelChoices(workspace, submittedModelQuery, controller.signal)
       .then((value) => { if (!controller.signal.aborted) { setModels(value.results.filter((model) => model.kind === 'hardware')); setError('') } })
-      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('integrations.modelLoadFailed')) })
+      .catch(() => { if (!controller.signal.aborted) setError(translate('integrations.modelLoadFailed')) })
     return () => controller.abort()
   }, [conflict.remote_type, inventoryClient, mode, submittedModelQuery, workspace])
 
@@ -420,7 +420,7 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
     const controller = new AbortController()
     networksClient.subnetCollection(workspace, { q: submittedSubnetQuery, page: subnetPage, page_size: 25, ordering: 'name' }, controller.signal)
       .then((value) => { if (!controller.signal.aborted) { setSubnetChoices(value); setError('') } })
-      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : translate('integrations.subnetLoadFailed')) })
+      .catch(() => { if (!controller.signal.aborted) setError(translate('integrations.subnetLoadFailed')) })
     return () => controller.abort()
   }, [conflict.remote_type, mode, networksClient, submittedSubnetQuery, subnetPage, workspace])
 
@@ -443,8 +443,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
               ? await providerClient.adoptNetBoxConflict(workspace, conflict, { mac_address: { address: macAddress.trim(), description: description.trim() } })
             : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
       onSaved(updated)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : translate('integrations.adoptFailed'))
+    } catch {
+      setError(translate('integrations.adoptFailed'))
     } finally { setBusy(false) }
   }
 

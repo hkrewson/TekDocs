@@ -5412,6 +5412,7 @@ class WebhookInboundReceipt(models.Model):
 
 class IntegrationProvider(models.TextChoices):
     NETBOX = "netbox", "NetBox"
+    UNIFI = "unifi", "UniFi Network"
     MICROSOFT_GRAPH = "microsoft_graph", "Microsoft 365"
     HALOPSA = "halopsa", "HaloPSA"
     NINJAONE = "ninjaone", "NinjaOne"

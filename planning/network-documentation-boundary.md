@@ -91,6 +91,37 @@ Wireless remains inside the approved navigation boundary. No current wireless
 field is guaranteed merely because it already exists; the retained wireless
 projection must be specified before its legacy model is reduced.
 
+## UniFi observation boundary
+
+UniFi Network is an optional read-only source for the existing five-view
+workspace. It does not add a sixth Networks view and it does not make TekDocs a
+controller. The supported provider projection is deliberately limited to:
+
+- configured network details needed to describe a CIDR, VLAN ID, subnet mask,
+  broadcast address, DHCP server and at most two DNS servers;
+- adopted infrastructure identity needed to create or refresh a hardware Asset
+  and show it in Devices;
+- connected-client name, IP address and MAC address as time-bounded observations;
+- Wi-Fi broadcast name, state, security and associated network for Wireless.
+
+Connected clients are observations, not durable inventory merely because they
+appeared on a network. A client may update an IP assignment only when TekDocs can
+deterministically identify an existing Asset or an operator approves the match.
+Unknown phones, guest devices and other transient clients never create Assets or
+NetBox devices automatically.
+
+Provider ownership remains explicit. NetBox owns durable inventory and placement
+facts imported from NetBox. UniFi owns live connectivity and broadcast observations.
+Locally authored values remain local unless a field has a documented provider
+ownership rule. Source evidence stays in Integrations and on the affected record;
+it is not another network-management surface.
+
+Publishing an eligible UniFi-derived change to NetBox is a separate reviewed
+operation. It requires a separately configured NetBox write credential, shows the
+exact proposed create or update before execution, revalidates both source and
+target immediately before writing, and records the result. There is no automatic
+UniFi-to-NetBox feedback loop.
+
 ## Data reduction sequence
 
 Existing data is preserved only long enough to extract the agreed values safely.
@@ -104,7 +135,11 @@ The pre-1.0 sequence is:
 4. Make NetBox sync create/update supported asset, model, device and CIDR records
    automatically; retain only ambiguous cases for review.
 5. Define the retained DNS-provider and wireless projections.
-6. Backfill supported values and source evidence, verify counts and relationships,
+6. Add the bounded UniFi reader and prove that unsupported or transient values
+   remain observations; then add deterministic projection into the retained views.
+7. Add reviewed NetBox publication only after the separate write-credential,
+   proposal, authorization and audit contract is implemented.
+8. Backfill supported values and source evidence, verify counts and relationships,
    then remove the superseded APIs, models, permissions, preferences, tests and
    stored rows for VRFs, standalone VLANs, racks, interfaces, MAC addresses,
    circuits and handoffs.
@@ -125,5 +160,11 @@ indefinitely merely because the old interface once exposed them.
 - CIDR-derived mask and broadcast are stable for IPv4 and IPv6 semantics.
 - Fresh-workspace sync, repeat sync, changed observations, ambiguous matches and
   provider failures are explicit and recoverable.
+- UniFi sync reads only the documented sites, networks, adopted devices, connected
+  clients and Wi-Fi broadcasts endpoints and retains only the bounded projection.
+- Transient UniFi clients remain observations unless an asset match is deterministic
+  or approved; no provider write occurs during synchronization.
+- A NetBox publication cannot occur without a separately configured write
+  credential and an explicit review of the current proposal.
 - Removed routes and controls cannot create extraneous record types.
 - Upgrade and recovery rehearsals prove the allowed values survive final cleanup.

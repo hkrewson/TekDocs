@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -11,6 +12,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from .integration_egress import (
     get_provider_json,
+    get_provider_json_api_key,
     get_provider_json_or_list,
     post_provider_form,
     post_provider_form_basic,
@@ -173,6 +175,274 @@ class NetBoxProvider:
             next_cursor = ""
         complete = (str(remote_type),) if not next_value else ()
         return ProviderPage(tuple(observations), next_cursor, complete)
+
+
+UNIFI_OBJECT_TYPES = ("unifi.network", "unifi.device", "unifi.client", "unifi.wifi")
+UNIFI_RESOURCES = (
+    (UNIFI_OBJECT_TYPES[0], "networks"),
+    (UNIFI_OBJECT_TYPES[1], "devices"),
+    (UNIFI_OBJECT_TYPES[2], "clients"),
+    (UNIFI_OBJECT_TYPES[3], "wifi/broadcasts"),
+)
+
+
+def unifi_api_base_url(value: str) -> str:
+    """Accept a console root or explicit UniFi Network integration API root."""
+
+    parts = urlsplit(value)
+    path = parts.path.rstrip("/")
+    if not path.endswith("/integration"):
+        path = f"{path}/proxy/network/integration"
+    return urlunsplit((parts.scheme, parts.netloc, f"{path}/", "", ""))
+
+
+def _unifi_cursor(value: str) -> dict[str, object]:
+    if not value:
+        return {}
+    try:
+        decoded = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+        cursor = json.loads(decoded)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("provider_cursor_invalid") from exc
+    if not isinstance(cursor, dict):
+        raise ValueError("provider_cursor_invalid")
+    return cursor
+
+
+def _encode_unifi_cursor(value: dict[str, object]) -> str:
+    raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _unifi_page(payload: dict[str, object]) -> tuple[list[dict[str, object]], int, int, int]:
+    data = payload.get("data")
+    offset = payload.get("offset")
+    count = payload.get("count")
+    total = payload.get("totalCount")
+    if (
+        not isinstance(data, list)
+        or not isinstance(offset, int)
+        or not isinstance(count, int)
+        or not isinstance(total, int)
+        or count != len(data)
+        or min(offset, count, total) < 0
+        or count > 200
+        or offset + count > total
+        or (offset < total and count == 0)
+        or any(not isinstance(item, dict) for item in data)
+    ):
+        raise ValueError("provider_response_invalid")
+    return data, offset, count, total
+
+
+def _unifi_network_projection(record: dict[str, object], *, site_id: str) -> dict[str, object]:
+    projection: dict[str, object] = {
+        "name": record.get("name"),
+        "site_id": site_id,
+        "management": record.get("management"),
+        "enabled": record.get("enabled"),
+        "vlan_id": record.get("vlanId"),
+    }
+    ipv4 = record.get("ipv4Configuration")
+    if isinstance(ipv4, dict):
+        host = ipv4.get("hostIpAddress")
+        prefix = ipv4.get("prefixLength")
+        if isinstance(host, str) and isinstance(prefix, int):
+            try:
+                network = ipaddress.ip_network(f"{host}/{prefix}", strict=False)
+            except ValueError:
+                pass
+            else:
+                projection.update(
+                    {
+                        "cidr": str(network),
+                        "subnet_mask": str(network.netmask),
+                        "broadcast_ip": str(network.broadcast_address) if network.version == 4 else None,
+                    }
+                )
+        dhcp = ipv4.get("dhcpConfiguration")
+        if isinstance(dhcp, dict):
+            mode = dhcp.get("mode")
+            projection["dhcp_mode"] = mode
+            relay = dhcp.get("dhcpServerIpAddresses")
+            if mode == "RELAY" and isinstance(relay, list) and relay and isinstance(relay[0], str):
+                projection["dhcp_server_ip"] = relay[0]
+            elif mode == "SERVER" and isinstance(host, str):
+                projection["dhcp_server_ip"] = host
+            dns = dhcp.get("dnsServerIpAddressesOverride")
+            if isinstance(dns, list):
+                for index, address in enumerate(item for item in dns if isinstance(item, str)):
+                    if index >= 2:
+                        break
+                    projection[f"dns_server_{index + 1}"] = address
+    return projection
+
+
+def _unifi_projection(remote_type: str, record: dict[str, object], *, site_id: str) -> dict[str, object]:
+    if remote_type == "unifi.network":
+        return _unifi_network_projection(record, site_id=site_id)
+    if remote_type == "unifi.device":
+        features = record.get("features")
+        return {
+            "name": record.get("name"),
+            "site_id": site_id,
+            "model": record.get("model"),
+            "serial": record.get("serialNumber"),
+            "mac_address": record.get("macAddress"),
+            "ip_address": record.get("ipAddress"),
+            "state": record.get("state"),
+            "firmware_version": record.get("firmwareVersion"),
+            "features": ", ".join(item for item in features if isinstance(item, str))
+            if isinstance(features, list)
+            else "",
+        }
+    if remote_type == "unifi.client":
+        return {
+            "name": record.get("name"),
+            "site_id": site_id,
+            "client_type": record.get("type"),
+            "mac_address": record.get("macAddress"),
+            "ip_address": record.get("ipAddress"),
+            "uplink_device_id": record.get("uplinkDeviceId"),
+            "connected_at": record.get("connectedAt"),
+        }
+    network = record.get("network")
+    security = record.get("securityConfiguration")
+    frequencies = record.get("broadcastingFrequenciesGHz")
+    return {
+        "name": record.get("name"),
+        "site_id": site_id,
+        "wifi_type": record.get("type"),
+        "enabled": record.get("enabled"),
+        "network_id": network.get("networkId") if isinstance(network, dict) else None,
+        "network_type": network.get("type") if isinstance(network, dict) else None,
+        "security": security.get("type") if isinstance(security, dict) else None,
+        "frequencies_ghz": ", ".join(str(item) for item in frequencies)
+        if isinstance(frequencies, list)
+        else "",
+    }
+
+
+class UniFiProvider:
+    key = str(IntegrationProvider.UNIFI)
+    label = "UniFi Network"
+    contract = ProviderContract(
+        key=key,
+        label=label,
+        version="1.0",
+        direction="read_only",
+        credential_fields=(
+            CredentialField(
+                "api_key",
+                "API key",
+                help_text="Create a read-only API key in the UniFi Network Integrations settings.",
+            ),
+        ),
+        capabilities=("network_observations", "device_observations", "client_observations", "wireless_observations"),
+        object_types=UNIFI_OBJECT_TYPES,
+        pagination="opaque_cursor",
+        minimum_sync_interval_minutes=5,
+        maximum_sync_interval_minutes=10080,
+        setup_help_url="https://help.ui.com/hc/en-us/articles/30076656117655-Getting-Started-with-the-Official-UniFi-API",
+    )
+
+    def __init__(self, fetcher: Callable[..., dict[str, object]] = get_provider_json_api_key):
+        self._fetcher = fetcher
+
+    def fetch_page(self, connection: IntegrationConnection, *, secret: str, cursor: str) -> ProviderPage:
+        base_url = unifi_api_base_url(connection.base_url)
+        state = _unifi_cursor(cursor)
+        if not state:
+            payload = self._fetcher(
+                base_url=base_url,
+                relative_path="v1/sites?offset=0&limit=200",
+                api_key=secret,
+            )
+            discovered_sites, _, _, total = _unifi_page(payload)
+            if total > 200:
+                raise ValueError("provider_response_too_large")
+            site_ids = [item.get("id") for item in discovered_sites]
+            if any(not isinstance(item, str) or not item for item in site_ids):
+                raise ValueError("provider_response_invalid")
+            if not site_ids:
+                return ProviderPage((), "", UNIFI_OBJECT_TYPES)
+            return ProviderPage(
+                (),
+                _encode_unifi_cursor({"sites": site_ids, "resource": 0, "site": 0, "offset": 0}),
+            )
+
+        raw_sites = state.get("sites")
+        resource_index = state.get("resource")
+        site_index = state.get("site")
+        requested_offset = state.get("offset")
+        if (
+            not isinstance(raw_sites, list)
+            or not raw_sites
+            or len(raw_sites) > 200
+            or any(not isinstance(item, str) or not item for item in raw_sites)
+            or not isinstance(resource_index, int)
+            or not 0 <= resource_index < len(UNIFI_RESOURCES)
+            or not isinstance(site_index, int)
+            or not 0 <= site_index < len(raw_sites)
+            or not isinstance(requested_offset, int)
+            or requested_offset < 0
+        ):
+            raise ValueError("provider_cursor_invalid")
+        sites = [item for item in raw_sites if isinstance(item, str)]
+        site_id = sites[site_index]
+        remote_type, resource = UNIFI_RESOURCES[resource_index]
+        payload = self._fetcher(
+            base_url=base_url,
+            relative_path=f"v1/sites/{site_id}/{resource}?offset={requested_offset}&limit=25",
+            api_key=secret,
+        )
+        records, offset, count, total = _unifi_page(payload)
+        observations: list[ProviderObservation] = []
+        for summary in records:
+            remote_id = summary.get("id")
+            if not isinstance(remote_id, str) or not remote_id:
+                raise ValueError("provider_response_invalid")
+            record = summary
+            if remote_type == "unifi.network":
+                record = self._fetcher(
+                    base_url=base_url,
+                    relative_path=f"v1/sites/{site_id}/networks/{remote_id}",
+                    api_key=secret,
+                )
+            projection: dict[str, object] = {
+                key: value
+                for key, value in _unifi_projection(remote_type, record, site_id=site_id).items()
+                if isinstance(value, str | int | float | bool | type(None))
+            }
+            observations.append(
+                ProviderObservation(
+                    remote_type,
+                    remote_id,
+                    _fingerprint(record),
+                    projection,
+                    source_timestamp=str(summary.get("connectedAt"))
+                    if remote_type == "unifi.client" and isinstance(summary.get("connectedAt"), str)
+                    else None,
+                )
+            )
+
+        complete: tuple[str, ...] = ()
+        next_offset = offset + count
+        if next_offset < total:
+            next_state = {**state, "offset": next_offset}
+        elif site_index + 1 < len(sites):
+            next_state = {**state, "site": site_index + 1, "offset": 0}
+        elif resource_index + 1 < len(UNIFI_RESOURCES):
+            complete = (remote_type,)
+            next_state = {**state, "resource": resource_index + 1, "site": 0, "offset": 0}
+        else:
+            complete = (remote_type,)
+            next_state = None
+        return ProviderPage(
+            tuple(observations),
+            _encode_unifi_cursor(next_state) if next_state is not None else "",
+            complete,
+        )
 
 
 GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0/"
@@ -1031,6 +1301,7 @@ def url_path(value: str, *, base_url: str) -> str:
 
 PROVIDERS: dict[str, ProviderAdapter] = {
     str(IntegrationProvider.NETBOX): NetBoxProvider(),
+    str(IntegrationProvider.UNIFI): UniFiProvider(),
     str(IntegrationProvider.MICROSOFT_GRAPH): MicrosoftGraphProvider(),
     str(IntegrationProvider.HALOPSA): HaloPSAProvider(),
     str(IntegrationProvider.NINJAONE): NinjaOneProvider(),

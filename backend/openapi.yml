@@ -34061,16 +34061,18 @@ components:
         provider:
           enum:
           - netbox
+          - unifi
           - microsoft_graph
           - halopsa
           - ninjaone
           type: string
           description: |-
             * `netbox` - netbox
+            * `unifi` - unifi
             * `microsoft_graph` - microsoft_graph
             * `halopsa` - halopsa
             * `ninjaone` - ninjaone
-          x-spec-enum-id: 53f177a396c9520d
+          x-spec-enum-id: fbcd3db59ab12ce4
         name:
           type: string
           maxLength: 100

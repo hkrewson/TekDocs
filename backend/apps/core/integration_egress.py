@@ -133,6 +133,20 @@ def get_provider_json(*, base_url: str, relative_path: str, authorization: str) 
     return payload
 
 
+def get_provider_json_api_key(*, base_url: str, relative_path: str, api_key: str) -> dict[str, Any]:
+    """GET one bounded provider page using an API key header at the egress boundary."""
+
+    payload = _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method="GET",
+        headers={"X-API-Key": api_key},
+    )
+    if not isinstance(payload, dict):
+        raise WebhookEgressError("provider_response_invalid")
+    return payload
+
+
 def get_provider_json_or_list(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:
     """GET a provider page and normalize an allowed top-level list."""
 

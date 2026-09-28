@@ -69,7 +69,7 @@ it('preserves service fields on successful partial edits', async () => {
 it('updates kind separately and confirms consequential status changes', async () => {
   const { user, write } = setup({ initial: '&circuits=circuit-1' })
   const drawer = await screen.findByRole('dialog', { name: 'Primary circuit' })
-  await user.click(within(drawer).getByRole('button', { name: 'Edit circuit kind' }))
+  await user.click(await within(drawer).findByRole('button', { name: 'Edit circuit kind' }))
   await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Kind' }), 'wan')
   await user.click(within(drawer).getByRole('button', { name: 'Save circuit kind' }))
   await waitFor(() => expect(write).toHaveBeenLastCalledWith(workspace, 'circuit-1', { kind: 'wan' }))

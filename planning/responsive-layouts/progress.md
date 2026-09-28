@@ -3446,3 +3446,36 @@ client types include the enriched device projection. The next implementation
 boundary is automatic NetBox device adoption into the hardware Asset and this
 read-only projection, followed by an IP-only asset assignment surface. Version
 remains 0.8.46.
+
+## Bounded UniFi observations and fresh-workspace projection — 2026-09-28
+
+The next pre-1.0 Networks integration slice adds UniFi Network as an encrypted,
+read-only provider without adding another Networks view. The adapter uses the
+official local integration API and walks only sites, configured networks, adopted
+devices, connected clients and Wi-Fi broadcasts. Network list rows are expanded
+through the documented detail endpoint so the retained projection can include CIDR,
+mask, broadcast, DHCP and at most two DNS server values. Pagination, response size,
+origin pinning, API-key handling and observation values remain bounded by the shared
+integration contract.
+
+Fresh workspaces now receive usable supported records instead of an observations-only
+queue. Deterministic observations create or link CIDRs, Ubiquiti catalog models,
+hardware Assets, the read-only Devices projection, unassigned DHCP IP rows and
+Wireless records. Connected clients never create Assets and no synchronization path
+writes to UniFi or NetBox. Existing exact CIDR, model/name and SSID matches are reused
+only when unambiguous; source identities are retained through integration mappings.
+
+The provider enum migration, OpenAPI enum and focused PostgreSQL projection coverage
+are included. Reviewed publication to NetBox remains a later slice because it requires
+a separate write credential and proposal/audit workflow. Version remains 0.8.46; no
+production deployment, external push or Wiki publication is included.
+
+Verification covers URL normalization, site/resource cursor traversal, bounded safe
+projections, API-key egress, connection creation and encryption, and two consecutive
+PostgreSQL syncs without duplicate supported records. The focused backend set passes
+66 tests. The locked frontend suite passes 686 tests across 122 files, the focused
+integration set passes 30 tests, and lint, TypeScript, production build and compressed
+bundle budgets pass. Repository security-review, UI-language, Wiki, product-boundary,
+responsive-route, responsive-acceptance, Compose, Ruff, MyPy, migration-drift and
+OpenAPI checks pass. The local stack was rebuilt; health returns 200, migration 0156
+is applied, and the running catalog exposes the read-only UniFi provider.

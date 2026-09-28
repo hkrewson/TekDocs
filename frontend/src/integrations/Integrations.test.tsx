@@ -23,6 +23,7 @@ function providerClient(): IntegrationsClient {
   return {
     listProviders: vi.fn().mockResolvedValue([
       { key: 'netbox', label: 'NetBox', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'api_token', label: 'API token', secret: true, minimum_length: 8, input_type: 'password', help_text: '' }], capabilities: ['inventory_observations', 'reconciliation'], object_types: ['ipam.vlan'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 5, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: '' },
+      { key: 'unifi', label: 'UniFi Network', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'api_key', label: 'API key', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Create a read-only API key.' }], capabilities: ['network_observations', 'device_observations', 'client_observations', 'wireless_observations'], object_types: ['unifi.network', 'unifi.device', 'unifi.client', 'unifi.wifi'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 5, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: 'https://help.ui.com/' },
       { key: 'microsoft_graph', label: 'Microsoft 365', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'tenant_id', label: 'Microsoft tenant ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The directory ID.' }, { key: 'client_id', label: 'Application (client) ID', secret: false, minimum_length: 36, input_type: 'text', help_text: 'The application ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['identity_observations'], object_types: ['user'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://graph.microsoft.com/v1.0/', base_url_editable: false, setup_help_url: 'https://learn.microsoft.com/' },
       { key: 'halopsa', label: 'HaloPSA', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'Client ID', secret: false, minimum_length: 1, input_type: 'text', help_text: 'Dedicated Halo API application client ID.' }, { key: 'client_secret', label: 'Client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['psa_observations', 'external_ticket_search', 'reconciliation'], object_types: ['client', 'site', 'contact', 'contract', 'ticket'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: '', base_url_editable: true, setup_help_url: 'https://halopsa.com/guides/article/?kbid=1499' },
       { key: 'ninjaone', label: 'NinjaOne', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'API application client ID', secret: false, minimum_length: 8, input_type: 'text', help_text: 'From Administration → Apps → API in NinjaOne.' }, { key: 'client_secret', label: 'API application client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['rmm_observations', 'asset_reconciliation', 'software_observations'], object_types: ['organization', 'location', 'device_status', 'device', 'operating_system', 'health', 'software'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://app.ninjarmm.com/', base_url_editable: true, setup_help_url: 'https://www.ninjaone.com/docs/application-programming-interface-api/oauth-token-configuration/' },
@@ -481,6 +482,34 @@ describe('Integrations', () => {
       provider: 'microsoft_graph', name: 'Client Microsoft 365', base_url: 'https://graph.microsoft.com/v1.0/',
       credentials: { tenant_id: '11111111-1111-1111-1111-111111111111', client_id: '22222222-2222-2222-2222-222222222222', client_secret: 'microsoft-client-secret' },
       sync_interval_minutes: 15,
+    }))
+  })
+
+  it('offers the bounded UniFi connection fields from the provider contract', async () => {
+    const provider = providerClient()
+    vi.mocked(provider.createConnection).mockResolvedValue({
+      id: 'connection-unifi', provider: 'unifi', name: 'Office UniFi',
+      base_url: 'https://console.example.test/proxy/network/integration/', provider_details: {},
+      credential_configured: true, secret_generation: 1, active: true, sync_interval_minutes: 15,
+      health_status: 'unknown', last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null,
+      reconciliation_counts: {}, next_sync_at: '2026-09-28T00:00:00Z', created_at: '2026-09-28T00:00:00Z', updated_at: '2026-09-28T00:00:00Z',
+    })
+    const user = userEvent.setup()
+    setup(provider)
+
+    await user.click(await screen.findByRole('button', { name: 'New connection' }))
+    await user.selectOptions(screen.getByLabelText('Provider'), 'unifi')
+    expect(screen.getByRole('link', { name: 'UniFi Network setup guidance' })).toHaveAttribute('href', 'https://help.ui.com/')
+    await user.type(screen.getByLabelText('Name'), 'Office UniFi')
+    await user.type(screen.getByLabelText('API base URL'), 'https://console.example.test')
+    await user.type(screen.getByLabelText('API key'), 'unifi-read-key')
+    await user.clear(screen.getByLabelText('Sync interval (minutes)'))
+    await user.type(screen.getByLabelText('Sync interval (minutes)'), '15')
+    await user.click(screen.getByRole('button', { name: 'Save connection' }))
+
+    await waitFor(() => expect(provider.createConnection).toHaveBeenCalledWith(workspace, {
+      provider: 'unifi', name: 'Office UniFi', base_url: 'https://console.example.test',
+      credentials: { api_key: 'unifi-read-key' }, sync_interval_minutes: 15,
     }))
   })
 

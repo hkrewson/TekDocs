@@ -3324,3 +3324,19 @@ compatibility-export identity checks, migration checks and OpenAPI agreement als
 pass. Schema generation retains only its four known operation-ID warnings. The
 serializer-domain sequence is complete; #40 now proceeds to a documented Django
 model dependency map before any model is moved.
+
+## Document model dependency checkpoint — 2026-09-27
+
+The required pre-move checkpoint for #40 now records the complete document model
+aggregate: 15 registered database models, their public choices and helpers,
+tables, cyclic and external relationships, reverse catalog/asset consumers,
+migration history and production import pressure. It defines a bounded eight-step
+extraction order beginning with monitored sources and ending with the document
+root.
+
+The compatibility contract requires the same `core` app labels, model names,
+tables, fields, reverse names, indexes, constraints, class identities and root
+imports. Every move must produce no Django migration. Runtime registry inspection
+verified the recorded model and relationship identities against the current local
+0.8.46 backend. This checkpoint changes no application code, schema, interface,
+stored data, route, permission or version.

@@ -113,10 +113,13 @@ shared unsaved-change guard.
 
 ## Remaining sequence
 
-The planned serializer-domain sequence is complete. The next slice records the
-Django model import and relationship map before moving any model. Model splits
-must retain the `core` app label, table names and compatibility imports with zero
-schema drift.
+The planned serializer-domain sequence is complete. The Django model import,
+relationship, migration and consumer boundaries are now recorded in
+[document-model-dependency-map.md](document-model-dependency-map.md). Model
+splits must retain the `core` app label, table names, class identities and root
+compatibility imports with zero schema drift. The first bounded move is the
+monitored-source pair and its source-kind choice, followed by template rollout
+and stable key bindings.
 
 Each slice must pass type/lint/component behavior checks. URL, browser, OpenAPI,
 migration, production-image and recovery gates recur when the affected boundary

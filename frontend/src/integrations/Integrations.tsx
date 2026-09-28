@@ -373,9 +373,11 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   const [submittedModelQuery, setSubmittedModelQuery] = useState('')
   const [models, setModels] = useState<ModelChoice[] | null>(null)
   const [selectedModelId, setSelectedModelId] = useState('')
+  const [vlanId, setVlanId] = useState('')
+  const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dirty = Boolean(selectedId || selectedModelId || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
+  const dirty = Boolean(selectedId || selectedModelId || vlanId || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
   const attempt = useUnsavedChanges(dirty, busy, () => {}, true)
 
   useEffect(() => {
@@ -405,7 +407,9 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
         ? await providerClient.adoptNetBoxConflict(workspace, conflict, { entity_id: selectedId })
         : conflict.remote_type === 'dcim.device'
           ? await providerClient.adoptNetBoxConflict(workspace, conflict, { asset: { name: name.trim(), model_id: selectedModelId } })
-          : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
+          : conflict.remote_type === 'ipam.vlan'
+            ? await providerClient.adoptNetBoxConflict(workspace, conflict, { vlan: { name: name.trim(), vlan_id: Number(vlanId), description: description.trim() } })
+            : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
       onSaved(updated)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : translate('integrations.adoptFailed'))
@@ -413,17 +417,34 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   }
 
   const selected = choices?.selected ?? choices?.results.find((choice) => choice.id === selectedId) ?? null
-  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device'
+  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan'
   const createDisabled = conflict.remote_type === 'dcim.device'
     ? !name.trim() || !selectedModelId
-    : !name.trim() || !site || Number.isNaN(unitCount)
+    : conflict.remote_type === 'ipam.vlan'
+      ? !name.trim() || !vlanId || Number(vlanId) < 1 || Number(vlanId) > 4094
+      : !name.trim() || !site || Number.isNaN(unitCount)
+  const linkLabel = conflict.remote_type === 'dcim.device'
+    ? 'integrations.linkExistingAsset'
+    : conflict.remote_type === 'ipam.vlan'
+      ? 'integrations.linkExistingVLAN'
+      : 'integrations.linkExisting'
+  const createLabel = conflict.remote_type === 'dcim.device'
+    ? 'integrations.createAsset'
+    : conflict.remote_type === 'ipam.vlan'
+      ? 'integrations.createVLAN'
+      : 'integrations.createRack'
+  const saveLabel = conflict.remote_type === 'dcim.device'
+    ? 'integrations.createAndLinkAsset'
+    : conflict.remote_type === 'ipam.vlan'
+      ? 'integrations.createAndLinkVLAN'
+      : 'integrations.createAndLink'
   return <QuickDrawer title={translate('integrations.adoptHeading')} returnLabel={translate('integrations.returnToReview')} returnHref={`${location.pathname}${location.search}`} returnFocusId="integrations-heading" onClose={() => attempt(onClose)}>
     <form onSubmit={(event) => void save(event)}>
       <p>{translate('integrations.adoptIntro', { source: sourceName, type: conflict.remote_type })}</p>
       <p className="field-help">{translate('integrations.localSearchHelp')}</p>
       {error && <p role="alert">{error}</p>}
       {objectType ? <>
-        {canCreate && <fieldset><legend>{translate('integrations.adoptMethod')}</legend><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'link'} onChange={() => setMode('link')} /> {translate(conflict.remote_type === 'dcim.device' ? 'integrations.linkExistingAsset' : 'integrations.linkExisting')}</label><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'create'} onChange={() => { setMode('create'); setSelectedId('') }} /> {translate(conflict.remote_type === 'dcim.device' ? 'integrations.createAsset' : 'integrations.createRack')}</label></fieldset>}
+        {canCreate && <fieldset><legend>{translate('integrations.adoptMethod')}</legend><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'link'} onChange={() => setMode('link')} /> {translate(linkLabel)}</label><label className="collection-choice"><input type="radio" name="adopt-method" checked={mode === 'create'} onChange={() => { setMode('create'); setSelectedId('') }} /> {translate(createLabel)}</label></fieldset>}
         {mode === 'link' ? <>
           <label>{translate('integrations.searchLocalRecords')}<span className="collection-search"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} /><button className="secondary-button" type="button" onClick={() => { setSubmittedQuery(query.trim()); setPage(1) }}>{translate('collections.searchAction')}</button></span></label>
           {choices === null ? <p role="status">{translate('collections.loading')}</p> : choices.results.length === 0 ? <p className="empty-state">{translate('integrations.noLocalMatches')}</p> : <fieldset><legend>{translate('integrations.chooseLocalRecord')}</legend>{choices.results.map((choice) => <label key={choice.id} className="collection-choice"><input type="radio" name="local-record" checked={selectedId === choice.id} onChange={() => setSelectedId(choice.id)} /> <span><strong>{choice.name}</strong></span></label>)}<CollectionPagination label={translate('integrations.chooseLocalRecord')} page={page} pageSize={25} count={choices.count} hasMore={choices.has_more} onPageChange={setPage} /></fieldset>}
@@ -432,6 +453,11 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           <label>{translate('integrations.assetName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label>{translate('integrations.searchHardwareModels')}<span className="collection-search"><input type="search" value={modelQuery} onChange={(event) => setModelQuery(event.target.value)} /><button className="secondary-button" type="button" onClick={() => setSubmittedModelQuery(modelQuery.trim())}>{translate('collections.searchAction')}</button></span></label>
           {models === null ? <p role="status">{translate('collections.loading')}</p> : models.length === 0 ? <p className="empty-state">{translate('integrations.noHardwareModels')}</p> : <fieldset><legend>{translate('integrations.chooseHardwareModel')}</legend>{models.map((model) => <label key={model.id} className="collection-choice"><input type="radio" name="hardware-model" checked={selectedModelId === model.id} onChange={() => setSelectedModelId(model.id)} /> <span><strong>{model.supplier_name} · {model.product_name} · {model.name}</strong><small>{model.model_number}</small></span></label>)}</fieldset>}
+        </> : conflict.remote_type === 'ipam.vlan' ? <>
+          <label>{translate('integrations.vlanName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label>{translate('integrations.vlanId')}<input required type="number" min={1} max={4094} value={vlanId} onChange={(event) => setVlanId(event.target.value)} /></label>
+          <label>{translate('integrations.vlanDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+          <p className="field-help">{translate('integrations.vlanIdHelp')}</p>
         </> : <>
           <label>{translate('integrations.rackName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <div className="field-grid"><label>{translate('integrations.rackUnits')}<input required type="number" min={1} max={100} value={unitCount} onChange={(event) => setUnitCount(event.target.valueAsNumber)} /></label><label>{translate('collections.status')}<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="planned">{translate('integrations.statusPlanned')}</option><option value="active">{translate('integrations.statusActive')}</option><option value="retired">{translate('integrations.statusRetired')}</option></select></label></div>
@@ -439,7 +465,7 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           {site && <RackPlaceChoice kind="location" siteId={site.id} selected={place} workspace={workspace} client={networksClient} onChange={setPlace} />}
           {!site && <p className="field-help">{translate('integrations.rackSiteRequired')}</p>}
         </>}
-        <div className="form-actions"><button className="primary-button" disabled={busy || (mode === 'link' ? !selectedId : createDisabled)}>{busy ? translate('common.saving') : mode === 'link' ? translate('integrations.linkRecord') : translate(conflict.remote_type === 'dcim.device' ? 'integrations.createAndLinkAsset' : 'integrations.createAndLink')}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => attempt(onClose)}>{translate('common.cancel')}</button></div>
+        <div className="form-actions"><button className="primary-button" disabled={busy || (mode === 'link' ? !selectedId : createDisabled)}>{busy ? translate('common.saving') : mode === 'link' ? translate('integrations.linkRecord') : translate(saveLabel)}</button><button className="secondary-button" type="button" disabled={busy} onClick={() => attempt(onClose)}>{translate('common.cancel')}</button></div>
       </> : <p role="alert">{translate('integrations.unsupportedNetBoxType')}</p>}
     </form>
   </QuickDrawer>

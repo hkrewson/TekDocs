@@ -2,6 +2,22 @@
 
 Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 6 NetBox VLAN adoption checkpoint — 2026-09-27
+
+An unmatched NetBox VLAN can now create and link a canonical TekDocs VLAN without
+leaving the integration review drawer. The form retains existing-record linking as
+the default, prepopulates only the editable name, and requires an explicit 1–4094
+VLAN ID so the remote database identity is never mistaken for network configuration.
+The ordinary network addressing service, authorization, validation, audit trail,
+reference fingerprint and conflict resolution all run in one transaction; NetBox
+remains read-only.
+
+Focused PostgreSQL and frontend tests cover creation, linking and the reviewed form.
+OpenAPI/generated types, lint, type checks, production compilation and bundle
+budgets pass. The local 0.8.46 services were refreshed. Prefix, IP-address and MAC
+adoption remain separate dependency-aware slices; production deployment and
+publication remain separately authorized.
+
 ## Phase 6 bounded integration review checkpoint — 2026-09-27
 
 Current source rows now receive their exact open reconciliation summary from the

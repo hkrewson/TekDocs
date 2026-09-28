@@ -254,6 +254,32 @@ describe('Integrations', () => {
     }))
   })
 
+  it('creates and links an unmatched NetBox VLAN after the operator supplies its numeric ID', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-vlan', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 31, name: 'Users' }, remote_type: 'ipam.vlan', remote_id: '31', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'vlan-users', local_entity_name: 'Users', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
+    } as unknown as NetworksClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs VLAN from this record' }))
+    await user.type(screen.getByLabelText('VLAN ID'), '120')
+    await user.type(screen.getByLabelText('Description'), 'User access network')
+    await user.click(screen.getByRole('button', { name: 'Create and link VLAN' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
+      vlan: { name: 'Users', vlan_id: 120, description: 'User access network' },
+    }))
+  })
+
   it('edits connection details without asking for the credential again', async () => {
     const provider = providerClient()
     const connection = {

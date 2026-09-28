@@ -115,8 +115,24 @@ supplier model; TekDocs never guesses the device model from the minimized NetBox
 projection. The operation requires integration, network, and asset edit access,
 creates the ordinary in-stock asset and lifecycle record, then records the
 NetBox identity and resolves the open conflict. Existing-asset linking remains
-the default. No write is sent to NetBox. VLANs, prefixes, addresses, and MAC
-addresses still require their canonical TekDocs dependencies before linking.
+the default. No write is sent to NetBox. Prefixes, addresses, and MAC addresses
+still require their canonical TekDocs dependencies before linking.
+
+### VLAN adoption correction
+
+An unmatched `ipam.vlan` can now create and link the ordinary workspace-scoped
+TekDocs VLAN from the same review drawer. Existing-record linking remains the
+default. Creation keeps the NetBox name as an editable starting value, requires the
+operator to enter the authoritative VLAN ID from 1 through 4094, and accepts an
+optional description. TekDocs does not infer the VLAN ID from a display label or
+the NetBox object's unrelated remote database ID.
+
+The backend uses the existing VLAN domain service, validates uniqueness and range,
+creates the `NetBoxReference` from the exact reviewed observation, and resolves the
+conflict in one transaction under integration-manage and network-edit permissions.
+No write is sent to NetBox. Prefixes, addresses, and MAC addresses remain later
+slices because their routing, subnet, device, or interface relationships require
+separate reviewed input.
 
 ### Bounded review queue correction
 

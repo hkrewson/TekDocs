@@ -372,13 +372,20 @@ class NetBoxAssetAdoptionSerializer(StrictSerializer):
     model_id = serializers.UUIDField(source="model_entity_id")
 
 
+class NetBoxVLANAdoptionSerializer(StrictSerializer):
+    name = serializers.CharField(max_length=240, trim_whitespace=True)
+    vlan_id = serializers.IntegerField(min_value=1, max_value=4094)
+    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
+
+
 class NetBoxAdoptionSerializer(StrictSerializer):
     entity_id = serializers.UUIDField(required=False)
     rack = NetBoxRackAdoptionSerializer(required=False)
     asset = NetBoxAssetAdoptionSerializer(required=False)
+    vlan = NetBoxVLANAdoptionSerializer(required=False)
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if sum(key in attrs for key in ("entity_id", "rack", "asset")) != 1:
+        if sum(key in attrs for key in ("entity_id", "rack", "asset", "vlan")) != 1:
             raise serializers.ValidationError("Choose one existing record or create one supported record.")
         return attrs
 

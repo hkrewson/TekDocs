@@ -40794,6 +40794,8 @@ components:
           $ref: '#/components/schemas/NetBoxRackAdoption'
         asset:
           $ref: '#/components/schemas/NetBoxAssetAdoption'
+        vlan:
+          $ref: '#/components/schemas/NetBoxVLANAdoption'
     NetBoxAssetAdoption:
       type: object
       properties:
@@ -41083,6 +41085,23 @@ components:
       - entity_id
       - object_id
       - object_type
+    NetBoxVLANAdoption:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        vlan_id:
+          type: integer
+          maximum: 4094
+          minimum: 1
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - name
+      - vlan_id
     NetworkAssignmentChoice:
       type: object
       properties:

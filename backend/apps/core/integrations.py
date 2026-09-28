@@ -7,8 +7,9 @@ from uuid import UUID, uuid4
 from uuid import UUID as UUIDValue
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import IntegrityError, transaction
 from django.db import connection as database_connection
-from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -1097,11 +1098,13 @@ def adopt_netbox_conflict(
     entity_id: UUID | None = None,
     rack: dict[str, object] | None = None,
     asset: dict[str, object] | None = None,
+    vlan: dict[str, object] | None = None,
 ) -> IntegrationConflict:
     """Link an unmatched NetBox observation, optionally creating a supported TekDocs record."""
 
     from .inventory import InventoryError, create_client_asset
     from .netbox_reconciliation import NetBoxReferenceError, set_reference
+    from .network_addressing import NetworkAddressingError, create_vlan
     from .network_inventory import NetworkInventoryError, create_rack
 
     try:
@@ -1117,7 +1120,7 @@ def adopt_netbox_conflict(
         raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
     if conflict.observation is None:
         raise ValidationError({"detail": "The source observation is unavailable."})
-    if sum(value is not None for value in (entity_id, rack, asset)) != 1:
+    if sum(value is not None for value in (entity_id, rack, asset, vlan)) != 1:
         raise ValidationError({"detail": "Choose one existing record or create one supported record."})
 
     selected_entity_id = entity_id
@@ -1162,6 +1165,21 @@ def adopt_netbox_conflict(
             detail = str(exc) if isinstance(exc, InventoryError) else "Choose an active hardware supplier model."
             raise ValidationError({"detail": detail}) from exc
         selected_entity_id = created_asset.entity_id
+    elif vlan is not None:
+        if conflict.remote_type != "ipam.vlan":
+            raise ValidationError({"detail": "Direct VLAN creation is available for NetBox VLANs."})
+        try:
+            created_vlan = create_vlan(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=actor.pk,
+                name=cast(str, vlan["name"]),
+                vlan_id=cast(int, vlan["vlan_id"]),
+                description=cast(str, vlan.get("description", "")),
+            )
+        except (NetworkAddressingError, DjangoValidationError, IntegrityError) as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+        selected_entity_id = created_vlan.entity_id
 
     if selected_entity_id is None:
         raise ValidationError({"detail": "Choose a TekDocs record to link."})

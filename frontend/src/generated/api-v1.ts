@@ -11842,6 +11842,7 @@ export interface components {
             readonly entity_id?: string;
             readonly rack?: components["schemas"]["NetBoxRackAdoption"];
             readonly asset?: components["schemas"]["NetBoxAssetAdoption"];
+            readonly vlan?: components["schemas"]["NetBoxVLANAdoption"];
         };
         readonly NetBoxAssetAdoption: {
             readonly name: string;
@@ -11964,6 +11965,12 @@ export interface components {
             readonly object_id: number;
             /** @default  */
             readonly fingerprint: string;
+        };
+        readonly NetBoxVLANAdoption: {
+            readonly name: string;
+            readonly vlan_id: number;
+            /** @default  */
+            readonly description: string;
         };
         readonly NetworkAssignmentChoice: {
             /** Format: uuid */

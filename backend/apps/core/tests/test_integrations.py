@@ -40,6 +40,7 @@ from apps.core.models import (
     IntegrationSyncJob,
     NetBoxReference,
     NetworkRack,
+    NetworkVLAN,
     OrganizationKind,
     workspace_for_owner,
 )
@@ -714,6 +715,51 @@ def test_unmatched_netbox_device_can_create_and_link_a_hardware_asset(installati
         "dcim.device",
         23,
         "d" * 64,
+    )
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_vlan_can_create_and_link_a_vlan(installation):
+    record = organization(installation, "Blank VLAN client")
+    source = connection(installation, record)
+
+    class VLANAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(ProviderObservation("ipam.vlan", "31", "e" * 64, {"id": 31, "name": "Users"}),),
+                next_cursor="",
+                complete_types=("ipam.vlan",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="vlan:starting-record").id,
+        adapter=VLANAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-integration-netbox-adopt",
+            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+        ),
+        data=json.dumps({"vlan": {"name": "Users", "vlan_id": 120, "description": "User access network"}}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    vlan = NetworkVLAN.objects.get(entity__display_name="Users")
+    assert (vlan.vlan_id, vlan.description) == (120, "User access network")
+    reference = NetBoxReference.objects.get(entity=vlan.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "ipam.vlan",
+        31,
+        "e" * 64,
     )
 
 

@@ -12,6 +12,7 @@ export type NetBoxAdoption =
   | { entity_id: string }
   | { rack: { name: string; site_id: string; location_id: string | null; unit_count: number; status: 'planned' | 'active' | 'retired' } }
   | { asset: { name: string; model_id: string } }
+  | { vlan: { name: string; vlan_id: number; description: string } }
 export type ObservationQuery = { page: number; page_size: number; q?: string; remote_type?: string }
 export type ConflictQuery = { page: number; page_size: number; q?: string; remote_type?: string; status?: IntegrationConflict['status'] }
 export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }

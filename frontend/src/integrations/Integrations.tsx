@@ -374,10 +374,13 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   const [models, setModels] = useState<ModelChoice[] | null>(null)
   const [selectedModelId, setSelectedModelId] = useState('')
   const [vlanId, setVlanId] = useState('')
+  const projectedPrefix = conflict.provider_values?.prefix
+  const sourceCidr = typeof projectedPrefix === 'string' ? projectedPrefix : conflict.remote_type === 'ipam.prefix' ? sourceName : ''
+  const [cidr, setCidr] = useState(sourceCidr)
   const [description, setDescription] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const dirty = Boolean(selectedId || selectedModelId || vlanId || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
+  const dirty = Boolean(selectedId || selectedModelId || vlanId || cidr !== sourceCidr || description || site || place || name !== sourceName || unitCount !== 42 || status !== 'active')
   const attempt = useUnsavedChanges(dirty, busy, () => {}, true)
 
   useEffect(() => {
@@ -409,6 +412,8 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           ? await providerClient.adoptNetBoxConflict(workspace, conflict, { asset: { name: name.trim(), model_id: selectedModelId } })
           : conflict.remote_type === 'ipam.vlan'
             ? await providerClient.adoptNetBoxConflict(workspace, conflict, { vlan: { name: name.trim(), vlan_id: Number(vlanId), description: description.trim() } })
+            : conflict.remote_type === 'ipam.prefix'
+              ? await providerClient.adoptNetBoxConflict(workspace, conflict, { prefix: { name: name.trim(), cidr: cidr.trim(), description: description.trim() } })
             : await providerClient.adoptNetBoxConflict(workspace, conflict, { rack: { name: name.trim(), site_id: site?.id ?? '', location_id: place?.id ?? null, unit_count: unitCount, status } })
       onSaved(updated)
     } catch (caught) {
@@ -417,26 +422,34 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
   }
 
   const selected = choices?.selected ?? choices?.results.find((choice) => choice.id === selectedId) ?? null
-  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan'
+  const canCreate = conflict.remote_type === 'dcim.rack' || conflict.remote_type === 'dcim.device' || conflict.remote_type === 'ipam.vlan' || conflict.remote_type === 'ipam.prefix'
   const createDisabled = conflict.remote_type === 'dcim.device'
     ? !name.trim() || !selectedModelId
     : conflict.remote_type === 'ipam.vlan'
       ? !name.trim() || !vlanId || Number(vlanId) < 1 || Number(vlanId) > 4094
+      : conflict.remote_type === 'ipam.prefix'
+        ? !name.trim() || !cidr.trim()
       : !name.trim() || !site || Number.isNaN(unitCount)
   const linkLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.linkExistingAsset'
     : conflict.remote_type === 'ipam.vlan'
       ? 'integrations.linkExistingVLAN'
+      : conflict.remote_type === 'ipam.prefix'
+        ? 'integrations.linkExistingPrefix'
       : 'integrations.linkExisting'
   const createLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAsset'
     : conflict.remote_type === 'ipam.vlan'
       ? 'integrations.createVLAN'
+      : conflict.remote_type === 'ipam.prefix'
+        ? 'integrations.createPrefix'
       : 'integrations.createRack'
   const saveLabel = conflict.remote_type === 'dcim.device'
     ? 'integrations.createAndLinkAsset'
     : conflict.remote_type === 'ipam.vlan'
       ? 'integrations.createAndLinkVLAN'
+      : conflict.remote_type === 'ipam.prefix'
+        ? 'integrations.createAndLinkPrefix'
       : 'integrations.createAndLink'
   return <QuickDrawer title={translate('integrations.adoptHeading')} returnLabel={translate('integrations.returnToReview')} returnHref={`${location.pathname}${location.search}`} returnFocusId="integrations-heading" onClose={() => attempt(onClose)}>
     <form onSubmit={(event) => void save(event)}>
@@ -458,6 +471,11 @@ function NetBoxAdoptionDrawer({ workspace, conflict, providerClient, networksCli
           <label>{translate('integrations.vlanId')}<input required type="number" min={1} max={4094} value={vlanId} onChange={(event) => setVlanId(event.target.value)} /></label>
           <label>{translate('integrations.vlanDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
           <p className="field-help">{translate('integrations.vlanIdHelp')}</p>
+        </> : conflict.remote_type === 'ipam.prefix' ? <>
+          <label>{translate('integrations.prefixName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <label>{translate('integrations.prefixCidr')}<input required maxLength={49} value={cidr} onChange={(event) => setCidr(event.target.value)} /></label>
+          <label>{translate('integrations.prefixDescription')}<textarea maxLength={4000} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
+          <p className="field-help">{translate('integrations.prefixHelp')}</p>
         </> : <>
           <label>{translate('integrations.rackName')}<input required maxLength={240} value={name} onChange={(event) => setName(event.target.value)} /></label>
           <div className="field-grid"><label>{translate('integrations.rackUnits')}<input required type="number" min={1} max={100} value={unitCount} onChange={(event) => setUnitCount(event.target.valueAsNumber)} /></label><label>{translate('collections.status')}<select value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="planned">{translate('integrations.statusPlanned')}</option><option value="active">{translate('integrations.statusActive')}</option><option value="retired">{translate('integrations.statusRetired')}</option></select></label></div>

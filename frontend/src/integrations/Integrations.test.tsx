@@ -280,6 +280,34 @@ describe('Integrations', () => {
     }))
   })
 
+  it('creates and links an unmatched NetBox prefix as a subnet', async () => {
+    const provider = providerClient()
+    const conflict: IntegrationConflict = {
+      id: 'conflict-prefix', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { id: 41, display: '10.42.0.0/24', prefix: '10.42.0.0/24' }, remote_type: 'ipam.prefix', remote_id: '41', difference: 'unmatched',
+      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    }
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'subnet-users', local_entity_name: 'User network', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    const networks = {
+      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
+    } as unknown as NetworksClient
+    const user = userEvent.setup()
+
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
+    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
+    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs subnet from this prefix' }))
+    expect(screen.getByLabelText('Network prefix')).toHaveValue('10.42.0.0/24')
+    await user.clear(screen.getByLabelText('Subnet name'))
+    await user.type(screen.getByLabelText('Subnet name'), 'User network')
+    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
+    await user.click(screen.getByRole('button', { name: 'Create and link subnet' }))
+
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
+      prefix: { name: 'User network', cidr: '10.42.0.0/24', description: 'Imported from NetBox' },
+    }))
+  })
+
   it('edits connection details without asking for the credential again', async () => {
     const provider = providerClient()
     const connection = {

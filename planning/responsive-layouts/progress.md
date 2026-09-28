@@ -2,6 +2,21 @@
 
 Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
 
+## Phase 6 NetBox prefix adoption checkpoint — 2026-09-27
+
+An unmatched NetBox prefix can now create and link a canonical TekDocs subnet from
+the integration review drawer. NetBox's primitive prefix value is retained in the
+safe observation projection and prefills the reviewed form, while nested provider
+objects stay outside the boundary. Creation uses TekDocs' canonical CIDR,
+address-family, overlap, audit and Workspace rules, then links the observed NetBox
+identity and resolves the conflict in the same transaction. Existing-record linking
+remains the default. The new subnet starts in the default routing table; optional
+VRF and VLAN associations remain available on the network record.
+
+IP-address and MAC-address adoption remain separate dependency-aware slices.
+Version remains 0.8.46; production deployment and publication remain separately
+authorized.
+
 ## Phase 6 NetBox VLAN adoption checkpoint — 2026-09-27
 
 An unmatched NetBox VLAN can now create and link a canonical TekDocs VLAN without
@@ -14,7 +29,7 @@ remains read-only.
 
 Focused PostgreSQL and frontend tests cover creation, linking and the reviewed form.
 OpenAPI/generated types, lint, type checks, production compilation and bundle
-budgets pass. The local 0.8.46 services were refreshed. Prefix, IP-address and MAC
+budgets pass. The local 0.8.46 services were refreshed. IP-address and MAC
 adoption remain separate dependency-aware slices; production deployment and
 publication remain separately authorized.
 

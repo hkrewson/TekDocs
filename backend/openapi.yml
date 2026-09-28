@@ -40796,6 +40796,8 @@ components:
           $ref: '#/components/schemas/NetBoxAssetAdoption'
         vlan:
           $ref: '#/components/schemas/NetBoxVLANAdoption'
+        prefix:
+          $ref: '#/components/schemas/NetBoxPrefixAdoption'
     NetBoxAssetAdoption:
       type: object
       properties:
@@ -40901,6 +40903,22 @@ components:
       - fingerprint
       - object_id
       - object_type
+    NetBoxPrefixAdoption:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 240
+        cidr:
+          type: string
+          maxLength: 49
+        description:
+          type: string
+          default: ''
+          maxLength: 4000
+      required:
+      - cidr
+      - name
     NetBoxPreviewItem:
       type: object
       properties:

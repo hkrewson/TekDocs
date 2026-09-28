@@ -29,8 +29,9 @@ authoritative.
   far-right action column. The
   matching search is explicitly identified as TekDocs-only, carries the remote
   type and ID without retyping, and permits an existing eligible record to be
-  linked. A NetBox rack can create and link a TekDocs rack in one transaction
-  after the operator selects its required TekDocs site and optional location;
+  linked. NetBox racks, hardware devices, VLANs and prefixes can create and link
+  their canonical TekDocs records in one transaction after the operator supplies
+  the required TekDocs context;
   the drawer opens on existing-record linking and presents creation as a clear
   alternative.
 - Both MSP and organization routes fit 320, 390, 768, 1024, 1280 and 1440px in
@@ -89,6 +90,22 @@ one transaction. It never writes to NetBox. Direct creation for devices, VLANs,
 prefixes, addresses, and MAC addresses initially remained a later extension
 because those records require product, addressing, or asset dependencies that
 cannot be safely guessed from the current value-minimized observation.
+
+## NetBox prefix adoption checkpoint — 2026-09-27
+
+An unmatched NetBox prefix can now create and link a canonical TekDocs subnet in
+the review drawer. The provider boundary retains only the primitive prefix needed
+for the reviewed form; nested NetBox tenant, VRF, VLAN and other provider data do
+not cross into the saved observation. The form prefills the network prefix when
+available and preserves explicit operator control over the TekDocs name and
+description. Canonical CIDR, address-family derivation, overlap protection, audit,
+reference fingerprinting and conflict resolution run through the ordinary subnet
+service in one transaction. The new subnet begins in the default routing table;
+optional VRF and VLAN associations can be added from its network record.
+
+Focused backend and frontend coverage verifies the safe projection and atomic
+create-and-link workflow. IP-address and MAC-address creation remain separate
+dependency-aware slices. Version remains 0.8.46.
 
 ### Linking visibility correction
 

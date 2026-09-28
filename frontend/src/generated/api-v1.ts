@@ -11843,6 +11843,7 @@ export interface components {
             readonly rack?: components["schemas"]["NetBoxRackAdoption"];
             readonly asset?: components["schemas"]["NetBoxAssetAdoption"];
             readonly vlan?: components["schemas"]["NetBoxVLANAdoption"];
+            readonly prefix?: components["schemas"]["NetBoxPrefixAdoption"];
         };
         readonly NetBoxAssetAdoption: {
             readonly name: string;
@@ -11884,6 +11885,12 @@ export interface components {
             /** Format: int64 */
             readonly object_id: number;
             readonly fingerprint: string;
+        };
+        readonly NetBoxPrefixAdoption: {
+            readonly name: string;
+            readonly cidr: string;
+            /** @default  */
+            readonly description: string;
         };
         readonly NetBoxPreviewItem: {
             readonly object_type: string;

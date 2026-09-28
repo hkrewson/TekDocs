@@ -40,6 +40,7 @@ from apps.core.models import (
     IntegrationSyncJob,
     NetBoxReference,
     NetworkRack,
+    NetworkSubnet,
     NetworkVLAN,
     OrganizationKind,
     workspace_for_owner,
@@ -203,6 +204,35 @@ def test_netbox_provider_tolerates_a_preexisting_site_root_connection(installati
     assert request["base_url"] == "https://netbox.example.com/api/"
     assert request["relative_path"] == "dcim/racks/"
     assert page.next_cursor == "1|dcim/devices/"
+
+
+@pytest.mark.django_db
+def test_netbox_provider_projects_prefix_for_review_without_nested_provider_data(installation):
+    record = organization(installation, "Prefix projection client")
+    source = connection(installation, record)
+
+    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
+        return {
+            "results": [
+                {
+                    "id": 41,
+                    "display": "10.42.0.0/24",
+                    "prefix": "10.42.0.0/24",
+                    "tenant": {"id": 9, "name": "Private provider tenant"},
+                }
+            ],
+            "next": None,
+        }
+
+    page = NetBoxProvider(fetcher=fetcher).fetch_page(
+        source, secret=TEST_PROVIDER_TOKEN, cursor="4|ipam/prefixes/"
+    )
+
+    assert page.observations[0].safe_projection == {
+        "id": 41,
+        "display": "10.42.0.0/24",
+        "prefix": "10.42.0.0/24",
+    }
 
 
 @pytest.mark.django_db
@@ -760,6 +790,61 @@ def test_unmatched_netbox_vlan_can_create_and_link_a_vlan(installation):
         "ipam.vlan",
         31,
         "e" * 64,
+    )
+
+
+@pytest.mark.django_db
+def test_unmatched_netbox_prefix_can_create_and_link_a_subnet(installation):
+    record = organization(installation, "Blank prefix client")
+    source = connection(installation, record)
+
+    class PrefixAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                observations=(
+                    ProviderObservation(
+                        "ipam.prefix", "41", "f" * 64, {"id": 41, "display": "10.42.0.0/24", "prefix": "10.42.0.0/24"}
+                    ),
+                ),
+                next_cursor="",
+                complete_types=("ipam.prefix",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="prefix:starting-record").id,
+        adapter=PrefixAdapter(),
+    )
+    conflict = IntegrationConflict.objects.get(observation__job=completed)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-integration-netbox-adopt",
+            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+        ),
+        data=json.dumps(
+            {"prefix": {"name": "User network", "cidr": "10.42.0.0/24", "description": "Imported from NetBox"}}
+        ),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "accept_remote"
+    subnet = NetworkSubnet.objects.get(entity__display_name="User network")
+    assert (subnet.cidr, subnet.address_family, subnet.description) == (
+        "10.42.0.0/24",
+        4,
+        "Imported from NetBox",
+    )
+    reference = NetBoxReference.objects.get(entity=subnet.entity)
+    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
+        "ipam.prefix",
+        41,
+        "f" * 64,
     )
 
 

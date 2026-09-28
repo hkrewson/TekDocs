@@ -17,8 +17,9 @@ from .approved_egress import (
     pinned_https_pool,
     resolve_public_https_target,
 )
+from .document_source_models import DocumentRemoteObservation, DocumentRemoteSource, DocumentSourceKind
 from .documents import PlacementConflict, primary_placement, update_shared_block
-from .models import AuditEvent, DocumentRemoteObservation, DocumentRemoteSource, DocumentSourceKind
+from .models import AuditEvent
 
 MAX_REMOTE_DOCUMENT_BYTES = 2 * 1024 * 1024
 

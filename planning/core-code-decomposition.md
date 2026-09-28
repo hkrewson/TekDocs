@@ -117,9 +117,21 @@ The planned serializer-domain sequence is complete. The Django model import,
 relationship, migration and consumer boundaries are now recorded in
 [document-model-dependency-map.md](document-model-dependency-map.md). Model
 splits must retain the `core` app label, table names, class identities and root
-compatibility imports with zero schema drift. The first bounded move is the
-monitored-source pair and its source-kind choice, followed by template rollout
-and stable key bindings.
+compatibility imports with zero schema drift. The monitored-source pair and its
+source-kind choice are now the first completed move. Template rollout and stable
+key bindings follow.
+
+## Backend checkpoint: document source models
+
+`DocumentSourceKind`, `DocumentRemoteSource` and
+`DocumentRemoteObservation` now live in `document_source_models.py`. Source
+serializers, handlers, services and scheduled tasks import that focused model
+boundary directly. `models.py` re-exports the same class objects, so established
+imports remain compatible.
+
+The shared abstract `TimestampedModel` now lives in `model_support.py`, avoiding
+a circular dependency as focused model modules are loaded. The root model module
+continues to export it. This changes no concrete model field or table.
 
 Each slice must pass type/lint/component behavior checks. URL, browser, OpenAPI,
 migration, production-image and recovery gates recur when the affected boundary

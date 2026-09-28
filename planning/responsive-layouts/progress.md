@@ -3340,3 +3340,20 @@ imports. Every move must produce no Django migration. Runtime registry inspectio
 verified the recorded model and relationship identities against the current local
 0.8.46 backend. This checkpoint changes no application code, schema, interface,
 stored data, route, permission or version.
+
+## Monitored document-source model decomposition — 2026-09-27
+
+The first model slice from the dependency map moves the monitored-source choice,
+source and immutable observation into `document_source_models.py`. Their
+serializers, request handlers, service and scheduled task now use the focused
+boundary. `models.py` retains identity-preserving exports for existing callers.
+The shared abstract timestamp base moved once to `model_support.py` so subsequent
+model modules can load without a root-model import cycle.
+
+Django reports no migration and preserves the `core` labels, tables, relations,
+constraint and index names. Root and focused imports resolve to the same classes.
+The three monitored-source and HTML conversion workflows pass, as do Django
+system checks, repository-wide Ruff and MyPy across 204 backend source files.
+No route, API schema, permission, RLS policy, stored data, recovery format,
+interface behavior or version changes. The next bounded model slice is template
+revision and enrollment.

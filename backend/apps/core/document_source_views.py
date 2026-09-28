@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey
 
+from .document_source_models import DocumentRemoteSource
 from .document_source_serializers import (
     RemoteObservationListSerializer,
     RemoteObservationSerializer,
@@ -18,7 +19,6 @@ from .document_source_serializers import (
 from .document_sources import apply_remote_observation, fetch_remote_document
 from .document_views import _document, _msp_workspace, _organization_workspace
 from .documents import PlacementConflict
-from .models import DocumentRemoteSource
 from .workspaces import ResolvedWorkspace
 
 

@@ -4,8 +4,8 @@ from difflib import unified_diff
 
 from rest_framework import serializers
 
+from .document_source_models import DocumentRemoteObservation, DocumentSourceKind
 from .document_sources import validate_remote_source_url
-from .models import DocumentRemoteObservation, DocumentSourceKind
 
 
 class RemoteSourceWriteSerializer(serializers.Serializer):

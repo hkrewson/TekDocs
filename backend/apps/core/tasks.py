@@ -5,13 +5,13 @@ from celery import shared_task
 from django.utils import timezone
 
 from .certificate_monitoring import process_certificate_monitoring_run, schedule_due_certificate_monitoring
+from .document_source_models import DocumentRemoteSource
 from .document_sources import fetch_remote_document
 from .domain_monitoring import process_domain_monitoring_run, schedule_due_domain_monitoring
 from .imports import purge_expired_import_staging
 from .integrations import process_sync_job, purge_integration_logs, schedule_due_connections
 from .models import (
     CertificateMonitorRun,
-    DocumentRemoteSource,
     DomainMonitorRun,
     DomainMonitorRunState,
     InstallationState,

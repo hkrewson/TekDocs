@@ -200,8 +200,8 @@ test('a stock line records its quantity for the client in one save', async ({ pa
     tax_rates: [],
   } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}/lines`, async (route) => {
-    expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, quantity: '125.500', unit: 'foot', tax_rate_id: null })
-    await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable', quantity: '125.500', unit: 'foot', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
+    expect(await route.request().postDataJSON()).toEqual({ origin_type: 'stock_item', origin_id: stockId, description: 'Cat6 bulk cable · lobby camera run', quantity: '125.500', unit: 'foot', tax_rate_id: null })
+    await route.fulfill({ json: { ...draft, subtotal: '37.65', total: '37.65', lines: [{ id: crypto.randomUUID(), position: 1, description: 'Cat6 bulk cable · lobby camera run', quantity: '125.500', unit: 'foot', unit_amount: '0.30', currency: 'USD', tax_rate_name: '', tax_rate_value: '0.000000', tax_inclusive: false, net: '37.65', tax: '0.00', total: '37.65', origin_type: 'stock_item', origin_id: stockId }] } })
   })
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices?*`, (route) => route.fulfill({ json: { results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: false } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${draftId}`, (route) => route.fulfill({ json: draft }))
@@ -210,8 +210,10 @@ test('a stock line records its quantity for the client in one save', async ({ pa
   await page.getByRole('button', { name: 'Add item' }).click()
   await page.getByLabel('Source').selectOption(`stock_item:${stockId}`)
   await expect(page.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeVisible()
+  await page.getByLabel('Invoice description').fill('Cat6 bulk cable · lobby camera run')
   await page.getByLabel('Quantity').fill('125.500')
   await page.getByRole('dialog').getByRole('button', { name: 'Save item' }).click()
+  await expect(page.getByText('Cat6 bulk cable · lobby camera run')).toBeVisible()
   await expect(page.getByText('125.500 foot × USD 0.30')).toBeVisible()
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })

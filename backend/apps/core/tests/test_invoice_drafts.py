@@ -251,6 +251,43 @@ def test_priced_product_service_rate_and_all_origins_snapshot_into_one_currency(
 
 
 @pytest.mark.django_db
+def test_sourced_invoice_line_honors_invoice_quantity(owner_client, installation):
+    client = organization(installation, "Quantity Client", "client")
+    service = owner_client.post(
+        reverse("msp-service-rate-list-create"),
+        {"name": "On-site labor", "unit_amount": "75.00", "currency": "USD"},
+        content_type="application/json",
+    )
+    assert service.status_code == 201
+    invoice = owner_client.post(
+        reverse("organization-invoice-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"currency": "USD", "invoice_date": "2026-09-29", "due_date": "2026-10-29"},
+        content_type="application/json",
+    )
+    assert invoice.status_code == 201
+
+    response = owner_client.post(
+        reverse(
+            "organization-invoice-line-list-create",
+            kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
+        ),
+        {
+            "origin_type": "service_rate",
+            "origin_id": service.json()["id"],
+            "quantity": "24.000",
+            "unit": "hour",
+        },
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    assert response.json()["lines"][0]["quantity"] == "24.000"
+    assert response.json()["lines"][0]["unit_amount"] == "75.00"
+    assert response.json()["lines"][0]["total"] == "1800.00"
+    assert response.json()["total"] == "1800.00"
+
+
+@pytest.mark.django_db
 def test_invoice_draft_rejects_cross_currency_origins_and_allows_line_edit_and_delete(owner_client, installation):
     client = organization(installation, "Currency Client", "client")
     service = owner_client.post(

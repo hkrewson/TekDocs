@@ -135,11 +135,17 @@ def test_stock_item_invoice_line_tracks_quantity_through_draft_changes(owner_cli
             "organization-invoice-line-list-create",
             kwargs={"organization_entity_id": client.entity_id, "invoice_entity_id": invoice.json()["id"]},
         ),
-        {"origin_type": "stock_item", "origin_id": item_id, "quantity": "125.500"},
+        {
+            "origin_type": "stock_item",
+            "origin_id": item_id,
+            "description": "Cat6 bulk cable · lobby camera run",
+            "quantity": "125.500",
+        },
         content_type="application/json",
     )
     assert line.status_code == 201, line.content
     assert line.json()["lines"][0]["origin_type"] == "stock_item"
+    assert line.json()["lines"][0]["description"] == "Cat6 bulk cable · lobby camera run"
     assert line.json()["lines"][0]["unit_amount"] == "0.30"
     line_id = line.json()["lines"][0]["id"]
     invoice_line = InvoiceLine.objects.get(id=line_id)

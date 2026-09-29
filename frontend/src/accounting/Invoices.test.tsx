@@ -60,7 +60,7 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     list: vi.fn().mockResolvedValue({ results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
     get: vi.fn().mockResolvedValue(draft),
     choices: vi.fn().mockResolvedValue({
-      origins: [{ id: 'rate-1', origin_type: 'service_rate', name: 'Remote support', description: '', unit_amount: '90.00', currency: 'USD', quantity: '1.000' }],
+      origins: [{ id: 'rate-1', origin_type: 'service_rate', name: 'Remote support', description: '', unit_amount: '75.00', currency: 'USD', quantity: '1.000' }],
       tax_rates: [],
     }),
     create: vi.fn().mockResolvedValue(draft),
@@ -116,7 +116,7 @@ describe('Invoices', () => {
     expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/invoices')
   })
 
-  it('shows exact draft totals and creates a snapshotted origin line', async () => {
+  it('shows the calculated amount and honors quantity for a sourced line', async () => {
     const addLine = vi.fn().mockResolvedValue(draft)
     const client = invoiceClient({ addLine })
     renderInvoice(client)
@@ -125,12 +125,17 @@ describe('Invoices', () => {
     expect(screen.getAllByText('USD 137.50')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Add item' }))
     fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'service_rate:rate-1' } })
+    expect(screen.getByLabelText('Unit label (optional)')).not.toBeRequired()
+    fireEvent.change(screen.getByLabelText('Invoice description'), { target: { value: 'Remote support · network cutover' } })
+    fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '24' } })
+    expect(screen.getByText('$1,800.00')).toBeInTheDocument()
+    expect(screen.getByText('Quantity × price per unit, before tax')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
       'invoice-1',
-      { origin_type: 'service_rate', origin_id: 'rate-1', unit: '', tax_rate_id: null },
+      { origin_type: 'service_rate', origin_id: 'rate-1', description: 'Remote support · network cutover', quantity: '24', unit: '', tax_rate_id: null },
     ))
   })
 
@@ -153,13 +158,14 @@ describe('Invoices', () => {
     expect(screen.getByRole('option', { name: 'In-stock item · Cat6 bulk cable · 1000.000 foot available · USD 0.30' })).toBeInTheDocument()
     expect(screen.getByText('Saving this item uses the quantity from stock for this client. 1000.000 foot are currently available.')).toBeInTheDocument()
     expect(screen.getByLabelText('Quantity')).toHaveAttribute('max', '1000.000')
+    fireEvent.change(screen.getByLabelText('Invoice description'), { target: { value: 'Cat6 bulk cable · lobby camera run' } })
     fireEvent.change(screen.getByLabelText('Quantity'), { target: { value: '125.500' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save item' }))
 
     await waitFor(() => expect(addLine).toHaveBeenCalledWith(
       workspace,
       'invoice-1',
-      { origin_type: 'stock_item', origin_id: 'stock-1', quantity: '125.500', unit: 'foot', tax_rate_id: null },
+      { origin_type: 'stock_item', origin_id: 'stock-1', description: 'Cat6 bulk cable · lobby camera run', quantity: '125.500', unit: 'foot', tax_rate_id: null },
     ))
   })
 

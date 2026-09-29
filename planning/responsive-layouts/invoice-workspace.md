@@ -28,6 +28,10 @@ settings in the MSP Workspace are a separate route and remain pending.
 - Invoice lines retain an optional billing unit. The focused MSP record and client
   portal show it with quantity and rate; CSV and accounting exports carry the same
   signed snapshot.
+- Sourced lines prefill an editable invoice description and quantity. Technicians
+  can identify the specific work or stock use while the retained source link and
+  snapshotted price remain authoritative for that draft line. The editor previews
+  quantity multiplied by price before saving.
 - Newly issued retained PDFs use friendly dates, an explicit amount due, clear
   quantity/unit/rate columns, issuer contact details, project notes, payment
   instructions and issue-time document metadata.

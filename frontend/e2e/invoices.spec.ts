@@ -243,7 +243,7 @@ for (const width of [1280, 390]) {
 
 
     const recurringPath = `**/api/v1/workspaces/organizations/${clientId}/recurring-invoices`
-    const schedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
+    const schedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, effective_from: '2025-01-01', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
     await page.route(`${recurringPath}?*`, (route) => route.fulfill({ json: { results: [schedule], page: 1, page_size: 20, count: 1, has_more: false, business_date: '2025-03-01' } }))
     await page.route(`${recurringPath}/schedule/due?*`, (route) => route.fulfill({ json: { due_from: '2025-01-01', as_of: '2025-03-01', periods: [
       { starts_on: '2025-01-01', ends_before: '2025-02-01', invoice_entity_id: invoiceId, can_generate: false, blocked_reason: '' },
@@ -332,7 +332,7 @@ for (const width of [1280, 390]) {
 
     let enrolled = false
     const recurringPath = `**/api/v1/workspaces/organizations/${clientId}/recurring-invoices`
-    const schedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
+    const schedule = { id: 'schedule', contract_cost_id: 'cost', source_label: 'Provider fee', contract_name: 'Support contract', anchor: '2025-01-01', ends_on: null, interval: 'monthly', enabled: true, terms: [{ id: 'terms', version: 1, effective_from: '2025-01-01', description: 'Managed support', quantity: '2.000', unit_amount: '75.0000', currency: 'USD', due_days: 30, tax_rate_id: null, source_digest: 'digest' }] }
     await page.route(`${recurringPath}?*`, (route) => route.fulfill({ json: { results: enrolled ? [schedule] : [], page: 1, page_size: 20, count: 1, has_more: false, business_date: '2025-03-01' } }))
     await page.route(`${recurringPath}/schedule/due?*`, (route) => route.fulfill({ json: { due_from: '2025-01-01', as_of: '2025-03-01', periods: [
       { starts_on: '2025-01-01', ends_before: '2025-02-01', invoice_entity_id: invoiceId, can_generate: false, blocked_reason: '' },

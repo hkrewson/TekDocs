@@ -60,9 +60,7 @@ class NetworkDeviceWriteSerializer(StrictSerializer):
     status = serializers.ChoiceField(
         choices=NetworkDeviceStatus.values, required=False, default=NetworkDeviceStatus.ACTIVE
     )
-    hardware_asset_id = serializers.UUIDField(
-        source="hardware_asset_entity_id", allow_null=False, required=True
-    )
+    hardware_asset_id = serializers.UUIDField(source="hardware_asset_entity_id", allow_null=False, required=True)
     expected_hardware_asset_id = serializers.UUIDField(
         source="expected_hardware_asset_entity_id", allow_null=True, required=False
     )
@@ -75,23 +73,17 @@ class NetworkDeviceWriteSerializer(StrictSerializer):
     def validate(self, attrs):  # type: ignore[no-untyped-def]
         if not self.partial:
             if "expected_hardware_asset_entity_id" in attrs:
-                raise serializers.ValidationError(
-                    "Expected hardware is only used when replacing a device binding."
-                )
+                raise serializers.ValidationError("Expected hardware is only used when replacing a device binding.")
             return attrs
         changing_hardware = "hardware_asset_entity_id" in attrs
         has_expected = "expected_hardware_asset_entity_id" in attrs
         if changing_hardware != has_expected:
-            raise serializers.ValidationError(
-                "Hardware changes require the expected current hardware asset."
-            )
+            raise serializers.ValidationError("Hardware changes require the expected current hardware asset.")
         if changing_hardware and set(attrs) != {
             "hardware_asset_entity_id",
             "expected_hardware_asset_entity_id",
         }:
-            raise serializers.ValidationError(
-                "Replace the hardware binding separately from editing device details."
-            )
+            raise serializers.ValidationError("Replace the hardware binding separately from editing device details.")
         return attrs
 
 
@@ -124,9 +116,9 @@ class NetworkDeviceSerializer(serializers.Serializer):
     location_id = serializers.UUIDField(source="location.entity.id", allow_null=True)
     location_name = serializers.CharField(source="location.entity.display_name", allow_null=True)
     rack_id = serializers.UUIDField(source="rack.entity.id", allow_null=True)
-    rack_name = serializers.CharField(source="rack.entity.display_name", allow_null=True)
-    rack_unit = serializers.IntegerField(allow_null=True)
-    rack_units = serializers.IntegerField()
+    rack_name = serializers.SerializerMethodField()
+    rack_unit = serializers.SerializerMethodField()
+    rack_units = serializers.SerializerMethodField()
     netbox_id = serializers.SerializerMethodField()
     serial_number = serializers.SerializerMethodField()
     manufacturer_name = serializers.SerializerMethodField()
@@ -137,6 +129,19 @@ class NetworkDeviceSerializer(serializers.Serializer):
     def _asset(self, device: NetworkDevice):  # type: ignore[no-untyped-def]
         return device.hardware_asset if self.context.get("can_view_assets") and device.hardware_asset_id else None
 
+    @extend_schema_field(serializers.CharField(allow_null=True))
+    def get_rack_name(self, device: NetworkDevice) -> str | None:
+        rack = device.rack
+        return device.source_rack_name or (rack.entity.display_name if rack is not None else None)
+
+    @extend_schema_field(serializers.DecimalField(max_digits=6, decimal_places=1, allow_null=True))
+    def get_rack_unit(self, device: NetworkDevice):  # type: ignore[no-untyped-def]
+        return device.source_rack_position if device.source_rack_position is not None else device.rack_unit
+
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_rack_units(self, device: NetworkDevice) -> int | None:
+        return device.source_rack_units if device.source_rack_units is not None else device.rack_units
+
     @extend_schema_field(serializers.IntegerField(allow_null=True))
     def get_netbox_id(self, device: NetworkDevice) -> int | None:
         annotated = getattr(device, "netbox_object_id", None)
@@ -145,9 +150,13 @@ class NetworkDeviceSerializer(serializers.Serializer):
         asset = device.hardware_asset if device.hardware_asset_id else None
         if asset is None:
             return None
-        value = NetBoxReference.objects.filter(
-            entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
-        ).values_list("object_id", flat=True).first()
+        value = (
+            NetBoxReference.objects.filter(
+                entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
+            )
+            .values_list("object_id", flat=True)
+            .first()
+        )
         return int(value) if value is not None else None
 
     @extend_schema_field(serializers.DateTimeField(allow_null=True))
@@ -158,9 +167,13 @@ class NetworkDeviceSerializer(serializers.Serializer):
         asset = device.hardware_asset if device.hardware_asset_id else None
         if asset is None:
             return None
-        return NetBoxReference.objects.filter(
-            entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
-        ).values_list("last_observed_at", flat=True).first()
+        return (
+            NetBoxReference.objects.filter(
+                entity_id=asset.entity_id, object_type=NetBoxObjectType.DEVICE, archived_at__isnull=True
+            )
+            .values_list("last_observed_at", flat=True)
+            .first()
+        )
 
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_serial_number(self, device: NetworkDevice) -> str | None:
@@ -194,9 +207,7 @@ class NetworkDeviceSerializer(serializers.Serializer):
     @extend_schema_field(serializers.CharField(allow_null=True))
     def get_hardware_asset_name(self, device: NetworkDevice) -> str | None:
         asset = device.hardware_asset if device.hardware_asset_id else None
-        return (
-            asset.entity.display_name if self.context.get("can_view_assets") and asset is not None else None
-        )
+        return asset.entity.display_name if self.context.get("can_view_assets") and asset is not None else None
 
 
 class NetworkRackResultSerializer(serializers.Serializer):
@@ -330,18 +341,16 @@ def _inventory_collection(
             QuerySet[Any],
             devices_for_scope(workspace.data_scope).annotate(
                 netbox_object_id=Subquery(references.values("object_id")[:1], output_field=BigIntegerField()),
-                netbox_observed_at=Subquery(
-                    references.values("last_observed_at")[:1], output_field=DateTimeField()
-                ),
+                netbox_observed_at=Subquery(references.values("last_observed_at")[:1], output_field=DateTimeField()),
             ),
         )
     else:
         # A register needs a count, not every installed device's full row.
         records = cast(
             QuerySet[Any],
-            racks_for_scope(workspace.data_scope).prefetch_related(None).annotate(
-                collection_device_count=Count("network_devices")
-            ),
+            racks_for_scope(workspace.data_scope)
+            .prefetch_related(None)
+            .annotate(collection_device_count=Count("network_devices")),
         )
     if site_id := values.get("site_id"):
         if not sites_for_scope(workspace.data_scope).filter(entity_id=site_id).exists():
@@ -387,16 +396,20 @@ class NetworkRackListCreateView(APIView):
         query = RackCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         page = _inventory_collection(workspace, query.validated_data, devices=False)
-        return Response(NetworkRackResultSerializer({
-            "results": page.records,
-            "page": page.page,
-            "page_size": page.page_size,
-            "count": page.count,
-            "has_more": page.has_more,
-            "can_manage": context_has_permission(
-                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
-            ),
-        }).data)
+        return Response(
+            NetworkRackResultSerializer(
+                {
+                    "results": page.records,
+                    "page": page.page,
+                    "page_size": page.page_size,
+                    "count": page.count,
+                    "has_more": page.has_more,
+                    "can_manage": context_has_permission(
+                        workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                    ),
+                }
+            ).data
+        )
 
     @extend_schema(request=NetworkRackWriteSerializer, responses={201: NetworkRackSerializer})
     def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
@@ -445,31 +458,36 @@ class NetworkDeviceListCreateView(APIView):
             workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
         )
         page = _inventory_collection(workspace, query.validated_data, devices=True, can_view_assets=can_view_assets)
-        response = NetworkDeviceResultSerializer({
-            "can_create": can_view_assets and context_has_permission(
-                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
-            ),
-            "results": page.records,
-            "page": page.page,
-            "page_size": page.page_size,
-            "count": page.count,
-            "has_more": page.has_more,
-            "can_manage": context_has_permission(
-                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
-            ),
-            "can_rebind_hardware": can_view_assets and context_has_permission(
-                workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
-            ),
-            "can_view_relationships": context_has_permission(
-                workspace.member, PermissionKey.RELATIONSHIPS_VIEW, organization=workspace.organization
-            ),
-            "can_create_relationships": context_has_permission(
-                workspace.member, PermissionKey.RELATIONSHIPS_CREATE, organization=workspace.organization
-            ),
-            "can_archive_relationships": context_has_permission(
-                workspace.member, PermissionKey.RELATIONSHIPS_ARCHIVE, organization=workspace.organization
-            ),
-        }, context={"can_view_assets": can_view_assets}).data
+        response = NetworkDeviceResultSerializer(
+            {
+                "can_create": can_view_assets
+                and context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+                "results": page.records,
+                "page": page.page,
+                "page_size": page.page_size,
+                "count": page.count,
+                "has_more": page.has_more,
+                "can_manage": context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+                "can_rebind_hardware": can_view_assets
+                and context_has_permission(
+                    workspace.member, PermissionKey.NETWORKS_EDIT, organization=workspace.organization
+                ),
+                "can_view_relationships": context_has_permission(
+                    workspace.member, PermissionKey.RELATIONSHIPS_VIEW, organization=workspace.organization
+                ),
+                "can_create_relationships": context_has_permission(
+                    workspace.member, PermissionKey.RELATIONSHIPS_CREATE, organization=workspace.organization
+                ),
+                "can_archive_relationships": context_has_permission(
+                    workspace.member, PermissionKey.RELATIONSHIPS_ARCHIVE, organization=workspace.organization
+                ),
+            },
+            context={"can_view_assets": can_view_assets},
+        ).data
         return Response(response)
 
     @extend_schema(request=NetworkDeviceWriteSerializer, responses={201: NetworkDeviceSerializer})
@@ -527,23 +545,23 @@ class NetworkChoiceListView(APIView):
         can_view_assets = context_has_permission(
             workspace.member, PermissionKey.ASSETS_VIEW, organization=workspace.organization
         )
-        assets = (
-            assets_for_scope(workspace.data_scope).filter(product__kind="hardware")
-            if can_view_assets
-            else []
+        assets = assets_for_scope(workspace.data_scope).filter(product__kind="hardware") if can_view_assets else []
+        return Response(
+            NetworkChoicesSerializer(
+                {
+                    "sites": [{"id": item.entity_id, "name": item.entity.display_name} for item in sites],
+                    "locations": [
+                        {"id": item.entity_id, "name": item.entity.display_name, "site_id": item.site.entity_id}
+                        for item in locations
+                    ],
+                    "racks": [
+                        {"id": item.entity_id, "name": item.entity.display_name, "site_id": item.site.entity_id}
+                        for item in racks
+                    ],
+                    "hardware_assets": [{"id": item.entity_id, "name": item.entity.display_name} for item in assets],
+                }
+            ).data
         )
-        return Response(NetworkChoicesSerializer({
-            "sites": [{"id": item.entity_id, "name": item.entity.display_name} for item in sites],
-            "locations": [
-                {"id": item.entity_id, "name": item.entity.display_name, "site_id": item.site.entity_id}
-                for item in locations
-            ],
-            "racks": [
-                {"id": item.entity_id, "name": item.entity.display_name, "site_id": item.site.entity_id}
-                for item in racks
-            ],
-            "hardware_assets": [{"id": item.entity_id, "name": item.entity.display_name} for item in assets],
-        }).data)
 
 
 class NetworkAssignmentQuerySerializer(BoundedCollectionQuerySerializer):

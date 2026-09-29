@@ -1,25 +1,19 @@
 import type { WorkspaceContext } from '../workspaces/api'
 
-export type IntegrationProvider = { key: string; label: string; version: string; direction: 'read_only'; credential_fields: { key: string; label: string; secret: boolean; minimum_length: number; input_type: string; help_text: string }[]; capabilities: string[]; object_types: string[]; pagination: string; minimum_sync_interval_minutes: number; maximum_sync_interval_minutes: number; health_states: string[]; observation_schema_version: number; default_base_url: string; base_url_editable: boolean; setup_help_url: string }
-export type IntegrationConnection = { id: string; provider: string; name: string; base_url: string; provider_details: Record<string, string>; credential_configured: boolean; secret_generation: number; active: boolean; sync_interval_minutes: number; next_sync_at: string; health_status: string; last_successful_sync_at: string | null; last_error_code: string; rate_limit_reset_at: string | null; reconciliation_counts: Record<string, number>; created_at: string; updated_at: string }
+export type IntegrationProvider = { key: string; label: string; version: string; direction: 'read_only' | 'read_write_reviewed'; credential_fields: { key: string; label: string; secret: boolean; minimum_length: number; input_type: string; help_text: string }[]; capabilities: string[]; object_types: string[]; pagination: string; minimum_sync_interval_minutes: number; maximum_sync_interval_minutes: number; health_states: string[]; observation_schema_version: number; default_base_url: string; base_url_editable: boolean; setup_help_url: string }
+export type IntegrationConnection = { id: string; provider: string; name: string; base_url: string; provider_details: Record<string, string>; credential_configured: boolean; write_credential_configured?: boolean; secret_generation: number; active: boolean; sync_interval_minutes: number; next_sync_at: string; health_status: string; last_successful_sync_at: string | null; last_error_code: string; rate_limit_reset_at: string | null; reconciliation_counts: Record<string, number>; created_at: string; updated_at: string }
 export type IntegrationConnectionDraft = { provider: string; name: string; base_url: string; credentials: Record<string, string>; sync_interval_minutes: number }
 export type IntegrationConnectionUpdate = { name?: string; base_url?: string; active: boolean; sync_interval_minutes: number }
 export type IntegrationJob = { id: string; connection_id: string; connection_name: string; trigger: 'manual' | 'scheduled'; state: 'pending' | 'processing' | 'succeeded' | 'dead_letter' | 'cancelled'; attempts: number; cursor_present: boolean; last_error_code: string; result_counts: Record<string, number>; available_at: string; started_at: string | null; finished_at: string | null; created_at: string }
 export type IntegrationLog = { id: string; connection_id: string; connection_name: string; job_id: string | null; level: 'info' | 'warning' | 'error'; code: string; metrics: Record<string, number>; occurred_at: string }
 export type IntegrationObservation = { id: string; connection_id: string; connection_name: string; remote_type: string; remote_id: string; safe_projection: Record<string, string | number | boolean | null>; source_timestamp: string | null; state: 'observed' | 'retired'; observed_at: string; linked_local_entity_id?: string | null; linked_local_entity_name?: string; accepted?: boolean; stale?: boolean; open_conflict?: IntegrationConflict | null }
 export type IntegrationConflict = { id: string; connection_id: string; connection_name: string; connection_provider?: string; local_entity_id: string | null; local_entity_name?: string; provider_values?: Record<string, unknown>; remote_type: string; remote_id: string; difference: string; status: 'open' | 'keep_local' | 'accept_remote' | 'ignored'; created_at: string; resolved_at: string | null }
-export type NetBoxAdoption =
-  | { entity_id: string }
-  | { rack: { name: string; site_id: string; location_id: string | null; unit_count: number; status: 'planned' | 'active' | 'retired' } }
-  | { asset: { name: string; model_id: string } }
-  | { vlan: { name: string; vlan_id: number; description: string } }
-  | { prefix: { name: string; cidr: string; description: string } }
-  | { ip_address: { address: string; subnet_id: string; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string } }
-  | { mac_address: { address: string; description: string } }
+export type NetBoxAdoption = { entity_id: string }
 export type ObservationQuery = { page: number; page_size: number; q?: string; remote_type?: string }
 export type ConflictQuery = { page: number; page_size: number; q?: string; remote_type?: string; status?: IntegrationConflict['status'] }
 export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }
 export type IntegrationPage<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean }
+export type NetBoxPublicationProposal = { source_observation_id: string; source_type: string; connection_id: string; action: 'create' | 'update'; endpoint: string; fields: Record<string, string | number | boolean | null>; target_fingerprint: string; proposal_digest: string }
 export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[] }; content_digest: string; byte_size: number; created_at: string }
 
 export interface IntegrationsClient {
@@ -28,6 +22,9 @@ export interface IntegrationsClient {
   createConnection(workspace: WorkspaceContext, draft: IntegrationConnectionDraft): Promise<IntegrationConnection>
   updateConnection(workspace: WorkspaceContext, connection: IntegrationConnection, values: IntegrationConnectionUpdate): Promise<IntegrationConnection>
   rotateConnection(workspace: WorkspaceContext, connection: IntegrationConnection, credentials: Record<string, string>): Promise<IntegrationConnection>
+  configureNetBoxWriteCredential(workspace: WorkspaceContext, connection: IntegrationConnection, apiToken: string): Promise<IntegrationConnection>
+  previewNetBoxPublication(workspace: WorkspaceContext, observation: IntegrationObservation, connection: IntegrationConnection): Promise<NetBoxPublicationProposal>
+  publishNetBoxProposal(workspace: WorkspaceContext, proposal: NetBoxPublicationProposal): Promise<{ status: 'published'; target_id: number | null; proposal_digest: string }>
   startSync(workspace: WorkspaceContext, connection: IntegrationConnection): Promise<IntegrationJob>
   listJobs(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationPage<IntegrationJob>>
   cancelJob(workspace: WorkspaceContext, job: IntegrationJob): Promise<IntegrationJob>
@@ -70,6 +67,9 @@ export const browserIntegrationsClient: IntegrationsClient = {
   createConnection: (workspace, draft) => mutate(`${base(workspace)}/connections`, 'POST', draft),
   updateConnection: (workspace, connection, values) => mutate(`${base(workspace)}/connections/${encodeURIComponent(connection.id)}`, 'PATCH', values),
   rotateConnection: (workspace, connection, credentials) => mutate(`${base(workspace)}/connections/${encodeURIComponent(connection.id)}/rotate`, 'POST', { credentials }),
+  configureNetBoxWriteCredential: (workspace, connection, api_token) => mutate(`${base(workspace)}/connections/${encodeURIComponent(connection.id)}/netbox-write-credential`, 'POST', { api_token }),
+  previewNetBoxPublication: (workspace, observation, connection) => mutate(`${base(workspace)}/netbox-publications/preview`, 'POST', { source_observation_id: observation.id, connection_id: connection.id }),
+  publishNetBoxProposal: (workspace, proposal) => mutate(`${base(workspace)}/netbox-publications/publish`, 'POST', { source_observation_id: proposal.source_observation_id, connection_id: proposal.connection_id, proposal_digest: proposal.proposal_digest }),
   startSync: (workspace, connection) => mutate(`${base(workspace)}/jobs`, 'POST', { connection_id: connection.id }, { 'Idempotency-Key': `browser:${crypto.randomUUID()}` }),
   listJobs: async (workspace, signal) => parse(await fetch(`${base(workspace)}/jobs?page=1&page_size=50`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
   cancelJob: (workspace, job) => mutate(`${base(workspace)}/jobs/${encodeURIComponent(job.id)}/cancel`, 'POST', {}),

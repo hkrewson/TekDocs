@@ -1,6 +1,6 @@
 # Pre-1.0 network documentation boundary
 
-Decision corrected 2026-09-28. This supersedes the broader network-object
+Decision corrected and implementation completed 2026-09-28. This supersedes the broader network-object
 workspace described in the original responsive Phase 3 plan. TekDocs documents a
 small set of useful network facts and may import them from authoritative systems.
 It does not recreate NetBox, an IPAM, a DNS controller or a network-management
@@ -143,6 +143,12 @@ The pre-1.0 sequence is:
    then remove the superseded APIs, models, permissions, preferences, tests and
    stored rows for VRFs, standalone VLANs, racks, interfaces, MAC addresses,
    circuits and handoffs.
+
+Steps 1–7 are implemented at 0.8.46. The cleanup rehearsal command reports retained
+records, lossless backfills and blockers before any apply run. Its apply mode performs
+only the lossless VLAN, rack-placement and asset-address backfills; deletion of legacy
+rows remains deliberately gated on a production-image rehearsal and recovery evidence.
+Legacy storage and compatibility endpoints are not supported product surfaces.
 
 Destructive migrations must first report what will be retained and deleted in a
 fixture and production-image rehearsal. They must not keep hidden legacy tables

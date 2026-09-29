@@ -27,6 +27,7 @@ from .models import (
     HardwareLifecycleEventType,
     HardwareLifecycleState,
     Location,
+    NetworkIPAddress,
     NetworkMACAddress,
     Organization,
     PersonAssociation,
@@ -115,6 +116,12 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
                 "network_mac_addresses",
                 queryset=NetworkMACAddress.objects.select_related("entity").order_by("address", "entity_id"),
             ),
+            Prefetch(
+                "network_ip_addresses",
+                queryset=NetworkIPAddress.objects.select_related("entity", "subnet", "subnet__entity").order_by(
+                    "address_family", "address", "entity_id"
+                ),
+            ),
             "lifecycle_events__person__person__entity",
             "lifecycle_events__site__entity",
             "lifecycle_events__location__entity",
@@ -135,10 +142,7 @@ def bulk_update_assets(
     if not requested or len(requested) != len(asset_entity_ids) or len(requested) > MAX_BULK_ASSETS:
         raise InventoryError("Choose between 1 and 100 unique assets.")
     assets = list(
-        assets_for_scope(scope)
-        .select_for_update(of=("self",))
-        .filter(entity_id__in=requested)
-        .order_by("entity_id")
+        assets_for_scope(scope).select_for_update(of=("self",)).filter(entity_id__in=requested).order_by("entity_id")
     )
     if len(assets) != len(requested):
         raise InventoryError("One or more selected assets are unavailable in this workspace.")
@@ -355,15 +359,12 @@ def create_client_asset(
     # Supplier catalog rows are a read-only RLS projection in client context.
     # Revisions and publication manifests are immutable, so exact identifiers and
     # checksums provide the snapshot boundary without cross-workspace write locks.
-    model = (
-        CatalogModel.objects.select_related("entity", "organization", "product", "product__entity")
-        .get(
-            tenant=tenant,
-            entity_id=model_entity_id,
-            archived_at__isnull=True,
-            entity__archived_at__isnull=True,
-            product__archived_at__isnull=True,
-        )
+    model = CatalogModel.objects.select_related("entity", "organization", "product", "product__entity").get(
+        tenant=tenant,
+        entity_id=model_entity_id,
+        archived_at__isnull=True,
+        entity__archived_at__isnull=True,
+        product__archived_at__isnull=True,
     )
     supplier_classifications = {item.kind for item in model.organization.classifications.all()}
     if not supplier_classifications.intersection({"vendor", "manufacturer"}):
@@ -486,9 +487,9 @@ def lifecycle_events(asset: ClientAsset) -> QuerySet[ClientAssetLifecycleEvent]:
 
 def assignment_choices(asset: ClientAsset) -> tuple[QuerySet[PersonAssociation], QuerySet[Site], QuerySet[Location]]:
     base = {"tenant": asset.tenant, "organization": asset.organization, "archived_at__isnull": True}
-    people = PersonAssociation.objects.filter(
-        **base, person__entity__archived_at__isnull=True
-    ).select_related("person__entity")
+    people = PersonAssociation.objects.filter(**base, person__entity__archived_at__isnull=True).select_related(
+        "person__entity"
+    )
     sites = Site.objects.filter(**base, entity__archived_at__isnull=True).select_related("entity")
     locations = Location.objects.filter(**base, entity__archived_at__isnull=True).select_related(
         "entity", "site__entity"
@@ -579,9 +580,7 @@ def assign_hardware(  # type: ignore[no-untyped-def]
         raise InventoryError("Choose a person, site, or location for this assignment.")
     scope = {"tenant": asset.tenant, "organization": asset.organization, "archived_at__isnull": True}
     person = (
-        PersonAssociation.objects.filter(
-            **scope, id=person_id, person__entity__archived_at__isnull=True
-        ).first()
+        PersonAssociation.objects.filter(**scope, id=person_id, person__entity__archived_at__isnull=True).first()
         if person_id
         else None
     )

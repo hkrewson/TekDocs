@@ -5,6 +5,7 @@ import type { ClientAsset, HardwareLifecycleEvent, InventoryClient } from './api
 import type { WorkspaceContext } from '../workspaces/api'
 import { HardwareLifecycle } from './HardwareLifecycle'
 import { HardwareAddresses } from './HardwareAddresses'
+import { AssetNetworkAddresses } from './AssetNetworkAddresses'
 import { SoftwareInstallation } from './SoftwareInstallation'
 import { SoftwareHistory } from './SoftwareHistory'
 import { AssetSpecifications } from './AssetSpecifications'
@@ -42,7 +43,7 @@ export function AssetRecord({ asset, workspace, client, canManage, access, secti
         {asset.kind === 'hardware' ? <HardwareLifecycle key={asset.id} asset={asset} workspace={workspace} client={client} canManage={canManage} showHistory={false} onChange={(hardware) => onChange({ ...asset, hardware })} /> : <AssetFacts asset={asset} />}
       </>}
       {current === 'specifications' && <AssetSpecifications key={asset.id} selected={asset} workspace={workspace} client={client} />}
-      {current === 'network' && <HardwareAddresses key={asset.id} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(mac_addresses) => onChange({ ...asset, mac_addresses })} />}
+      {current === 'network' && <><AssetNetworkAddresses key={`${asset.id}-ip`} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(ip_addresses) => onChange({ ...asset, ip_addresses })} /><HardwareAddresses key={`${asset.id}-mac`} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(mac_addresses) => onChange({ ...asset, mac_addresses })} /></>}
       {current === 'installation' && <SoftwareInstallation key={asset.id} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(software_installation) => onChange({ ...asset, software_installation })} />}
       {current === 'history' && <AssetHistory key={asset.id} asset={asset} workspace={workspace} client={client} />}
       {current === 'related' && access.view && <><AssetRelationships key={asset.id} workspace={workspace} assetId={asset.id} assetName={asset.name} canCreate={access.create} canArchive={access.archive} /><button type="button" className="secondary-button" aria-expanded={graph} onClick={() => setGraph(!graph)}>{translate('collections.graph')}</button>{graph && <RelationshipGraph scope={workspace.kind === 'organization' ? { organizationId: workspace.id } : {}} family="asset" rootId={asset.id} client={browserRelationshipsClient} heading={`${asset.name} relationships`} />}</>}

@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any
 from uuid import UUID, uuid4
 from uuid import UUID as UUIDValue
 
 from allauth.account.internal.flows.reauthentication import did_recently_authenticate
-from django.core.exceptions import ValidationError as DjangoValidationError
-from django.db import IntegrityError, transaction
 from django.db import connection as database_connection
+from django.db import transaction
 from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -28,7 +27,6 @@ from .integration_providers import (
 from .integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from .models import (
     AuditEvent,
-    CatalogModel,
     ClientHardwareAsset,
     ClientSoftwareInstallation,
     CommercialContract,
@@ -43,12 +41,15 @@ from .models import (
     IntegrationProvider,
     IntegrationSyncJob,
     NetBoxReference,
+    NetworkDevice,
+    NetworkSubnet,
     Organization,
     PersonAssociation,
     Site,
     Tenant,
     workspace_for_owner,
 )
+from .netbox import project_netbox_observations
 from .rls import OrganizationRLSMode, bind_local_rls_scope, system_rls_scope_if_postgresql
 from .scoping import DataScope
 from .unifi import project_unifi_observations
@@ -335,6 +336,46 @@ def rotate_connection_secret(
         entity_id=connection.id,
         request_id=getattr(request, "request_id", None),
         metadata={},
+    )
+    return connection
+
+
+@transaction.atomic
+def configure_netbox_write_secret(
+    *,
+    request: Any,
+    organization_entity_id: UUID | None,
+    connection_id: UUID,
+    api_token: str,
+) -> IntegrationConnection:
+    _recent_session(request)
+    resolved = resolve_integration_workspace(
+        request.user, organization_entity_id=organization_entity_id, permission=PermissionKey.INTEGRATIONS_MANAGE
+    )
+    try:
+        connection = (
+            connections_for_workspace(resolved)
+            .select_for_update()
+            .get(pk=connection_id, provider=IntegrationProvider.NETBOX)
+        )
+    except IntegrationConnection.DoesNotExist as exc:
+        raise NotFound("The NetBox connection is unavailable.") from exc
+    secret = _validate_provider_secret(api_token, field="api_token")
+    connection.write_secret_generation += 1
+    connection.write_secret_envelope = encrypt_integration_secret(
+        secret=secret,
+        tenant_id=connection.tenant_id,
+        connection_id=connection.id,
+        generation=connection.write_secret_generation,
+    )
+    connection.save(update_fields=("write_secret_envelope", "write_secret_generation", "updated_at"))
+    AuditEvent.objects.create(
+        tenant=connection.tenant,
+        actor=request.user,
+        action="integration_connection.write_credential_configured",
+        entity_id=connection.id,
+        request_id=getattr(request, "request_id", None),
+        metadata={"provider": IntegrationProvider.NETBOX},
     )
     return connection
 
@@ -898,7 +939,9 @@ def process_sync_job(*, job_id: UUID, adapter: ProviderAdapter | None = None, no
                     raise ValueError("provider_configuration_invalid")
                 job.connection.configuration = {**job.connection.configuration, **page.configuration_updates}
                 job.connection.save(update_fields=("configuration", "updated_at"))
-            if job.connection.provider == IntegrationProvider.UNIFI:
+            if job.connection.provider == IntegrationProvider.NETBOX:
+                project_netbox_observations(job, created)
+            elif job.connection.provider == IntegrationProvider.UNIFI:
                 project_unifi_observations(job, created)
             _conflicts_for_observations(job, created)
             job.cursor_after = page.next_cursor
@@ -1104,156 +1147,40 @@ def adopt_netbox_conflict(
     workspace: ResolvedWorkspace,
     conflict_id: UUID,
     actor: Any,
-    entity_id: UUID | None = None,
-    rack: dict[str, object] | None = None,
-    asset: dict[str, object] | None = None,
-    vlan: dict[str, object] | None = None,
-    prefix: dict[str, object] | None = None,
-    ip_address: dict[str, object] | None = None,
-    mac_address: dict[str, object] | None = None,
+    entity_id: UUID,
 ) -> IntegrationConflict:
-    """Link an unmatched NetBox observation, optionally creating a supported TekDocs record."""
+    """Link an ambiguous supported NetBox record to an existing TekDocs record."""
 
-    from .inventory import InventoryError, create_client_asset
     from .netbox_reconciliation import NetBoxReferenceError, set_reference
-    from .network_addressing import NetworkAddressingError, create_subnet, create_vlan
-    from .network_endpoints import NetworkEndpointError, create_ip_address, create_mac_address
-    from .network_inventory import NetworkInventoryError, create_rack
 
     try:
         conflict = (
             IntegrationConflict.scoped.for_scope(workspace.data_scope)
-            .select_for_update()
-            .select_related("connection")
+            .select_for_update(of=("self",))
+            .select_related("connection", "observation")
             .get(workspace_id=workspace.data_scope.workspace_id, pk=conflict_id, status=IntegrationConflictStatus.OPEN)
         )
     except IntegrationConflict.DoesNotExist as exc:
         raise NotFound("The integration conflict is unavailable.") from exc
     if conflict.connection.provider != IntegrationProvider.NETBOX or conflict.difference != "unmatched":
-        raise ValidationError({"detail": "Only unmatched NetBox records can be adopted."})
+        raise ValidationError({"detail": "Only unmatched NetBox records can be linked."})
     if conflict.observation is None:
         raise ValidationError({"detail": "The source observation is unavailable."})
-    if sum(value is not None for value in (entity_id, rack, asset, vlan, prefix, ip_address, mac_address)) != 1:
-        raise ValidationError({"detail": "Choose one existing record or create one supported record."})
-
-    selected_entity_id = entity_id
-    if rack is not None:
-        if conflict.remote_type != "dcim.rack":
-            raise ValidationError({"detail": "Direct creation is currently available for NetBox racks."})
-        try:
-            created_rack = create_rack(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                name=cast(str, rack["name"]),
-                site_entity_id=cast(UUID, rack["site_entity_id"]),
-                location_entity_id=cast(UUID | None, rack.get("location_entity_id")),
-                unit_count=cast(int, rack["unit_count"]),
-                status=cast(str, rack["status"]),
-            )
-        except NetworkInventoryError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created_rack.entity_id
-    elif asset is not None:
-        if conflict.remote_type != "dcim.device":
-            raise ValidationError({"detail": "Direct asset creation is available for NetBox devices."})
-        try:
-            model = CatalogModel.objects.select_related("product").get(
-                tenant=workspace.member.tenant,
-                entity_id=cast(UUID, asset["model_entity_id"]),
-                archived_at__isnull=True,
-                entity__archived_at__isnull=True,
-                product__archived_at__isnull=True,
-            )
-            if model.product.kind != "hardware":
-                raise InventoryError("Choose an active hardware supplier model.")
-            created_asset = create_client_asset(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                model_entity_id=model.entity_id,
-                name=cast(str, asset["name"]),
-            )
-        except (CatalogModel.DoesNotExist, InventoryError) as exc:
-            detail = str(exc) if isinstance(exc, InventoryError) else "Choose an active hardware supplier model."
-            raise ValidationError({"detail": detail}) from exc
-        selected_entity_id = created_asset.entity_id
-    elif vlan is not None:
-        if conflict.remote_type != "ipam.vlan":
-            raise ValidationError({"detail": "Direct VLAN creation is available for NetBox VLANs."})
-        try:
-            created_vlan = create_vlan(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                name=cast(str, vlan["name"]),
-                vlan_id=cast(int, vlan["vlan_id"]),
-                description=cast(str, vlan.get("description", "")),
-            )
-        except (NetworkAddressingError, DjangoValidationError, IntegrityError) as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created_vlan.entity_id
-    elif prefix is not None:
-        if conflict.remote_type != "ipam.prefix":
-            raise ValidationError({"detail": "Direct prefix creation is available for NetBox prefixes."})
-        try:
-            created_subnet = create_subnet(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                name=cast(str, prefix["name"]),
-                cidr=cast(str, prefix["cidr"]),
-                vrf_entity_id=None,
-                vlan_entity_id=None,
-                description=cast(str, prefix.get("description", "")),
-            )
-        except (NetworkAddressingError, DjangoValidationError, IntegrityError, ValueError) as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created_subnet.entity_id
-    elif ip_address is not None:
-        if conflict.remote_type != "ipam.ipaddress":
-            raise ValidationError({"detail": "Direct IP address creation is available for NetBox IP addresses."})
-        try:
-            created_ip_address = create_ip_address(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                address=cast(str, ip_address["address"]),
-                subnet_entity_id=cast(UUID, ip_address["subnet_entity_id"]),
-                interface_entity_id=None,
-                hardware_asset_entity_id=None,
-                status=cast(str, ip_address["status"]),
-                dns_name=cast(str, ip_address.get("dns_name", "")),
-                description=cast(str, ip_address.get("description", "")),
-            )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError, ValueError) as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created_ip_address.entity_id
-    elif mac_address is not None:
-        if conflict.remote_type != "dcim.macaddress":
-            raise ValidationError({"detail": "Direct MAC address creation is available for NetBox MAC addresses."})
-        try:
-            created_mac_address = create_mac_address(
-                tenant=workspace.member.tenant,
-                organization=workspace.organization,
-                actor_id=actor.pk,
-                address=cast(str, mac_address["address"]),
-                interface_entity_id=None,
-                hardware_asset_entity_id=None,
-                description=cast(str, mac_address.get("description", "")),
-            )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError, ValueError) as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
-        selected_entity_id = created_mac_address.entity_id
-
-    if selected_entity_id is None:
-        raise ValidationError({"detail": "Choose a TekDocs record to link."})
+    scope = workspace.data_scope
+    if conflict.remote_type == "ipam.prefix":
+        exists = NetworkSubnet.scoped.for_scope(scope).filter(entity_id=entity_id).exists()
+    elif conflict.remote_type == "dcim.device":
+        exists = NetworkDevice.scoped.for_scope(scope).filter(hardware_asset_id=entity_id).exists()
+    else:
+        raise ValidationError({"detail": "Only NetBox prefixes and devices are supported."})
+    if not exists:
+        raise ValidationError({"entity_id": "Choose a compatible record from this workspace."})
     try:
         reference = set_reference(
             tenant=workspace.member.tenant,
             organization=workspace.organization,
             actor_id=actor.pk,
-            entity_id=selected_entity_id,
+            entity_id=entity_id,
             object_type=conflict.remote_type,
             object_id=int(conflict.remote_id),
             fingerprint=conflict.remote_fingerprint,
@@ -1263,6 +1190,19 @@ def adopt_netbox_conflict(
     reference.last_observed_at = conflict.observation.observed_at
     reference.save(update_fields=("last_observed_at", "updated_at"))
 
+    IntegrationEntityMapping.objects.update_or_create(
+        connection=conflict.connection,
+        remote_type=conflict.remote_type,
+        remote_id=conflict.remote_id,
+        defaults={
+            "tenant": conflict.tenant,
+            "workspace": conflict.workspace,
+            "organization": conflict.organization,
+            "local_entity_id": entity_id,
+            "observed_fingerprint": conflict.remote_fingerprint,
+            "last_observed_at": conflict.observation.observed_at,
+        },
+    )
     conflict.status = IntegrationConflictStatus.ACCEPT_REMOTE
     conflict.resolved_by = actor
     conflict.resolved_at = timezone.now()
@@ -1270,8 +1210,8 @@ def adopt_netbox_conflict(
     AuditEvent.objects.create(
         tenant=workspace.member.tenant,
         actor=actor,
-        action="integration_conflict.adopted",
+        action="integration_conflict.linked",
         entity_id=conflict.id,
-        metadata={"created": rack is not None or asset is not None, "object_type": conflict.remote_type},
+        metadata={"object_type": conflict.remote_type},
     )
     return conflict

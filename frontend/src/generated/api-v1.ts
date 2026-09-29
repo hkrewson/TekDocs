@@ -2132,6 +2132,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/assets/{asset_entity_id}/ip-addresses": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_assets_ip_addresses_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_assets_ip_addresses_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/assets/{asset_entity_id}/ip-addresses/{ip_address_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_msp_assets_ip_addresses_partial_update"];
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/assets/{asset_entity_id}/mac-addresses": {
         readonly parameters: {
             readonly query?: never;
@@ -2162,6 +2194,22 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch: operations["workspaces_msp_assets_mac_addresses_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/assets/{asset_entity_id}/network-choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_assets_network_choices_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/v1/workspaces/msp/assets/{asset_entity_id}/software": {
@@ -2886,6 +2934,22 @@ export interface paths {
         readonly patch: operations["workspaces_msp_integrations_connections_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/integrations/connections/{connection_id}/netbox-write-credential": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_connections_netbox_write_credential_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/integrations/connections/{connection_id}/rotate": {
         readonly parameters: {
             readonly query?: never;
@@ -3104,6 +3168,38 @@ export interface paths {
         readonly get: operations["workspaces_msp_integrations_logs_retrieve"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/netbox-publications/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_netbox_publications_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/integrations/netbox-publications/publish": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_integrations_netbox_publications_publish_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -4215,6 +4311,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/ip-addresses": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_assets_ip_addresses_list"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_assets_ip_addresses_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/ip-addresses/{ip_address_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["workspaces_organizations_assets_ip_addresses_partial_update"];
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/mac-addresses": {
         readonly parameters: {
             readonly query?: never;
@@ -4245,6 +4373,22 @@ export interface paths {
         readonly options?: never;
         readonly head?: never;
         readonly patch: operations["workspaces_organizations_assets_mac_addresses_partial_update"];
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/network-choices": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_assets_network_choices_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
         readonly trace?: never;
     };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/software": {
@@ -5993,6 +6137,22 @@ export interface paths {
         readonly patch: operations["workspaces_organizations_integrations_connections_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}/netbox-write-credential": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_connections_netbox_write_credential_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}/rotate": {
         readonly parameters: {
             readonly query?: never;
@@ -6211,6 +6371,38 @@ export interface paths {
         readonly get: operations["workspaces_organizations_integrations_logs_retrieve"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/netbox-publications/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_netbox_publications_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/integrations/netbox-publications/publish": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_integrations_netbox_publications_publish_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -7992,6 +8184,32 @@ export interface components {
             };
             readonly artifacts: readonly components["schemas"]["AssetPublicationArtifact"][];
         };
+        readonly AssetIPAddress: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly address: string;
+            /** Format: uuid */
+            readonly subnet_id: string;
+            readonly subnet_cidr: string;
+            readonly status: string;
+            readonly dns_name: string;
+            readonly description: string;
+        };
+        readonly AssetIPAddressWrite: {
+            readonly address: string;
+            /** Format: uuid */
+            readonly subnet_id?: string;
+            /**
+             * @description * `active` - active
+             *     * `reserved` - reserved
+             *     * `dhcp` - dhcp
+             *     * `deprecated` - deprecated
+             * @enum {string}
+             */
+            readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
+            readonly dns_name?: string;
+            readonly description?: string;
+        };
         readonly AssetMACAddress: {
             /** Format: uuid */
             readonly id: string;
@@ -8002,6 +8220,12 @@ export interface components {
             readonly address: string;
             /** @default  */
             readonly description: string;
+        };
+        readonly AssetNetworkChoice: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly cidr: string;
+            readonly name: string;
         };
         readonly AssetPublicationArtifact: {
             /** Format: uuid */
@@ -8508,6 +8732,9 @@ export interface components {
             readonly mac_addresses: readonly {
                 readonly [key: string]: unknown;
             }[];
+            readonly ip_addresses: readonly {
+                readonly [key: string]: unknown;
+            }[];
             readonly software_installation: components["schemas"]["SoftwareInstallationSummary"] | null;
             /** Format: date-time */
             readonly created_at: string;
@@ -8944,6 +9171,7 @@ export interface components {
             readonly name: string;
             readonly base_url: string;
             readonly credential_configured: boolean;
+            readonly write_credential_configured: boolean;
             readonly secret_generation: number;
             readonly active: boolean;
             readonly sync_interval_minutes: number;
@@ -9124,8 +9352,6 @@ export interface components {
             readonly credentials?: {
                 readonly [key: string]: string;
             };
-            /** @default  */
-            readonly api_token: string;
         };
         readonly CustomFieldDefinition: {
             /** Format: uuid */
@@ -11840,18 +12066,7 @@ export interface components {
         };
         readonly NetBoxAdoption: {
             /** Format: uuid */
-            readonly entity_id?: string;
-            readonly rack?: components["schemas"]["NetBoxRackAdoption"];
-            readonly asset?: components["schemas"]["NetBoxAssetAdoption"];
-            readonly vlan?: components["schemas"]["NetBoxVLANAdoption"];
-            readonly prefix?: components["schemas"]["NetBoxPrefixAdoption"];
-            readonly ip_address?: components["schemas"]["NetBoxIPAddressAdoption"];
-            readonly mac_address?: components["schemas"]["NetBoxMACAddressAdoption"];
-        };
-        readonly NetBoxAssetAdoption: {
-            readonly name: string;
-            /** Format: uuid */
-            readonly model_id: string;
+            readonly entity_id: string;
         };
         readonly NetBoxChoice: {
             /** Format: uuid */
@@ -11874,29 +12089,6 @@ export interface components {
             readonly results: readonly components["schemas"]["NetBoxChoice"][];
             readonly can_manage: boolean;
         };
-        readonly NetBoxIPAddressAdoption: {
-            readonly address: string;
-            /** Format: uuid */
-            readonly subnet_id: string;
-            /**
-             * @description * `active` - active
-             *     * `reserved` - reserved
-             *     * `dhcp` - dhcp
-             *     * `deprecated` - deprecated
-             * @default active
-             * @enum {string}
-             */
-            readonly status: "active" | "reserved" | "dhcp" | "deprecated";
-            /** @default  */
-            readonly dns_name: string;
-            /** @default  */
-            readonly description: string;
-        };
-        readonly NetBoxMACAddressAdoption: {
-            readonly address: string;
-            /** @default  */
-            readonly description: string;
-        };
         readonly NetBoxObservation: {
             /**
              * @description * `dcim.rack` - Rack
@@ -11911,12 +12103,6 @@ export interface components {
             /** Format: int64 */
             readonly object_id: number;
             readonly fingerprint: string;
-        };
-        readonly NetBoxPrefixAdoption: {
-            readonly name: string;
-            readonly cidr: string;
-            /** @default  */
-            readonly description: string;
         };
         readonly NetBoxPreviewItem: {
             readonly object_type: string;
@@ -11943,22 +12129,45 @@ export interface components {
         readonly NetBoxPreviewWrite: {
             readonly observations: readonly components["schemas"]["NetBoxObservation"][];
         };
-        readonly NetBoxRackAdoption: {
-            readonly name: string;
+        readonly NetBoxPublicationConfirm: {
             /** Format: uuid */
-            readonly site_id: string;
+            readonly source_observation_id: string;
             /** Format: uuid */
-            readonly location_id?: string | null;
-            /** @default 42 */
-            readonly unit_count: number;
+            readonly connection_id: string;
+            readonly proposal_digest: string;
+        };
+        readonly NetBoxPublicationPreview: {
+            /** Format: uuid */
+            readonly source_observation_id: string;
+            /** Format: uuid */
+            readonly connection_id: string;
+        };
+        readonly NetBoxPublicationProposal: {
+            /** Format: uuid */
+            readonly source_observation_id: string;
+            readonly source_type: string;
+            readonly source_fingerprint: string;
+            /** Format: uuid */
+            readonly connection_id: string;
             /**
-             * @description * `planned` - planned
-             *     * `active` - active
-             *     * `retired` - retired
-             * @default active
+             * @description * `create` - create
+             *     * `update` - update
              * @enum {string}
              */
-            readonly status: "planned" | "active" | "retired";
+            readonly action: "create" | "update";
+            readonly endpoint: string;
+            readonly fields: unknown;
+            readonly target_fingerprint: string;
+            readonly proposal_digest: string;
+        };
+        readonly NetBoxPublicationResult: {
+            /**
+             * @description * `published` - published
+             * @enum {string}
+             */
+            readonly status: "published";
+            readonly target_id: number | null;
+            readonly proposal_digest: string;
         };
         readonly NetBoxReference: {
             /** Format: uuid */
@@ -11999,11 +12208,8 @@ export interface components {
             /** @default  */
             readonly fingerprint: string;
         };
-        readonly NetBoxVLANAdoption: {
-            readonly name: string;
-            readonly vlan_id: number;
-            /** @default  */
-            readonly description: string;
+        readonly NetBoxWriteCredential: {
+            readonly api_token: string;
         };
         readonly NetworkAssignmentChoice: {
             /** Format: uuid */
@@ -12050,8 +12256,9 @@ export interface components {
             /** Format: uuid */
             readonly rack_id: string | null;
             readonly rack_name: string | null;
-            readonly rack_unit: number | null;
-            readonly rack_units: number;
+            /** Format: decimal */
+            readonly rack_unit: string | null;
+            readonly rack_units: number | null;
             readonly netbox_id: number | null;
             readonly serial_number: string | null;
             readonly manufacturer_name: string | null;
@@ -12443,6 +12650,21 @@ export interface components {
             /** @default  */
             readonly description: string;
             readonly organization_ids?: readonly string[];
+        };
+        readonly PatchedAssetIPAddressWrite: {
+            readonly address?: string;
+            /** Format: uuid */
+            readonly subnet_id?: string;
+            /**
+             * @description * `active` - active
+             *     * `reserved` - reserved
+             *     * `dhcp` - dhcp
+             *     * `deprecated` - deprecated
+             * @enum {string}
+             */
+            readonly status?: "active" | "reserved" | "dhcp" | "deprecated";
+            readonly dns_name?: string;
+            readonly description?: string;
         };
         readonly PatchedAssetMACAddressWrite: {
             readonly address?: string;
@@ -20883,6 +21105,88 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_assets_ip_addresses_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["AssetIPAddress"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_assets_ip_addresses_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AssetIPAddressWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["AssetIPAddressWrite"];
+                readonly "multipart/form-data": components["schemas"]["AssetIPAddressWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetIPAddress"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_assets_ip_addresses_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+                readonly ip_address_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedAssetIPAddressWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedAssetIPAddressWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedAssetIPAddressWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetIPAddress"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_assets_mac_addresses_list: {
         readonly parameters: {
             readonly query?: never;
@@ -20961,6 +21265,29 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["AssetMACAddress"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_assets_network_choices_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["AssetNetworkChoice"][];
                 };
             };
         };
@@ -22632,7 +22959,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: {
+        readonly requestBody: {
             readonly content: {
                 readonly "application/json": components["schemas"]["NetBoxAdoption"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxAdoption"];
@@ -22743,6 +23070,35 @@ export interface operations {
                 readonly "application/json": components["schemas"]["PatchedConnectionUpdate"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedConnectionUpdate"];
                 readonly "multipart/form-data": components["schemas"]["PatchedConnectionUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_connections_netbox_write_credential_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxWriteCredential"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxWriteCredential"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxWriteCredential"];
             };
         };
         readonly responses: {
@@ -23271,6 +23627,60 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_netbox_publications_preview_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxPublicationPreview"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxPublicationPreview"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxPublicationPreview"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxPublicationProposal"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_integrations_netbox_publications_publish_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxPublicationConfirm"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxPublicationConfirm"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxPublicationConfirm"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxPublicationResult"];
                 };
             };
         };
@@ -26578,6 +26988,91 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_assets_ip_addresses_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["AssetIPAddress"][];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_assets_ip_addresses_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["AssetIPAddressWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["AssetIPAddressWrite"];
+                readonly "multipart/form-data": components["schemas"]["AssetIPAddressWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetIPAddress"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_assets_ip_addresses_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+                readonly ip_address_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedAssetIPAddressWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedAssetIPAddressWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedAssetIPAddressWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["AssetIPAddress"];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_assets_mac_addresses_list: {
         readonly parameters: {
             readonly query?: never;
@@ -26659,6 +27154,30 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["AssetMACAddress"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_assets_network_choices_list: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly asset_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": readonly components["schemas"]["AssetNetworkChoice"][];
                 };
             };
         };
@@ -31235,7 +31754,7 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: {
+        readonly requestBody: {
             readonly content: {
                 readonly "application/json": components["schemas"]["NetBoxAdoption"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxAdoption"];
@@ -31352,6 +31871,36 @@ export interface operations {
                 readonly "application/json": components["schemas"]["PatchedConnectionUpdate"];
                 readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedConnectionUpdate"];
                 readonly "multipart/form-data": components["schemas"]["PatchedConnectionUpdate"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Connection"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_connections_netbox_write_credential_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly connection_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxWriteCredential"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxWriteCredential"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxWriteCredential"];
             };
         };
         readonly responses: {
@@ -31905,6 +32454,64 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["LogPage"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_netbox_publications_preview_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxPublicationPreview"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxPublicationPreview"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxPublicationPreview"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxPublicationProposal"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_integrations_netbox_publications_publish_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NetBoxPublicationConfirm"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NetBoxPublicationConfirm"];
+                readonly "multipart/form-data": components["schemas"]["NetBoxPublicationConfirm"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NetBoxPublicationResult"];
                 };
             };
         };

@@ -52,6 +52,7 @@ def _provider_json_request(
     headers: dict[str, str],
     body: bytes | None = None,
     allow_list: bool = False,
+    success_statuses: tuple[int, ...] = (200,),
 ) -> dict[str, Any] | list[Any]:
     """GET one pinned, bounded provider page without following redirects."""
 
@@ -98,7 +99,7 @@ def _provider_json_request(
         if response.status in {400, 401, 403}:
             response.close()
             raise WebhookEgressError("provider_authentication_failed")
-        if response.status != 200:
+        if response.status not in success_statuses:
             response.close()
             raise WebhookEgressError("provider_http_error")
         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
@@ -194,6 +195,26 @@ def post_provider_form_basic(
             "Content-Type": "application/x-www-form-urlencoded",
         },
         body=urlencode(fields).encode("utf-8"),
+    )
+    if not isinstance(payload, dict):
+        raise WebhookEgressError("provider_response_invalid")
+    return payload
+
+
+def send_provider_json(
+    *, base_url: str, relative_path: str, method: str, authorization: str, values: dict[str, object]
+) -> dict[str, Any]:
+    """Send one reviewed JSON mutation to a pinned provider endpoint."""
+
+    if method not in {"POST", "PATCH"}:
+        raise ValueError("provider_method_invalid")
+    payload = _provider_json_request(
+        base_url=base_url,
+        relative_path=relative_path,
+        method=method,
+        headers={"Authorization": authorization, "Content-Type": "application/json"},
+        body=json.dumps(values, sort_keys=True, separators=(",", ":")).encode(),
+        success_statuses=(200, 201),
     )
     if not isinstance(payload, dict):
         raise WebhookEgressError("provider_response_invalid")

@@ -7488,6 +7488,120 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/ip-addresses:
+    get:
+      operationId: workspaces_msp_assets_ip_addresses_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_assets_ip_addresses_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/ip-addresses/{ip_address_entity_id}:
+    patch:
+      operationId: workspaces_msp_assets_ip_addresses_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/assets/{asset_entity_id}/mac-addresses:
     get:
       operationId: workspaces_msp_assets_mac_addresses_list
@@ -7595,6 +7709,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/assets/{asset_entity_id}/network-choices:
+    get:
+      operationId: workspaces_msp_assets_network_choices_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetNetworkChoice'
           description: ''
           headers:
             X-Request-ID:
@@ -9897,6 +10041,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/NetBoxAdoption'
+        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -10031,6 +10176,46 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedConnectionUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/connections/{connection_id}/netbox-write-credential:
+    post:
+      operationId: workspaces_msp_integrations_connections_netbox_write_credential_create
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -10649,6 +10834,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/netbox-publications/preview:
+    post:
+      operationId: workspaces_msp_integrations_netbox_publications_preview_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPublicationProposal'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/integrations/netbox-publications/publish:
+    post:
+      operationId: workspaces_msp_integrations_netbox_publications_publish_create
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPublicationResult'
           description: ''
           headers:
             X-Request-ID:
@@ -15547,6 +15798,138 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/ip-addresses:
+    get:
+      operationId: workspaces_organizations_assets_ip_addresses_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_assets_ip_addresses_create
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetIPAddressWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/ip-addresses/{ip_address_entity_id}:
+    patch:
+      operationId: workspaces_organizations_assets_ip_addresses_partial_update
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: ip_address_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAssetIPAddressWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetIPAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/mac-addresses:
     get:
       operationId: workspaces_organizations_assets_mac_addresses_list
@@ -15672,6 +16055,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssetMACAddress'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/assets/{asset_entity_id}/network-choices:
+    get:
+      operationId: workspaces_organizations_assets_network_choices_list
+      parameters:
+      - in: path
+        name: asset_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AssetNetworkChoice'
           description: ''
           headers:
             X-Request-ID:
@@ -22581,6 +23000,7 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/NetBoxAdoption'
+        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -22741,6 +23161,52 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/PatchedConnectionUpdate'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Connection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/connections/{connection_id}/netbox-write-credential:
+    post:
+      operationId: workspaces_organizations_integrations_connections_netbox_write_credential_create
+      parameters:
+      - in: path
+        name: connection_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxWriteCredential'
+        required: true
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -23469,6 +23935,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LogPage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/netbox-publications/preview:
+    post:
+      operationId: workspaces_organizations_integrations_netbox_publications_preview_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationPreview'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPublicationProposal'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/integrations/netbox-publications/publish:
+    post:
+      operationId: workspaces_organizations_integrations_netbox_publications_publish_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NetBoxPublicationConfirm'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetBoxPublicationResult'
           description: ''
           headers:
             X-Request-ID:
@@ -31687,6 +32233,63 @@ components:
       - source_document_id
       - title
       - verification
+    AssetIPAddress:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        subnet_id:
+          type: string
+          format: uuid
+        subnet_cidr:
+          type: string
+        status:
+          type: string
+        dns_name:
+          type: string
+        description:
+          type: string
+      required:
+      - address
+      - description
+      - dns_name
+      - id
+      - status
+      - subnet_cidr
+      - subnet_id
+    AssetIPAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 45
+        subnet_id:
+          type: string
+          format: uuid
+        status:
+          enum:
+          - active
+          - reserved
+          - dhcp
+          - deprecated
+          type: string
+          description: |-
+            * `active` - active
+            * `reserved` - reserved
+            * `dhcp` - dhcp
+            * `deprecated` - deprecated
+          x-spec-enum-id: 31948ed0ed6806be
+        dns_name:
+          type: string
+          maxLength: 253
+        description:
+          type: string
+          maxLength: 4000
+      required:
+      - address
     AssetMACAddress:
       type: object
       properties:
@@ -31714,6 +32317,20 @@ components:
           maxLength: 4000
       required:
       - address
+    AssetNetworkChoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        cidr:
+          type: string
+        name:
+          type: string
+      required:
+      - cidr
+      - id
+      - name
     AssetPublicationArtifact:
       type: object
       properties:
@@ -32942,6 +33559,12 @@ components:
             type: object
             additionalProperties: {}
           readOnly: true
+        ip_addresses:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         software_installation:
           allOf:
           - $ref: '#/components/schemas/SoftwareInstallationSummary'
@@ -32954,6 +33577,7 @@ components:
       - documents
       - hardware
       - id
+      - ip_addresses
       - kind
       - mac_addresses
       - model_id
@@ -34004,6 +34628,9 @@ components:
         credential_configured:
           type: boolean
           readOnly: true
+        write_credential_configured:
+          type: boolean
+          readOnly: true
         secret_generation:
           type: integer
         active:
@@ -34055,6 +34682,7 @@ components:
       - secret_generation
       - sync_interval_minutes
       - updated_at
+      - write_credential_configured
     ConnectionWrite:
       type: object
       properties:
@@ -34413,12 +35041,6 @@ components:
             type: string
             maxLength: 4096
           writeOnly: true
-        api_token:
-          type: string
-          writeOnly: true
-          default: ''
-          maxLength: 4096
-          minLength: 8
     CustomFieldDefinition:
       type: object
       properties:
@@ -40824,30 +41446,8 @@ components:
         entity_id:
           type: string
           format: uuid
-        rack:
-          $ref: '#/components/schemas/NetBoxRackAdoption'
-        asset:
-          $ref: '#/components/schemas/NetBoxAssetAdoption'
-        vlan:
-          $ref: '#/components/schemas/NetBoxVLANAdoption'
-        prefix:
-          $ref: '#/components/schemas/NetBoxPrefixAdoption'
-        ip_address:
-          $ref: '#/components/schemas/NetBoxIPAddressAdoption'
-        mac_address:
-          $ref: '#/components/schemas/NetBoxMACAddressAdoption'
-    NetBoxAssetAdoption:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 240
-        model_id:
-          type: string
-          format: uuid
       required:
-      - model_id
-      - name
+      - entity_id
     NetBoxChoice:
       type: object
       properties:
@@ -40909,52 +41509,6 @@ components:
       required:
       - can_manage
       - results
-    NetBoxIPAddressAdoption:
-      type: object
-      properties:
-        address:
-          type: string
-          maxLength: 45
-        subnet_id:
-          type: string
-          format: uuid
-        status:
-          enum:
-          - active
-          - reserved
-          - dhcp
-          - deprecated
-          type: string
-          description: |-
-            * `active` - active
-            * `reserved` - reserved
-            * `dhcp` - dhcp
-            * `deprecated` - deprecated
-          x-spec-enum-id: 31948ed0ed6806be
-          default: active
-        dns_name:
-          type: string
-          default: ''
-          maxLength: 253
-        description:
-          type: string
-          default: ''
-          maxLength: 4000
-      required:
-      - address
-      - subnet_id
-    NetBoxMACAddressAdoption:
-      type: object
-      properties:
-        address:
-          type: string
-          maxLength: 32
-        description:
-          type: string
-          default: ''
-          maxLength: 4000
-      required:
-      - address
     NetBoxObservation:
       type: object
       properties:
@@ -40987,22 +41541,6 @@ components:
       - fingerprint
       - object_id
       - object_type
-    NetBoxPrefixAdoption:
-      type: object
-      properties:
-        name:
-          type: string
-          maxLength: 240
-        cidr:
-          type: string
-          maxLength: 49
-        description:
-          type: string
-          default: ''
-          maxLength: 4000
-      required:
-      - cidr
-      - name
     NetBoxPreviewItem:
       type: object
       properties:
@@ -41062,39 +41600,91 @@ components:
             $ref: '#/components/schemas/NetBoxObservation'
       required:
       - observations
-    NetBoxRackAdoption:
+    NetBoxPublicationConfirm:
       type: object
       properties:
-        name:
-          type: string
-          maxLength: 240
-        site_id:
+        source_observation_id:
           type: string
           format: uuid
-        location_id:
+        connection_id:
           type: string
           format: uuid
-          nullable: true
-        unit_count:
-          type: integer
-          maximum: 100
-          minimum: 1
-          default: 42
-        status:
+        proposal_digest:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      required:
+      - connection_id
+      - proposal_digest
+      - source_observation_id
+    NetBoxPublicationPreview:
+      type: object
+      properties:
+        source_observation_id:
+          type: string
+          format: uuid
+        connection_id:
+          type: string
+          format: uuid
+      required:
+      - connection_id
+      - source_observation_id
+    NetBoxPublicationProposal:
+      type: object
+      properties:
+        source_observation_id:
+          type: string
+          format: uuid
+        source_type:
+          type: string
+        source_fingerprint:
+          type: string
+        connection_id:
+          type: string
+          format: uuid
+        action:
           enum:
-          - planned
-          - active
-          - retired
+          - create
+          - update
           type: string
           description: |-
-            * `planned` - planned
-            * `active` - active
-            * `retired` - retired
-          x-spec-enum-id: 5761b434c9a5aca2
-          default: active
+            * `create` - create
+            * `update` - update
+          x-spec-enum-id: 906f7ffaffd1f733
+        endpoint:
+          type: string
+        fields: {}
+        target_fingerprint:
+          type: string
+        proposal_digest:
+          type: string
       required:
-      - name
-      - site_id
+      - action
+      - connection_id
+      - endpoint
+      - fields
+      - proposal_digest
+      - source_fingerprint
+      - source_observation_id
+      - source_type
+      - target_fingerprint
+    NetBoxPublicationResult:
+      type: object
+      properties:
+        status:
+          enum:
+          - published
+          type: string
+          description: '* `published` - published'
+          x-spec-enum-id: e90ac3d36d3a6a38
+        target_id:
+          type: integer
+          nullable: true
+        proposal_digest:
+          type: string
+      required:
+      - proposal_digest
+      - status
+      - target_id
     NetBoxReference:
       type: object
       properties:
@@ -41187,23 +41777,16 @@ components:
       - entity_id
       - object_id
       - object_type
-    NetBoxVLANAdoption:
+    NetBoxWriteCredential:
       type: object
       properties:
-        name:
+        api_token:
           type: string
-          maxLength: 240
-        vlan_id:
-          type: integer
-          maximum: 4094
-          minimum: 1
-        description:
-          type: string
-          default: ''
-          maxLength: 4000
+          writeOnly: true
+          maxLength: 4096
+          minLength: 8
       required:
-      - name
-      - vlan_id
+      - api_token
     NetworkAssignmentChoice:
       type: object
       properties:
@@ -41323,11 +41906,17 @@ components:
         rack_name:
           type: string
           nullable: true
+          readOnly: true
         rack_unit:
-          type: integer
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,1})?$
           nullable: true
+          readOnly: true
         rack_units:
           type: integer
+          nullable: true
+          readOnly: true
         netbox_id:
           type: integer
           nullable: true
@@ -42374,6 +42963,34 @@ components:
           items:
             type: string
             format: uuid
+    PatchedAssetIPAddressWrite:
+      type: object
+      properties:
+        address:
+          type: string
+          maxLength: 45
+        subnet_id:
+          type: string
+          format: uuid
+        status:
+          enum:
+          - active
+          - reserved
+          - dhcp
+          - deprecated
+          type: string
+          description: |-
+            * `active` - active
+            * `reserved` - reserved
+            * `dhcp` - dhcp
+            * `deprecated` - deprecated
+          x-spec-enum-id: 31948ed0ed6806be
+        dns_name:
+          type: string
+          maxLength: 253
+        description:
+          type: string
+          maxLength: 4000
     PatchedAssetMACAddressWrite:
       type: object
       properties:

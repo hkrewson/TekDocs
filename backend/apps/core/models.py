@@ -2956,6 +2956,9 @@ class NetworkDevice(TimestampedModel):
     )
     rack_unit = models.PositiveSmallIntegerField(null=True, blank=True)
     rack_units = models.PositiveSmallIntegerField(default=1)
+    source_rack_name = models.CharField(max_length=200, blank=True)
+    source_rack_position = models.DecimalField(max_digits=6, decimal_places=1, null=True, blank=True)
+    source_rack_units = models.PositiveSmallIntegerField(null=True, blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -5433,6 +5436,8 @@ class IntegrationConnection(TimestampedModel):
     configuration = models.JSONField(default=dict, blank=True)
     secret_envelope = models.JSONField()
     secret_generation = models.PositiveIntegerField(default=1)
+    write_secret_envelope = models.JSONField(default=dict, blank=True)
+    write_secret_generation = models.PositiveIntegerField(default=1)
     active = models.BooleanField(default=True)
     sync_interval_minutes = models.PositiveIntegerField(default=60)
     next_sync_at = models.DateTimeField(default=timezone.now)
@@ -5456,6 +5461,10 @@ class IntegrationConnection(TimestampedModel):
             ),
             models.CheckConstraint(
                 condition=models.Q(secret_generation__gte=1), name="integration_secret_generation_valid"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(write_secret_generation__gte=1),
+                name="integration_write_secret_generation_valid",
             ),
             models.CheckConstraint(
                 condition=models.Q(sync_interval_minutes__gte=5) & models.Q(sync_interval_minutes__lte=10080),

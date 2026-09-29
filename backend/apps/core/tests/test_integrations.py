@@ -6,15 +6,14 @@ import zipfile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.management import call_command
 from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.policy import PermissionKey
-from apps.core import integration_views
 from apps.core.documents import create_document
 from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
 from apps.core.integration_providers import (
@@ -39,19 +38,14 @@ from apps.core.models import (
     IntegrationObservation,
     IntegrationSyncJob,
     NetBoxReference,
-    NetworkIPAddress,
-    NetworkMACAddress,
-    NetworkRack,
     NetworkSubnet,
-    NetworkVLAN,
     OrganizationKind,
     workspace_for_owner,
 )
+from apps.core.netbox_publication import preview_netbox_publication, publish_netbox_proposal
 from apps.core.network_addressing import create_subnet
 from apps.core.organizations import create_organization
-from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
-from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.workspaces import resolve_organization_workspace
 
 
@@ -97,6 +91,19 @@ def organization(installation, name):  # type: ignore[no-untyped-def]
         website="https://example.invalid",
         classifications=[OrganizationKind.CLIENT],
     )
+
+
+@pytest.mark.django_db
+def test_network_cleanup_rehearsal_is_report_only_by_default(installation):
+    record = organization(installation, "Cleanup rehearsal client")
+    output = io.StringIO()
+
+    call_command("rehearse_network_model_cleanup", organization=str(record.entity_id), stdout=output)
+
+    report = json.loads(output.getvalue())
+    assert report["workspace"] == str(record.entity_id)
+    assert report["applied"] is False
+    assert report["blockers"] == []
 
 
 def connection(  # type: ignore[no-untyped-def]
@@ -205,94 +212,67 @@ def test_netbox_provider_tolerates_a_preexisting_site_root_connection(installati
     page = NetBoxProvider(fetcher=fetcher).fetch_page(source, secret=TEST_PROVIDER_TOKEN, cursor="")
 
     assert request["base_url"] == "https://netbox.example.com/api/"
-    assert request["relative_path"] == "dcim/racks/"
+    assert request["relative_path"] == "ipam/prefixes/"
     assert page.next_cursor == "1|dcim/devices/"
 
 
 @pytest.mark.django_db
-def test_netbox_provider_projects_prefix_for_review_without_nested_provider_data(installation):
-    record = organization(installation, "Prefix projection client")
+def test_netbox_provider_retains_only_supported_prefix_and_device_facts(installation):
+    record = organization(installation, "Projection client")
     source = connection(installation, record)
-
-    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
-        return {
+    pages = {
+        "ipam/prefixes/": {
             "results": [
                 {
                     "id": 41,
-                    "display": "10.42.0.0/24",
                     "prefix": "10.42.0.0/24",
-                    "tenant": {"id": 9, "name": "Private provider tenant"},
+                    "description": "Users",
+                    "vlan": {"id": 3, "vid": 120},
+                    "tenant": {"id": 9, "name": "Private"},
                 }
             ],
             "next": None,
-        }
-
-    page = NetBoxProvider(fetcher=fetcher).fetch_page(
-        source, secret=TEST_PROVIDER_TOKEN, cursor="4|ipam/prefixes/"
-    )
-
-    assert page.observations[0].safe_projection == {
-        "id": 41,
-        "display": "10.42.0.0/24",
-        "prefix": "10.42.0.0/24",
-    }
-
-
-@pytest.mark.django_db
-def test_netbox_provider_projects_ip_address_for_review_without_nested_provider_data(installation):
-    record = organization(installation, "Address projection client")
-    source = connection(installation, record)
-
-    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
-        return {
+        },
+        "dcim/devices/": {
             "results": [
                 {
                     "id": 51,
-                    "display": "10.42.0.10/24",
-                    "address": "10.42.0.10/24",
-                    "tenant": {"id": 9, "name": "Private provider tenant"},
+                    "name": "arrakis",
+                    "serial": "SERIAL-1",
+                    "status": {"value": "active"},
+                    "role": {"slug": "switch"},
+                    "device_type": {"model": "C9300", "u_height": 1, "manufacturer": {"name": "Cisco"}},
+                    "rack": {"name": "Core rack"},
+                    "position": 12.0,
+                    "tenant": {"id": 9},
                 }
             ],
             "next": None,
-        }
-
-    page = NetBoxProvider(fetcher=fetcher).fetch_page(
-        source, secret=TEST_PROVIDER_TOKEN, cursor="5|ipam/ip-addresses/"
-    )
-
-    assert page.observations[0].safe_projection == {
-        "id": 51,
-        "display": "10.42.0.10/24",
-        "address": "10.42.0.10/24",
+        },
     }
 
+    def fetcher(**kwargs):  # type: ignore[no-untyped-def]
+        return pages[kwargs["relative_path"]]
 
-@pytest.mark.django_db
-def test_netbox_provider_projects_mac_address_for_review_without_nested_provider_data(installation):
-    record = organization(installation, "MAC projection client")
-    source = connection(installation, record)
-
-    def fetcher(**_kwargs):  # type: ignore[no-untyped-def]
-        return {
-            "results": [
-                {
-                    "id": 61,
-                    "display": "00:11:22:33:44:55",
-                    "mac_address": "00:11:22:33:44:55",
-                    "assigned_object": {"id": 17, "name": "eth0"},
-                }
-            ],
-            "next": None,
-        }
-
-    page = NetBoxProvider(fetcher=fetcher).fetch_page(
-        source, secret=TEST_PROVIDER_TOKEN, cursor="2|dcim/mac-addresses/"
-    )
-
-    assert page.observations[0].safe_projection == {
-        "id": 61,
-        "display": "00:11:22:33:44:55",
-        "mac_address": "00:11:22:33:44:55",
+    prefix = NetBoxProvider(fetcher=fetcher).fetch_page(source, secret=TEST_PROVIDER_TOKEN, cursor="")
+    device = NetBoxProvider(fetcher=fetcher).fetch_page(source, secret=TEST_PROVIDER_TOKEN, cursor=prefix.next_cursor)
+    assert prefix.observations[0].safe_projection == {
+        "id": 41,
+        "prefix": "10.42.0.0/24",
+        "description": "Users",
+        "vlan_id": 120,
+    }
+    assert device.observations[0].safe_projection == {
+        "id": 51,
+        "name": "arrakis",
+        "serial": "SERIAL-1",
+        "status": "active",
+        "role": "switch",
+        "model": "C9300",
+        "manufacturer": "Cisco",
+        "rack": "Core rack",
+        "position": 12.0,
+        "height": 1,
     }
 
 
@@ -548,6 +528,63 @@ def test_conflict_api_filters_open_review_queue_before_paging(installation):
     assert searched.json()["results"][0]["id"] == str(expected.id)
 
 
+@pytest.mark.django_db
+def test_netbox_review_links_only_a_compatible_existing_supported_record(installation):
+    record = organization(installation, "Link-only review client")
+    source = connection(installation, record, name="Link source")
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="link-only:prefix")
+    observation = IntegrationObservation.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        job=job,
+        remote_type="ipam.prefix",
+        remote_id="41",
+        fingerprint="d" * 64,
+        safe_projection={"prefix": "10.42.0.0/24"},
+    )
+    conflict = IntegrationConflict.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        connection=source,
+        observation=observation,
+        remote_type="ipam.prefix",
+        remote_id="41",
+        difference="unmatched",
+        remote_fingerprint=observation.fingerprint,
+    )
+    subnet = create_subnet(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Users",
+        cidr="10.42.0.0/24",
+        vrf_entity_id=None,
+        vlan_entity_id=None,
+        description="",
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-integration-netbox-adopt",
+        kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
+    )
+
+    rejected = browser.post(
+        url,
+        data=json.dumps({"prefix": {"name": "Duplicate", "cidr": "10.42.0.0/24"}}),
+        content_type="application/json",
+    )
+    assert rejected.status_code == 400
+    assert NetworkSubnet.objects.filter(organization=record).count() == 1
+
+    linked = browser.post(url, data=json.dumps({"entity_id": str(subnet.entity_id)}), content_type="application/json")
+    assert linked.status_code == 200
+    assert linked.json()["status"] == "accept_remote"
+    assert NetBoxReference.objects.get(entity_id=subnet.entity_id).object_id == 41
+
+
 @pytest.mark.django_db(transaction=True)
 def test_database_rejects_a_cross_workspace_job_connection(installation):
     first = organization(installation, "Job owner")
@@ -573,9 +610,9 @@ class SuccessfulAdapter:
         assert secret == TEST_PROVIDER_TOKEN
         assert cursor == ""
         return ProviderPage(
-            observations=(ProviderObservation("ipam.vlan", "42", "a" * 64),),
+            observations=(ProviderObservation("ipam.prefix", "42", "a" * 64, {"id": 42, "prefix": "10.42.0.0/24"}),),
             next_cursor="",
-            complete_types=("ipam.vlan",),
+            complete_types=("ipam.prefix",),
         )
 
 
@@ -597,7 +634,7 @@ def test_provider_catalog_is_a_complete_versioned_contract():
     contract = provider_catalog()[0]
     assert contract["key"] == "netbox"
     assert contract["version"] == "1.0"
-    assert contract["direction"] == "read_only"
+    assert contract["direction"] == "read_write_reviewed"
     assert contract["pagination"] == "opaque_cursor"
     assert contract["observation_schema_version"] == 1
     assert contract["credential_fields"] == [
@@ -607,7 +644,7 @@ def test_provider_catalog_is_a_complete_versioned_contract():
             "secret": True,
             "minimum_length": 8,
             "input_type": "password",
-                "help_text": "Paste the complete token. NetBox v2 tokens start with nbt_ and include a period.",
+            "help_text": "Paste the complete token. NetBox v2 tokens start with nbt_ and include a period.",
         }
     ]
 
@@ -620,13 +657,13 @@ def test_duplicate_provider_objects_are_idempotent_and_safe(installation):
 
     class DuplicateAdapter(SuccessfulAdapter):
         def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
-            item = ProviderObservation("ipam.vlan", "42", "a" * 64, {"id": 42, "name": "Users"})
+            item = ProviderObservation("ipam.prefix", "42", "a" * 64, {"id": 42, "prefix": "10.42.0.0/24"})
             return ProviderPage((item, item), "")
 
     completed = process_sync_job(job_id=job.id, adapter=DuplicateAdapter())
     observation = IntegrationObservation.objects.get(job=completed)
     assert completed.state == IntegrationJobState.SUCCEEDED
-    assert observation.safe_projection == {"id": 42, "name": "Users"}
+    assert observation.safe_projection == {"id": 42, "prefix": "10.42.0.0/24"}
     assert observation.schema_version == 1
     assert source.__class__.objects.get(pk=source.pk).health_status == "healthy"
 
@@ -655,11 +692,12 @@ def test_sync_job_is_idempotent_value_minimized_and_retryable(installation):
     assert completed.state == IntegrationJobState.SUCCEEDED
     observation = IntegrationObservation.objects.get(job=completed)
     assert (observation.remote_type, observation.remote_id, observation.fingerprint) == (
-        "ipam.vlan",
+        "ipam.prefix",
         "42",
         "a" * 64,
     )
-    assert IntegrationConflict.objects.get().difference == "unmatched"
+    assert NetworkSubnet.objects.filter(cidr="10.42.0.0/24").exists()
+    assert not IntegrationConflict.objects.exists()
     assert set(IntegrationLogEvent.objects.values_list("code", flat=True)) == {
         "sync_started",
         "sync_page_succeeded",
@@ -674,89 +712,9 @@ def test_sync_job_is_idempotent_value_minimized_and_retryable(installation):
 
 
 @pytest.mark.django_db
-def test_unmatched_netbox_rack_can_create_and_link_a_starting_record(installation):
-    record = organization(installation, "Blank NetBox client")
+def test_netbox_sync_automatically_creates_asset_backed_device(installation):
+    record = organization(installation, "Automatic device client")
     source = connection(installation, record)
-    site = create_site(
-        tenant=installation.tenant,
-        organization=record,
-        actor_id=installation.owner.id,
-        name="Main office",
-        code="MAIN",
-        address_line_1="",
-        address_line_2="",
-        city="",
-        region="",
-        postal_code="",
-        country_code="US",
-        timezone="America/Chicago",
-        phone="",
-    )
-
-    class RackAdapter:
-        key = "netbox"
-        label = NetBoxProvider.label
-        contract = PROVIDERS["netbox"].contract
-
-        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
-            return ProviderPage(
-                observations=(ProviderObservation("dcim.rack", "17", "b" * 64, {"id": 17, "name": "Core rack"}),),
-                next_cursor="",
-                complete_types=("dcim.rack",),
-            )
-
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="rack:starting-record").id,
-        adapter=RackAdapter(),
-    )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    response = browser.post(
-        reverse(
-            "organization-integration-netbox-adopt",
-            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-        ),
-        data=json.dumps(
-            {
-                "rack": {
-                    "name": "Core rack",
-                    "site_id": str(site.entity_id),
-                    "location_id": None,
-                    "unit_count": 42,
-                    "status": "active",
-                }
-            }
-        ),
-        content_type="application/json",
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
-    rack = NetworkRack.objects.get(entity__display_name="Core rack")
-    reference = NetBoxReference.objects.get(entity=rack.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "dcim.rack",
-        17,
-        "b" * 64,
-    )
-    assert reference.last_observed_at is not None
-    observations = browser.get(
-        reverse(
-            "organization-integration-observation-list",
-            kwargs={"organization_entity_id": record.entity_id},
-        )
-    ).json()["results"]
-    assert observations[0]["linked_local_entity_id"] == str(rack.entity_id)
-    assert observations[0]["linked_local_entity_name"] == "Core rack"
-    assert observations[0]["accepted"] is True
-
-
-@pytest.mark.django_db
-def test_unmatched_netbox_device_can_create_and_link_a_hardware_asset(installation, monkeypatch):
-    record = organization(installation, "Blank device client")
-    source = connection(installation, record)
-    seed = create_network_hardware_asset(installation=installation, organization=record, name="Seed hardware")
 
     class DeviceAdapter:
         key = "netbox"
@@ -765,287 +723,132 @@ def test_unmatched_netbox_device_can_create_and_link_a_hardware_asset(installati
 
         def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
             return ProviderPage(
-                observations=(ProviderObservation("dcim.device", "23", "d" * 64, {"id": 23, "name": "arrakis"}),),
+                observations=(
+                    ProviderObservation(
+                        "dcim.device",
+                        "23",
+                        "d" * 64,
+                        {
+                            "id": 23,
+                            "name": "arrakis",
+                            "serial": "ARR-1",
+                            "manufacturer": "Cisco",
+                            "model": "C9300",
+                            "role": "switch",
+                            "status": "active",
+                            "rack": "Core rack",
+                            "position": 12.0,
+                            "height": 1,
+                        },
+                    ),
+                ),
                 next_cursor="",
                 complete_types=("dcim.device",),
             )
 
     completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="device:starting-record").id,
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="device:auto").id,
         adapter=DeviceAdapter(),
     )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    url = reverse(
-        "organization-integration-netbox-adopt",
-        kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-    )
-    body = json.dumps({"asset": {"name": "arrakis", "model_id": str(seed.model.entity_id)}})
-    original_require_permission = integration_views.require_permission
-
-    def deny_asset_edit(user, permission, **kwargs):  # type: ignore[no-untyped-def]
-        if permission == PermissionKey.ASSETS_EDIT:
-            raise PermissionDenied("Asset editing denied.")
-        return original_require_permission(user, permission, **kwargs)
-
-    monkeypatch.setattr(integration_views, "require_permission", deny_asset_edit)
-    denied = browser.post(url, data=body, content_type="application/json")
-    assert denied.status_code == 403
-    assert not ClientAsset.objects.filter(entity__display_name="arrakis").exists()
-
-    monkeypatch.setattr(integration_views, "require_permission", original_require_permission)
-    response = browser.post(url, data=body, content_type="application/json")
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
     asset = ClientAsset.objects.get(entity__display_name="arrakis")
-    assert asset.hardware.lifecycle_state == "in_stock"
-    reference = NetBoxReference.objects.get(entity=asset.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "dcim.device",
-        23,
-        "d" * 64,
-    )
+    device = asset.network_device
+    assert asset.hardware.serial_number == "ARR-1"
+    assert asset.model.model_number == "C9300"
+    assert (
+        device.role,
+        device.status,
+        device.source_rack_name,
+        device.source_rack_position,
+        device.source_rack_units,
+    ) == ("switch", "active", "Core rack", 12, 1)
+    assert NetBoxReference.objects.get(entity=asset.entity).object_id == 23
+    assert IntegrationObservation.objects.filter(job=completed).count() == 1
+    assert not IntegrationConflict.objects.exists()
 
 
 @pytest.mark.django_db
-def test_unmatched_netbox_vlan_can_create_and_link_a_vlan(installation):
-    record = organization(installation, "Blank VLAN client")
-    source = connection(installation, record)
-
-    class VLANAdapter:
-        key = "netbox"
-        label = NetBoxProvider.label
-        contract = PROVIDERS["netbox"].contract
-
-        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
-            return ProviderPage(
-                observations=(ProviderObservation("ipam.vlan", "31", "e" * 64, {"id": 31, "name": "Users"}),),
-                next_cursor="",
-                complete_types=("ipam.vlan",),
-            )
-
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="vlan:starting-record").id,
-        adapter=VLANAdapter(),
+def test_unifi_network_publication_requires_exact_reviewed_current_proposal(installation):
+    record = organization(installation, "Publication client")
+    target = connection(installation, record)
+    target.write_secret_envelope = encrypt_integration_secret(
+        secret=b"separate-write-token",
+        tenant_id=installation.tenant.id,
+        connection_id=target.id,
+        generation=1,
     )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    response = browser.post(
-        reverse(
-            "organization-integration-netbox-adopt",
-            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-        ),
-        data=json.dumps({"vlan": {"name": "Users", "vlan_id": 120, "description": "User access network"}}),
-        content_type="application/json",
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
-    vlan = NetworkVLAN.objects.get(entity__display_name="Users")
-    assert (vlan.vlan_id, vlan.description) == (120, "User access network")
-    reference = NetBoxReference.objects.get(entity=vlan.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "ipam.vlan",
-        31,
-        "e" * 64,
-    )
-
-
-@pytest.mark.django_db
-def test_unmatched_netbox_prefix_can_create_and_link_a_subnet(installation):
-    record = organization(installation, "Blank prefix client")
-    source = connection(installation, record)
-
-    class PrefixAdapter:
-        key = "netbox"
-        label = NetBoxProvider.label
-        contract = PROVIDERS["netbox"].contract
-
-        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
-            return ProviderPage(
-                observations=(
-                    ProviderObservation(
-                        "ipam.prefix", "41", "f" * 64, {"id": 41, "display": "10.42.0.0/24", "prefix": "10.42.0.0/24"}
-                    ),
-                ),
-                next_cursor="",
-                complete_types=("ipam.prefix",),
-            )
-
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="prefix:starting-record").id,
-        adapter=PrefixAdapter(),
-    )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    response = browser.post(
-        reverse(
-            "organization-integration-netbox-adopt",
-            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-        ),
-        data=json.dumps(
-            {"prefix": {"name": "User network", "cidr": "10.42.0.0/24", "description": "Imported from NetBox"}}
-        ),
-        content_type="application/json",
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
-    subnet = NetworkSubnet.objects.get(entity__display_name="User network")
-    assert (subnet.cidr, subnet.address_family, subnet.description) == (
-        "10.42.0.0/24",
-        4,
-        "Imported from NetBox",
-    )
-    reference = NetBoxReference.objects.get(entity=subnet.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "ipam.prefix",
-        41,
-        "f" * 64,
-    )
-
-
-@pytest.mark.django_db
-def test_unmatched_netbox_ip_address_can_create_and_link_an_address(installation):
-    record = organization(installation, "Blank address client")
-    source = connection(installation, record)
-    subnet = create_subnet(
+    target.save(update_fields=("write_secret_envelope", "updated_at"))
+    source_id = uuid.uuid4()
+    source = IntegrationConnection.objects.create(
+        id=source_id,
         tenant=installation.tenant,
+        workspace=target.workspace,
         organization=record,
+        provider="unifi",
+        name="UniFi source",
+        base_url="https://unifi.example.com/proxy/network/integration/",
+        configuration={},
+        secret_envelope=encrypt_integration_secret(
+            secret=b'{"api_key":"unifi-test-key"}',
+            tenant_id=installation.tenant.id,
+            connection_id=source_id,
+            generation=1,
+        ),
+        created_by=installation.owner,
+    )
+    job = IntegrationSyncJob.objects.create(
+        tenant=installation.tenant,
+        workspace=target.workspace,
+        organization=record,
+        connection=source,
+        idempotency_key="publication:source",
+        trigger="manual",
+    )
+    observation = IntegrationObservation.objects.create(
+        tenant=installation.tenant,
+        workspace=target.workspace,
+        organization=record,
+        job=job,
+        remote_type="unifi.network",
+        remote_id="network-1",
+        fingerprint="a" * 64,
+        safe_projection={"name": "Users", "cidr": "10.42.0.0/24"},
+    )
+    workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
+    current = {"results": []}
+    proposal = preview_netbox_publication(
+        workspace=workspace,
+        source_observation_id=observation.id,
+        connection_id=target.id,
+        fetcher=lambda **_kwargs: current,
+    )
+    assert proposal["action"] == "create"
+    assert proposal["fields"]["prefix"] == "10.42.0.0/24"
+
+    sent = []
+    result = publish_netbox_proposal(
+        workspace=workspace,
         actor_id=installation.owner.id,
-        name="User network",
-        cidr="10.42.0.0/24",
-        vrf_entity_id=None,
-        vlan_entity_id=None,
-        description="",
+        source_observation_id=observation.id,
+        connection_id=target.id,
+        proposal_digest=str(proposal["proposal_digest"]),
+        fetcher=lambda **_kwargs: current,
+        sender=lambda **kwargs: sent.append(kwargs) or {"id": 99},
     )
+    assert result["status"] == "published"
+    assert sent[0]["method"] == "POST"
+    assert sent[0]["authorization"] == "Token separate-write-token"
 
-    class IPAddressAdapter:
-        key = "netbox"
-        label = NetBoxProvider.label
-        contract = PROVIDERS["netbox"].contract
-
-        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
-            return ProviderPage(
-                observations=(
-                    ProviderObservation(
-                        "ipam.ipaddress",
-                        "51",
-                        "9" * 64,
-                        {"id": 51, "display": "10.42.0.10/24", "address": "10.42.0.10/24"},
-                    ),
-                ),
-                next_cursor="",
-                complete_types=("ipam.ipaddress",),
-            )
-
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="address:starting-record").id,
-        adapter=IPAddressAdapter(),
-    )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    response = browser.post(
-        reverse(
-            "organization-integration-netbox-adopt",
-            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-        ),
-        data=json.dumps(
-            {
-                "ip_address": {
-                    "address": "10.42.0.10",
-                    "subnet_id": str(subnet.entity_id),
-                    "status": "reserved",
-                    "dns_name": "printer.example.invalid",
-                    "description": "Imported from NetBox",
-                }
-            }
-        ),
-        content_type="application/json",
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
-    address = NetworkIPAddress.objects.get(address="10.42.0.10")
-    assert (address.subnet_id, address.status, address.dns_name, address.description) == (
-        subnet.id,
-        "reserved",
-        "printer.example.invalid",
-        "Imported from NetBox",
-    )
-    reference = NetBoxReference.objects.get(entity=address.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "ipam.ipaddress",
-        51,
-        "9" * 64,
-    )
-
-
-@pytest.mark.django_db
-def test_unmatched_netbox_mac_address_can_create_and_link_an_address(installation):
-    record = organization(installation, "Blank MAC client")
-    source = connection(installation, record)
-
-    class MACAddressAdapter:
-        key = "netbox"
-        label = NetBoxProvider.label
-        contract = PROVIDERS["netbox"].contract
-
-        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
-            return ProviderPage(
-                observations=(
-                    ProviderObservation(
-                        "dcim.macaddress",
-                        "61",
-                        "8" * 64,
-                        {
-                            "id": 61,
-                            "display": "00:11:22:33:44:55",
-                            "mac_address": "00:11:22:33:44:55",
-                        },
-                    ),
-                ),
-                next_cursor="",
-                complete_types=("dcim.macaddress",),
-            )
-
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="mac:starting-record").id,
-        adapter=MACAddressAdapter(),
-    )
-    conflict = IntegrationConflict.objects.get(observation__job=completed)
-    browser = Client()
-    browser.force_login(installation.owner)
-    response = browser.post(
-        reverse(
-            "organization-integration-netbox-adopt",
-            kwargs={"organization_entity_id": record.entity_id, "conflict_id": conflict.id},
-        ),
-        data=json.dumps(
-            {"mac_address": {"address": "00:11:22:33:44:55", "description": "Imported from NetBox"}}
-        ),
-        content_type="application/json",
-    )
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "accept_remote"
-    address = NetworkMACAddress.objects.get(address="00:11:22:33:44:55")
-    assert (address.interface_id, address.hardware_asset_id, address.description) == (
-        None,
-        None,
-        "Imported from NetBox",
-    )
-    reference = NetBoxReference.objects.get(entity=address.entity)
-    assert (reference.object_type, reference.object_id, reference.observed_fingerprint) == (
-        "dcim.macaddress",
-        61,
-        "8" * 64,
-    )
+    current = {"results": [{"id": 99, "prefix": "10.42.0.0/24"}]}
+    with pytest.raises(ValidationError, match="Review a fresh proposal"):
+        publish_netbox_proposal(
+            workspace=workspace,
+            actor_id=installation.owner.id,
+            source_observation_id=observation.id,
+            connection_id=target.id,
+            proposal_digest=str(proposal["proposal_digest"]),
+            fetcher=lambda **_kwargs: current,
+            sender=lambda **_kwargs: {"id": 99},
+        )
 
 
 @pytest.mark.django_db

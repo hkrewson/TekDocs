@@ -149,6 +149,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route("msp-integration-connection-detail", ("PATCH",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
     route("msp-integration-connection-rotate", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-integration-netbox-write-credential", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-integration-netbox-publication-preview", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-integration-netbox-publication-publish", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
     route(
         "msp-integration-job-list-create",
         ("GET", "POST"),
@@ -160,6 +163,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-integration-observation-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route("msp-integration-conflict-list", ("GET",), PermissionKey.INTEGRATIONS_VIEW),
     route("msp-integration-conflict-resolve", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
+    route("msp-integration-netbox-adopt", ("POST",), mutations=(PermissionKey.INTEGRATIONS_MANAGE,)),
     route(
         "msp-git-export-list-create",
         ("GET", "POST"),
@@ -728,6 +732,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         (PermissionKey.ASSETS_EDIT,),
     ),
     route("msp-asset-mac-address-detail", ("PATCH",), mutations=(PermissionKey.ASSETS_EDIT,)),
+    route("msp-asset-ip-addresses", ("GET", "POST"), PermissionKey.ASSETS_VIEW, (PermissionKey.ASSETS_EDIT,)),
+    route("msp-asset-ip-address-detail", ("PATCH",), mutations=(PermissionKey.ASSETS_EDIT,)),
+    route("msp-asset-network-choices", ("GET",), PermissionKey.ASSETS_VIEW),
     route("msp-networks", ("GET", "POST"), PermissionKey.NETWORKS_VIEW, (PermissionKey.NETWORKS_EDIT,)),
     route(
         "msp-network-detail", ("GET", "PATCH"), PermissionKey.NETWORKS_VIEW, mutations=(PermissionKey.NETWORKS_EDIT,)
@@ -875,6 +882,20 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.ASSETS_EDIT,),
         organization_scoped=True,
     ),
+    route(
+        "organization-asset-ip-addresses",
+        ("GET", "POST"),
+        PermissionKey.ASSETS_VIEW,
+        (PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-asset-ip-address-detail",
+        ("PATCH",),
+        mutations=(PermissionKey.ASSETS_EDIT,),
+        organization_scoped=True,
+    ),
+    route("organization-asset-network-choices", ("GET",), PermissionKey.ASSETS_VIEW, organization_scoped=True),
     route(
         "organization-client-hardware-detail",
         ("GET", "PATCH"),
@@ -1738,6 +1759,30 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-integration-connection-rotate",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-integration-netbox-write-credential",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-integration-netbox-publication-preview",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-integration-netbox-publication-publish",
+        ("POST",),
+        mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-integration-netbox-adopt",
         ("POST",),
         mutations=(PermissionKey.INTEGRATIONS_MANAGE,),
         organization_scoped=True,

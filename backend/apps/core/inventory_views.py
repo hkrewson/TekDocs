@@ -55,10 +55,19 @@ from .models import (
     HardwareAcquisitionMethod,
     HardwareDisposalMethod,
     HardwareLifecycleState,
+    NetworkIPAddress,
+    NetworkIPAddressStatus,
     NetworkMACAddress,
+    NetworkSubnet,
     Organization,
 )
-from .network_endpoints import NetworkEndpointError, create_mac_address, update_mac_address
+from .network_endpoints import (
+    NetworkEndpointError,
+    create_ip_address,
+    create_mac_address,
+    update_ip_address,
+    update_mac_address,
+)
 from .publications import PublicationConflict, read_publication_artifact, verify_publication
 from .software_inventory import SoftwareInventoryError
 from .workspaces import ResolvedWorkspace, resolve_msp_workspace, resolve_organization_workspace
@@ -327,6 +336,7 @@ class ClientAssetSerializer(serializers.Serializer):
     documents = AssetDocumentSummarySerializer(source="document_provenance", many=True)
     hardware = HardwareProfileSerializer(allow_null=True)
     mac_addresses = serializers.SerializerMethodField()
+    ip_addresses = serializers.SerializerMethodField()
     software_installation = SoftwareInstallationSummarySerializer(allow_null=True)
     created_at = serializers.DateTimeField()
 
@@ -335,6 +345,21 @@ class ClientAssetSerializer(serializers.Serializer):
         return [
             {"id": item.entity_id, "address": item.address.upper(), "description": item.description}
             for item in asset.network_mac_addresses.all()
+        ]
+
+    @extend_schema_field(serializers.ListField(child=serializers.DictField()))
+    def get_ip_addresses(self, asset: ClientAsset) -> list[dict[str, object]]:
+        return [
+            {
+                "id": item.entity_id,
+                "address": item.address,
+                "subnet_id": item.subnet.entity_id,
+                "subnet_cidr": item.subnet.cidr,
+                "status": item.status,
+                "dns_name": item.dns_name,
+                "description": item.description,
+            }
+            for item in asset.network_ip_addresses.all()
         ]
 
 
@@ -357,6 +382,30 @@ class AssetMACAddressSerializer(serializers.Serializer):
     @extend_schema_field(serializers.CharField())
     def get_address(self, record: NetworkMACAddress) -> str:
         return record.address.upper()
+
+
+class AssetIPAddressWriteSerializer(StrictSerializer):
+    address = serializers.CharField(max_length=45, trim_whitespace=True)
+    subnet_id = serializers.UUIDField(source="subnet_entity_id", required=False)
+    status = serializers.ChoiceField(choices=NetworkIPAddressStatus.values, required=False)
+    dns_name = serializers.CharField(max_length=253, allow_blank=True, required=False)
+    description = serializers.CharField(max_length=4000, allow_blank=True, required=False)
+
+
+class AssetIPAddressSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    address = serializers.CharField()
+    subnet_id = serializers.UUIDField(source="subnet.entity_id")
+    subnet_cidr = serializers.CharField(source="subnet.cidr")
+    status = serializers.CharField()
+    dns_name = serializers.CharField()
+    description = serializers.CharField()
+
+
+class AssetNetworkChoiceSerializer(serializers.Serializer):
+    id = serializers.UUIDField(source="entity_id")
+    cidr = serializers.CharField()
+    name = serializers.CharField(source="entity.display_name")
 
 
 class ClientAssetResultSerializer(serializers.Serializer):
@@ -601,6 +650,85 @@ class ClientAssetMACAddressDetailView(APIView):
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(AssetMACAddressSerializer(updated).data)
+
+
+class ClientAssetIPAddressListCreateView(APIView):
+    @extend_schema(responses={200: AssetIPAddressSerializer(many=True)})
+    def get(self, request, organization_entity_id=None, asset_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        asset = _asset(workspace, asset_entity_id)
+        if asset.product.kind != "hardware":
+            raise serializers.ValidationError({"detail": "IP addresses are available only for physical assets."})
+        records = asset.network_ip_addresses.select_related("entity", "subnet", "subnet__entity")
+        return Response(AssetIPAddressSerializer(records, many=True).data)
+
+    @extend_schema(request=AssetIPAddressWriteSerializer, responses={201: AssetIPAddressSerializer})
+    def post(self, request, organization_entity_id=None, asset_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        asset = _asset(workspace, asset_entity_id)
+        if asset.product.kind != "hardware":
+            raise serializers.ValidationError({"detail": "IP addresses are available only for physical assets."})
+        serializer = AssetIPAddressWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if "subnet_entity_id" not in serializer.validated_data:
+            raise serializers.ValidationError({"subnet_id": "Choose a network."})
+        values = {
+            "status": NetworkIPAddressStatus.ACTIVE,
+            "dns_name": "",
+            "description": "",
+            **serializer.validated_data,
+        }
+        try:
+            record = create_ip_address(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                actor_id=request.user.pk,
+                interface_entity_id=None,
+                hardware_asset_entity_id=asset.entity_id,
+                **values,
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(AssetIPAddressSerializer(record).data, status=201)
+
+
+class ClientAssetIPAddressDetailView(APIView):
+    @extend_schema(request=AssetIPAddressWriteSerializer, responses={200: AssetIPAddressSerializer})
+    def patch(self, request, organization_entity_id=None, asset_entity_id=None, ip_address_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_EDIT)
+        asset = _asset(workspace, asset_entity_id)
+        try:
+            record = asset.network_ip_addresses.select_related("entity", "subnet", "subnet__entity").get(
+                entity_id=ip_address_entity_id
+            )
+        except NetworkIPAddress.DoesNotExist as exc:
+            raise PermissionDenied("The selected IP address is unavailable for this asset.") from exc
+        serializer = AssetIPAddressWriteSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        try:
+            updated = update_ip_address(
+                record=record,
+                actor_id=request.user.pk,
+                values={**serializer.validated_data, "hardware_asset_entity_id": asset.entity_id},
+            )
+        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(AssetIPAddressSerializer(updated).data)
+
+
+class ClientAssetNetworkChoicesView(APIView):
+    @extend_schema(responses={200: AssetNetworkChoiceSerializer(many=True)})
+    def get(self, request, organization_entity_id=None, asset_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
+        asset = _asset(workspace, asset_entity_id)
+        if asset.product.kind != "hardware":
+            raise serializers.ValidationError({"detail": "Networks are available only for physical assets."})
+        records = (
+            NetworkSubnet.scoped.for_scope(workspace.data_scope)
+            .select_related("entity")
+            .order_by("address_family", "cidr", "entity_id")[:500]
+        )
+        return Response(AssetNetworkChoiceSerializer(records, many=True).data)
 
 
 class ClientHardwareDetailView(APIView):

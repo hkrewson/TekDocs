@@ -79,12 +79,8 @@ class ProviderAdapter(Protocol):
 
 
 NETBOX_ENDPOINTS = (
-    (NetBoxObjectType.RACK, "dcim/racks/"),
-    (NetBoxObjectType.DEVICE, "dcim/devices/"),
-    (NetBoxObjectType.MAC_ADDRESS, "dcim/mac-addresses/"),
-    (NetBoxObjectType.VLAN, "ipam/vlans/"),
     (NetBoxObjectType.PREFIX, "ipam/prefixes/"),
-    (NetBoxObjectType.IP_ADDRESS, "ipam/ip-addresses/"),
+    (NetBoxObjectType.DEVICE, "dcim/devices/"),
 )
 
 
@@ -117,7 +113,7 @@ class NetBoxProvider:
         key=key,
         label=label,
         version="1.0",
-        direction="read_only",
+        direction="read_write_reviewed",
         credential_fields=(
             CredentialField(
                 "api_token",
@@ -125,7 +121,7 @@ class NetBoxProvider:
                 help_text="Paste the complete token. NetBox v2 tokens start with nbt_ and include a period.",
             ),
         ),
-        capabilities=("inventory_observations", "reconciliation"),
+        capabilities=("network_inventory", "automatic_asset_projection", "reviewed_publication"),
         object_types=tuple(str(item[0]) for item in NETBOX_ENDPOINTS),
         pagination="opaque_cursor",
         minimum_sync_interval_minutes=5,
@@ -154,12 +150,9 @@ class NetBoxProvider:
         for record in results:
             if not isinstance(record, dict) or not isinstance(record.get("id"), int):
                 raise ValueError("provider_response_invalid")
-            # The digest covers the provider record, but only the digest and identity leave this boundary.
-            projection = {
-                key: record[key]
-                for key in ("id", "name", "display", "url", "prefix", "address", "mac_address")
-                if key in record and isinstance(record[key], str | int | float | bool | type(None))
-            }
+            # Keep only the facts used by the TekDocs Networks and Assets projections.
+            # The full provider response contributes to the digest but never crosses this boundary.
+            projection = _netbox_projection(str(remote_type), record)
             observations.append(
                 ProviderObservation(str(remote_type), str(record["id"]), _fingerprint(record), projection)
             )
@@ -175,6 +168,38 @@ class NetBoxProvider:
             next_cursor = ""
         complete = (str(remote_type),) if not next_value else ()
         return ProviderPage(tuple(observations), next_cursor, complete)
+
+
+def _netbox_choice(value: object, key: str) -> object:
+    return value.get(key) if isinstance(value, dict) else None
+
+
+def _netbox_projection(remote_type: str, record: dict[str, object]) -> dict[str, object]:
+    projection: dict[str, object] = {"id": record["id"]}
+    if remote_type == NetBoxObjectType.PREFIX:
+        projection.update(
+            {
+                "prefix": record.get("prefix"),
+                "description": record.get("description"),
+                "vlan_id": _netbox_choice(record.get("vlan"), "vid"),
+            }
+        )
+    elif remote_type == NetBoxObjectType.DEVICE:
+        device_type = record.get("device_type")
+        projection.update(
+            {
+                "name": record.get("name") or record.get("display"),
+                "serial": record.get("serial"),
+                "status": _netbox_choice(record.get("status"), "value"),
+                "role": _netbox_choice(record.get("role"), "slug") or _netbox_choice(record.get("device_role"), "slug"),
+                "model": _netbox_choice(device_type, "model"),
+                "manufacturer": _netbox_choice(_netbox_choice(device_type, "manufacturer"), "name"),
+                "rack": _netbox_choice(record.get("rack"), "name"),
+                "position": record.get("position"),
+                "height": _netbox_choice(device_type, "u_height"),
+            }
+        )
+    return {key: value for key, value in projection.items() if isinstance(value, str | int | float | bool | type(None))}
 
 
 UNIFI_OBJECT_TYPES = ("unifi.network", "unifi.device", "unifi.client", "unifi.wifi")
@@ -317,9 +342,7 @@ def _unifi_projection(remote_type: str, record: dict[str, object], *, site_id: s
         "network_id": network.get("networkId") if isinstance(network, dict) else None,
         "network_type": network.get("type") if isinstance(network, dict) else None,
         "security": security.get("type") if isinstance(security, dict) else None,
-        "frequencies_ghz": ", ".join(str(item) for item in frequencies)
-        if isinstance(frequencies, list)
-        else "",
+        "frequencies_ghz": ", ".join(str(item) for item in frequencies) if isinstance(frequencies, list) else "",
     }
 
 
@@ -1312,7 +1335,11 @@ def validate_provider_adapter(adapter: ProviderAdapter) -> None:
     contract = adapter.contract
     if adapter.key != contract.key or adapter.label != contract.label:
         raise ValueError("provider_contract_identity_invalid")
-    if contract.direction != "read_only" or not contract.version or not contract.object_types:
+    if (
+        contract.direction not in {"read_only", "read_write_reviewed"}
+        or not contract.version
+        or not contract.object_types
+    ):
         raise ValueError("provider_contract_invalid")
     if contract.pagination != "opaque_cursor":
         raise ValueError("provider_contract_pagination_invalid")

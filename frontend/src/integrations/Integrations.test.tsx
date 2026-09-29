@@ -29,7 +29,7 @@ function providerClient(): IntegrationsClient {
       { key: 'ninjaone', label: 'NinjaOne', version: '1.0', direction: 'read_only', credential_fields: [{ key: 'client_id', label: 'API application client ID', secret: false, minimum_length: 8, input_type: 'text', help_text: 'From Administration → Apps → API in NinjaOne.' }, { key: 'client_secret', label: 'API application client secret', secret: true, minimum_length: 8, input_type: 'password', help_text: 'Stored encrypted.' }], capabilities: ['rmm_observations', 'asset_reconciliation', 'software_observations'], object_types: ['organization', 'location', 'device_status', 'device', 'operating_system', 'health', 'software'], pagination: 'opaque_cursor', minimum_sync_interval_minutes: 15, maximum_sync_interval_minutes: 10080, health_states: ['unknown', 'healthy', 'degraded', 'failing', 'paused'], observation_schema_version: 1, default_base_url: 'https://app.ninjarmm.com/', base_url_editable: true, setup_help_url: 'https://www.ninjaone.com/docs/application-programming-interface-api/oauth-token-configuration/' },
     ]),
     listConnections: vi.fn().mockResolvedValue([]), createConnection: vi.fn(), updateConnection: vi.fn(),
-    rotateConnection: vi.fn(), startSync: vi.fn(),
+    rotateConnection: vi.fn(), configureNetBoxWriteCredential: vi.fn(), previewNetBoxPublication: vi.fn(), publishNetBoxProposal: vi.fn(), startSync: vi.fn(),
     listJobs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
     cancelJob: vi.fn(),
     listLogs: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false }),
@@ -196,20 +196,18 @@ describe('Integrations', () => {
     expect(screen.getByText(/No differences match these filters/i)).toBeInTheDocument()
   })
 
-  it('explains local-only matching and links a discovered NetBox record without retyping its identity', async () => {
+  it('links an ambiguous supported NetBox prefix to an existing TekDocs network', async () => {
     const provider = providerClient()
     const conflict: IntegrationConflict = {
-      id: 'conflict-unmatched', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 42, name: 'Rack 1' }, remote_type: 'dcim.rack', remote_id: '42', difference: 'unmatched',
+      id: 'conflict-prefix', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { prefix: '10.42.0.0/24' }, remote_type: 'ipam.prefix', remote_id: '41', difference: 'unmatched',
       status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
     }
-    vi.mocked(provider.listConflicts)
-      .mockResolvedValueOnce({ results: [conflict], page: 1, page_size: 50, count: 1, has_more: false })
-      .mockResolvedValue({ results: [], page: 1, page_size: 50, count: 0, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'rack-1', local_entity_name: 'Main rack', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
+    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'network-1', local_entity_name: '10.42.0.0/24', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
     const networks = {
       netBoxChoiceCollection: vi.fn().mockResolvedValue({
-        results: [{ id: 'rack-1', name: 'Main rack', entity_type: 'network_rack', object_type: 'dcim.rack', linked: false }],
+        results: [{ id: 'network-1', name: '10.42.0.0/24', entity_type: 'network_subnet', object_type: 'ipam.prefix', linked: false }],
         selected: null, page: 1, page_size: 25, count: 1, has_more: false, can_manage: true,
       }),
     } as unknown as NetworksClient
@@ -218,151 +216,60 @@ describe('Integrations', () => {
     setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
     await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
     expect(screen.getByRole('heading', { name: 'Link NetBox record' })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Link it to an existing TekDocs rack' })).toBeChecked()
-    expect(screen.getByText(/contains TekDocs records only/i)).toBeInTheDocument()
-    await user.click(await screen.findByRole('radio', { name: /Main rack/i }))
+    expect(screen.queryByText(/Create a TekDocs/i)).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('radio', { name: /10.42.0.0\/24/i }))
     await user.click(screen.getByRole('button', { name: 'Link record' }))
 
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'rack-1' }))
-    expect(screen.getByText(/No differences need review/i)).toBeInTheDocument()
+    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, { entity_id: 'network-1' }))
   })
 
-  it('creates and links an unmatched NetBox device after choosing its hardware model', async () => {
+  it('reviews the exact current UniFi proposal before publishing it to NetBox', async () => {
     const provider = providerClient()
-    const conflict: IntegrationConflict = {
-      id: 'conflict-arrakis', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 23, name: 'arrakis' }, remote_type: 'dcim.device', remote_id: '23', difference: 'unmatched',
-      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
+    const connection = {
+      id: 'connection-1', provider: 'netbox', name: 'Primary NetBox', base_url: 'https://netbox.example.com/api/',
+      provider_details: {}, credential_configured: true, write_credential_configured: true, secret_generation: 1,
+      active: true, sync_interval_minutes: 60, next_sync_at: '2026-08-12T01:00:00Z', health_status: 'healthy',
+      last_successful_sync_at: null, last_error_code: '', rate_limit_reset_at: null, reconciliation_counts: {},
+      created_at: '2026-08-12T00:00:00Z', updated_at: '2026-08-12T00:00:00Z',
+    } as IntegrationConnection
+    const observation = {
+      id: 'observation-1', connection_id: 'unifi-1', connection_name: 'Client UniFi', remote_type: 'unifi.network',
+      remote_id: 'network-1', safe_projection: { name: 'Users', cidr: '10.42.0.0/24' }, source_timestamp: null,
+      state: 'observed' as const, observed_at: '2026-08-12T00:00:00Z', linked_local_entity_id: 'network-1',
     }
-    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 50, count: 1, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'asset-arrakis', local_entity_name: 'arrakis', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    const networks = {
-      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
-    } as unknown as NetworksClient
-    const inventory = {
-      listModelChoices: vi.fn().mockResolvedValue({ results: [{ id: 'model-1', name: 'PowerEdge R650', model_number: 'R650', product_id: 'product-1', product_name: 'PowerEdge Server', kind: 'hardware', supplier_id: 'supplier-1', supplier_name: 'Dell', revision: 1, specification_version_id: 'spec-1', specifications: {} }] }),
-    } as unknown as InventoryClient
+    const proposal = {
+      source_observation_id: observation.id, source_type: observation.remote_type, connection_id: connection.id,
+      action: 'update' as const, endpoint: 'ipam/prefixes/41/', fields: { prefix: '10.42.0.0/24' },
+      target_fingerprint: 'a'.repeat(64), proposal_digest: 'b'.repeat(64),
+    }
+    vi.mocked(provider.listConnections).mockResolvedValue([connection])
+    vi.mocked(provider.listObservations).mockResolvedValue({ results: [observation], page: 1, page_size: 25, count: 1, has_more: false })
+    vi.mocked(provider.previewNetBoxPublication).mockResolvedValue(proposal)
+    vi.mocked(provider.publishNetBoxProposal).mockResolvedValue({ status: 'published', target_id: 41, proposal_digest: proposal.proposal_digest })
     const user = userEvent.setup()
 
-    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks, inventory)
-    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
-    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs hardware asset from this device' }))
-    await user.click(await screen.findByRole('radio', { name: /Dell · PowerEdge Server · PowerEdge R650/i }))
-    await user.click(screen.getByRole('button', { name: 'Create and link asset' }))
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=source')
+    await user.click(await screen.findByRole('button', { name: 'Review for NetBox' }))
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('ipam/prefixes/41/')
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('10.42.0.0/24')
+    await user.click(screen.getByRole('button', { name: 'Publish to NetBox' }))
 
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
-      asset: { name: 'arrakis', model_id: 'model-1' },
-    }))
+    await waitFor(() => expect(provider.publishNetBoxProposal).toHaveBeenCalledWith(workspace, proposal))
   })
 
-  it('creates and links an unmatched NetBox VLAN after the operator supplies its numeric ID', async () => {
+  it('does not offer legacy NetBox record families for linking or creation', async () => {
     const provider = providerClient()
     const conflict: IntegrationConflict = {
-      id: 'conflict-vlan', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 31, name: 'Users' }, remote_type: 'ipam.vlan', remote_id: '31', difference: 'unmatched',
-      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
-    }
-    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'vlan-users', local_entity_name: 'Users', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    const networks = {
-      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
-    } as unknown as NetworksClient
-    const user = userEvent.setup()
-
-    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
-    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
-    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs VLAN from this record' }))
-    await user.type(screen.getByLabelText('VLAN ID'), '120')
-    await user.type(screen.getByLabelText('Description'), 'User access network')
-    await user.click(screen.getByRole('button', { name: 'Create and link VLAN' }))
-
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
-      vlan: { name: 'Users', vlan_id: 120, description: 'User access network' },
-    }))
-  })
-
-  it('creates and links an unmatched NetBox prefix as a subnet', async () => {
-    const provider = providerClient()
-    const conflict: IntegrationConflict = {
-      id: 'conflict-prefix', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 41, display: '10.42.0.0/24', prefix: '10.42.0.0/24' }, remote_type: 'ipam.prefix', remote_id: '41', difference: 'unmatched',
+      id: 'conflict-rack', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
+      local_entity_id: null, provider_values: { name: 'Rack 1' }, remote_type: 'dcim.rack', remote_id: '42', difference: 'unmatched',
       status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
     }
     vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'subnet-users', local_entity_name: 'User network', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    const networks = {
-      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
-    } as unknown as NetworksClient
-    const user = userEvent.setup()
 
-    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
-    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
-    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs subnet from this prefix' }))
-    expect(screen.getByLabelText('Network prefix')).toHaveValue('10.42.0.0/24')
-    await user.clear(screen.getByLabelText('Subnet name'))
-    await user.type(screen.getByLabelText('Subnet name'), 'User network')
-    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
-    await user.click(screen.getByRole('button', { name: 'Create and link subnet' }))
-
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
-      prefix: { name: 'User network', cidr: '10.42.0.0/24', description: 'Imported from NetBox' },
-    }))
-  })
-
-  it('creates and links an unmatched NetBox IP address within a chosen subnet', async () => {
-    const provider = providerClient()
-    const conflict: IntegrationConflict = {
-      id: 'conflict-address', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 51, display: '10.42.0.10/24', address: '10.42.0.10/24' }, remote_type: 'ipam.ipaddress', remote_id: '51', difference: 'unmatched',
-      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
-    }
-    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'address-printer', local_entity_name: '10.42.0.10', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    const networks = {
-      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
-      subnetCollection: vi.fn().mockResolvedValue({ results: [{ id: 'subnet-users', name: 'User network', cidr: '10.42.0.0/24', address_family: 4, vrf_id: null, vrf_name: null, vlan_id: null, vlan_name: null, vlan_number: null }], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true }),
-    } as unknown as NetworksClient
-    const user = userEvent.setup()
-
-    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
-    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
-    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs IP address from this record' }))
-    expect(screen.getByLabelText('IP address')).toHaveValue('10.42.0.10')
-    await user.click(await screen.findByRole('radio', { name: /User network/i }))
-    await user.selectOptions(screen.getByLabelText('Status'), 'reserved')
-    await user.type(screen.getByLabelText('DNS name'), 'printer.example.invalid')
-    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
-    await user.click(screen.getByRole('button', { name: 'Create and link IP address' }))
-
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
-      ip_address: { address: '10.42.0.10', subnet_id: 'subnet-users', status: 'reserved', dns_name: 'printer.example.invalid', description: 'Imported from NetBox' },
-    }))
-  })
-
-  it('creates and links an unmatched NetBox MAC address as an unassigned record', async () => {
-    const provider = providerClient()
-    const conflict: IntegrationConflict = {
-      id: 'conflict-mac', connection_id: 'connection-1', connection_name: 'Primary NetBox', connection_provider: 'netbox',
-      local_entity_id: null, provider_values: { id: 61, display: '00:11:22:33:44:55', mac_address: '00:11:22:33:44:55' }, remote_type: 'dcim.macaddress', remote_id: '61', difference: 'unmatched',
-      status: 'open', created_at: '2026-08-12T00:00:00Z', resolved_at: null,
-    }
-    vi.mocked(provider.listConflicts).mockResolvedValue({ results: [conflict], page: 1, page_size: 25, count: 1, has_more: false })
-    vi.mocked(provider.adoptNetBoxConflict).mockResolvedValue({ ...conflict, local_entity_id: 'mac-printer', local_entity_name: '00:11:22:33:44:55', status: 'accept_remote', resolved_at: '2026-08-12T01:00:00Z' })
-    const networks = {
-      netBoxChoiceCollection: vi.fn().mockResolvedValue({ results: [], selected: null, page: 1, page_size: 25, count: 0, has_more: false, can_manage: true }),
-    } as unknown as NetworksClient
-    const user = userEvent.setup()
-
-    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation', undefined, networks)
-    await user.click(await screen.findByRole('button', { name: 'Link to TekDocs' }))
-    await user.click(screen.getByRole('radio', { name: 'Create a TekDocs MAC address from this record' }))
-    expect(screen.getByLabelText('MAC address')).toHaveValue('00:11:22:33:44:55')
-    await user.type(screen.getByLabelText('Description'), 'Imported from NetBox')
-    await user.click(screen.getByRole('button', { name: 'Create and link MAC address' }))
-
-    await waitFor(() => expect(provider.adoptNetBoxConflict).toHaveBeenCalledWith(workspace, conflict, {
-      mac_address: { address: '00:11:22:33:44:55', description: 'Imported from NetBox' },
-    }))
+    setup(provider, documentsClient(), '/workspaces/organizations/client-1/integrations?section=reconciliation')
+    expect(await screen.findByText('dcim.rack:42')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Link to TekDocs' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Create a TekDocs/i)).not.toBeInTheDocument()
   })
 
   it('edits connection details without asking for the credential again', async () => {

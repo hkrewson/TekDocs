@@ -228,16 +228,10 @@ def test_endpoint_creation_can_bind_exact_interface_without_hardware(owner_clien
     assert mac_address.status_code == 201, mac_address.content
     assert mac_address.json()["interface_id"] == str(interface.entity_id)
     assert (
-        AuditEvent.objects.filter(
-            entity_id=ip_address.json()["id"], action="network_ip_address.created"
-        ).count()
-        == 1
+        AuditEvent.objects.filter(entity_id=ip_address.json()["id"], action="network_ip_address.created").count() == 1
     )
     assert (
-        AuditEvent.objects.filter(
-            entity_id=mac_address.json()["id"], action="network_mac_address.created"
-        ).count()
-        == 1
+        AuditEvent.objects.filter(entity_id=mac_address.json()["id"], action="network_mac_address.created").count() == 1
     )
 
     mixed = _post(
@@ -296,6 +290,49 @@ def test_mac_address_is_authored_and_returned_as_a_hardware_asset_field(owner_cl
         )
     )
     assert hidden.status_code == 404
+
+
+@pytest.mark.django_db
+def test_ip_address_can_be_authored_from_the_hardware_asset(owner_client, installation):
+    organization = _organization(installation, "Asset IP")
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name="Core switch")
+    subnet = _subnet(installation, organization)
+    route = reverse(
+        "organization-asset-ip-addresses",
+        kwargs={"organization_entity_id": organization.entity_id, "asset_entity_id": asset.entity_id},
+    )
+    response = owner_client.post(
+        route,
+        {
+            "address": "192.0.2.10",
+            "subnet_id": str(subnet.entity_id),
+            "status": "reserved",
+            "dns_name": "switch.example.invalid",
+            "description": "Management address",
+        },
+        content_type="application/json",
+    )
+    assert response.status_code == 201, response.content
+    assert response.json()["subnet_cidr"] == "192.0.2.0/24"
+    assert NetworkIPAddress.objects.get(entity_id=response.json()["id"]).hardware_asset_id == asset.id
+
+    detail = owner_client.get(
+        reverse(
+            "organization-client-asset-detail",
+            kwargs={"organization_entity_id": organization.entity_id, "asset_entity_id": asset.entity_id},
+        )
+    )
+    assert detail.status_code == 200
+    assert detail.json()["ip_addresses"][0]["address"] == "192.0.2.10"
+
+    choices = owner_client.get(
+        reverse(
+            "organization-asset-network-choices",
+            kwargs={"organization_entity_id": organization.entity_id, "asset_entity_id": asset.entity_id},
+        )
+    )
+    assert choices.status_code == 200
+    assert choices.json() == [{"id": str(subnet.entity_id), "cidr": "192.0.2.0/24", "name": "192.0.2.0/24"}]
 
 
 @pytest.mark.django_db

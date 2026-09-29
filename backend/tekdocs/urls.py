@@ -250,6 +250,9 @@ from apps.core.integration_views import (
     IntegrationJobListCreateView,
     IntegrationLogListView,
     IntegrationNetBoxAdoptView,
+    IntegrationNetBoxPublicationConfirmView,
+    IntegrationNetBoxPublicationPreviewView,
+    IntegrationNetBoxWriteCredentialView,
     IntegrationObservationListView,
     IntegrationProviderCatalogView,
 )
@@ -262,10 +265,13 @@ from apps.core.inventory_views import (
     ClientAssetDetailView,
     ClientAssetDocumentArtifactDownloadView,
     ClientAssetDocumentDetailView,
+    ClientAssetIPAddressDetailView,
+    ClientAssetIPAddressListCreateView,
     ClientAssetListCreateView,
     ClientAssetMACAddressDetailView,
     ClientAssetMACAddressListCreateView,
     ClientAssetModelChoiceListView,
+    ClientAssetNetworkChoicesView,
     ClientHardwareAssignmentChoicesView,
     ClientHardwareAssignmentView,
     ClientHardwareDetailView,
@@ -920,6 +926,24 @@ urlpatterns = [
         "api/v1/workspaces/msp/integrations/connections/<uuid:connection_id>/rotate",
         IntegrationConnectionRotateView.as_view(),
         name="msp-integration-connection-rotate",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/connections/<uuid:connection_id>/netbox-write-credential",
+        IntegrationNetBoxWriteCredentialView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-integration-netbox-write-credential",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/netbox-publications/preview",
+        IntegrationNetBoxPublicationPreviewView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-integration-netbox-publication-preview",
+    ),
+    path(
+        "api/v1/workspaces/msp/integrations/netbox-publications/publish",
+        IntegrationNetBoxPublicationConfirmView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-integration-netbox-publication-publish",
     ),
     path(
         "api/v1/workspaces/msp/integrations/jobs",
@@ -1771,6 +1795,24 @@ urlpatterns = [
         name="msp-asset-mac-address-detail",
     ),
     path(
+        "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/ip-addresses",
+        ClientAssetIPAddressListCreateView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-ip-addresses",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/ip-addresses/<uuid:ip_address_entity_id>",
+        ClientAssetIPAddressDetailView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-ip-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/network-choices",
+        ClientAssetNetworkChoicesView.as_view(),
+        {"organization_entity_id": None},
+        name="msp-asset-network-choices",
+    ),
+    path(
         "api/v1/workspaces/msp/assets/<uuid:asset_entity_id>/hardware",
         ClientHardwareDetailView.as_view(),
         {"organization_entity_id": None},
@@ -1960,6 +2002,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/mac-addresses/<uuid:mac_address_entity_id>",
         ClientAssetMACAddressDetailView.as_view(),
         name="organization-asset-mac-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/ip-addresses",
+        ClientAssetIPAddressListCreateView.as_view(),
+        name="organization-asset-ip-addresses",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/ip-addresses/<uuid:ip_address_entity_id>",
+        ClientAssetIPAddressDetailView.as_view(),
+        name="organization-asset-ip-address-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/network-choices",
+        ClientAssetNetworkChoicesView.as_view(),
+        name="organization-asset-network-choices",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/assets/<uuid:asset_entity_id>/hardware",
@@ -2320,6 +2377,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections/<uuid:connection_id>/rotate",
         IntegrationConnectionRotateView.as_view(),
         name="organization-integration-connection-rotate",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/connections/<uuid:connection_id>/netbox-write-credential",
+        IntegrationNetBoxWriteCredentialView.as_view(),
+        name="organization-integration-netbox-write-credential",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/netbox-publications/preview",
+        IntegrationNetBoxPublicationPreviewView.as_view(),
+        name="organization-integration-netbox-publication-preview",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/netbox-publications/publish",
+        IntegrationNetBoxPublicationConfirmView.as_view(),
+        name="organization-integration-netbox-publication-publish",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/integrations/jobs",

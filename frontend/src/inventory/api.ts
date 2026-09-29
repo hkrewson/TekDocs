@@ -33,10 +33,13 @@ export type ClientAsset = {
   documents: AssetDocument[]
   hardware: HardwareProfile | null
   mac_addresses: AssetMACAddress[]
+  ip_addresses?: AssetIPAddress[]
   software_installation: SoftwareInstallation | null
   created_at: string
 }
 export type AssetMACAddress = { id: string; address: string; description: string }
+export type AssetIPAddress = { id: string; address: string; subnet_id: string; subnet_cidr: string; status: 'active' | 'reserved' | 'dhcp' | 'deprecated'; dns_name: string; description: string }
+export type AssetNetworkChoice = { id: string; cidr: string; name: string }
 export type HardwareProfile = {
   serial_number: string
   asset_tag: string
@@ -114,6 +117,9 @@ export interface InventoryClient {
   disposeHardware(workspace: WorkspaceContext, assetId: string, values: { disposed_on: string; method: string; reason: string }): Promise<HardwareProfile>
   createAssetMACAddress(workspace: WorkspaceContext, assetId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
   updateAssetMACAddress(workspace: WorkspaceContext, assetId: string, macId: string, values: Omit<AssetMACAddress, 'id'>): Promise<AssetMACAddress>
+  listAssetNetworkChoices(workspace: WorkspaceContext, assetId: string): Promise<AssetNetworkChoice[]>
+  createAssetIPAddress(workspace: WorkspaceContext, assetId: string, values: Omit<AssetIPAddress, 'id' | 'subnet_cidr'>): Promise<AssetIPAddress>
+  updateAssetIPAddress(workspace: WorkspaceContext, assetId: string, addressId: string, values: Partial<Omit<AssetIPAddress, 'id' | 'subnet_cidr'>>): Promise<AssetIPAddress>
   updateSoftwareInstallation(workspace: WorkspaceContext, assetId: string, values: Partial<SoftwareInstallation>): Promise<SoftwareInstallation>
   listLicenses(workspace: WorkspaceContext, query: LicenseQuery, signal?: AbortSignal): Promise<LicenseResult>
   retrieveLicense(workspace: WorkspaceContext, licenseId: string, signal?: AbortSignal): Promise<SoftwareLicense>
@@ -196,6 +202,9 @@ export const browserInventoryClient: InventoryClient = {
   disposeHardware: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/hardware/dispose`, 'POST', values),
   createAssetMACAddress: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses`, 'POST', values),
   updateAssetMACAddress: (workspace, assetId, macId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/mac-addresses/${encodeURIComponent(macId)}`, 'PATCH', values),
+  listAssetNetworkChoices: (workspace, assetId) => get(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/network-choices`),
+  createAssetIPAddress: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/ip-addresses`, 'POST', values),
+  updateAssetIPAddress: (workspace, assetId, addressId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/ip-addresses/${encodeURIComponent(addressId)}`, 'PATCH', values),
   updateSoftwareInstallation: (workspace, assetId, values) => mutate(`${basePath(workspace)}/assets/${encodeURIComponent(assetId)}/software`, 'PATCH', values),
   listLicenses: (workspace, query, signal) => {
     const parameters = new URLSearchParams({

@@ -23,6 +23,7 @@ from .integration_providers import provider_catalog
 from .integrations import (
     adopt_netbox_conflict,
     cancel_sync_job,
+    configure_netbox_write_secret,
     connections_for_workspace,
     create_connection,
     enqueue_sync,
@@ -43,6 +44,7 @@ from .models import (
     IntegrationSyncJob,
     NetBoxReference,
 )
+from .netbox_publication import preview_netbox_publication, publish_netbox_proposal
 from .scoping import DataScope
 from .workspaces import ResolvedWorkspace
 
@@ -90,6 +92,7 @@ class ConnectionSerializer(serializers.Serializer):
     name = serializers.CharField()
     base_url = serializers.CharField()
     credential_configured = serializers.SerializerMethodField()
+    write_credential_configured = serializers.SerializerMethodField()
     secret_generation = serializers.IntegerField()
     active = serializers.BooleanField()
     sync_interval_minutes = serializers.IntegerField()
@@ -105,6 +108,9 @@ class ConnectionSerializer(serializers.Serializer):
 
     def get_credential_configured(self, connection: IntegrationConnection) -> bool:
         return bool(connection.secret_envelope)
+
+    def get_write_credential_configured(self, connection: IntegrationConnection) -> bool:
+        return connection.provider == IntegrationProvider.NETBOX and bool(connection.write_secret_envelope)
 
     def get_provider_details(self, connection: IntegrationConnection) -> dict[str, str]:
         if connection.provider == IntegrationProvider.MICROSOFT_GRAPH:
@@ -150,9 +156,37 @@ class CredentialRotationSerializer(StrictSerializer):
         default=dict,
         write_only=True,
     )
-    api_token = serializers.CharField(
-        min_length=8, max_length=4096, trim_whitespace=False, write_only=True, required=False, default=""
-    )
+
+
+class NetBoxWriteCredentialSerializer(StrictSerializer):
+    api_token = serializers.CharField(min_length=8, max_length=4096, trim_whitespace=False, write_only=True)
+
+
+class NetBoxPublicationPreviewSerializer(StrictSerializer):
+    source_observation_id = serializers.UUIDField()
+    connection_id = serializers.UUIDField()
+
+
+class NetBoxPublicationConfirmSerializer(NetBoxPublicationPreviewSerializer):
+    proposal_digest = serializers.RegexField(r"^[0-9a-f]{64}$")
+
+
+class NetBoxPublicationProposalSerializer(serializers.Serializer):
+    source_observation_id = serializers.UUIDField()
+    source_type = serializers.CharField()
+    source_fingerprint = serializers.CharField()
+    connection_id = serializers.UUIDField()
+    action = serializers.ChoiceField(choices=("create", "update"))
+    endpoint = serializers.CharField()
+    fields = serializers.JSONField()
+    target_fingerprint = serializers.CharField(allow_blank=True)
+    proposal_digest = serializers.CharField()
+
+
+class NetBoxPublicationResultSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("published",))
+    target_id = serializers.IntegerField(allow_null=True)
+    proposal_digest = serializers.CharField()
 
 
 class JobSerializer(serializers.Serializer):
@@ -260,34 +294,37 @@ class ObservationSerializer(serializers.Serializer):
                     object_id = int(observation.remote_id)
                 except ValueError:
                     object_id = 0
-                cache[cache_key] = NetBoxReference.scoped.for_scope(
-                    DataScope(observation.tenant_id, observation.workspace_id, observation.organization_id)
-                ).select_related("entity").filter(
-                    workspace_id=observation.workspace_id,
-                    object_type=remote_type,
-                    object_id=object_id,
-                    archived_at__isnull=True,
-                ).first()
+                cache[cache_key] = (
+                    NetBoxReference.scoped.for_scope(
+                        DataScope(observation.tenant_id, observation.workspace_id, observation.organization_id)
+                    )
+                    .select_related("entity")
+                    .filter(
+                        workspace_id=observation.workspace_id,
+                        object_type=remote_type,
+                        object_id=object_id,
+                        archived_at__isnull=True,
+                    )
+                    .first()
+                )
             else:
-                cache[cache_key] = IntegrationEntityMapping.objects.select_related("local_entity").filter(
-                    connection_id=observation.job.connection_id,
-                    remote_type=remote_type,
-                    remote_id=(
-                        observation.remote_id.split(":", 1)[0]
-                        if remote_type == "device"
-                        else observation.remote_id
-                    ),
-                ).first()
+                cache[cache_key] = (
+                    IntegrationEntityMapping.objects.select_related("local_entity")
+                    .filter(
+                        connection_id=observation.job.connection_id,
+                        remote_type=remote_type,
+                        remote_id=(
+                            observation.remote_id.split(":", 1)[0] if remote_type == "device" else observation.remote_id
+                        ),
+                    )
+                    .first()
+                )
         return cache[cache_key]
 
     def get_linked_local_entity_id(self, observation: IntegrationObservation) -> UUID | None:
         mapping = self._mapping(observation)
         return (
-            mapping.entity_id
-            if isinstance(mapping, NetBoxReference)
-            else mapping.local_entity_id
-            if mapping
-            else None
+            mapping.entity_id if isinstance(mapping, NetBoxReference) else mapping.local_entity_id if mapping else None
         )
 
     def get_linked_local_entity_name(self, observation: IntegrationObservation) -> str:
@@ -359,59 +396,8 @@ class ConflictResolutionSerializer(StrictSerializer):
     )
 
 
-class NetBoxRackAdoptionSerializer(StrictSerializer):
-    name = serializers.CharField(max_length=240, trim_whitespace=True)
-    site_id = serializers.UUIDField(source="site_entity_id")
-    location_id = serializers.UUIDField(source="location_entity_id", allow_null=True, required=False, default=None)
-    unit_count = serializers.IntegerField(min_value=1, max_value=100, required=False, default=42)
-    status = serializers.ChoiceField(choices=("planned", "active", "retired"), required=False, default="active")
-
-
-class NetBoxAssetAdoptionSerializer(StrictSerializer):
-    name = serializers.CharField(max_length=240, trim_whitespace=True)
-    model_id = serializers.UUIDField(source="model_entity_id")
-
-
-class NetBoxVLANAdoptionSerializer(StrictSerializer):
-    name = serializers.CharField(max_length=240, trim_whitespace=True)
-    vlan_id = serializers.IntegerField(min_value=1, max_value=4094)
-    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
-
-
-class NetBoxPrefixAdoptionSerializer(StrictSerializer):
-    name = serializers.CharField(max_length=240, trim_whitespace=True)
-    cidr = serializers.CharField(max_length=49, trim_whitespace=True)
-    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
-
-
-class NetBoxIPAddressAdoptionSerializer(StrictSerializer):
-    address = serializers.CharField(max_length=45, trim_whitespace=True)
-    subnet_id = serializers.UUIDField(source="subnet_entity_id")
-    status = serializers.ChoiceField(choices=("active", "reserved", "dhcp", "deprecated"), default="active")
-    dns_name = serializers.CharField(max_length=253, required=False, allow_blank=True, default="")
-    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
-
-
-class NetBoxMACAddressAdoptionSerializer(StrictSerializer):
-    address = serializers.CharField(max_length=32, trim_whitespace=True)
-    description = serializers.CharField(max_length=4000, required=False, allow_blank=True, default="")
-
-
 class NetBoxAdoptionSerializer(StrictSerializer):
-    entity_id = serializers.UUIDField(required=False)
-    rack = NetBoxRackAdoptionSerializer(required=False)
-    asset = NetBoxAssetAdoptionSerializer(required=False)
-    vlan = NetBoxVLANAdoptionSerializer(required=False)
-    prefix = NetBoxPrefixAdoptionSerializer(required=False)
-    ip_address = NetBoxIPAddressAdoptionSerializer(required=False)
-    mac_address = NetBoxMACAddressAdoptionSerializer(required=False)
-
-    def validate(self, attrs):  # type: ignore[no-untyped-def]
-        if sum(
-            key in attrs for key in ("entity_id", "rack", "asset", "vlan", "prefix", "ip_address", "mac_address")
-        ) != 1:
-            raise serializers.ValidationError("Choose one existing record or create one supported record.")
-        return attrs
+    entity_id = serializers.UUIDField()
 
 
 class ObservationCollectionQuerySerializer(BoundedCollectionQuerySerializer):
@@ -514,6 +500,48 @@ class IntegrationConnectionRotateView(APIView):
             **serializer.validated_data,
         )
         return _private(Response(ConnectionSerializer(connection).data))
+
+
+class IntegrationNetBoxWriteCredentialView(APIView):
+    @extend_schema(request=NetBoxWriteCredentialSerializer, responses={200: ConnectionSerializer})
+    def post(self, request, connection_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_MANAGE)
+        serializer = NetBoxWriteCredentialSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        connection = configure_netbox_write_secret(
+            request=request,
+            organization_entity_id=organization_entity_id,
+            connection_id=connection_id,
+            **serializer.validated_data,
+        )
+        return _private(Response(ConnectionSerializer(connection).data))
+
+
+class IntegrationNetBoxPublicationPreviewView(APIView):
+    @extend_schema(request=NetBoxPublicationPreviewSerializer, responses={200: NetBoxPublicationProposalSerializer})
+    def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_MANAGE)
+        serializer = NetBoxPublicationPreviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return _private(Response(preview_netbox_publication(workspace=workspace, **serializer.validated_data)))
+
+
+class IntegrationNetBoxPublicationConfirmView(APIView):
+    @extend_schema(request=NetBoxPublicationConfirmSerializer, responses={200: NetBoxPublicationResultSerializer})
+    def post(self, request, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INTEGRATIONS_MANAGE)
+        serializer = NetBoxPublicationConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return _private(
+            Response(
+                publish_netbox_proposal(
+                    workspace=workspace,
+                    actor_id=request.user.pk,
+                    request_id=getattr(request, "request_id", None),
+                    **serializer.validated_data,
+                )
+            )
+        )
 
 
 class IntegrationJobListCreateView(APIView):
@@ -726,8 +754,6 @@ class IntegrationNetBoxAdoptView(APIView):
         require_permission(request.user, PermissionKey.NETWORKS_EDIT, organization=workspace.organization)
         serializer = NetBoxAdoptionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if "asset" in serializer.validated_data:
-            require_permission(request.user, PermissionKey.ASSETS_EDIT, organization=workspace.organization)
         conflict = adopt_netbox_conflict(
             workspace=workspace, conflict_id=conflict_id, actor=request.user, **serializer.validated_data
         )

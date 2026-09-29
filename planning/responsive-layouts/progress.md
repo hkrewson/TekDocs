@@ -3479,3 +3479,20 @@ bundle budgets pass. Repository security-review, UI-language, Wiki, product-boun
 responsive-route, responsive-acceptance, Compose, Ruff, MyPy, migration-drift and
 OpenAPI checks pass. The local stack was rebuilt; health returns 200, migration 0156
 is applied, and the running catalog exposes the read-only UniFi provider.
+
+## Corrected Networks model completion — 2026-09-28
+
+Completed the corrected pre-1.0 Networks boundary at version 0.8.46. Networks now has
+five supported views: Networks, Devices, DNS, Wireless and NetBox. NetBox prefix sync
+automatically creates or refreshes canonical CIDRs with an integer VLAN fact. Device
+sync automatically creates or matches the manufacturer, product, model, hardware Asset
+and asset-backed Device, retaining rack name, position and height as source display facts.
+Only ambiguous prefixes and devices enter a link-only review path; the interface no
+longer creates standalone VLAN, VRF, rack, interface, MAC, circuit or handoff records.
+
+Assets and Networks share the same IP assignment records. UniFi remains read-only during
+sync. An optional reviewed publication uses a separate NetBox write token, exact proposal,
+source and target revalidation, and an audit event; there is no automatic feedback loop.
+A cleanup rehearsal reports and losslessly backfills retained values before any later
+legacy deletion. ADR 0104 and the Networks Wiki record the operating and security
+boundary. Production deployment, external push and Wiki publication remain separate.

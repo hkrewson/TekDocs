@@ -31,7 +31,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
 - Scoped built-in and custom roles at MSP, organization, and collection boundaries
 - Public API, personal and service tokens, signed webhooks, integration jobs, reconciliation, and sanitized Git export
-- Exact-Workspace read-only NetBox, UniFi Network, Microsoft 365/Entra/Intune, HaloPSA, and NinjaOne observations with encrypted credentials; UniFi can deterministically seed supported CIDRs, hardware Assets, network Devices, unassigned client IPs and Wireless records while transient clients remain observations
+- Exact-Workspace NetBox and read-only UniFi Network, Microsoft 365/Entra/Intune, HaloPSA, and NinjaOne integrations with encrypted credentials; NetBox projects supported prefixes and devices into CIDRs and hardware Assets automatically, while separately credentialed UniFi-to-NetBox changes require an exact reviewed proposal and audit event
 - Dry-run, idempotent Workspace imports for native bundles and documented ITFlow, IT Glue, Hudu, and TekDocs CSV mappings
 - Compliance controls, evidence, risks, reviews, and immutable evidence bundles
 

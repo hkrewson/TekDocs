@@ -55,6 +55,11 @@ def invoice_delivery(db, tmp_path):
         legal_name="Sibling Client, LLC",
         website="",
         classifications=["client"],
+        billing_address_line_1="500 Congress Avenue",
+        billing_city="Austin",
+        billing_region="TX",
+        billing_postal_code="78701",
+        billing_country_code="US",
     )
     for record in (organization, sibling):
         record.access_mode = "all_authorized"

@@ -103,7 +103,7 @@ test('expired authentication can be confirmed and invoice issue resumes', async 
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/invoices/${invoiceId}`, (route) => route.fulfill({ json: draft }))
 
   await page.goto(`/workspaces/organizations/${clientId}/invoices?invoice=${invoiceId}`)
-  await page.getByRole('button', { name: 'Issue invoice' }).click()
+  await page.getByRole('button', { name: 'Review and issue' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Issue invoice' }).click()
   await expect(page.getByRole('heading', { name: 'Confirm invoice issue' })).toBeVisible()
   await page.getByLabel('Current password').fill('current-password')

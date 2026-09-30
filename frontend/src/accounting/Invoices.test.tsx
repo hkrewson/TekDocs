@@ -44,6 +44,8 @@ const draft: InvoiceDraft = {
     origin_type: 'catalog_product',
     origin_id: 'product-1',
   }],
+  issuer: { legal_name: 'Example MSP, LLC', billing_email: 'billing@example.invalid', address_line_1: '100 Main Street', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US' },
+  bill_to: { legal_name: 'Example Client, LLC', contact_name: 'Morgan Lee', billing_email: 'accounts@example.invalid', address_line_1: '400 Congress Avenue', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US' },
   created_at: '2026-08-29T12:00:00Z',
   updated_at: '2026-08-29T12:00:00Z',
 }
@@ -75,6 +77,7 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     withdrawRecurring: vi.fn().mockResolvedValue(draft),
     deliver: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }),
     recordEvent: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001' }),
+    followUp: vi.fn().mockResolvedValue(draft),
     pdfUrl: vi.fn().mockReturnValue('/invoice.pdf'),
     csvUrl: vi.fn().mockReturnValue('/invoice.csv'),
     accountingExportUrl: vi.fn().mockReturnValue('/invoice-accounting.json'),
@@ -111,7 +114,7 @@ describe('Invoices', () => {
 
     expect(await screen.findByRole('heading', { name: 'Invoices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Invoice settings' })).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Review and issue' }))
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
     expect(await screen.findByRole('link', { name: 'Open invoice settings' })).toHaveAttribute('href', '/invoices')
   })
@@ -187,8 +190,8 @@ describe('Invoices', () => {
     const issue = vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', signature_algorithm: 'Ed25519', content_digest: 'a'.repeat(64), key_fingerprint: 'b'.repeat(64) })
     renderInvoice(invoiceClient({ issue }))
 
-    await screen.findByRole('button', { name: 'Issue invoice' })
-    fireEvent.click(screen.getByRole('button', { name: 'Issue invoice' }))
+    await screen.findByRole('button', { name: 'Review and issue' })
+    fireEvent.click(screen.getByRole('button', { name: 'Review and issue' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Issue the draft dated Aug 29, 2026?')
     expect(screen.getByRole('alertdialog')).toHaveTextContent('You cannot undo this.')
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
@@ -199,6 +202,40 @@ describe('Invoices', () => {
     expect(screen.getByText(/verification ID/)).toBeInTheDocument()
   })
 
+  it('reviews and edits invoice-specific billing details before issue', async () => {
+    const update = vi.fn().mockResolvedValue(draft)
+    renderInvoice(invoiceClient({ update }))
+
+    expect(await screen.findByText('Example Client, LLC')).toBeInTheDocument()
+    expect(screen.getByText('Example MSP, LLC')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit billing details' }))
+    expect(screen.getByRole('heading', { name: 'Invoice billing details' })).toBeInTheDocument()
+    const legalNames = screen.getAllByLabelText('Legal name')
+    fireEvent.change(legalNames[1], { target: { value: 'Client AP Office' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save billing details' }))
+
+    await waitFor(() => expect(update).toHaveBeenCalled())
+    const saved = update.mock.calls[0]?.[2] as { bill_to: { legal_name?: string } }
+    expect(saved.bill_to.legal_name).toBe('Client AP Office')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review and issue' }))
+    const review = screen.getByRole('alertdialog')
+    expect(review).toHaveTextContent('Example MSP, LLC')
+    expect(review).toHaveTextContent('Example Client, LLC')
+    expect(review).toHaveTextContent('USD 137.50')
+  })
+
+  it('creates a linked supplemental or replacement draft from an issued invoice', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
+    const supplement = { ...draft, id: 'invoice-2', source: { id: 'invoice-1', number: 'INV-000001', kind: 'supplement' as const }, lines: [] }
+    const followUp = vi.fn().mockResolvedValue(supplement)
+    renderInvoice(invoiceClient({ get: vi.fn().mockImplementation((_workspace, id: string) => Promise.resolve(id === 'invoice-2' ? supplement : issued)), followUp }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add missed items' }))
+    await waitFor(() => expect(followUp).toHaveBeenCalledWith(workspace, 'invoice-1', 'supplement'))
+    expect(await screen.findByText(/Supplement to INV-000001/)).toBeInTheDocument()
+  })
+
   it('confirms the password and retries issuance when recent authentication expired', async () => {
     const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
     const issue = vi.fn()
@@ -207,7 +244,7 @@ describe('Invoices', () => {
     const reauthenticate = vi.fn().mockResolvedValue(undefined)
     renderInvoice(invoiceClient({ issue }), undefined, { reauthenticate })
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue invoice' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Review and issue' }))
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Issue invoice' }))
     expect(await screen.findByRole('heading', { name: 'Confirm invoice issue' })).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'current-password' } })
@@ -247,7 +284,7 @@ describe('Invoices', () => {
     await waitFor(() => expect(withdrawRecurring).toHaveBeenCalledWith(workspace, 'invoice-1', 'Client cancelled before issue'))
     expect(await screen.findByText('Client cancelled before issue')).toBeInTheDocument()
     expect(screen.getByText('Withdrawn', { selector: '.lifecycle-state' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Issue invoice' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review and issue' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add item' })).not.toBeInTheDocument()
   })

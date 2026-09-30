@@ -246,6 +246,11 @@ class InvoiceState(models.TextChoices):
     ISSUED = "issued", "Issued"
 
 
+class InvoiceSourceKind(models.TextChoices):
+    SUPPLEMENT = "supplement", "Supplement"
+    REPLACEMENT = "replacement", "Replacement"
+
+
 class InvoiceNumberSeries(TimestampedModel):
     """A tenant-owned transactional counter used only while issuing invoices."""
 
@@ -337,6 +342,14 @@ class Invoice(TimestampedModel):
     due_date = models.DateField()
     reference = models.CharField(max_length=240, blank=True)
     notes = models.TextField(blank=True)
+    source_invoice = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="derived_invoices",
+        null=True,
+        blank=True,
+    )
+    source_kind = models.CharField(max_length=16, choices=InvoiceSourceKind.choices, blank=True, default="")
     issuer_snapshot = models.JSONField(default=dict, blank=True)
     customer_snapshot = models.JSONField(default=dict, blank=True)
     key_resolutions = models.JSONField(default=list, blank=True)
@@ -374,6 +387,17 @@ class Invoice(TimestampedModel):
         ordering = ("-invoice_date", "-created_at", "id")
         constraints = [
             models.CheckConstraint(condition=models.Q(state__in=InvoiceState.values), name="invoice_state_valid"),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(source_invoice__isnull=True, source_kind="")
+                    | models.Q(source_invoice__isnull=False, source_kind__in=InvoiceSourceKind.values)
+                ),
+                name="invoice_source_fields_consistent",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(source_invoice__isnull=True) | ~models.Q(source_invoice=models.F("id")),
+                name="invoice_source_not_self",
+            ),
             models.CheckConstraint(
                 condition=models.Q(due_date__gte=models.F("invoice_date")), name="invoice_due_date_valid"
             ),

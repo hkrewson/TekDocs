@@ -146,9 +146,9 @@ def test_issue_requires_recent_session_and_complete_settings(owner_client, insta
 def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, installation, monkeypatch, tmp_path):
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
     organization = client_organization(installation)
-    invoice = draft_with_line(installation, organization)
     settings_url = reverse("msp-invoice-settings")
     assert owner_client.put(settings_url, settings_payload(), content_type="application/json").status_code == 200
+    invoice = draft_with_line(installation, organization)
     issue_url = reverse(
         "organization-invoice-issue",
         kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": invoice.entity_id},
@@ -196,6 +196,71 @@ def test_issue_allocates_number_signs_and_retains_immutable_pdf(owner_client, in
         InvoiceArtifact.objects.filter(pk=artifact.pk).update(size=1)
     assert owner_client.post(issue_url).status_code == 400
     assert InvoiceNumberSeries.objects.get(tenant=installation.tenant, prefix="INV").next_number == 2
+
+
+@pytest.mark.django_db
+def test_draft_reviews_invoice_specific_parties_and_creates_linked_follow_ups(
+    owner_client, installation, monkeypatch, tmp_path
+):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    organization = client_organization(installation)
+    assert owner_client.put(
+        reverse("msp-invoice-settings"), settings_payload(), content_type="application/json"
+    ).status_code == 200
+    source = draft_with_line(installation, organization)
+    detail_url = reverse(
+        "organization-invoice-detail",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    draft_payload = owner_client.get(detail_url).json()
+    assert draft_payload["issuer"]["legal_name"] == "Issue MSP, LLC"
+    assert draft_payload["bill_to"]["address_line_1"] == "400 Congress Avenue"
+
+    changed_bill_to = {
+        **draft_payload["bill_to"],
+        "legal_name": "Issue Client Accounts Payable",
+        "address_line_1": "900 Invoice Lane",
+    }
+    changed_issuer = {**draft_payload["issuer"], "payment_instructions": "ACH reference PO-1"}
+    updated = owner_client.patch(
+        detail_url,
+        {"issuer": changed_issuer, "bill_to": changed_bill_to},
+        content_type="application/json",
+    )
+    assert updated.status_code == 200
+    assert updated.json()["bill_to"]["address_line_1"] == "900 Invoice Lane"
+
+    issue_url = reverse(
+        "organization-invoice-issue",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        issued = owner_client.post(issue_url)
+    assert issued.status_code == 200
+    assert issued.json()["bill_to"]["legal_name"] == "Issue Client Accounts Payable"
+    assert issued.json()["issuer"]["payment_instructions"] == "ACH reference PO-1"
+
+    organization.billing_address_line_1 = "Changed client default"
+    organization.save(update_fields=("billing_address_line_1", "updated_at"))
+    assert owner_client.get(detail_url).json()["bill_to"]["address_line_1"] == "900 Invoice Lane"
+
+    follow_up_url = reverse(
+        "organization-invoice-follow-up",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    supplement = owner_client.post(follow_up_url, {"mode": "supplement"}, content_type="application/json")
+    assert supplement.status_code == 201
+    assert supplement.json()["source"] == {
+        "id": str(source.entity_id), "number": "INV-000001", "kind": "supplement"
+    }
+    assert supplement.json()["lines"] == []
+    assert supplement.json()["bill_to"]["address_line_1"] == "900 Invoice Lane"
+
+    replacement = owner_client.post(follow_up_url, {"mode": "replacement"}, content_type="application/json")
+    assert replacement.status_code == 201
+    assert replacement.json()["source"]["kind"] == "replacement"
+    assert replacement.json()["lines"][0]["description"] == "Managed service"
+    assert replacement.json()["lines"][0]["origin_type"] == ""
 
 
 @pytest.mark.django_db

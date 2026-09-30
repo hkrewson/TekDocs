@@ -793,3 +793,57 @@ def test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_
     assert "audience_profile" in guard
     assert retained.content_digest == retained_digest
     assert all(verify_publication(retained).values())
+
+
+@pytest.mark.django_db(transaction=True)
+def test_invoice_follow_up_upgrade_backfills_reviewable_draft_parties(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Invoice upgrade validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Invoice Follow-up Upgrade MSP",
+        owner_email=f"invoice-follow-up-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Invoice Follow-up Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = create_organization(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        name="Invoice Follow-up Client",
+        legal_name="Invoice Follow-up Client, LLC",
+        website="https://example.invalid",
+        classifications=["client"],
+        billing_address_line_1="400 Review Street",
+        billing_city="Austin",
+        billing_postal_code="78701",
+        billing_country_code="US",
+    )
+    TenantBillingProfile.objects.create(
+        tenant=result.tenant,
+        legal_name="Invoice Follow-up MSP, LLC",
+        address_line_1="100 Sender Street",
+        city="Austin",
+        postal_code="78701",
+        country_code="US",
+        billing_email="billing@example.invalid",
+    )
+    invoice = create_invoice(
+        tenant=result.tenant,
+        organization=organization,
+        actor_id=result.owner.id,
+        currency="USD",
+        invoice_date=date(2026, 9, 30),
+        due_date=date(2026, 10, 30),
+    )
+    Invoice.objects.filter(pk=invoice.pk).update(issuer_snapshot={}, customer_snapshot={})
+
+    call_command("migrate", "core", "0158_netbox_write_credential", verbosity=0, interactive=False)
+    call_command("migrate", "core", verbosity=0, interactive=False)
+
+    upgraded = Invoice.objects.get(pk=invoice.pk)
+    assert upgraded.issuer_snapshot["legal_name"] == "Invoice Follow-up MSP, LLC"
+    assert upgraded.customer_snapshot["legal_name"] == "Invoice Follow-up Client, LLC"
+    assert upgraded.customer_snapshot["address_line_1"] == "400 Review Street"
+    assert upgraded.source_invoice_id is None
+    assert upgraded.source_kind == ""

@@ -24808,6 +24808,52 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/follow-up:
+    post:
+      operationId: workspaces_organizations_invoices_follow_up_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceFollowUpWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceFollowUpWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceFollowUpWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/issue:
     post:
       operationId: workspaces_organizations_invoices_issue_create
@@ -39661,10 +39707,21 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InvoiceLifecycleEvent'
+        issuer:
+          type: object
+          additionalProperties:
+            type: string
+          readOnly: true
         bill_to:
           type: object
           additionalProperties:
             type: string
+          readOnly: true
+        source:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
           readOnly: true
         recurring:
           allOf:
@@ -39683,6 +39740,7 @@ components:
       - id
       - invoice_date
       - issued_at
+      - issuer
       - key_fingerprint
       - last_event_at
       - lifecycle_events
@@ -39695,6 +39753,7 @@ components:
       - recurring
       - reference
       - signature_algorithm
+      - source
       - state
       - subtotal
       - tax_total
@@ -39719,6 +39778,20 @@ components:
           maxLength: 254
       required:
       - recipient
+    InvoiceFollowUpWrite:
+      type: object
+      properties:
+        mode:
+          enum:
+          - supplement
+          - replacement
+          type: string
+          description: |-
+            * `supplement` - supplement
+            * `replacement` - replacement
+          x-spec-enum-id: ce42ab891259f5e2
+      required:
+      - mode
     InvoiceIssueSettings:
       type: object
       properties:
@@ -40613,6 +40686,567 @@ components:
           type: string
           format: uuid
           nullable: true
+    InvoicePartyWrite:
+      type: object
+      properties:
+        display_name:
+          type: string
+          default: ''
+          maxLength: 240
+        legal_name:
+          type: string
+          default: ''
+          maxLength: 240
+        contact_name:
+          type: string
+          default: ''
+          maxLength: 240
+        billing_email:
+          type: string
+          format: email
+          default: ''
+          maxLength: 254
+        phone:
+          type: string
+          default: ''
+          maxLength: 64
+        address_line_1:
+          type: string
+          default: ''
+          maxLength: 240
+        address_line_2:
+          type: string
+          default: ''
+          maxLength: 240
+        city:
+          type: string
+          default: ''
+          maxLength: 120
+        region:
+          type: string
+          default: ''
+          maxLength: 120
+        postal_code:
+          type: string
+          default: ''
+          maxLength: 32
+        country_code:
+          enum:
+          - AD
+          - AE
+          - AF
+          - AG
+          - AI
+          - AL
+          - AM
+          - AO
+          - AQ
+          - AR
+          - AS
+          - AT
+          - AU
+          - AW
+          - AX
+          - AZ
+          - BA
+          - BB
+          - BD
+          - BE
+          - BF
+          - BG
+          - BH
+          - BI
+          - BJ
+          - BL
+          - BM
+          - BN
+          - BO
+          - BQ
+          - BR
+          - BS
+          - BT
+          - BV
+          - BW
+          - BY
+          - BZ
+          - CA
+          - CC
+          - CD
+          - CF
+          - CG
+          - CH
+          - CI
+          - CK
+          - CL
+          - CM
+          - CN
+          - CO
+          - CR
+          - CU
+          - CV
+          - CW
+          - CX
+          - CY
+          - CZ
+          - DE
+          - DJ
+          - DK
+          - DM
+          - DO
+          - DZ
+          - EC
+          - EE
+          - EG
+          - EH
+          - ER
+          - ES
+          - ET
+          - FI
+          - FJ
+          - FK
+          - FM
+          - FO
+          - FR
+          - GA
+          - GB
+          - GD
+          - GE
+          - GF
+          - GG
+          - GH
+          - GI
+          - GL
+          - GM
+          - GN
+          - GP
+          - GQ
+          - GR
+          - GS
+          - GT
+          - GU
+          - GW
+          - GY
+          - HK
+          - HM
+          - HN
+          - HR
+          - HT
+          - HU
+          - ID
+          - IE
+          - IL
+          - IM
+          - IN
+          - IO
+          - IQ
+          - IR
+          - IS
+          - IT
+          - JE
+          - JM
+          - JO
+          - JP
+          - KE
+          - KG
+          - KH
+          - KI
+          - KM
+          - KN
+          - KP
+          - KR
+          - KW
+          - KY
+          - KZ
+          - LA
+          - LB
+          - LC
+          - LI
+          - LK
+          - LR
+          - LS
+          - LT
+          - LU
+          - LV
+          - LY
+          - MA
+          - MC
+          - MD
+          - ME
+          - MF
+          - MG
+          - MH
+          - MK
+          - ML
+          - MM
+          - MN
+          - MO
+          - MP
+          - MQ
+          - MR
+          - MS
+          - MT
+          - MU
+          - MV
+          - MW
+          - MX
+          - MY
+          - MZ
+          - NA
+          - NC
+          - NE
+          - NF
+          - NG
+          - NI
+          - NL
+          - 'NO'
+          - NP
+          - NR
+          - NU
+          - NZ
+          - OM
+          - PA
+          - PE
+          - PF
+          - PG
+          - PH
+          - PK
+          - PL
+          - PM
+          - PN
+          - PR
+          - PS
+          - PT
+          - PW
+          - PY
+          - QA
+          - RE
+          - RO
+          - RS
+          - RU
+          - RW
+          - SA
+          - SB
+          - SC
+          - SD
+          - SE
+          - SG
+          - SH
+          - SI
+          - SJ
+          - SK
+          - SL
+          - SM
+          - SN
+          - SO
+          - SR
+          - SS
+          - ST
+          - SV
+          - SX
+          - SY
+          - SZ
+          - TC
+          - TD
+          - TF
+          - TG
+          - TH
+          - TJ
+          - TK
+          - TL
+          - TM
+          - TN
+          - TO
+          - TR
+          - TT
+          - TV
+          - TW
+          - TZ
+          - UA
+          - UG
+          - UM
+          - US
+          - UY
+          - UZ
+          - VA
+          - VC
+          - VE
+          - VG
+          - VI
+          - VN
+          - VU
+          - WF
+          - WS
+          - YE
+          - YT
+          - ZA
+          - ZM
+          - ZW
+          - ''
+          type: string
+          description: |-
+            * `AD` - Andorra
+            * `AE` - United Arab Emirates
+            * `AF` - Afghanistan
+            * `AG` - Antigua & Barbuda
+            * `AI` - Anguilla
+            * `AL` - Albania
+            * `AM` - Armenia
+            * `AO` - Angola
+            * `AQ` - Antarctica
+            * `AR` - Argentina
+            * `AS` - Samoa (American)
+            * `AT` - Austria
+            * `AU` - Australia
+            * `AW` - Aruba
+            * `AX` - Åland Islands
+            * `AZ` - Azerbaijan
+            * `BA` - Bosnia & Herzegovina
+            * `BB` - Barbados
+            * `BD` - Bangladesh
+            * `BE` - Belgium
+            * `BF` - Burkina Faso
+            * `BG` - Bulgaria
+            * `BH` - Bahrain
+            * `BI` - Burundi
+            * `BJ` - Benin
+            * `BL` - St Barthelemy
+            * `BM` - Bermuda
+            * `BN` - Brunei
+            * `BO` - Bolivia
+            * `BQ` - Caribbean NL
+            * `BR` - Brazil
+            * `BS` - Bahamas
+            * `BT` - Bhutan
+            * `BV` - Bouvet Island
+            * `BW` - Botswana
+            * `BY` - Belarus
+            * `BZ` - Belize
+            * `CA` - Canada
+            * `CC` - Cocos (Keeling) Islands
+            * `CD` - Congo (Dem. Rep.)
+            * `CF` - Central African Rep.
+            * `CG` - Congo (Rep.)
+            * `CH` - Switzerland
+            * `CI` - Côte d’Ivoire
+            * `CK` - Cook Islands
+            * `CL` - Chile
+            * `CM` - Cameroon
+            * `CN` - China
+            * `CO` - Colombia
+            * `CR` - Costa Rica
+            * `CU` - Cuba
+            * `CV` - Cape Verde
+            * `CW` - Curaçao
+            * `CX` - Christmas Island
+            * `CY` - Cyprus
+            * `CZ` - Czech Republic
+            * `DE` - Germany
+            * `DJ` - Djibouti
+            * `DK` - Denmark
+            * `DM` - Dominica
+            * `DO` - Dominican Republic
+            * `DZ` - Algeria
+            * `EC` - Ecuador
+            * `EE` - Estonia
+            * `EG` - Egypt
+            * `EH` - Western Sahara
+            * `ER` - Eritrea
+            * `ES` - Spain
+            * `ET` - Ethiopia
+            * `FI` - Finland
+            * `FJ` - Fiji
+            * `FK` - Falkland Islands
+            * `FM` - Micronesia
+            * `FO` - Faroe Islands
+            * `FR` - France
+            * `GA` - Gabon
+            * `GB` - Britain (UK)
+            * `GD` - Grenada
+            * `GE` - Georgia
+            * `GF` - French Guiana
+            * `GG` - Guernsey
+            * `GH` - Ghana
+            * `GI` - Gibraltar
+            * `GL` - Greenland
+            * `GM` - Gambia
+            * `GN` - Guinea
+            * `GP` - Guadeloupe
+            * `GQ` - Equatorial Guinea
+            * `GR` - Greece
+            * `GS` - South Georgia & the South Sandwich Islands
+            * `GT` - Guatemala
+            * `GU` - Guam
+            * `GW` - Guinea-Bissau
+            * `GY` - Guyana
+            * `HK` - Hong Kong
+            * `HM` - Heard Island & McDonald Islands
+            * `HN` - Honduras
+            * `HR` - Croatia
+            * `HT` - Haiti
+            * `HU` - Hungary
+            * `ID` - Indonesia
+            * `IE` - Ireland
+            * `IL` - Israel
+            * `IM` - Isle of Man
+            * `IN` - India
+            * `IO` - British Indian Ocean Territory
+            * `IQ` - Iraq
+            * `IR` - Iran
+            * `IS` - Iceland
+            * `IT` - Italy
+            * `JE` - Jersey
+            * `JM` - Jamaica
+            * `JO` - Jordan
+            * `JP` - Japan
+            * `KE` - Kenya
+            * `KG` - Kyrgyzstan
+            * `KH` - Cambodia
+            * `KI` - Kiribati
+            * `KM` - Comoros
+            * `KN` - St Kitts & Nevis
+            * `KP` - Korea (North)
+            * `KR` - Korea (South)
+            * `KW` - Kuwait
+            * `KY` - Cayman Islands
+            * `KZ` - Kazakhstan
+            * `LA` - Laos
+            * `LB` - Lebanon
+            * `LC` - St Lucia
+            * `LI` - Liechtenstein
+            * `LK` - Sri Lanka
+            * `LR` - Liberia
+            * `LS` - Lesotho
+            * `LT` - Lithuania
+            * `LU` - Luxembourg
+            * `LV` - Latvia
+            * `LY` - Libya
+            * `MA` - Morocco
+            * `MC` - Monaco
+            * `MD` - Moldova
+            * `ME` - Montenegro
+            * `MF` - St Martin (French)
+            * `MG` - Madagascar
+            * `MH` - Marshall Islands
+            * `MK` - North Macedonia
+            * `ML` - Mali
+            * `MM` - Myanmar (Burma)
+            * `MN` - Mongolia
+            * `MO` - Macau
+            * `MP` - Northern Mariana Islands
+            * `MQ` - Martinique
+            * `MR` - Mauritania
+            * `MS` - Montserrat
+            * `MT` - Malta
+            * `MU` - Mauritius
+            * `MV` - Maldives
+            * `MW` - Malawi
+            * `MX` - Mexico
+            * `MY` - Malaysia
+            * `MZ` - Mozambique
+            * `NA` - Namibia
+            * `NC` - New Caledonia
+            * `NE` - Niger
+            * `NF` - Norfolk Island
+            * `NG` - Nigeria
+            * `NI` - Nicaragua
+            * `NL` - Netherlands
+            * `NO` - Norway
+            * `NP` - Nepal
+            * `NR` - Nauru
+            * `NU` - Niue
+            * `NZ` - New Zealand
+            * `OM` - Oman
+            * `PA` - Panama
+            * `PE` - Peru
+            * `PF` - French Polynesia
+            * `PG` - Papua New Guinea
+            * `PH` - Philippines
+            * `PK` - Pakistan
+            * `PL` - Poland
+            * `PM` - St Pierre & Miquelon
+            * `PN` - Pitcairn
+            * `PR` - Puerto Rico
+            * `PS` - Palestine
+            * `PT` - Portugal
+            * `PW` - Palau
+            * `PY` - Paraguay
+            * `QA` - Qatar
+            * `RE` - Réunion
+            * `RO` - Romania
+            * `RS` - Serbia
+            * `RU` - Russia
+            * `RW` - Rwanda
+            * `SA` - Saudi Arabia
+            * `SB` - Solomon Islands
+            * `SC` - Seychelles
+            * `SD` - Sudan
+            * `SE` - Sweden
+            * `SG` - Singapore
+            * `SH` - St Helena
+            * `SI` - Slovenia
+            * `SJ` - Svalbard & Jan Mayen
+            * `SK` - Slovakia
+            * `SL` - Sierra Leone
+            * `SM` - San Marino
+            * `SN` - Senegal
+            * `SO` - Somalia
+            * `SR` - Suriname
+            * `SS` - South Sudan
+            * `ST` - Sao Tome & Principe
+            * `SV` - El Salvador
+            * `SX` - St Maarten (Dutch)
+            * `SY` - Syria
+            * `SZ` - Eswatini (Swaziland)
+            * `TC` - Turks & Caicos Is
+            * `TD` - Chad
+            * `TF` - French S. Terr.
+            * `TG` - Togo
+            * `TH` - Thailand
+            * `TJ` - Tajikistan
+            * `TK` - Tokelau
+            * `TL` - East Timor
+            * `TM` - Turkmenistan
+            * `TN` - Tunisia
+            * `TO` - Tonga
+            * `TR` - Turkey
+            * `TT` - Trinidad & Tobago
+            * `TV` - Tuvalu
+            * `TW` - Taiwan
+            * `TZ` - Tanzania
+            * `UA` - Ukraine
+            * `UG` - Uganda
+            * `UM` - US minor outlying islands
+            * `US` - United States
+            * `UY` - Uruguay
+            * `UZ` - Uzbekistan
+            * `VA` - Vatican City
+            * `VC` - St Vincent
+            * `VE` - Venezuela
+            * `VG` - Virgin Islands (UK)
+            * `VI` - Virgin Islands (US)
+            * `VN` - Vietnam
+            * `VU` - Vanuatu
+            * `WF` - Wallis & Futuna
+            * `WS` - Samoa (western)
+            * `YE` - Yemen
+            * `YT` - Mayotte
+            * `ZA` - South Africa
+            * `ZM` - Zambia
+            * `ZW` - Zimbabwe
+          x-spec-enum-id: 3d3eea62b21165d8
+          default: ''
+        website:
+          type: string
+          default: ''
+          maxLength: 500
+        tax_registration:
+          type: string
+          default: ''
+          maxLength: 120
+        payment_instructions:
+          type: string
+          default: ''
+          maxLength: 2000
     InvoiceResult:
       type: object
       properties:
@@ -40660,6 +41294,10 @@ components:
           type: string
           default: ''
           maxLength: 4000
+        issuer:
+          $ref: '#/components/schemas/InvoicePartyWrite'
+        bill_to:
+          $ref: '#/components/schemas/InvoicePartyWrite'
       required:
       - currency
       - due_date
@@ -43695,6 +44333,10 @@ components:
         notes:
           type: string
           maxLength: 4000
+        issuer:
+          $ref: '#/components/schemas/InvoicePartyWrite'
+        bill_to:
+          $ref: '#/components/schemas/InvoicePartyWrite'
     PatchedLicenseWrite:
       type: object
       properties:

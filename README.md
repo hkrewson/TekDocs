@@ -26,7 +26,7 @@ The historical security review used Claude Opus 5 (High) for three maintainer-di
 - Permission-aware workspace search across documentation content and operational identifiers
 - Hardware and software inventory, product catalogs, licenses, warranties, costs, contracts, and lifecycle history
 - MSP-wide stock supplies with exact quantities, vendor provenance, client-use history, and invoice-line pricing
-- Draft and immutable issued invoices with billing units, payment instructions, retained PDFs, CSV/accounting exports, delivery history, and exact-client portal access
+- Draft and immutable issued invoices with reviewable invoice-specific sender/bill-to details, linked supplemental and replacement drafts, billing units, payment instructions, retained PDFs, CSV/accounting exports, delivery history, and exact-client portal access
 - Lightweight network documentation with five focused views for CIDRs, asset-backed devices, DNS, Wireless and NetBox evidence; CIDRs retain optional VLAN, DHCP and DNS facts plus useful IP-to-asset assignments without recreating an IPAM or network controller
 - Client publication controls, portal access, notifications, reminders, domains, and certificate monitoring
 - Scoped built-in and custom roles at MSP, organization, and collection boundaries

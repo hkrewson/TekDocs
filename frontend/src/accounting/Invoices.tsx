@@ -8,7 +8,7 @@ import { browserAuthClient } from '../auth/api'
 import type { AuthClient } from '../auth/api'
 import type { WorkspaceContext } from '../workspaces/api'
 import { InvoiceRequestError } from './api'
-import type { InvoiceClient, InvoiceCollectionQuery, InvoiceCollectionResult, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
+import type { InvoiceBillingIdentity, InvoiceClient, InvoiceCollectionQuery, InvoiceCollectionResult, InvoiceDraft, InvoiceLine, InvoiceOrigin, TaxRateChoice } from './api'
 import { InvoiceBillTo } from './InvoiceBillTo'
 import { CollectionTable } from '../collections/CollectionTable'
 import { CollectionPagination } from '../CollectionPagination'
@@ -16,6 +16,7 @@ import { ColumnChooser } from '../collections/ColumnChooser'
 import { browserCollectionPreferences, defaultPreferences } from '../collections/preferences'
 import type { CollectionPreferences } from '../collections/preferences'
 import { FilterMenu } from '../FilterMenu'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
 import '../collections/collections.css'
 import './invoices.css'
 
@@ -23,6 +24,7 @@ import { RecurringInvoices } from './RecurringInvoices'
 import { browserRecurringClient } from './recurringApi'
 
 type DraftForm = { currency: string; invoice_date: string; due_date: string; reference: string; notes: string }
+type BillingForm = { issuer: InvoiceBillingIdentity; bill_to: InvoiceBillingIdentity }
 type LineForm = {
   originKey: string
   description: string
@@ -124,9 +126,10 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
   const [canIssue, setCanIssue] = useState(false)
   const [needsSettings, setNeedsSettings] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'line' | 'delivery' | 'event'>('none')
+  const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'billing' | 'line' | 'delivery' | 'event'>('none')
   const [editingLineId, setEditingLineId] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftForm>(emptyDraft)
+  const [billing, setBilling] = useState<BillingForm>({ issuer: {}, bill_to: {} })
   const [line, setLine] = useState<LineForm>(emptyLine)
   const [eventValue, setEventValue] = useState<EventForm>(emptyEvent)
   const [busy, setBusy] = useState(false)
@@ -298,6 +301,11 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
     if (!selected) return
     await perform(() => client.deliver(workspace, selected.id, deliveryRecipient), 'accounting.deliveryFailed')
   }
+
+  async function createFollowUp(mode: 'supplement' | 'replacement') {
+    if (!selected) return
+    await perform(() => client.followUp(workspace, selected.id, mode), 'accounting.followUpFailed')
+  }
   const collectionRows = records.map((record) => ({
     ...record,
     name: record.number || formatPlainDate(record.invoice_date),
@@ -351,9 +359,9 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
           </dl>
           {selected.notes && <p>{selected.notes}</p>}
           {selected.recurring && <section className="invoice-recurring-history" aria-labelledby="invoice-recurring-heading"><div className="section-heading"><h3 id="invoice-recurring-heading">{translate('accounting.recurringPeriod')}</h3></div><dl className="invoice-metadata"><div><dt>{translate('accounting.serviceFrom')}</dt><dd>{formatPlainDate(selected.recurring.starts_on)}</dd></div><div><dt>{translate('accounting.serviceUntil')}</dt><dd>{formatPlainDate(selected.recurring.ends_before)}</dd></div>{selected.recurring.disposition === 'withdrawn' && <><div><dt>{translate('accounting.withdrawnAt')}</dt><dd>{formatPlainDate(selected.recurring.withdrawn_at!.slice(0, 10))}</dd></div><div><dt>{translate('accounting.withdrawalReason')}</dt><dd>{selected.recurring.withdrawal_reason}</dd></div></>}</dl></section>}
-          {selected.state === 'draft' && selected.recurring?.disposition !== 'withdrawn' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setConfirmation(null); setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button>{selected.recurring ? <button type="button" className="danger-button" disabled={busy} onClick={() => { setWithdrawalReason(''); setConfirmation('withdraw') }}><History size={15} />{translate('accounting.withdrawDraft')}</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation('delete')}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button>}</>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => { setReauthenticationAction(null); setConfirmation('issue') }}><FileCheck2 size={15} />{translate('accounting.issue')}</button>}</div>}
+          {selected.state === 'draft' && selected.recurring?.disposition !== 'withdrawn' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setConfirmation(null); setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button><button type="button" className="secondary-button" onClick={() => { setBilling({ issuer: selected.issuer ?? {}, bill_to: selected.bill_to ?? {} }); setEditor('billing') }}><Pencil size={15} />{translate('accounting.editBillingDetails')}</button>{selected.recurring ? <button type="button" className="danger-button" disabled={busy} onClick={() => { setWithdrawalReason(''); setConfirmation('withdraw') }}><History size={15} />{translate('accounting.withdrawDraft')}</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation('delete')}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button>}</>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => { setReauthenticationAction(null); setConfirmation('issue') }}><FileCheck2 size={15} />{translate('accounting.reviewAndIssue')}</button>}</div>}
           {selected.state === 'draft' && confirmation === 'withdraw' && <div className="archive-confirmation" role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate('accounting.withdrawConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate('accounting.withdrawConfirmHelp')}</p><label><span>{translate('accounting.withdrawalReason')}</span><textarea autoFocus required maxLength={1000} rows={3} disabled={busy} value={withdrawalReason} onChange={(event) => setWithdrawalReason(event.target.value)} /></label></div><div className="form-actions"><button type="button" className="danger-button" disabled={busy || !withdrawalReason.trim()} onClick={() => { void withdrawSelected() }}>{busy ? translate('accounting.withdrawing') : translate('accounting.withdrawDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
-          {selected.state === 'draft' && confirmation && confirmation !== 'withdraw' && <div className="archive-confirmation" role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHeading' : 'accounting.deleteDraftConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHelp' : 'accounting.deleteDraftConfirmHelp')}</p></div><div className="form-actions"><button type="button" className={confirmation === 'delete' ? 'danger-button' : 'primary-button'} disabled={busy} onClick={() => { void (confirmation === 'issue' ? issueSelected() : removeDraft()) }}>{busy ? translate(confirmation === 'issue' ? 'accounting.issuing' : 'accounting.deleting') : translate(confirmation === 'issue' ? 'accounting.issue' : 'accounting.deleteDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
+          {selected.state === 'draft' && confirmation && confirmation !== 'withdraw' && <div className={`archive-confirmation${confirmation === 'issue' ? ' invoice-review' : ''}`} role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHeading' : 'accounting.deleteDraftConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHelp' : 'accounting.deleteDraftConfirmHelp')}</p>{confirmation === 'issue' && <><div className="invoice-review-parties"><InvoicePartySummary label={translate('accounting.from')} identity={selected.issuer} /><InvoicePartySummary label={translate('accounting.billTo')} identity={selected.bill_to} /></div><dl className="invoice-review-facts"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{formatPlainDate(selected.invoice_date)}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{formatPlainDate(selected.due_date)}</dd></div><div><dt>{translate('accounting.total')}</dt><dd>{selected.currency} {selected.total}</dd></div><div><dt>{translate('accounting.items')}</dt><dd>{selected.lines.length}</dd></div></dl></>}</div><div className="form-actions"><button type="button" className={confirmation === 'delete' ? 'danger-button' : 'primary-button'} disabled={busy} onClick={() => { void (confirmation === 'issue' ? issueSelected() : removeDraft()) }}>{busy ? translate(confirmation === 'issue' ? 'accounting.issuing' : 'accounting.deleting') : translate(confirmation === 'issue' ? 'accounting.issue' : 'accounting.deleteDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
           {selected.state === 'draft' && reauthenticationAction && <form className="invoice-reauth-form invoice-issue-reauth" onSubmit={(event) => { void confirmSensitivePassword(event) }}>
             <div><h3>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdraw' : 'accounting.confirmIssue')}</h3><p>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdrawHelp' : 'accounting.confirmIssueHelp')}</p></div>
             <label><span>{translate('accounting.currentPassword')}</span><input autoFocus required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
@@ -366,9 +374,12 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
             <a className="secondary-button" href={client.accountingExportUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.accountingExport')}</a>
             {canIssue && <button type="button" className="primary-button" disabled={busy} onClick={() => { setDeliveryRecipient(''); setEditor('delivery') }}><Mail size={15} aria-hidden="true" />{translate('accounting.deliver')}</button>}
             {canIssue && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
+            {canManage && <button type="button" className="secondary-button" disabled={busy} onClick={() => { void createFollowUp('supplement') }}><Plus size={15} aria-hidden="true" />{translate('accounting.addMissedItems')}</button>}
+            {canManage && <button type="button" className="secondary-button" disabled={busy} onClick={() => { void createFollowUp('replacement') }}><Pencil size={15} aria-hidden="true" />{translate('accounting.createReplacement')}</button>}
           </div>}
           {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate((selected.delivery_count ?? 1) === 1 ? 'accounting.deliveredProof' : 'accounting.deliveredProofPlural', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
-          {selected.state === 'issued' && selected.bill_to && <section aria-labelledby="invoice-bill-to-heading"><div className="section-heading"><h3 id="invoice-bill-to-heading">{translate('accounting.billTo')}</h3></div><InvoiceBillTo identity={selected.bill_to} /></section>}
+          {selected.source && <p className="workspace-area-note">{translate(selected.source.kind === 'supplement' ? 'accounting.supplementsInvoice' : 'accounting.replacesInvoice', { number: selected.source.number })}</p>}
+          {(selected.issuer || selected.bill_to) && <div className="invoice-party-grid">{selected.issuer && <section aria-labelledby="invoice-from-heading"><div className="section-heading"><h3 id="invoice-from-heading">{translate('accounting.from')}</h3></div><InvoiceBillTo identity={selected.issuer} /></section>}{selected.bill_to && <section aria-labelledby="invoice-bill-to-heading"><div className="section-heading"><h3 id="invoice-bill-to-heading">{translate('accounting.billTo')}</h3></div><InvoiceBillTo identity={selected.bill_to} /></section>}</div>}
           {selected.state === 'issued' && <dl className="invoice-metadata">
             <div><dt>{translate('accounting.lifecycle')}</dt><dd>{lifecycleLabel(selected.lifecycle_state ?? 'issued')}</dd></div>
             <div><dt>{translate('accounting.reconciliation')}</dt><dd>{reconciliationLabel(selected.reconciliation_state ?? 'unsynchronized')}</dd></div>
@@ -387,6 +398,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
       </section>
     </>}
     {(editor === 'new' || editor === 'draft') && <DraftEditor value={draft} setValue={setDraft} busy={busy} title={editor === 'new' ? translate('accounting.newDraftTitle') : translate('accounting.editDraftTitle')} cancel={() => setEditor('none')} submit={() => { void perform(() => editor === 'new' ? client.create(workspace, draft) : client.update(workspace, selected!.id, draft)) }} />}
+    {editor === 'billing' && selected && <BillingEditor value={billing} setValue={setBilling} busy={busy} cancel={() => setEditor('none')} submit={() => { void perform(() => client.update(workspace, selected.id, billing)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} currency={selected.currency} adjustsExistingStock={Boolean(editingLineId && selected.lines.find((item) => item.id === editingLineId)?.origin_type === 'stock_item')} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit: line.unit, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, description: line.description, quantity: line.quantity, unit: line.unit, tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit: line.unit, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
     {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input autoFocus type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
     {editor === 'event' && selected && <InvoiceEventEditor value={eventValue} setValue={setEventValue} invoices={records.filter((item) => item.state === 'issued' && item.id !== selected.id)} currency={selected.currency} busy={busy} cancel={() => setEditor('none')} submit={() => { const payment = eventValue.event_type === 'payment_recorded' || eventValue.event_type === 'payment_reversed'; const provider = eventValue.event_type.startsWith('accounting_'); void perform(() => client.recordEvent(workspace, selected.id, { event_type: eventValue.event_type, occurred_at: new Date().toISOString(), amount: payment ? eventValue.amount : null, currency: payment ? selected.currency : '', provider: provider ? eventValue.provider : '', external_id: provider ? eventValue.external_id : '', idempotency_key: provider ? eventValue.idempotency_key : `tekdocs:invoice:${selected.id}:${eventValue.event_type}:${crypto.randomUUID()}`, related_invoice_id: eventValue.related_invoice_id || null, note: eventValue.note }), 'accounting.updateFailed') }} />}
@@ -424,6 +436,43 @@ function DraftEditor({ value, setValue, busy, title, cancel, submit }: { value: 
     <Field label={translate('accounting.reference')} value={value.reference} required={false} onChange={(reference) => setValue({ ...value, reference })} />
     <label className="wide-field"><span>{translate('accounting.notes')}</span><textarea rows={3} value={value.notes} onChange={(event) => setValue({ ...value, notes: event.target.value })} /></label>
   </div><Actions busy={busy} cancel={cancel} label={translate('accounting.saveDraft')} /></form></section>
+}
+
+function InvoicePartySummary({ label, identity }: { label: string; identity?: InvoiceBillingIdentity }) {
+  const name = identity?.legal_name || identity?.display_name || translate('accounting.notProvided')
+  const address = [identity?.address_line_1, identity?.address_line_2, [identity?.city, identity?.region, identity?.postal_code].filter(Boolean).join(' '), identity?.country_code].filter(Boolean).join(', ')
+  return <section><h4>{label}</h4><strong>{name}</strong><span>{address || translate('accounting.notProvided')}</span></section>
+}
+
+function BillingEditor({ value, setValue, busy, cancel, submit }: { value: BillingForm; setValue: (value: BillingForm) => void; busy: boolean; cancel: () => void; submit: () => void }) {
+  const [initial] = useState(value)
+  const dirty = JSON.stringify(value) !== JSON.stringify(initial)
+  const finishCancel = () => { setValue(initial); cancel() }
+  const attempt = useUnsavedChanges(dirty, busy, finishCancel, true)
+  function save(event: FormEvent) { event.preventDefault(); submit() }
+  return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-billing-title"><form className="record-form invoice-billing-form" onSubmit={save}><div className="section-heading"><div><h2 id="invoice-billing-title">{translate('accounting.billingDetails')}</h2><p>{translate('accounting.billingDetailsHelp')}</p></div></div>
+    <fieldset><legend>{translate('accounting.from')}</legend><div className="form-grid"><PartyFields value={value.issuer} setValue={(issuer) => setValue({ ...value, issuer })} issuer /></div></fieldset>
+    <fieldset><legend>{translate('accounting.billTo')}</legend><div className="form-grid"><PartyFields value={value.bill_to} setValue={(bill_to) => setValue({ ...value, bill_to })} /></div></fieldset>
+    <Actions busy={busy} cancel={() => attempt(finishCancel)} label={translate('accounting.saveBillingDetails')} />
+  </form></section>
+}
+
+function PartyFields({ value, setValue, issuer = false }: { value: InvoiceBillingIdentity; setValue: (value: InvoiceBillingIdentity) => void; issuer?: boolean }) {
+  const set = (field: keyof InvoiceBillingIdentity) => (next: string) => setValue({ ...value, [field]: next })
+  return <>
+    <Field label={translate('organizations.legalName')} value={value.legal_name ?? ''} onChange={set('legal_name')} />
+    {!issuer && <Field label={translate('organizations.displayName')} value={value.display_name ?? ''} required={false} onChange={set('display_name')} />}
+    {!issuer && <Field label={translate('organizations.billingContact')} value={value.contact_name ?? ''} required={false} onChange={set('contact_name')} />}
+    <Field label={translate('organizations.billingEmail')} type="email" value={value.billing_email ?? ''} required={issuer} onChange={set('billing_email')} />
+    <Field label={translate('organizations.billingPhone')} value={value.phone ?? ''} required={false} onChange={set('phone')} />
+    <Field label={translate('accounting.addressLine1')} value={value.address_line_1 ?? ''} onChange={set('address_line_1')} />
+    <Field label={translate('accounting.addressLine2')} value={value.address_line_2 ?? ''} required={false} onChange={set('address_line_2')} />
+    <Field label={translate('accounting.city')} value={value.city ?? ''} onChange={set('city')} />
+    <Field label={translate('accounting.region')} value={value.region ?? ''} required={false} onChange={set('region')} />
+    <Field label={translate('accounting.postalCode')} value={value.postal_code ?? ''} onChange={set('postal_code')} />
+    <Field label={translate('accounting.country')} value={value.country_code ?? ''} onChange={(next) => set('country_code')(next.toUpperCase())} />
+    {issuer && <><Field label={translate('accounting.taxRegistration')} value={value.tax_registration ?? ''} required={false} onChange={set('tax_registration')} /><label className="wide-field"><span>{translate('accounting.paymentInstructions')}</span><textarea rows={3} value={value.payment_instructions ?? ''} onChange={(event) => set('payment_instructions')(event.target.value)} /></label></>}
+  </>
 }
 
 function LineEditor({ value, setValue, origins, taxRates, currency, adjustsExistingStock, busy, cancel, submit }: { value: LineForm; setValue: (value: LineForm) => void; origins: InvoiceOrigin[]; taxRates: TaxRateChoice[]; currency: string; adjustsExistingStock: boolean; busy: boolean; cancel: () => void; submit: () => void }) {

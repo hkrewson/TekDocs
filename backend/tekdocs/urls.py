@@ -287,6 +287,7 @@ from apps.core.invoice_views import (
     InvoiceCSVDownloadView,
     InvoiceDeliveryView,
     InvoiceDetailView,
+    InvoiceFollowUpView,
     InvoiceIssueView,
     InvoiceLifecycleEventView,
     InvoiceLineDetailView,
@@ -1628,6 +1629,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/issue",
         InvoiceIssueView.as_view(),
         name="organization-invoice-issue",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/follow-up",
+        InvoiceFollowUpView.as_view(),
+        name="organization-invoice-follow-up",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/withdraw-recurring-draft",

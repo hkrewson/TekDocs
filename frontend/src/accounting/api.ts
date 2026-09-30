@@ -45,7 +45,9 @@ export type InvoiceDraft = {
   balance_amount?: string
   last_event_at?: string | null
   lifecycle_events?: InvoiceLifecycleEvent[]
+  issuer?: InvoiceBillingIdentity
   bill_to?: InvoiceBillingIdentity
+  source?: { id: string; number: string; kind: 'supplement' | 'replacement' } | null
   recurring?: {
     starts_on: string
     ends_before: string
@@ -68,6 +70,8 @@ export type InvoiceBillingIdentity = {
   postal_code?: string
   country_code?: string
   website?: string
+  tax_registration?: string
+  payment_instructions?: string
 }
 
 export type InvoiceCollectionQuery = {
@@ -160,6 +164,7 @@ export interface InvoiceClient {
   withdrawRecurring(workspace: WorkspaceContext, invoiceId: string, reason: string): Promise<InvoiceDraft>
   deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
   recordEvent(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
+  followUp(workspace: WorkspaceContext, invoiceId: string, mode: 'supplement' | 'replacement'): Promise<InvoiceDraft>
   pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
   csvUrl(workspace: WorkspaceContext, invoiceId: string): string
   accountingExportUrl(workspace: WorkspaceContext, invoiceId: string): string
@@ -235,6 +240,7 @@ export const browserInvoiceClient: InvoiceClient = {
   withdrawRecurring: (workspace, invoiceId, reason) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/withdraw-recurring-draft`, 'POST', { reason }),
   deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
   recordEvent: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/events`, 'POST', values),
+  followUp: (workspace, invoiceId, mode) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/follow-up`, 'POST', { mode }),
   pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,
   csvUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/csv`,
   accountingExportUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/accounting-export`,

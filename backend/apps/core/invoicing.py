@@ -6,7 +6,7 @@ import hashlib
 import io
 import json
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import cast
 from uuid import UUID, uuid4
@@ -33,6 +33,7 @@ from .models import (
     InvoiceLifecycleEvent,
     InvoiceLine,
     InvoiceNumberSeries,
+    InvoiceSourceKind,
     InvoiceState,
     Organization,
     RecurringInvoicePeriod,
@@ -361,7 +362,7 @@ def deliver_invoice(*, invoice: Invoice, recipient: str, actor_id: UUID) -> Invo
 def invoices_for_scope(scope: DataScope) -> QuerySet[Invoice]:
     return (
         Invoice.scoped.for_scope(scope)
-        .select_related("entity", "organization")
+        .select_related("entity", "organization", "source_invoice__entity")
         .select_related("recurring_period__withdrawal")
         .prefetch_related(
             Prefetch("lines", queryset=InvoiceLine.objects.select_related("catalog_product__entity")),
@@ -543,7 +544,16 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         raise InvoiceError("Configure the invoice issuer before issuing") from exc
     if not profile.is_issue_ready:
         raise InvoiceError("Complete the invoice issuer identity before issuing")
-    if any(line.tax_rate_value > 0 for line in lines) and not profile.tax_registration.strip():
+    issuer = dict(locked.issuer_snapshot)
+    customer = dict(locked.customer_snapshot)
+    required_issuer = ("legal_name", "address_line_1", "city", "postal_code", "country_code", "billing_email")
+    if any(not str(issuer.get(field, "")).strip() for field in required_issuer):
+        raise InvoiceError("Complete the invoice-specific sender identity before issuing")
+    customer_name = str(customer.get("legal_name") or customer.get("display_name") or "").strip()
+    required_customer = ("address_line_1", "city", "postal_code", "country_code")
+    if not customer_name or any(not str(customer.get(field, "")).strip() for field in required_customer):
+        raise InvoiceError("Complete the invoice-specific bill-to identity before issuing")
+    if any(line.tax_rate_value > 0 for line in lines) and not str(issuer.get("tax_registration", "")).strip():
         raise InvoiceError("Add the issuer tax registration before issuing a taxed invoice")
     try:
         series = InvoiceNumberSeries.objects.select_for_update().get(tenant=locked.tenant, **_series_values(profile))
@@ -562,8 +572,6 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     number = render_invoice_number(series, locked.invoice_date, sequence)
     amounts = calculate_invoice((line_amounts(line) for line in lines), locked.currency)
     issued_at = timezone.now()
-    issuer = _profile_snapshot(profile)
-    customer = _customer_snapshot(locked)
     line_records = []
     for line in lines:
         values = line_amounts(line)
@@ -744,6 +752,10 @@ def create_invoice(
         reference=reference,
         notes=notes,
     )
+    invoice.customer_snapshot = _customer_snapshot(invoice)
+    profile = TenantBillingProfile.objects.filter(tenant=tenant).first()
+    if profile is not None:
+        invoice.issuer_snapshot = _profile_snapshot(profile)
     _validate(invoice)
     invoice.save()
     AuditEvent.objects.create(
@@ -761,7 +773,7 @@ def update_invoice(*, invoice: Invoice, actor_id: UUID, values: dict[str, object
     next_currency = str(values.get("currency", locked.currency))
     if next_currency != locked.currency and InvoiceLine.objects.filter(invoice=locked).exists():
         raise InvoiceError("Remove draft lines before changing invoice currency")
-    for field in ("currency", "invoice_date", "due_date", "reference", "notes"):
+    for field in ("currency", "invoice_date", "due_date", "reference", "notes", "issuer_snapshot", "customer_snapshot"):
         if field in values:
             setattr(locked, field, values[field])
     _validate(locked)
@@ -777,6 +789,76 @@ def update_invoice(*, invoice: Invoice, actor_id: UUID, values: dict[str, object
         metadata={},
     )
     return locked
+
+
+@transaction.atomic
+def create_invoice_from_issued(
+    *, source: Invoice, actor_id: UUID, source_kind: str
+) -> Invoice:
+    if source_kind not in InvoiceSourceKind.values:
+        raise InvoiceError("Choose a supported invoice follow-up type")
+    locked = (
+        Invoice.objects.select_for_update()
+        .select_related("tenant", "organization", "entity")
+        .prefetch_related("lines")
+        .get(pk=source.pk)
+    )
+    if locked.state != InvoiceState.ISSUED:
+        raise InvoiceError("Only an issued invoice can start a follow-up draft")
+    today = timezone.localdate()
+    profile = TenantBillingProfile.objects.filter(tenant=locked.tenant).first()
+    terms = profile.payment_terms_days if profile is not None else max((locked.due_date - locked.invoice_date).days, 0)
+    label = "Supplement" if source_kind == InvoiceSourceKind.SUPPLEMENT else "Replacement"
+    entity = Entity.objects.create(
+        tenant=locked.tenant,
+        workspace=workspace_for_owner(tenant=locked.tenant, organization=locked.organization),
+        organization=locked.organization,
+        entity_type="invoice",
+        display_name=f"Draft invoice · {today.isoformat()}",
+        visibility=EntityVisibility.MSP_PRIVATE,
+    )
+    draft = Invoice(
+        tenant=locked.tenant,
+        organization=locked.organization,
+        entity=entity,
+        currency=locked.currency,
+        invoice_date=today,
+        due_date=today + timedelta(days=terms),
+        reference=f"{label} to {locked.number}",
+        notes=locked.notes,
+        source_invoice=locked,
+        source_kind=source_kind,
+        issuer_snapshot=dict(locked.issuer_snapshot),
+        customer_snapshot=dict(locked.customer_snapshot),
+    )
+    _validate(draft)
+    draft.save()
+    if source_kind == InvoiceSourceKind.REPLACEMENT:
+        for original in locked.lines.all():
+            copied = InvoiceLine(
+                tenant=locked.tenant,
+                organization=locked.organization,
+                invoice=draft,
+                position=original.position,
+                description=original.description,
+                quantity=original.quantity,
+                unit=original.unit,
+                unit_amount=original.unit_amount,
+                currency=original.currency,
+                tax_rate_name=original.tax_rate_name,
+                tax_rate_value=original.tax_rate_value,
+                tax_inclusive=original.tax_inclusive,
+            )
+            _validate(copied)
+            copied.save()
+    AuditEvent.objects.create(
+        tenant=locked.tenant,
+        actor_id=actor_id,
+        action="invoice.follow_up_draft_created",
+        entity_id=entity.id,
+        metadata={"source_invoice_id": str(locked.entity_id), "source_kind": source_kind},
+    )
+    return draft
 
 
 @transaction.atomic

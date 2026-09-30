@@ -1,6 +1,12 @@
 # Progress and verification
 
-Updated 2026-09-27. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+Updated 2026-09-30. Version 0.8.46. Epic #77; existing delivery obligations remain open.
+
+## Phase 6 invoice review and follow-up draft checkpoint — 2026-09-30
+
+Invoice drafts now expose the exact sender and bill-to details that issuance will freeze. Authorized staff can tailor either party for one invoice without changing MSP or client defaults, and the final confirmation shows both parties, dates, item count and total before the irreversible issue action. Existing drafts receive current defaults during upgrade; later default changes cannot rewrite saved or issued snapshots.
+
+An issued invoice can create an empty linked supplement for omitted work or a populated linked replacement for correction without changing the issued source. Replacement line values are copied without live origins so stock is not consumed twice. Exact-Workspace service checks, database guards, forced RLS and the IDOR matrix protect the source relationship. This foundation does not mark the source voided or credited; separately numbered credit notes and void-before-delivery remain in the corrections milestone. Version remains 0.8.46; production deployment and Wiki publication remain separately authorized.
 
 ## Phase 6 NetBox MAC-address adoption checkpoint — 2026-09-27
 

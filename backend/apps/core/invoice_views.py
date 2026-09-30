@@ -26,6 +26,7 @@ from .invoicing import (
     InvoiceLifecycle,
     configure_issue_settings,
     create_invoice,
+    create_invoice_from_issued,
     create_line,
     delete_invoice,
     delete_line,
@@ -77,12 +78,31 @@ class StrictSerializer(serializers.Serializer):
         return super().to_internal_value(data)
 
 
+class InvoicePartyWriteSerializer(StrictSerializer):
+    display_name = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    legal_name = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    contact_name = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    billing_email = serializers.EmailField(max_length=254, allow_blank=True, required=False, default="")
+    phone = serializers.CharField(max_length=64, allow_blank=True, required=False, default="")
+    address_line_1 = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    address_line_2 = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
+    city = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    region = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    postal_code = serializers.CharField(max_length=32, allow_blank=True, required=False, default="")
+    country_code = serializers.ChoiceField(choices=COUNTRY_CHOICES, allow_blank=True, required=False, default="")
+    website = serializers.CharField(max_length=500, allow_blank=True, required=False, default="")
+    tax_registration = serializers.CharField(max_length=120, allow_blank=True, required=False, default="")
+    payment_instructions = serializers.CharField(max_length=2000, allow_blank=True, required=False, default="")
+
+
 class InvoiceWriteSerializer(StrictSerializer):
     currency = serializers.CharField(max_length=3)
     invoice_date = serializers.DateField()
     due_date = serializers.DateField()
     reference = serializers.CharField(max_length=240, allow_blank=True, required=False, default="")
     notes = serializers.CharField(max_length=4000, allow_blank=True, required=False, default="")
+    issuer = InvoicePartyWriteSerializer(required=False)
+    bill_to = InvoicePartyWriteSerializer(required=False)
 
 
 class InvoiceUpdateSerializer(StrictSerializer):
@@ -91,6 +111,12 @@ class InvoiceUpdateSerializer(StrictSerializer):
     due_date = serializers.DateField(required=False)
     reference = serializers.CharField(max_length=240, allow_blank=True, required=False)
     notes = serializers.CharField(max_length=4000, allow_blank=True, required=False)
+    issuer = InvoicePartyWriteSerializer(required=False)
+    bill_to = InvoicePartyWriteSerializer(required=False)
+
+
+class InvoiceFollowUpWriteSerializer(StrictSerializer):
+    mode = serializers.ChoiceField(choices=("supplement", "replacement"))
 
 
 class InvoiceLineWriteSerializer(StrictSerializer):
@@ -255,7 +281,9 @@ class InvoiceSerializer(serializers.Serializer):
     balance_amount = serializers.SerializerMethodField()
     last_event_at = serializers.SerializerMethodField()
     lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
+    issuer = serializers.SerializerMethodField()
     bill_to = serializers.SerializerMethodField()
+    source = serializers.SerializerMethodField()
     recurring = serializers.SerializerMethodField()
 
     @extend_schema_field(RecurringInvoiceDispositionSerializer(allow_null=True))
@@ -277,7 +305,7 @@ class InvoiceSerializer(serializers.Serializer):
         if self.context.get("summary"):
             for field in (
                 "notes", "lines", "content_digest", "signature_algorithm", "key_fingerprint",
-                "lifecycle_events", "bill_to",
+                "lifecycle_events", "issuer", "bill_to", "source",
             ):
                 fields.pop(field, None)
         return fields
@@ -299,7 +327,6 @@ class InvoiceSerializer(serializers.Serializer):
                 "balance_amount",
                 "last_event_at",
                 "lifecycle_events",
-                "bill_to",
             ):
                 rendered.pop(field, None)
         elif self.context.get("portal"):
@@ -310,6 +337,20 @@ class InvoiceSerializer(serializers.Serializer):
     @extend_schema_field(serializers.DictField(child=serializers.CharField(allow_blank=True)))
     def get_bill_to(self, item):  # type: ignore[no-untyped-def]
         return dict(item.customer_snapshot)
+
+    @extend_schema_field(serializers.DictField(child=serializers.CharField(allow_blank=True)))
+    def get_issuer(self, item):  # type: ignore[no-untyped-def]
+        return dict(item.issuer_snapshot)
+
+    @extend_schema_field(serializers.DictField(child=serializers.CharField(allow_blank=True), allow_null=True))
+    def get_source(self, item):  # type: ignore[no-untyped-def]
+        if item.source_invoice_id is None:
+            return None
+        return {
+            "id": str(item.source_invoice.entity_id),
+            "number": item.source_invoice.number,
+            "kind": item.source_kind,
+        }
 
     def _lifecycle(self, item: Invoice) -> InvoiceLifecycle:
         return invoice_lifecycle(item)
@@ -636,13 +677,23 @@ class InvoiceListCreateView(APIView):
         organization = workspace.organization
         if organization is None:  # pragma: no cover - guarded by _workspace
             raise PermissionDenied("Invoice drafts require a client organization Workspace.")
+        values = dict(serializer.validated_data)
+        issuer = values.pop("issuer", None)
+        bill_to = values.pop("bill_to", None)
         try:
             record = create_invoice(
                 tenant=workspace.member.tenant,
                 organization=organization,
                 actor_id=request.user.pk,
-                **serializer.validated_data,
+                **values,
             )
+            updates: dict[str, object] = {}
+            if issuer is not None:
+                updates["issuer_snapshot"] = dict(issuer)
+            if bill_to is not None:
+                updates["customer_snapshot"] = dict(bill_to)
+            if updates:
+                record = update_invoice(invoice=record, actor_id=request.user.pk, values=updates)
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
@@ -682,6 +733,23 @@ class InvoiceIssueView(APIView):
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
+
+
+class InvoiceFollowUpView(APIView):
+    @extend_schema(request=InvoiceFollowUpWriteSerializer, responses={201: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_EDIT)
+        serializer = InvoiceFollowUpWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = create_invoice_from_issued(
+                source=_invoice(workspace, invoice_entity_id),
+                actor_id=request.user.pk,
+                source_kind=serializer.validated_data["mode"],
+            )
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
 
 class InvoiceRecurringWithdrawalView(APIView):
@@ -833,11 +901,16 @@ class InvoiceDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         if not serializer.validated_data:
             raise serializers.ValidationError({"detail": "At least one invoice field is required."})
+        values = dict(serializer.validated_data)
+        if "issuer" in values:
+            values["issuer_snapshot"] = dict(values.pop("issuer"))
+        if "bill_to" in values:
+            values["customer_snapshot"] = dict(values.pop("bill_to"))
         try:
             record = update_invoice(
                 invoice=_invoice(workspace, invoice_entity_id),
                 actor_id=request.user.pk,
-                values=dict(serializer.validated_data),
+                values=values,
             )
         except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc

@@ -26,11 +26,14 @@ Issuance creates an ordinary exact-Workspace invoice due reminder. Delivery succ
 
 Invoice readiness reports missing issuer identity, address, country, currency, contact, and numbering configuration. A taxed invoice cannot issue without an issuer tax registration. TekDocs does not determine tax jurisdiction or claim statutory accounting or tax compliance.
 
+Draft invoices materialize editable invoice-specific sender and bill-to snapshots before issue. The operator reviews those saved values; issuance freezes them without re-reading mutable MSP or client defaults. An issued invoice may start a linked supplemental draft with no lines or a linked replacement draft with copied immutable line values. Creating either draft does not alter the source invoice or its receivable. Replacement lines do not retain stock origins because physical use has already been recorded and must not be consumed twice.
+
 ## Consequences
 
 - External accounting and payment systems provide observations, not write authority over issued invoices.
 - Payment events are records of settlement performed elsewhere; TekDocs stores no payment credential and initiates no transfer.
 - Void and credit are explicit linked history records. The original issued artifact is retained unchanged.
+- Supplemental and replacement drafts reduce re-entry and retain lineage, but neither is itself a void or credit note. The corrections milestone still owns separately numbered credit documents and void-before-delivery.
 - Quotes, expenses, purchasing, payroll, bank reconciliation, chart of accounts, general ledger, payment processing, automatic tax determination, and tax filing remain unavailable.
 - A future provider connector consumes the versioned export and event contract instead of adding provider-specific columns to invoices.
 

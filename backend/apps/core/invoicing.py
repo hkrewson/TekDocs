@@ -434,6 +434,20 @@ def _customer_snapshot(invoice: Invoice) -> dict[str, object]:
     }
 
 
+def _follow_up_snapshot(
+    saved: dict[str, object], fallback: dict[str, object], required_fields: tuple[str, ...]
+) -> dict[str, object]:
+    """Preserve issued values while filling legacy gaps from current defaults."""
+    result = dict(saved)
+    for field, value in fallback.items():
+        if field not in result:
+            result[field] = value
+    for field in required_fields:
+        if not str(result.get(field, "")).strip():
+            result[field] = fallback.get(field, "")
+    return result
+
+
 def _series_values(profile: TenantBillingProfile) -> dict[str, object]:
     return {
         "prefix": profile.invoice_prefix,
@@ -817,6 +831,22 @@ def create_invoice_from_issued(
         display_name=f"Draft invoice · {today.isoformat()}",
         visibility=EntityVisibility.MSP_PRIVATE,
     )
+    issuer_snapshot = dict(locked.issuer_snapshot)
+    if profile is not None:
+        issuer_snapshot = _follow_up_snapshot(
+            issuer_snapshot,
+            _profile_snapshot(profile),
+            ("legal_name", "address_line_1", "city", "postal_code", "country_code", "billing_email"),
+        )
+    customer_snapshot = _follow_up_snapshot(
+        dict(locked.customer_snapshot),
+        _customer_snapshot(locked),
+        ("address_line_1", "city", "postal_code", "country_code"),
+    )
+    if not str(customer_snapshot.get("legal_name") or customer_snapshot.get("display_name") or "").strip():
+        current_customer = _customer_snapshot(locked)
+        customer_snapshot["legal_name"] = current_customer.get("legal_name", "")
+        customer_snapshot["display_name"] = current_customer.get("display_name", "")
     draft = Invoice(
         tenant=locked.tenant,
         organization=locked.organization,
@@ -828,8 +858,8 @@ def create_invoice_from_issued(
         notes=locked.notes,
         source_invoice=locked,
         source_kind=source_kind,
-        issuer_snapshot=dict(locked.issuer_snapshot),
-        customer_snapshot=dict(locked.customer_snapshot),
+        issuer_snapshot=issuer_snapshot,
+        customer_snapshot=customer_snapshot,
     )
     _validate(draft)
     draft.save()

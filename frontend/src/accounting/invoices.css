@@ -115,6 +115,29 @@
 .invoice-review-facts dt { color: var(--muted); font-size: 11px; }
 .invoice-review-facts dd { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
 
+.invoice-review-lines {
+  display: grid;
+  gap: 0;
+  margin: 14px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.invoice-review-lines li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 16px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.invoice-review-lines li > span { display: grid; gap: 2px; min-width: 0; }
+.invoice-review-lines strong { overflow-wrap: anywhere; }
+.invoice-review-lines small { color: var(--muted); }
+
 .invoice-billing-form fieldset {
   margin: 0;
   padding: 16px 0 0;

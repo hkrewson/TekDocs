@@ -225,15 +225,28 @@ describe('Invoices', () => {
     expect(review).toHaveTextContent('USD 137.50')
   })
 
-  it('creates a linked supplemental or replacement draft from an issued invoice', async () => {
+  it('creates a complete linked revision draft from an issued invoice', async () => {
     const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z' }
-    const supplement = { ...draft, id: 'invoice-2', source: { id: 'invoice-1', number: 'INV-000001', kind: 'supplement' as const }, lines: [] }
-    const followUp = vi.fn().mockResolvedValue(supplement)
-    renderInvoice(invoiceClient({ get: vi.fn().mockImplementation((_workspace, id: string) => Promise.resolve(id === 'invoice-2' ? supplement : issued)), followUp }))
+    const revision = { ...draft, id: 'invoice-2', reference: 'Replacement to INV-000001', source: { id: 'invoice-1', number: 'INV-000001', kind: 'replacement' as const } }
+    const followUp = vi.fn().mockResolvedValue(revision)
+    renderInvoice(invoiceClient({ get: vi.fn().mockImplementation((_workspace, id: string) => Promise.resolve(id === 'invoice-2' ? revision : issued)), followUp }))
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Add missed items' }))
-    await waitFor(() => expect(followUp).toHaveBeenCalledWith(workspace, 'invoice-1', 'supplement'))
-    expect(await screen.findByText(/Supplement to INV-000001/)).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Revise invoice' }))
+    await waitFor(() => expect(followUp).toHaveBeenCalledWith(workspace, 'invoice-1', 'replacement'))
+    expect(await screen.findByText(/Every original item was carried forward/)).toBeInTheDocument()
+  })
+
+  it('shows every line and the exact server validation message before a retry', async () => {
+    const issue = vi.fn().mockRejectedValue(new InvoiceRequestError('Complete the invoice-specific bill-to identity before issuing', 400))
+    renderInvoice(invoiceClient({ issue }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Review and issue' }))
+    const review = screen.getByRole('alertdialog')
+    expect(review).toHaveTextContent('Managed firewall')
+    expect(review).toHaveTextContent('1.000 each × USD 125.00')
+    fireEvent.click(within(review).getByRole('button', { name: 'Issue invoice' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Complete the invoice-specific bill-to identity before issuing')
   })
 
   it('confirms the password and retries issuance when recent authentication expired', async () => {

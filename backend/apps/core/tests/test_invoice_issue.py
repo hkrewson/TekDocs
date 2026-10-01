@@ -26,6 +26,26 @@ from apps.core.models import (
 from apps.core.organizations import create_organization
 
 
+def test_follow_up_snapshot_preserves_saved_values_and_fills_required_legacy_gaps():
+    merged = invoicing._follow_up_snapshot(  # noqa: SLF001
+        {"legal_name": "Saved Client", "address_line_1": "", "phone": ""},
+        {
+            "legal_name": "Current Client",
+            "address_line_1": "400 Congress Avenue",
+            "city": "Austin",
+            "phone": "512-555-0100",
+        },
+        ("legal_name", "address_line_1", "city"),
+    )
+
+    assert merged == {
+        "legal_name": "Saved Client",
+        "address_line_1": "400 Congress Avenue",
+        "city": "Austin",
+        "phone": "",
+    }
+
+
 @pytest.fixture
 def installation(db):
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)

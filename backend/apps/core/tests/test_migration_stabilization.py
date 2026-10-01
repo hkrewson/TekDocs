@@ -8,6 +8,7 @@ import psycopg
 import pytest
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
+from django.test import override_settings
 from django.utils import timezone
 from psycopg import sql
 
@@ -23,7 +24,14 @@ from apps.accounts.models import (
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
 from apps.core.documents import create_document
-from apps.core.invoicing import create_invoice, create_line
+from apps.core.invoicing import (
+    configure_issue_settings,
+    create_invoice,
+    create_invoice_from_issued,
+    create_line,
+    invoice_pdf_bytes,
+    issue_invoice,
+)
 from apps.core.models import (
     AuditEvent,
     CustomFieldDefinition,
@@ -847,3 +855,122 @@ def test_invoice_follow_up_upgrade_backfills_reviewable_draft_parties(migration_
     assert upgraded.customer_snapshot["address_line_1"] == "400 Review Street"
     assert upgraded.source_invoice_id is None
     assert upgraded.source_kind == ""
+
+
+@pytest.mark.django_db(transaction=True)
+def test_legacy_supplement_drafts_upgrade_to_complete_revisions(
+    migration_head_restored, tmp_path, monkeypatch
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Invoice upgrade validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Complete Invoice Revision MSP",
+        owner_email=f"complete-invoice-revision-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Complete Invoice Revision Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    organization = create_organization(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        name="Complete Invoice Revision Client",
+        legal_name="Complete Invoice Revision Client, LLC",
+        website="https://example.invalid",
+        classifications=["client"],
+        billing_address_line_1="400 Review Street",
+        billing_city="Austin",
+        billing_postal_code="78701",
+        billing_country_code="US",
+    )
+    configure_issue_settings(
+        tenant=result.tenant,
+        actor_id=result.owner.id,
+        values={
+            "legal_name": "Complete Invoice Revision MSP, LLC",
+            "address_line_1": "100 Sender Street",
+            "address_line_2": "",
+            "city": "Austin",
+            "region": "TX",
+            "postal_code": "78701",
+            "country_code": "US",
+            "billing_email": "billing@example.invalid",
+            "phone": "",
+            "tax_registration": "",
+            "payment_instructions": "ACH",
+            "default_currency": "USD",
+            "payment_terms_days": 30,
+            "invoice_prefix": "REV",
+            "invoice_date_component": "none",
+            "invoice_separator": "-",
+            "invoice_sequence_digits": 6,
+            "invoice_reset_period": "never",
+        },
+    )
+    source = create_invoice(
+        tenant=result.tenant,
+        organization=organization,
+        actor_id=result.owner.id,
+        currency="USD",
+        invoice_date=date(2026, 9, 30),
+        due_date=date(2026, 10, 30),
+    )
+    for description, amount in (("Managed service", "125.00"), ("Site visit", "75.00")):
+        create_line(
+            invoice=source,
+            actor_id=result.owner.id,
+            values={
+                "description": description,
+                "quantity": "1",
+                "unit": "each",
+                "unit_amount": amount,
+            },
+        )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        source = issue_invoice(invoice=source, actor_id=result.owner.id)
+    supplement = create_invoice_from_issued(
+        source=source,
+        actor_id=result.owner.id,
+        source_kind="supplement",
+    )
+    create_line(
+        invoice=supplement,
+        actor_id=result.owner.id,
+        values={
+            "description": "Missed cable run",
+            "quantity": "24",
+            "unit": "foot",
+            "unit_amount": "2.50",
+        },
+    )
+    assert list(supplement.lines.values_list("description", flat=True)) == ["Missed cable run"]
+
+    call_command("migrate", "core", "0159_invoice_follow_up_drafts", verbosity=0, interactive=False)
+    call_command("migrate", "core", verbosity=0, interactive=False)
+
+    upgraded = Invoice.objects.get(pk=supplement.pk)
+    assert upgraded.source_kind == "replacement"
+    assert upgraded.reference == f"Replacement to {source.number}"
+    assert list(upgraded.lines.values_list("description", flat=True)) == [
+        "Managed service",
+        "Site visit",
+        "Missed cable run",
+    ]
+    assert list(upgraded.lines.values_list("position", flat=True)) == [1, 2, 3]
+    assert list(source.lines.values_list("description", flat=True)) == ["Managed service", "Site visit"]
+
+    rendered_descriptions: list[str] = []
+
+    def capture_pdf(**values):  # type: ignore[no-untyped-def]
+        rendered_descriptions.extend(line["description"] for line in values["lines"])
+        return b"%PDF-1.4 complete-revision-test"
+
+    monkeypatch.setattr("apps.core.invoicing.render_invoice_pdf", capture_pdf)
+    with override_settings(MEDIA_ROOT=tmp_path):
+        issued_revision = issue_invoice(invoice=upgraded, actor_id=result.owner.id)
+        assert invoice_pdf_bytes(issued_revision) == b"%PDF-1.4 complete-revision-test"
+    assert rendered_descriptions == [
+        "Managed service",
+        "Site visit",
+        "Missed cable run",
+    ]

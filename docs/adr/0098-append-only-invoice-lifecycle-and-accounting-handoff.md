@@ -28,6 +28,8 @@ Invoice readiness reports missing issuer identity, address, country, currency, c
 
 Draft invoices materialize editable invoice-specific sender and bill-to snapshots before issue. The operator reviews those saved values; issuance freezes them without re-reading mutable MSP or client defaults. The primary interface starts a complete linked revision draft by copying every immutable source line so the operator can review the whole revised invoice and add, remove, or edit items without rebuilding it. The lower-level API retains the separately named supplemental mode for integrations that deliberately need a delta-only invoice. Creating either draft does not alter the source invoice or its receivable. Copied lines do not retain stock origins because physical use has already been recorded and must not be consumed twice. Legacy issued snapshots keep their saved values while required fields that did not exist at the time are filled from current billing defaults; issuance still validates the resulting invoice-specific snapshot.
 
+Editable supplemental drafts created before the primary interface adopted complete revisions are upgraded in place. The immutable source lines are inserted before the draft's added lines, the draft becomes a replacement, and any operator-authored reference is preserved. Issued supplemental invoices are retained unchanged.
+
 ## Consequences
 
 - External accounting and payment systems provide observations, not write authority over issued invoices.

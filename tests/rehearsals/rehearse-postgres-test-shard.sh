@@ -73,6 +73,7 @@ case "$shard" in
     set -- \
       apps/core/tests/test_migration_stabilization.py::test_billing_foundation_upgrades_from_document_operations \
       apps/core/tests/test_migration_stabilization.py::test_invoice_issue_upgrades_an_exact_prior_draft_without_allocating_a_number \
+      apps/core/tests/test_migration_stabilization.py::test_legacy_supplement_drafts_upgrade_to_complete_revisions \
       apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply
     ;;
   migration-isolation)

@@ -371,7 +371,11 @@ def test_network_device_serializer_does_not_disclose_linked_asset_without_asset_
 
 
 @pytest.mark.django_db
-def test_inventory_collections_search_paging_order_and_parent_boundaries(owner_client, installation):
+def test_inventory_collections_search_paging_order_and_parent_boundaries(owner_client, installation, monkeypatch):
+    from apps.core.tests import network_asset_fixtures
+
+    suffixes = iter(f"30{index:08x}" for index in range(31))
+    monkeypatch.setattr(network_asset_fixtures, "_catalog_suffix", lambda: next(suffixes))
     organization = _organization(installation, "Collection workspace")
     sibling = _organization(installation, "Collection sibling")
     site = _site(owner_client, organization, "Collection site")

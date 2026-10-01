@@ -5,9 +5,13 @@ from apps.core.inventory import create_client_asset
 from apps.core.organizations import create_organization
 
 
+def _catalog_suffix() -> str:
+    return uuid.uuid4().hex[:10]
+
+
 def create_network_hardware_asset(*, installation, organization, name: str):  # type: ignore[no-untyped-def]
     """Create the smallest real supplier catalog chain for an asset-backed network record."""
-    suffix = uuid.uuid4().hex[:10]
+    suffix = _catalog_suffix()
     supplier = create_organization(
         tenant=installation.tenant,
         actor_id=installation.owner.id,
@@ -33,7 +37,9 @@ def create_network_hardware_asset(*, installation, organization, name: str):  # 
         tenant=installation.tenant,
         organization=supplier,
         actor_id=installation.owner.id,
-        name=f"Network device {suffix}",
+        # Keep random fixture identifiers from accidentally matching a device-name
+        # collection search such as "Device 30".
+        name=f"Network device fixture-{suffix}",
         kind="hardware",
         description="Test-only physical network asset",
     )

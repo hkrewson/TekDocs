@@ -4,6 +4,12 @@ Issue #40. Application version remains 0.8.46. This record owns the bounded
 decomposition sequence and the evidence needed to prove that moving code does not
 change public behavior.
 
+> **Version 1 reconciliation (2026-10-02):** preserve the completed extractions
+> and their compatibility exports. Further Documentation decomposition is driven
+> by the repository, parser, composition and migration slices in
+> `planning/v1-markdown-content-graph.md`, not by a goal of splitting the current
+> database-backed implementation unchanged.
+
 ## Dependency direction
 
 - `Documentation.tsx` remains the route-level coordinator. It owns URL state,

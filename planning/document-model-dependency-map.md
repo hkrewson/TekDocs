@@ -5,6 +5,14 @@ checkpoint before the document models leave `apps.core.models`; it records the
 runtime identities that the split must preserve and gives each extraction a
 bounded order and verification contract.
 
+> **Version 1 reconciliation (2026-10-02):** completed behavior-preserving
+> extractions remain valid, but this sequence no longer authorizes mechanically
+> extracting every remaining database-backed document model. ADR 0105 and
+> `planning/v1-markdown-content-graph.md` now own the next architecture step.
+> Database models retained for workflow, publications, files and migration may
+> still be decomposed when a delivery slice needs it; canonical content models
+> first migrate behind the repository boundary.
+
 ## Compatibility contract
 
 Every extraction keeps all of the following unchanged:

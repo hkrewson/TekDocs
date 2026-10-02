@@ -39,6 +39,13 @@ TekDocs stores provider-neutral credential references. It does not store or retr
 
 Invoices are a bounded issuance capability with immutable artifacts, append-only lifecycle projections, and a versioned accounting handoff; TekDocs is not a general ledger or payment processor. Ticketing, PSA, CRM, RMM, and MDM workflows remain in their authoritative external systems and may be projected through explicit integrations. The maintained [product capability contract](docs/PRODUCT_BOUNDARY.md) distinguishes current, intended 1.0, experimental, and excluded behavior.
 
+The accepted [version 1 delivery plan](planning/v1-markdown-content-graph.md)
+makes Markdown documents and reusable fragments canonical in TekDocs-managed
+local Git repositories while PostgreSQL retains permissions, workflow,
+publications, audit and operational data. This is a planned `0.9.x` migration,
+not a claim about the current database-first `0.8.46` runtime, and it requires no
+GitHub organization or hosted Git service.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

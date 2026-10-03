@@ -18,6 +18,7 @@ const workspace: WorkspaceContext = {
 
 const draft: InvoiceDraft = {
   id: 'invoice-1',
+  document_kind: 'invoice',
   state: 'draft',
   currency: 'USD',
   invoice_date: '2026-08-29',
@@ -55,11 +56,11 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
     address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
     billing_email: 'billing@example.invalid', phone: '', tax_registration: '', payment_instructions: '', default_currency: 'USD',
-    payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none', invoice_separator: '-',
+    payment_terms_days: 30, invoice_prefix: 'INV', credit_note_prefix: 'CR', invoice_date_component: 'none', invoice_separator: '-',
     invoice_sequence_digits: 6, invoice_reset_period: 'never', country_choices: [{ value: 'US', label: 'United States' }],
   }
   return {
-    list: vi.fn().mockResolvedValue({ results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+    list: vi.fn().mockResolvedValue({ results: [draft], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
     get: vi.fn().mockResolvedValue(draft),
     choices: vi.fn().mockResolvedValue({
       origins: [{ id: 'rate-1', origin_type: 'service_rate', name: 'Remote support', description: '', unit_amount: '75.00', currency: 'USD', quantity: '1.000' }],
@@ -78,6 +79,8 @@ function invoiceClient(overrides: Partial<InvoiceClient> = {}): InvoiceClient {
     deliver: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }),
     recordEvent: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001' }),
     followUp: vi.fn().mockResolvedValue(draft),
+    createCreditNote: vi.fn().mockResolvedValue({ ...draft, id: 'credit-1', document_kind: 'credit_note', reference: 'Service adjustment' }),
+    voidInvoice: vi.fn().mockResolvedValue({ ...draft, state: 'issued', number: 'INV-000001', lifecycle_state: 'voided' }),
     pdfUrl: vi.fn().mockReturnValue('/invoice.pdf'),
     csvUrl: vi.fn().mockReturnValue('/invoice.csv'),
     accountingExportUrl: vi.fn().mockReturnValue('/invoice-accounting.json'),
@@ -175,7 +178,7 @@ describe('Invoices', () => {
   it('keeps a read-only draft useful without requesting edit-only choices', async () => {
     const choices = vi.fn()
     const client = invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [draft], can_manage: false, can_issue: false }),
+      list: vi.fn().mockResolvedValue({ results: [draft], can_manage: false, can_issue: false, can_void: false }),
       choices,
     })
     renderInvoice(client)
@@ -286,7 +289,7 @@ describe('Invoices', () => {
     const recurring = { ...draft, recurring: { starts_on: '2026-08-01', ends_before: '2026-09-01', disposition: 'active' as const, withdrawn_at: null, withdrawal_reason: '' } }
     const withdrawn = { ...recurring, recurring: { ...recurring.recurring, disposition: 'withdrawn' as const, withdrawn_at: '2026-08-30T10:00:00Z', withdrawal_reason: 'Client cancelled before issue' } }
     const withdrawRecurring = vi.fn().mockResolvedValue(withdrawn)
-    renderInvoice(invoiceClient({ list: vi.fn().mockResolvedValue({ results: [recurring], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }), get: vi.fn().mockResolvedValue(recurring), withdrawRecurring }))
+    renderInvoice(invoiceClient({ list: vi.fn().mockResolvedValue({ results: [recurring], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }), get: vi.fn().mockResolvedValue(recurring), withdrawRecurring }))
 
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw draft' }))
     const confirmation = screen.getByRole('alertdialog')
@@ -346,7 +349,7 @@ describe('Invoices', () => {
     const delivered = { ...issued, delivered_at: '2026-08-29T14:00:00Z', delivery_count: 1 }
     const deliver = vi.fn().mockResolvedValue(delivered)
     renderInvoice(invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
       get: vi.fn().mockResolvedValue(issued),
       deliver,
     }))
@@ -366,7 +369,7 @@ describe('Invoices', () => {
     const synchronized = { ...issued, lifecycle_state: 'externally_synchronized' as const, reconciliation_state: 'synchronized' as const, lifecycle_events: [{ id: 'event-1', event_type: 'accounting_synchronized', occurred_at: '2026-08-29T14:00:00Z', recorded_at: '2026-08-29T14:00:00Z', actor: 'Invoice Owner', provider: 'ledger', external_id: 'evt-1', amount: null, currency: '', related_invoice_id: null, note: 'Invoice 44' }] }
     const recordEvent = vi.fn().mockResolvedValue(synchronized)
     renderInvoice(invoiceClient({
-      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true }),
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
       get: vi.fn().mockResolvedValue(issued),
       recordEvent,
     }))
@@ -385,6 +388,43 @@ describe('Invoices', () => {
       event_type: 'accounting_synchronized', provider: 'ledger', external_id: 'evt-1', idempotency_key: 'ledger:evt-1',
     })))
     expect(await screen.findAllByText('Sent to accounting')).not.toHaveLength(0)
+  })
+
+  it('creates a reasoned credit-note draft from an issued invoice', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', lifecycle_state: 'issued' as const, balance_amount: '137.50', delivery_count: 1 }
+    const credit = { ...draft, id: 'credit-1', document_kind: 'credit_note' as const, reference: 'Service adjustment' }
+    const createCreditNote = vi.fn().mockResolvedValue(credit)
+    renderInvoice(invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
+      get: vi.fn().mockResolvedValue(issued),
+      createCreditNote,
+    }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Create credit note' }))
+    fireEvent.change(screen.getByLabelText('Reason for correction'), { target: { value: 'Service adjustment' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create credit note' }).at(-1)!)
+
+    await waitFor(() => expect(createCreditNote).toHaveBeenCalledWith(workspace, 'invoice-1', 'Service adjustment'))
+    expect(await screen.findByRole('heading', { name: 'Credit note draft · Aug 29, 2026' })).toBeInTheDocument()
+  })
+
+  it('voids only an undelivered issued invoice while retaining its record', async () => {
+    const issued = { ...draft, state: 'issued' as const, number: 'INV-000001', issued_at: '2026-08-29T13:00:00Z', lifecycle_state: 'issued' as const, balance_amount: '137.50', delivery_count: 0 }
+    const voided = { ...issued, lifecycle_state: 'voided' as const, balance_amount: '0.00' }
+    const voidInvoice = vi.fn().mockResolvedValue(voided)
+    renderInvoice(invoiceClient({
+      list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
+      get: vi.fn().mockResolvedValue(issued),
+      voidInvoice,
+    }))
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Void invoice' }))
+    fireEvent.change(screen.getByLabelText('Reason for correction'), { target: { value: 'Issued in error' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Void invoice' }).at(-1)!)
+
+    await waitFor(() => expect(voidInvoice).toHaveBeenCalledWith(workspace, 'invoice-1', 'Issued in error'))
+    expect(await screen.findAllByText('Voided')).not.toHaveLength(0)
+    expect(screen.queryByRole('button', { name: 'Email invoice' })).not.toBeInTheDocument()
   })
 
   it('shows a bounded error state when the workspace request fails', async () => {

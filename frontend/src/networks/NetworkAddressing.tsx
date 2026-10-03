@@ -213,7 +213,13 @@ export function NetworkAddressing({
             onClick={() => setForm(blank(kind))}
           >
             <Plus size={15} />
-            Add {kind === "vrfs" ? "VRF" : kind === "vlans" ? "VLAN" : "subnet"}
+            {translate(
+              kind === "vrfs"
+                ? "networks.addVrf"
+                : kind === "vlans"
+                  ? "networks.addVlan"
+                  : "networks.addSubnet",
+            )}
           </button>
         )}
       </div>

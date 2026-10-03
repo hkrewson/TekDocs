@@ -14,11 +14,12 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core import invoicing
-from apps.core.invoicing import create_invoice, create_line, issue_invoice
+from apps.core.invoicing import create_invoice, create_line, invoice_lifecycle, issue_invoice, record_invoice_event
 from apps.core.models import (
     InstallationState,
     Invoice,
     InvoiceArtifact,
+    InvoiceEventType,
     InvoiceLine,
     InvoiceNumberSeries,
     TenantBillingProfile,
@@ -281,6 +282,144 @@ def test_draft_reviews_invoice_specific_parties_and_creates_linked_follow_ups(
     assert replacement.json()["source"]["kind"] == "replacement"
     assert replacement.json()["lines"][0]["description"] == "Managed service"
     assert replacement.json()["lines"][0]["origin_type"] == ""
+
+
+@pytest.mark.django_db
+def test_credit_note_is_separately_numbered_signed_and_reduces_source_balance(
+    owner_client, installation, monkeypatch, tmp_path
+):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    organization = client_organization(installation, "Credit Client")
+    assert owner_client.put(
+        reverse("msp-invoice-settings"), settings_payload(), content_type="application/json"
+    ).status_code == 200
+    source = draft_with_line(installation, organization)
+    issue_url = reverse(
+        "organization-invoice-issue",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        assert owner_client.post(issue_url).status_code == 200
+
+    credit_url = reverse(
+        "organization-invoice-credit-note",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    draft_response = owner_client.post(
+        credit_url, {"reason": "Service-level adjustment"}, content_type="application/json"
+    )
+    assert draft_response.status_code == 201
+    credit_payload = draft_response.json()
+    assert credit_payload["document_kind"] == "credit_note"
+    assert credit_payload["reference"] == "Service-level adjustment"
+    assert credit_payload["source"] == {
+        "id": str(source.entity_id), "number": "INV-000001", "kind": "credit_note"
+    }
+    assert credit_payload["lines"][0]["description"] == "Managed service"
+    assert credit_payload["lines"][0]["origin_type"] == ""
+
+    credit_issue_url = reverse(
+        "organization-invoice-issue",
+        kwargs={
+            "organization_entity_id": organization.entity_id,
+            "invoice_entity_id": credit_payload["id"],
+        },
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        issued_response = owner_client.post(credit_issue_url)
+    assert issued_response.status_code == 200
+    issued_credit = issued_response.json()
+    assert issued_credit["number"] == "CR-000001"
+    assert issued_credit["document_kind"] == "credit_note"
+    assert issued_credit["balance_amount"] == "0.00"
+    assert issued_credit["signature_algorithm"] == "Ed25519"
+    assert InvoiceArtifact.objects.get(invoice__entity_id=credit_payload["id"]).file
+
+    source_record = Invoice.objects.get(pk=source.pk)
+    lifecycle = invoice_lifecycle(
+        Invoice.objects.prefetch_related("lifecycle_events__related_invoice").get(pk=source_record.pk)
+    )
+    assert lifecycle.state == "credited"
+    assert lifecycle.credited_amount == source_record.total_amount
+    assert lifecycle.balance_amount == 0
+    assert InvoiceNumberSeries.objects.get(tenant=installation.tenant, prefix="INV").next_number == 2
+    assert InvoiceNumberSeries.objects.get(tenant=installation.tenant, prefix="CR").next_number == 2
+
+    second_credit = owner_client.post(
+        credit_url, {"reason": "Duplicate adjustment"}, content_type="application/json"
+    )
+    assert second_credit.status_code == 201
+    with override_settings(MEDIA_ROOT=tmp_path):
+        rejected = owner_client.post(
+            reverse(
+                "organization-invoice-issue",
+                kwargs={
+                    "organization_entity_id": organization.entity_id,
+                    "invoice_entity_id": second_credit.json()["id"],
+                },
+            )
+        )
+    assert rejected.status_code == 400
+    assert "remaining creditable" in str(rejected.json()).lower()
+    assert InvoiceNumberSeries.objects.get(tenant=installation.tenant, prefix="CR").next_number == 2
+
+
+@pytest.mark.django_db
+def test_void_retains_invoice_and_is_only_available_before_delivery(
+    owner_client, installation, monkeypatch, tmp_path
+):
+    monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    organization = client_organization(installation, "Void Client")
+    assert owner_client.put(
+        reverse("msp-invoice-settings"), settings_payload(), content_type="application/json"
+    ).status_code == 200
+
+    source = draft_with_line(installation, organization)
+    issue_url = reverse(
+        "organization-invoice-issue",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    with override_settings(MEDIA_ROOT=tmp_path):
+        assert owner_client.post(issue_url).status_code == 200
+    issued = Invoice.objects.get(pk=source.pk)
+    artifact = InvoiceArtifact.objects.get(invoice=issued)
+    original_checksum = artifact.checksum
+
+    void_url = reverse(
+        "organization-invoice-void",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": source.entity_id},
+    )
+    voided = owner_client.post(void_url, {"reason": "Issued in error"}, content_type="application/json")
+    assert voided.status_code == 200
+    assert voided.json()["lifecycle_state"] == "voided"
+    assert voided.json()["balance_amount"] == "0.00"
+    issued.refresh_from_db()
+    artifact.refresh_from_db()
+    assert issued.state == "issued"
+    assert issued.number == "INV-000001"
+    assert artifact.checksum == original_checksum
+    assert owner_client.post(void_url, {"reason": "Retry"}, content_type="application/json").status_code == 200
+    assert issued.lifecycle_events.filter(event_type=InvoiceEventType.VOIDED).count() == 1
+
+    delivered = draft_with_line(installation, organization, "delivered")
+    with override_settings(MEDIA_ROOT=tmp_path):
+        issue_invoice(invoice=delivered, actor_id=installation.owner.id)
+    record_invoice_event(
+        invoice=delivered,
+        event_type=InvoiceEventType.DELIVERY_SUCCEEDED,
+        occurred_at=invoicing.timezone.now(),
+        actor_id=installation.owner.id,
+        note="Delivered",
+    )
+    delivered_void_url = reverse(
+        "organization-invoice-void",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": delivered.entity_id},
+    )
+    rejected = owner_client.post(
+        delivered_void_url, {"reason": "Too late"}, content_type="application/json"
+    )
+    assert rejected.status_code == 400
+    assert "delivered invoice" in str(rejected.json()).lower()
 
 
 @pytest.mark.django_db

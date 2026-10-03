@@ -2,12 +2,12 @@
 
 This is the maintained capability inventory for TekDocs. `supported` means the visible product may expose the capability and the release gates cover it. `experimental` means useful implementation exists but it is not part of the 1.0 compatibility promise until the linked issue closes. `excluded` means TekDocs may integrate with an authoritative external system but must not present itself as that system.
 
-The current column describes the database-first `0.8.46` baseline. The 1.0 column is the accepted release contract, not a claim that the Markdown/Git migration is already implemented.
+The current column describes the frozen database-first `0.9.0` baseline. The 1.0 column is the accepted release contract, not a claim that the Markdown/Git migration is already implemented.
 
 | Capability | Current | Intended 1.0 | Authority and boundary | Required issue |
 | --- | --- | --- | --- | --- |
 | Workspaces, organizations, people, sites, files, access control, audit, recovery | supported | supported | TekDocs | — |
-| Markdown documentation, reusable fragments, Git-backed revision history, STATIC publication, client portal | supported in the database-first baseline | supported | Local managed Git for authored content/portable metadata; TekDocs/PostgreSQL for authorization, workflow and retained evidence | [Version 1 content-graph plan](../planning/v1-markdown-content-graph.md) |
+| Markdown documentation, reusable fragments, Git-backed revision history, STATIC publication, client portal | supported | supported | Local managed Git for authored content/portable metadata; TekDocs/PostgreSQL for authorization, workflow and retained evidence | [Version 1 content-graph plan](../planning/v1-markdown-content-graph.md) |
 | Structured topic types and guided authoring | excluded | supported | TekDocs | [#30](https://github.com/hkrewson/TekDocs/issues/30) |
 | Documentation maps, baselines, and client handoff packages | supported | supported | TekDocs | — |
 | Publication preflight and documentation lint | experimental | supported | TekDocs | [#31](https://github.com/hkrewson/TekDocs/issues/31) |

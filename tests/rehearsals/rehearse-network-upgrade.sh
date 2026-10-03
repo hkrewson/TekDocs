@@ -64,6 +64,8 @@ echo "Applying TekDocs $current_version to the retained $baseline_version networ
 current_compose up -d --build --wait backend
 current_compose exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify \
+  -e TEKDOCS_FIXTURE_CLEANUP_APPLY=true \
+  -e TEKDOCS_FIXTURE_EXPECT_CLEANUP=true \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/network-validation-fixture.py"
 current_compose exec -T backend python manage.py check
 current_compose exec -T backend python manage.py makemigrations --check --dry-run

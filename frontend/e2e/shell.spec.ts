@@ -574,7 +574,7 @@ test('authorized operators can inspect value-free renderer diagnostics', async (
   await page.route('**/api/v1/system/diagnostics', (route) => route.fulfill({ json: {
     status: 'ready',
     checked_at: '2026-09-05T12:00:00Z',
-    application_version: '0.8.46',
+    application_version: '0.9.0',
     database: 'ready',
     diagram_renderer: {
       status: 'ready',

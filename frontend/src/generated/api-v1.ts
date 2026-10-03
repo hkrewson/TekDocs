@@ -6569,6 +6569,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/credit-note": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_credit_note_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/csv": {
         readonly parameters: {
             readonly query?: never;
@@ -6691,6 +6707,22 @@ export interface paths {
         readonly get: operations["workspaces_organizations_invoices_pdf_retrieve"];
         readonly put?: never;
         readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/void": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_invoices_void_create"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -11264,6 +11296,7 @@ export interface components {
         readonly Invoice: {
             /** Format: uuid */
             readonly id: string;
+            readonly document_kind: string;
             readonly state: string;
             readonly number: string;
             readonly currency: string;
@@ -11292,6 +11325,7 @@ export interface components {
             readonly lifecycle_state: string;
             readonly reconciliation_state: string;
             readonly paid_amount: string;
+            readonly credited_amount: string;
             readonly balance_amount: string;
             /** Format: date-time */
             readonly last_event_at: string | null;
@@ -11306,6 +11340,9 @@ export interface components {
                 readonly [key: string]: string;
             } | null;
             readonly recurring: components["schemas"]["RecurringInvoiceDisposition"] | null;
+        };
+        readonly InvoiceCorrectionWrite: {
+            readonly reason: string;
         };
         readonly InvoiceCountryChoice: {
             readonly value: string;
@@ -11596,6 +11633,8 @@ export interface components {
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
+            /** @default CR */
+            readonly credit_note_prefix: string;
             /**
              * @description * `none` - none
              *     * `year` - year
@@ -11644,6 +11683,7 @@ export interface components {
             readonly default_currency: string;
             readonly payment_terms_days: number;
             readonly invoice_prefix: string;
+            readonly credit_note_prefix: string;
             readonly invoice_date_component: string;
             readonly invoice_separator: string;
             readonly invoice_sequence_digits: number;
@@ -11676,11 +11716,9 @@ export interface components {
              *     * `accounting_changed` - accounting_changed
              *     * `payment_recorded` - payment_recorded
              *     * `payment_reversed` - payment_reversed
-             *     * `voided` - voided
-             *     * `credited` - credited
              * @enum {string}
              */
-            readonly event_type: "accounting_synchronized" | "accounting_rejected" | "accounting_duplicate" | "accounting_changed" | "payment_recorded" | "payment_reversed" | "voided" | "credited";
+            readonly event_type: "accounting_synchronized" | "accounting_rejected" | "accounting_duplicate" | "accounting_changed" | "payment_recorded" | "payment_reversed";
             /** Format: date-time */
             readonly occurred_at?: string;
             /** @default  */
@@ -12033,6 +12071,7 @@ export interface components {
             readonly has_more: boolean;
             readonly can_manage: boolean;
             readonly can_issue: boolean;
+            readonly can_void: boolean;
         };
         readonly InvoiceWrite: {
             readonly currency: string;
@@ -33256,6 +33295,36 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_invoices_credit_note_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceCorrectionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceCorrectionWrite"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceCorrectionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
+                };
+            };
+        };
+    };
     readonly workspaces_organizations_invoices_csv_retrieve: {
         readonly parameters: {
             readonly query?: never;
@@ -33522,6 +33591,36 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_invoices_void_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly invoice_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["InvoiceCorrectionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["InvoiceCorrectionWrite"];
+                readonly "multipart/form-data": components["schemas"]["InvoiceCorrectionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Invoice"];
                 };
             };
         };

@@ -671,8 +671,15 @@ export function Compliance({
                   >
                     <strong>{item.name}</strong>
                     <span>
-                      {item.current_revision.version_label} ·{" "}
-                      {item.current_revision.entries.length} controls
+                      {translate(
+                        item.current_revision.entries.length === 1
+                          ? 'compliance.frameworkVersionSummaryOne'
+                          : 'compliance.frameworkVersionSummary',
+                        {
+                          version: item.current_revision.version_label,
+                          count: item.current_revision.entries.length,
+                        },
+                      )}
                     </span>
                   </button>
                 </li>

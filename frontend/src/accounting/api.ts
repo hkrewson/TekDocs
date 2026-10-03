@@ -20,6 +20,7 @@ export type InvoiceLine = {
 
 export type InvoiceDraft = {
   id: string
+  document_kind: 'invoice' | 'credit_note'
   state: 'draft' | 'issued'
   number?: string
   currency: string
@@ -42,12 +43,13 @@ export type InvoiceDraft = {
   lifecycle_state?: 'issued' | 'delivered' | 'externally_synchronized' | 'partially_paid' | 'paid' | 'overdue' | 'voided' | 'credited'
   reconciliation_state?: 'unsynchronized' | 'synchronized' | 'rejected' | 'duplicate' | 'externally_changed'
   paid_amount?: string
+  credited_amount?: string
   balance_amount?: string
   last_event_at?: string | null
   lifecycle_events?: InvoiceLifecycleEvent[]
   issuer?: InvoiceBillingIdentity
   bill_to?: InvoiceBillingIdentity
-  source?: { id: string; number: string; kind: 'supplement' | 'replacement' } | null
+  source?: { id: string; number: string; kind: 'supplement' | 'replacement' | 'credit_note' } | null
   recurring?: {
     starts_on: string
     ends_before: string
@@ -91,6 +93,7 @@ export type InvoiceCollectionResult = {
   has_more: boolean
   can_manage: boolean
   can_issue: boolean
+  can_void: boolean
 }
 
 export type InvoiceLifecycleEvent = {
@@ -141,6 +144,7 @@ export type InvoiceIssueSettings = {
   default_currency: string
   payment_terms_days: number
   invoice_prefix: string
+  credit_note_prefix: string
   invoice_date_component: InvoiceDateComponent
   invoice_separator: '-' | '/' | '.' | ''
   invoice_sequence_digits: number
@@ -165,6 +169,8 @@ export interface InvoiceClient {
   deliver(workspace: WorkspaceContext, invoiceId: string, recipient: string): Promise<InvoiceDraft>
   recordEvent(workspace: WorkspaceContext, invoiceId: string, values: object): Promise<InvoiceDraft>
   followUp(workspace: WorkspaceContext, invoiceId: string, mode: 'supplement' | 'replacement'): Promise<InvoiceDraft>
+  createCreditNote(workspace: WorkspaceContext, invoiceId: string, reason: string): Promise<InvoiceDraft>
+  voidInvoice(workspace: WorkspaceContext, invoiceId: string, reason: string): Promise<InvoiceDraft>
   pdfUrl(workspace: WorkspaceContext, invoiceId: string): string
   csvUrl(workspace: WorkspaceContext, invoiceId: string): string
   accountingExportUrl(workspace: WorkspaceContext, invoiceId: string): string
@@ -241,6 +247,8 @@ export const browserInvoiceClient: InvoiceClient = {
   deliver: (workspace, invoiceId, recipient) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/deliver`, 'POST', { recipient }),
   recordEvent: (workspace, invoiceId, values) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/events`, 'POST', values),
   followUp: (workspace, invoiceId, mode) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/follow-up`, 'POST', { mode }),
+  createCreditNote: (workspace, invoiceId, reason) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/credit-note`, 'POST', { reason }),
+  voidInvoice: (workspace, invoiceId, reason) => mutate(`${basePath(workspace)}/${encodeURIComponent(invoiceId)}/void`, 'POST', { reason }),
   pdfUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/pdf`,
   csvUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/csv`,
   accountingExportUrl: (workspace, invoiceId) => `${basePath(workspace)}/${encodeURIComponent(invoiceId)}/accounting-export`,

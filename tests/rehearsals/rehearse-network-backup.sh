@@ -34,6 +34,7 @@ echo "Creating an isolated network recovery fixture"
 compose_for "$source_project" up -d --build --wait backend
 compose_for "$source_project" exec -T \
   -e TEKDOCS_FIXTURE_MODE=create \
+  -e TEKDOCS_FIXTURE_CLEANUP_APPLY=true \
   -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/network-validation-fixture.py"
 
@@ -54,6 +55,7 @@ docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_director
 compose_for "$restore_project" up -d --wait backend
 compose_for "$restore_project" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify \
+  -e TEKDOCS_FIXTURE_EXPECT_CLEANUP=true \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/network-validation-fixture.py"
 compose_for "$restore_project" exec -T backend python manage.py check
 

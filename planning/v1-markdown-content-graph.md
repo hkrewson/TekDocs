@@ -1,8 +1,9 @@
 # Version 1 Markdown content graph delivery plan
 
-Status: accepted product and architecture direction  
+Status: accepted direction with reconciled GitHub milestones; `0.9.0` baseline frozen
 Decision date: 2026-10-02  
-Baseline: 0.8.46  
+Architecture input baseline: 0.8.46
+Current baseline: 0.9.0
 Target: 1.0.0
 
 ## Version boundary
@@ -17,14 +18,14 @@ after the repository, migration, recovery, authorization and release evidence
 agree. Calling the first repository-backed build `1.0.0` would promise stability
 while intentionally breaking and replacing persistence paths.
 
-- `0.8.46` remains the current database-first baseline.
+- `0.9.0` is the frozen database-first baseline.
 - `0.9.0` closes or explicitly transfers the remaining current-line work.
 - `0.9.1` through `0.9.8` implement the version 1 storage and content graph.
 - `1.0.0` freezes the supported Markdown profile, repository layout, migration
   path and application compatibility contract.
 
-Version metadata is not changed by this planning decision. It changes with the
-first completed and validated implementation checkpoint.
+Version metadata now identifies the frozen `0.9.0` baseline. Later metadata
+changes only with each completed and validated implementation checkpoint.
 
 ## Accepted architecture decisions
 
@@ -166,13 +167,20 @@ they cannot independently restore a TekDocs installation.
 
 ## Version 1 delivery sequence
 
+The evidence-backed `0.9.0` disposition and issue-ready `0.9.1` work breakdown
+are maintained in
+[`v1-transition-work-package.md`](v1-transition-work-package.md). That record is
+the execution checklist; this document remains the architecture and release
+sequence authority. GitHub issues #92–#108 now provide the corresponding
+implementation, acceptance, optional-remote and final-freeze owners.
+
 ### `0.9.0` — current-line closeout and transfer
 
 Goal: enter the architecture change with one understood baseline rather than
 carrying two conflicting pre-1.0 plans.
 
-- Complete the remaining invoice boundary: void-before-delivery, immutable
-  credit notes and issue #33 accounting-handoff acceptance.
+- Retain and close out the implemented invoice boundary: void-before-delivery,
+  immutable credit notes and issue #33 accounting-handoff acceptance.
 - Reconcile recurring-invoice issues #75/#76 against their existing runtime and
   recovery evidence; implement only reproduced gaps.
 - Complete or explicitly transfer the non-document responsive work in
@@ -185,8 +193,10 @@ carrying two conflicting pre-1.0 plans.
   where it no longer reduces migration risk. Preserve the focused modules
   already extracted and redirect the remaining document decomposition to
   storage adapters and repository services.
-- Finish the controlled Networks legacy cleanup rehearsal and either apply the
-  approved deletion or record the exact retained blocker.
+- The controlled Networks legacy cleanup rehearsal is complete. Lossless
+  projections pass exact-workspace, upgrade and clean recovery evidence; the
+  exact retained disposition requires a separate deprecation and
+  operator-approved migration before any compatibility row can be deleted.
 - Shrink the parameterized-label exception register where wording is already
   decided; unresolved copy joins final interface acceptance.
 
@@ -334,7 +344,7 @@ release, hosted service, external certification or independent security audit.
 | #30 structured topics | Existing guided-authoring behavior is foundation; frontmatter/schema/index integration moves to `0.9.2`, authoring parity to `0.9.5`. |
 | #31 publication preflight | Parser/link validation moves to `0.9.2`; Git-object dependency freezing and final publication evidence move to `0.9.7`. |
 | #32 taxonomy governance | Taxonomy definitions remain database canonical; file selections and projections move to `0.9.2` and migration to `0.9.6`. |
-| #33 invoice boundary | Priority closeout in `0.9.0`; it is independent of the document persistence change. |
+| #33 invoice boundary | Complete in `0.9.0`: privileged void-before-delivery, separately numbered immutable credit notes, supported recovery and the composed repository gate. It is independent of the document persistence change. |
 | #38 security assurance | Final candidate work in `0.9.8`; focused security tests recur in every slice. |
 | #39 pilots | Run in `0.9.8` against the final content model. Early usability checks may inform `0.9.3`–`0.9.5`. |
 | #40 hotspot decomposition | Preserve completed seams; replace remaining old-document model extraction with repository, parser, graph-index and storage-adapter boundaries in `0.9.1`–`0.9.6`. |
@@ -377,7 +387,7 @@ release, hosted service, external certification or independent security audit.
 - Expanded conditional-content profiles, hierarchical key scopes, remote Git
   collaboration, pull-request authoring and bidirectional provider writeback
   remain post-1.0 unless separately promoted with bounded acceptance criteria.
-- The accepted remote-Git follow-on is one optional connection and private
+- The accepted remote-Git follow-on in #107 is one optional connection and private
   repository per organization workspace. It supports local-only, MSP-owned and
   organization-owned custody; a single all-organizations remote is prohibited.
 

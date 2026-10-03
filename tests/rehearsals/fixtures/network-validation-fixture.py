@@ -1,6 +1,9 @@
+import io
+import json
 import os
 
 from apps.accounts.bootstrap import bootstrap_owner
+from django.core.management import call_command
 from apps.core.catalogs import create_definition, create_model, create_product
 from apps.core.inventory import create_client_asset
 from apps.core.models import (
@@ -10,16 +13,18 @@ from apps.core.models import (
     NetworkCircuit,
     NetworkCircuitHandoff,
     NetworkDevice,
+    NetworkInterface,
     NetworkIPAddress,
     NetworkMACAddress,
     NetworkRack,
     NetworkSubnet,
     NetworkVLAN,
+    NetworkVRF,
     WirelessNetwork,
 )
 from apps.core.netbox_reconciliation import set_reference
-from apps.core.network_addressing import create_subnet, create_vlan
-from apps.core.network_endpoints import create_ip_address, create_mac_address
+from apps.core.network_addressing import create_subnet, create_vlan, create_vrf
+from apps.core.network_endpoints import create_interface, create_ip_address, create_mac_address
 from apps.core.network_inventory import create_rack
 from apps.core.network_inventory import create_device
 from apps.core.network_circuits import create_circuit, create_handoff
@@ -184,15 +189,33 @@ def create_fixture():
             vlan_id=42,
             description="Retained network recovery fixture",
         )
+        vrf = create_vrf(
+            tenant=result.tenant,
+            organization=client,
+            actor_id=result.owner.id,
+            name="Recovery isolated routing",
+            route_distinguisher="65000:42",
+            description="Retained legacy relationship",
+        )
         subnet = create_subnet(
             tenant=result.tenant,
             organization=client,
             actor_id=result.owner.id,
             name="Recovery operations subnet",
             cidr="192.0.2.0/24",
-            vrf_entity_id=None,
+            vrf_entity_id=vrf.entity_id,
             vlan_entity_id=vlan.entity_id,
             description="Retained network recovery fixture",
+        )
+        interface = create_interface(
+            tenant=result.tenant,
+            organization=client,
+            actor_id=result.owner.id,
+            name="Ethernet1",
+            device_entity_id=device.entity_id,
+            kind="physical",
+            status="active",
+            description="Retained legacy relationship",
         )
         address = create_ip_address(
             tenant=result.tenant,
@@ -200,7 +223,7 @@ def create_fixture():
             actor_id=result.owner.id,
             address="192.0.2.42",
             subnet_entity_id=subnet.entity_id,
-            interface_entity_id=None,
+            interface_entity_id=interface.entity_id,
             status="active",
             dns_name="recovery.example.invalid",
             description="Retained network recovery fixture",
@@ -210,7 +233,7 @@ def create_fixture():
             organization=client,
             actor_id=result.owner.id,
             address="02:00:00:00:00:42",
-            interface_entity_id=None,
+            interface_entity_id=interface.entity_id,
             description="Retained network recovery fixture",
         )
         create_wireless_network(
@@ -282,7 +305,45 @@ def create_fixture():
             interface_entity_id=None,
             description="Retained network recovery fixture",
         )
+    if os.environ.get("TEKDOCS_FIXTURE_CLEANUP_APPLY") == "true":
+        apply_cleanup_rehearsal(client)
     print("Network validation fixture created")
+
+
+def apply_cleanup_rehearsal(client):  # type: ignore[no-untyped-def]
+    preview_output = io.StringIO()
+    call_command("rehearse_network_model_cleanup", organization=str(client.entity_id), stdout=preview_output)
+    preview = json.loads(preview_output.getvalue())
+    assert preview["applied"] is False
+    assert preview["blockers"] == []
+    assert preview["legacy"] == {
+        "racks": 1,
+        "vlans": 1,
+        "vrfs": 1,
+        "interfaces": 1,
+        "circuits": 1,
+        "circuit_handoffs": 1,
+        "unbacked_devices": 0,
+    }
+    assert preview["legacy_relationships"] == {
+        "subnets_to_vlans": 1,
+        "subnets_to_vrfs": 1,
+        "devices_to_racks": 1,
+        "ip_addresses_to_interfaces": 1,
+        "mac_addresses_to_interfaces": 1,
+        "handoffs_to_interfaces": 0,
+    }
+    assert preview["planned_backfills"]["ip_asset_assignments"] == 1
+    assert preview["planned_backfills"]["mac_asset_assignments"] == 1
+    apply_output = io.StringIO()
+    call_command(
+        "rehearse_network_model_cleanup",
+        organization=str(client.entity_id),
+        apply=True,
+        stdout=apply_output,
+    )
+    assert json.loads(apply_output.getvalue())["applied"] is True
+    print(json.dumps(preview, sort_keys=True))
 
 
 def verify_fixture():
@@ -300,6 +361,8 @@ def verify_fixture():
             organization_mode=OrganizationRLSMode.ORGANIZATION,
         )
         scope = DataScope.organization(tenant, client)
+        if os.environ.get("TEKDOCS_FIXTURE_CLEANUP_APPLY") == "true":
+            apply_cleanup_rehearsal(client)
         rack = NetworkRack.scoped.for_scope(scope).get(entity__display_name="Recovery core rack")
         assert rack.entity.workspace.organization_id == client.id
         assert rack.unit_count == 42
@@ -308,14 +371,20 @@ def verify_fixture():
         assert (device.hardware_asset_id is not None) != device.legacy_unbacked
         assert NetBoxReference.scoped.for_scope(scope).get(entity=rack.entity).object_id == 4242
         assert NetworkVLAN.scoped.for_scope(scope).get(entity__display_name="Recovery operations VLAN").vlan_id == 42
-        assert NetworkSubnet.scoped.for_scope(scope).get(entity__display_name="Recovery operations subnet").cidr == "192.0.2.0/24"
+        assert NetworkVRF.scoped.for_scope(scope).get(entity__display_name="Recovery isolated routing")
+        retained_subnet = NetworkSubnet.scoped.for_scope(scope).get(entity__display_name="Recovery operations subnet")
+        assert retained_subnet.cidr == "192.0.2.0/24"
+        assert retained_subnet.vrf.entity.display_name == "Recovery isolated routing"
         retained_ip = NetworkIPAddress.scoped.for_scope(scope).get(address="192.0.2.42")
         assert retained_ip.dns_name == "recovery.example.invalid"
         retained_mac = NetworkMACAddress.scoped.for_scope(scope).get()
         assert retained_mac.address == "02:00:00:00:00:42"
-        if device.hardware_asset_id is not None:
-            assert retained_ip.hardware_asset_id is None
-            assert retained_mac.hardware_asset_id is None
+        retained_interface = NetworkInterface.scoped.for_scope(scope).get(entity__display_name="Ethernet1")
+        assert retained_ip.interface_id == retained_interface.id
+        assert retained_mac.interface_id == retained_interface.id
+        if device.hardware_asset_id is not None and os.environ.get("TEKDOCS_FIXTURE_EXPECT_CLEANUP") == "true":
+            assert retained_ip.hardware_asset_id == device.hardware_asset_id
+            assert retained_mac.hardware_asset_id == device.hardware_asset_id
         assert WirelessNetwork.scoped.for_scope(scope).get().ssid == "Recovery Staff"
         assert DNSRecord.scoped.for_scope(scope).get().value == "192.0.2.42"
         circuit = NetworkCircuit.scoped.for_scope(scope).get()

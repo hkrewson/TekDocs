@@ -43,12 +43,14 @@ from .invoicing import (
     record_invoice_event,
     update_invoice,
     update_line,
+    void_invoice,
     withdraw_recurring_draft,
 )
 from .models import (
     CatalogProduct,
     ContractCost,
     Invoice,
+    InvoiceDocumentKind,
     InvoiceEventType,
     InvoiceLifecycleEvent,
     InvoiceLine,
@@ -228,8 +230,6 @@ class InvoiceLifecycleEventWriteSerializer(StrictSerializer):
             InvoiceEventType.ACCOUNTING_CHANGED,
             InvoiceEventType.PAYMENT_RECORDED,
             InvoiceEventType.PAYMENT_REVERSED,
-            InvoiceEventType.VOIDED,
-            InvoiceEventType.CREDITED,
         )
     )
     occurred_at = serializers.DateTimeField(required=False, default=timezone.now)
@@ -254,8 +254,13 @@ class RecurringInvoiceWithdrawalWriteSerializer(StrictSerializer):
     reason = serializers.CharField(max_length=1000, trim_whitespace=True)
 
 
+class InvoiceCorrectionWriteSerializer(StrictSerializer):
+    reason = serializers.CharField(max_length=240, trim_whitespace=True)
+
+
 class InvoiceSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
+    document_kind = serializers.CharField()
     state = serializers.CharField()
     number = serializers.CharField(allow_blank=True)
     currency = serializers.CharField()
@@ -278,6 +283,7 @@ class InvoiceSerializer(serializers.Serializer):
     lifecycle_state = serializers.SerializerMethodField()
     reconciliation_state = serializers.SerializerMethodField()
     paid_amount = serializers.SerializerMethodField()
+    credited_amount = serializers.SerializerMethodField()
     balance_amount = serializers.SerializerMethodField()
     last_event_at = serializers.SerializerMethodField()
     lifecycle_events = InvoiceLifecycleEventSerializer(many=True)
@@ -324,6 +330,7 @@ class InvoiceSerializer(serializers.Serializer):
                 "lifecycle_state",
                 "reconciliation_state",
                 "paid_amount",
+                "credited_amount",
                 "balance_amount",
                 "last_event_at",
                 "lifecycle_events",
@@ -368,6 +375,10 @@ class InvoiceSerializer(serializers.Serializer):
         return render_amount(self._lifecycle(item).paid_amount, item.currency)
 
     @extend_schema_field(serializers.CharField())
+    def get_credited_amount(self, item):  # type: ignore[no-untyped-def]
+        return render_amount(self._lifecycle(item).credited_amount, item.currency)
+
+    @extend_schema_field(serializers.CharField())
     def get_balance_amount(self, item):  # type: ignore[no-untyped-def]
         return render_amount(self._lifecycle(item).balance_amount, item.currency)
 
@@ -399,6 +410,7 @@ class InvoiceResultSerializer(serializers.Serializer):
     has_more = serializers.BooleanField()
     can_manage = serializers.BooleanField()
     can_issue = serializers.BooleanField()
+    can_void = serializers.BooleanField()
 
 
 INVOICE_ORDERING = {
@@ -437,6 +449,7 @@ class InvoiceIssueSettingsSerializer(StrictSerializer):
     default_currency = serializers.CharField(max_length=3)
     payment_terms_days = serializers.IntegerField(min_value=0, max_value=365)
     invoice_prefix = serializers.RegexField(r"^[A-Z0-9-]{1,16}$")
+    credit_note_prefix = serializers.RegexField(r"^[A-Z0-9-]{1,16}$", required=False, default="CR")
     invoice_date_component = serializers.ChoiceField(
         choices=(
             "none", "year", "short_year", "year_month", "short_year_month", "month_year",
@@ -448,6 +461,10 @@ class InvoiceIssueSettingsSerializer(StrictSerializer):
     invoice_reset_period = serializers.ChoiceField(choices=("never", "yearly", "monthly"))
 
     def validate(self, attrs):  # type: ignore[no-untyped-def]
+        if attrs["credit_note_prefix"] == attrs["invoice_prefix"]:
+            raise serializers.ValidationError(
+                {"credit_note_prefix": "Credit notes require a separate numbering prefix."}
+            )
         date_component = attrs["invoice_date_component"]
         reset_period = attrs["invoice_reset_period"]
         if reset_period == "yearly" and date_component == "none":
@@ -492,6 +509,7 @@ class InvoiceIssueSettingsResultSerializer(serializers.Serializer):
     default_currency = serializers.CharField()
     payment_terms_days = serializers.IntegerField()
     invoice_prefix = serializers.CharField()
+    credit_note_prefix = serializers.CharField()
     invoice_date_component = serializers.CharField()
     invoice_separator = serializers.CharField(allow_blank=True)
     invoice_sequence_digits = serializers.IntegerField()
@@ -559,7 +577,7 @@ def _tax_rate(workspace: ResolvedWorkspace, value: UUID | None) -> TaxRate | Non
 
 def _require_recent_session(request) -> None:  # type: ignore[no-untyped-def]
     if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
-        raise PermissionDenied("API tokens cannot issue or deliver invoices or configure invoice issuance.")
+        raise PermissionDenied("API tokens cannot issue, deliver, void, or configure invoice documents.")
     if not did_recently_authenticate(request._request):
         raise RecentAuthenticationRequired()
 
@@ -579,6 +597,14 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         sequence_digits=profile.invoice_sequence_digits,
         reset_period=profile.invoice_reset_period,
     ).first()
+    credit_series = InvoiceNumberSeries.objects.filter(
+        tenant=tenant,
+        prefix=profile.credit_note_prefix,
+        date_component=profile.invoice_date_component,
+        separator=profile.invoice_separator,
+        sequence_digits=profile.invoice_sequence_digits,
+        reset_period=profile.invoice_reset_period,
+    ).first()
     readiness_issues = []
     for value, message in (
         (profile.legal_name, "Add the legal business name."),
@@ -589,14 +615,23 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         (profile.billing_email, "Add the invoice contact email."),
         (profile.default_currency, "Choose the default currency."),
         (profile.invoice_prefix, "Configure invoice numbering."),
+        (profile.credit_note_prefix, "Configure credit-note numbering."),
     ):
         if not str(value).strip():
             readiness_issues.append(message)
     if series is None:
         readiness_issues.append("Save a valid invoice numbering format.")
+    if credit_series is None:
+        readiness_issues.append("Save a valid credit-note numbering format.")
     return {
-        "configured": configured and series is not None,
-        "issue_ready": configured and series is not None and profile.is_issue_ready and not readiness_issues,
+        "configured": configured and series is not None and credit_series is not None,
+        "issue_ready": (
+            configured
+            and series is not None
+            and credit_series is not None
+            and profile.is_issue_ready
+            and not readiness_issues
+        ),
         "readiness_issues": readiness_issues,
         "legal_name": profile.legal_name,
         "address_line_1": profile.address_line_1,
@@ -612,6 +647,7 @@ def _issue_settings_payload(tenant) -> dict[str, object]:  # type: ignore[no-unt
         "default_currency": profile.default_currency,
         "payment_terms_days": profile.payment_terms_days,
         "invoice_prefix": profile.invoice_prefix,
+        "credit_note_prefix": profile.credit_note_prefix,
         "invoice_date_component": profile.invoice_date_component,
         "invoice_separator": profile.invoice_separator,
         "invoice_sequence_digits": profile.invoice_sequence_digits,
@@ -663,6 +699,9 @@ class InvoiceListCreateView(APIView):
                     ),
                     "can_issue": context_has_permission(
                         workspace.member, PermissionKey.INVOICES_ISSUE, organization=workspace.organization
+                    ),
+                    "can_void": context_has_permission(
+                        workspace.member, PermissionKey.INVOICES_VOID, organization=workspace.organization
                     ),
                 },
                 context={"summary": values["summary"]},
@@ -728,8 +767,11 @@ class InvoiceIssueView(APIView):
     def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
         workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_ISSUE)
         _require_recent_session(request)
+        invoice = _invoice(workspace, invoice_entity_id)
+        if invoice.document_kind == InvoiceDocumentKind.CREDIT_NOTE:
+            require_permission(request.user, PermissionKey.INVOICES_VOID, organization=workspace.organization)
         try:
-            record = issue_invoice(invoice=_invoice(workspace, invoice_entity_id), actor_id=request.user.pk)
+            record = issue_invoice(invoice=invoice, actor_id=request.user.pk)
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
@@ -750,6 +792,48 @@ class InvoiceFollowUpView(APIView):
         except (InvoiceError, IntegrityError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
+
+
+class InvoiceCreditNoteView(APIView):
+    @extend_schema(request=InvoiceCorrectionWriteSerializer, responses={201: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VOID)
+        require_permission(request.user, PermissionKey.INVOICES_EDIT, organization=workspace.organization)
+        _require_recent_session(request)
+        serializer = InvoiceCorrectionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = create_invoice_from_issued(
+                source=_invoice(workspace, invoice_entity_id),
+                actor_id=request.user.pk,
+                source_kind="credit_note",
+            )
+            record = update_invoice(
+                invoice=record,
+                actor_id=request.user.pk,
+                values={"reference": serializer.validated_data["reason"]},
+            )
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
+
+
+class InvoiceVoidView(APIView):
+    @extend_schema(request=InvoiceCorrectionWriteSerializer, responses={200: InvoiceSerializer})
+    def post(self, request, organization_entity_id, invoice_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _workspace(request, organization_entity_id, PermissionKey.INVOICES_VOID)
+        _require_recent_session(request)
+        serializer = InvoiceCorrectionWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record = void_invoice(
+                invoice=_invoice(workspace, invoice_entity_id),
+                actor_id=request.user.pk,
+                reason=serializer.validated_data["reason"],
+            )
+        except (InvoiceError, IntegrityError) as exc:
+            raise serializers.ValidationError({"detail": str(exc)}) from exc
+        return Response(InvoiceSerializer(record).data)
 
 
 class InvoiceRecurringWithdrawalView(APIView):

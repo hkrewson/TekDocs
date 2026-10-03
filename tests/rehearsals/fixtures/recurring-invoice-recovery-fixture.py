@@ -1,5 +1,7 @@
 """Runtime-role recovery assertions; expected identities are stored outside the dump."""
 
+import base64
+import hashlib
 import json
 import os
 from datetime import date
@@ -8,6 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from django.core import serializers
 from django.db import DatabaseError, connection, transaction
 
@@ -16,7 +19,16 @@ from apps.accounts.models import User
 from apps.core.billing import create_tax_rate_version
 from apps.core.commercial import create_contract, create_cost
 from apps.core.invoice_recurrence import RecurrenceError
-from apps.core.invoicing import withdraw_recurring_draft
+from apps.core.invoicing import (
+    configure_issue_settings,
+    create_invoice,
+    create_invoice_from_issued,
+    create_line,
+    invoice_lifecycle,
+    issue_invoice,
+    void_invoice,
+    withdraw_recurring_draft,
+)
 from apps.core.models import (
     AuditEvent,
     CommercialContract,
@@ -24,14 +36,19 @@ from apps.core.models import (
     InstallationState,
     Invoice,
     InvoiceArtifact,
+    InvoiceDocumentKind,
+    InvoiceEventType,
     InvoiceLifecycleEvent,
     InvoiceLine,
+    InvoiceNumberSeries,
+    InvoiceSourceKind,
     Organization,
     RecurringInvoicePeriod,
     RecurringInvoiceSchedule,
     RecurringInvoiceTerms,
     RecurringInvoiceWithdrawal,
     TaxRate,
+    TenantBillingProfile,
 )
 from apps.core.organizations import create_organization
 from apps.core.recurring_invoice_preview import (
@@ -61,6 +78,10 @@ MODELS = (
     RecurringInvoiceWithdrawal,
     Invoice,
     InvoiceLine,
+    InvoiceArtifact,
+    InvoiceLifecycleEvent,
+    InvoiceNumberSeries,
+    TenantBillingProfile,
 )
 RECURRING_MODELS = (
     RecurringInvoiceSchedule,
@@ -71,6 +92,7 @@ RECURRING_MODELS = (
 ANCHOR = date(2025, 1, 31)
 STOP_REASON = "Client ended the recurring service"
 WITHDRAWAL_REASON = "Client cancelled this recovered billing period"
+VOID_REASON = "Duplicate invoice retained for audit"
 
 
 def snapshot():
@@ -112,6 +134,29 @@ def bind(tenant, client):
     bind_local_rls_scope(DataScope.organization(tenant, client), organization_mode=OrganizationRLSMode.ORGANIZATION)
 
 
+def create_issued_invoice(owner, tenant, client, *, reference, amount):
+    invoice = create_invoice(
+        tenant=tenant,
+        organization=client,
+        actor_id=owner.pk,
+        currency="USD",
+        invoice_date=date(2025, 1, 15),
+        due_date=date(2025, 2, 14),
+        reference=reference,
+    )
+    create_line(
+        invoice=invoice,
+        actor_id=owner.pk,
+        values={
+            "description": f"Recovery evidence for {reference}",
+            "quantity": "1.000",
+            "unit": "service",
+            "unit_amount": amount,
+        },
+    )
+    return issue_invoice(invoice=invoice, actor_id=owner.pk)
+
+
 def create_fixture():
     result = bootstrap_owner(
         tenant_name="Recurring Recovery MSP",
@@ -144,6 +189,47 @@ def create_fixture():
         client = organization("Recurring Recovery Client", "client")
         sibling = organization("Recurring Recovery Sibling", "client")
         supplier = organization("Recurring Recovery Supplier", "vendor")
+        client.billing_contact_name = "Recovery Accounts"
+        client.billing_email = "recovery-accounts@example.invalid"
+        client.billing_address_line_1 = "100 Recovery Way"
+        client.billing_city = "Austin"
+        client.billing_region = "TX"
+        client.billing_postal_code = "78701"
+        client.billing_country_code = "US"
+        client.save(
+            update_fields=(
+                "billing_contact_name",
+                "billing_email",
+                "billing_address_line_1",
+                "billing_city",
+                "billing_region",
+                "billing_postal_code",
+                "billing_country_code",
+                "updated_at",
+            )
+        )
+        configure_issue_settings(
+            tenant=result.tenant,
+            actor_id=result.owner.pk,
+            values={
+                "legal_name": "Recurring Recovery MSP, LLC",
+                "address_line_1": "200 Restore Street",
+                "city": "Austin",
+                "region": "TX",
+                "postal_code": "78701",
+                "country_code": "US",
+                "billing_email": "billing-recovery@example.invalid",
+                "payment_instructions": "Include the document number.",
+                "default_currency": "USD",
+                "payment_terms_days": 30,
+                "invoice_prefix": "INV",
+                "credit_note_prefix": "CR",
+                "invoice_date_component": "none",
+                "invoice_separator": "-",
+                "invoice_sequence_digits": 6,
+                "invoice_reset_period": "never",
+            },
+        )
         tax = create_tax_rate_version(
             tenant=result.tenant,
             name="Recovery tax",
@@ -271,6 +357,33 @@ def create_fixture():
         stop_event = AuditEvent.objects.get(
             action="invoice.recurring_stopped", metadata__schedule_id=str(stopped_schedule.pk)
         )
+        credited_source = create_issued_invoice(
+            result.owner,
+            result.tenant,
+            client,
+            reference="RECOVERY-CREDIT",
+            amount="125.00",
+        )
+        credit_note = create_invoice_from_issued(
+            source=credited_source,
+            actor_id=result.owner.pk,
+            source_kind=InvoiceSourceKind.CREDIT_NOTE,
+        )
+        credit_note.reference = "Recovery service adjustment"
+        credit_note.save(update_fields=("reference", "updated_at"))
+        credit_note = issue_invoice(invoice=credit_note, actor_id=result.owner.pk)
+        voided_invoice = create_issued_invoice(
+            result.owner,
+            result.tenant,
+            client,
+            reference="RECOVERY-VOID",
+            amount="75.00",
+        )
+        voided_invoice = void_invoice(
+            invoice=voided_invoice,
+            actor_id=result.owner.pk,
+            reason=VOID_REASON,
+        )
         MANIFEST.write_text(
             json.dumps(
                 {
@@ -286,6 +399,9 @@ def create_fixture():
                     "stopped_schedule": str(stopped_schedule.pk),
                     "stopped_claim": str(stopped_claim.pk),
                     "stop_event": audit_snapshot(stop_event),
+                    "credited_source": str(credited_source.pk),
+                    "credit_note": str(credit_note.pk),
+                    "voided_invoice": str(voided_invoice.pk),
                     "snapshot": snapshot(),
                 }
             )
@@ -325,6 +441,11 @@ def verify_fixture():
         stopped_claim = RecurringInvoicePeriod.objects.select_related("line", "invoice", "terms").get(
             pk=expected["stopped_claim"]
         )
+        credited_source = Invoice.objects.prefetch_related("lifecycle_events__related_invoice").get(
+            pk=expected["credited_source"]
+        )
+        credit_note = Invoice.objects.prefetch_related("lifecycle_events").get(pk=expected["credit_note"])
+        voided_invoice = Invoice.objects.prefetch_related("lifecycle_events").get(pk=expected["voided_invoice"])
         stop_event = AuditEvent.objects.get(pk=expected["stop_event"]["id"])
         amendment_event = AuditEvent.objects.get(pk=expected["amendment_event"]["id"])
         withdrawal_event = AuditEvent.objects.get(pk=expected["withdrawal_event"]["id"])
@@ -344,7 +465,29 @@ def verify_fixture():
         assert claim.terms.source_snapshot["amount"] == "20.00"
         assert claim.line.tax_rate_value == Decimal("0.100000")
         assert claim.invoice.state == "draft" and claim.invoice.number == "" and claim.invoice.issued_at is None
-        assert not InvoiceArtifact.objects.exists() and not InvoiceLifecycleEvent.objects.exists()
+        assert credited_source.number == "INV-000001"
+        assert credit_note.number == "CR-000001"
+        assert credit_note.document_kind == InvoiceDocumentKind.CREDIT_NOTE
+        assert credit_note.source_invoice_id == credited_source.pk
+        assert invoice_lifecycle(credited_source).state == "credited"
+        assert invoice_lifecycle(credited_source).balance_amount == Decimal("0.00")
+        assert invoice_lifecycle(credit_note).balance_amount == Decimal("0.00")
+        assert voided_invoice.number == "INV-000002"
+        assert invoice_lifecycle(voided_invoice).state == "voided"
+        assert voided_invoice.lifecycle_events.get(event_type=InvoiceEventType.VOIDED).note == VOID_REASON
+        assert InvoiceArtifact.objects.count() == 3
+        assert InvoiceLifecycleEvent.objects.count() == 5
+        assert InvoiceNumberSeries.objects.get(prefix="INV").next_number == 3
+        assert InvoiceNumberSeries.objects.get(prefix="CR").next_number == 2
+        for invoice in (credited_source, credit_note, voided_invoice):
+            artifact = InvoiceArtifact.objects.get(invoice=invoice)
+            payload = Path(artifact.file.path).read_bytes()
+            assert payload.startswith(b"%PDF-")
+            assert artifact.size == len(payload)
+            assert artifact.checksum == hashlib.sha256(payload).hexdigest()
+            Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(invoice.public_key)).verify(
+                base64.urlsafe_b64decode(invoice.signature), bytes.fromhex(invoice.content_digest)
+            )
         for attempt in (
             lambda: RecurringInvoiceSchedule.objects.filter(pk=schedule.pk).update(anchor=date(2025, 2, 1)),
             lambda: RecurringInvoiceTerms.objects.filter(pk=claim.terms_id).update(unit_amount=Decimal("1.00")),
@@ -354,6 +497,12 @@ def verify_fixture():
             lambda: RecurringInvoiceWithdrawal.objects.filter(pk=withdrawal.pk).delete(),
             lambda: Invoice.objects.filter(pk=claim.invoice_id).update(notes="rewritten"),
             lambda: InvoiceLine.objects.filter(pk=claim.line_id).update(description="rewritten"),
+            lambda: Invoice.objects.filter(pk=credited_source.pk).update(notes="rewritten"),
+            lambda: InvoiceLine.objects.filter(invoice=credit_note).delete(),
+            lambda: InvoiceArtifact.objects.filter(invoice=voided_invoice).update(size=1),
+            lambda: InvoiceLifecycleEvent.objects.filter(
+                invoice=voided_invoice, event_type=InvoiceEventType.VOIDED
+            ).delete(),
         ):
             try:
                 with transaction.atomic():
@@ -429,11 +578,14 @@ def verify_fixture():
         assert following.line.quantity == Decimal("3.000")
         assert following.line.unit_amount == Decimal("80.0000")
         assert review_and_apply(owner, client, schedule, date(2025, 2, 28)).pk == following.pk
-        assert RecurringInvoicePeriod.objects.count() == Invoice.objects.count() == InvoiceLine.objects.count() == 3
+        assert RecurringInvoicePeriod.objects.count() == 3
+        assert Invoice.objects.count() == InvoiceLine.objects.count() == 6
+        assert InvoiceArtifact.objects.count() == 3
+        assert InvoiceLifecycleEvent.objects.count() == 5
         assert RecurringInvoiceWithdrawal.objects.count() == 1
     print(
-        "Verified exact restoration, amendments, withdrawal retention, stopped-schedule history, forced RLS, "
-        "safe retries, and active continuation."
+        "Verified exact restoration, amendments, withdrawal retention, stopped-schedule history, invoice "
+        "corrections, signed artifacts, forced RLS, safe retries, and active continuation."
     )
 
 

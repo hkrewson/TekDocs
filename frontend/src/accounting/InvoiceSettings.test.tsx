@@ -10,7 +10,7 @@ const settings = {
   configured: true, issue_ready: true, readiness_issues: [], legal_name: 'Example MSP, LLC', address_line_1: '100 Main Street',
   address_line_2: '', city: 'Austin', region: 'TX', postal_code: '78701', country_code: 'US',
   billing_email: 'billing@example.invalid', phone: '', tax_registration: '', payment_instructions: '', default_currency: 'USD',
-  payment_terms_days: 30, invoice_prefix: 'INV', invoice_date_component: 'none' as const, invoice_separator: '-' as const,
+  payment_terms_days: 30, invoice_prefix: 'INV', credit_note_prefix: 'CR', invoice_date_component: 'none' as const, invoice_separator: '-' as const,
   invoice_sequence_digits: 6, invoice_reset_period: 'never' as const,
   country_choices: [{ value: 'CA', label: 'Canada' }, { value: 'US', label: 'United States' }],
 }

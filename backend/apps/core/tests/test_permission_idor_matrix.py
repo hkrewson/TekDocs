@@ -315,6 +315,8 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-invoice-detail": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-issue": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-follow-up": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-credit-note": ("organization_entity_id", "invoice_entity_id"),
+        "organization-invoice-void": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-recurring-withdrawal": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-pdf": ("organization_entity_id", "invoice_entity_id"),
         "organization-invoice-csv": ("organization_entity_id", "invoice_entity_id"),

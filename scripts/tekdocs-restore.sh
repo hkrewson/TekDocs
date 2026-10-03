@@ -94,6 +94,7 @@ restore_compose exec -T db sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --clean --if-exists' \
   < "$work_directory/database.dump"
 restore_compose run --rm migrate
+restore_compose build --with-dependencies backend
 restore_compose create backend >/dev/null
 backend_id=$(restore_compose ps -q --all backend)
 media_volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/media"}}{{.Name}}{{end}}{{end}}' "$backend_id")
@@ -101,6 +102,6 @@ media_volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/
 docker run --rm -i -v "$media_volume:/restore" \
   postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
   tar -xf - -C /restore < "$work_directory/media.tar"
-restore_compose up -d --wait
+restore_compose up -d --build --wait
 restore_compose exec -T backend python manage.py check
 echo "TekDocs recovery completed for explicitly confirmed project $project_name"

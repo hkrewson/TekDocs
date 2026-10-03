@@ -657,6 +657,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         organization_scoped=True,
     ),
     route(
+        "organization-invoice-credit-note",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_VOID,),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-invoice-void",
+        ("POST",),
+        mutations=(PermissionKey.INVOICES_VOID,),
+        organization_scoped=True,
+    ),
+    route(
         "organization-invoice-recurring-withdrawal",
         ("POST",),
         mutations=(PermissionKey.INVOICES_EDIT,),

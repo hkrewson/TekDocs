@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.8.46
+  version: 0.9.0
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -24669,6 +24669,52 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/credit-note:
+    post:
+      operationId: workspaces_organizations_invoices_credit_note_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/csv:
     get:
       operationId: workspaces_organizations_invoices_csv_retrieve
@@ -25070,6 +25116,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/void:
+    post:
+      operationId: workspaces_organizations_invoices_void_create
+      parameters:
+      - in: path
+        name: invoice_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InvoiceCorrectionWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/invoices/{invoice_entity_id}/withdraw-recurring-draft:
     post:
       operationId: workspaces_organizations_invoices_withdraw_recurring_draft_create
@@ -39635,6 +39727,8 @@ components:
         id:
           type: string
           format: uuid
+        document_kind:
+          type: string
         state:
           type: string
         number:
@@ -39695,6 +39789,9 @@ components:
         paid_amount:
           type: string
           readOnly: true
+        credited_amount:
+          type: string
+          readOnly: true
         balance_amount:
           type: string
           readOnly: true
@@ -39733,9 +39830,11 @@ components:
       - bill_to
       - content_digest
       - created_at
+      - credited_amount
       - currency
       - delivered_at
       - delivery_count
+      - document_kind
       - due_date
       - id
       - invoice_date
@@ -39759,6 +39858,14 @@ components:
       - tax_total
       - total
       - updated_at
+    InvoiceCorrectionWrite:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 240
+      required:
+      - reason
     InvoiceCountryChoice:
       type: object
       properties:
@@ -40344,6 +40451,10 @@ components:
         invoice_prefix:
           type: string
           pattern: ^[A-Z0-9-]{1,16}$
+        credit_note_prefix:
+          type: string
+          default: CR
+          pattern: ^[A-Z0-9-]{1,16}$
         invoice_date_component:
           enum:
           - none
@@ -40444,6 +40555,8 @@ components:
           type: integer
         invoice_prefix:
           type: string
+        credit_note_prefix:
+          type: string
         invoice_date_component:
           type: string
         invoice_separator:
@@ -40464,6 +40577,7 @@ components:
       - configured
       - country_choices
       - country_code
+      - credit_note_prefix
       - default_currency
       - invoice_date_component
       - invoice_prefix
@@ -40537,8 +40651,6 @@ components:
           - accounting_changed
           - payment_recorded
           - payment_reversed
-          - voided
-          - credited
           type: string
           description: |-
             * `accounting_synchronized` - accounting_synchronized
@@ -40547,9 +40659,7 @@ components:
             * `accounting_changed` - accounting_changed
             * `payment_recorded` - payment_recorded
             * `payment_reversed` - payment_reversed
-            * `voided` - voided
-            * `credited` - credited
-          x-spec-enum-id: e9f90c292898e56b
+          x-spec-enum-id: 06e05cabaae327af
         occurred_at:
           type: string
           format: date-time
@@ -41266,9 +41376,12 @@ components:
           type: boolean
         can_issue:
           type: boolean
+        can_void:
+          type: boolean
       required:
       - can_issue
       - can_manage
+      - can_void
       - count
       - has_more
       - page

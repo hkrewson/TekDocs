@@ -138,6 +138,7 @@ export function InvoiceSettings({ client, authClient }: { client: SettingsClient
           <p className="field-help">{translate('accounting.numberingHelp')}</p>
           <div className="form-grid">
             <Field autoFocus label={translate('accounting.invoicePrefix')} value={value.invoice_prefix} onChange={(invoice_prefix) => setValue({ ...value, invoice_prefix: invoice_prefix.toUpperCase() })} />
+            <Field label={translate('accounting.creditNotePrefix')} value={value.credit_note_prefix} onChange={(credit_note_prefix) => setValue({ ...value, credit_note_prefix: credit_note_prefix.toUpperCase() })} />
             <SelectField label={translate('accounting.dateComponent')} value={value.invoice_date_component} options={DATE_OPTIONS} onChange={(invoice_date_component) => setValue({ ...value, invoice_date_component: invoice_date_component as InvoiceDateComponent })} />
             <SelectField label={translate('accounting.separator')} value={value.invoice_separator} options={SEPARATOR_OPTIONS} onChange={(invoice_separator) => setValue({ ...value, invoice_separator: invoice_separator as InvoiceIssueSettings['invoice_separator'] })} />
             <SelectField label={translate('accounting.sequenceDigits')} value={String(value.invoice_sequence_digits)} options={DIGIT_OPTIONS} onChange={(invoice_sequence_digits) => setValue({ ...value, invoice_sequence_digits: Number(invoice_sequence_digits) })} />

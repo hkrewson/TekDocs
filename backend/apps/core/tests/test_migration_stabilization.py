@@ -43,6 +43,7 @@ from apps.core.models import (
     InstallationState,
     Invoice,
     InvoiceLine,
+    InvoiceNumberSeries,
     Location,
     Organization,
     OrganizationClassification,
@@ -855,6 +856,59 @@ def test_invoice_follow_up_upgrade_backfills_reviewable_draft_parties(migration_
     assert upgraded.customer_snapshot["address_line_1"] == "400 Review Street"
     assert upgraded.source_invoice_id is None
     assert upgraded.source_kind == ""
+
+
+@pytest.mark.django_db(transaction=True)
+def test_invoice_correction_upgrade_creates_a_distinct_credit_note_series(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Invoice upgrade validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Invoice Correction Upgrade MSP",
+        owner_email=f"invoice-correction-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Invoice Correction Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    profile = TenantBillingProfile.objects.create(
+        tenant=result.tenant,
+        legal_name="Invoice Correction MSP, LLC",
+        address_line_1="100 Sender Street",
+        city="Austin",
+        postal_code="78701",
+        country_code="US",
+        billing_email="billing@example.invalid",
+        invoice_prefix="INV",
+        credit_note_prefix="CR",
+    )
+
+    call_command("migrate", "core", "0160_complete_legacy_invoice_revisions", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE core_tenantbillingprofile SET invoice_prefix='CR' WHERE id=%s",
+            [profile.id],
+        )
+    call_command("migrate", "core", verbosity=0, interactive=False)
+
+    upgraded = TenantBillingProfile.objects.get(pk=profile.pk)
+    assert upgraded.invoice_prefix == "CR"
+    assert upgraded.credit_note_prefix == "CRN"
+    assert InvoiceNumberSeries.objects.filter(
+        tenant=result.tenant,
+        prefix="CRN",
+        date_component=upgraded.invoice_date_component,
+        separator=upgraded.invoice_separator,
+        sequence_digits=upgraded.invoice_sequence_digits,
+        reset_period=upgraded.invoice_reset_period,
+    ).exists()
+
+    call_command("migrate", "core", "0160_complete_legacy_invoice_revisions", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name='core_invoice' AND column_name='document_kind'"
+        )
+        assert cursor.fetchone() is None
 
 
 @pytest.mark.django_db(transaction=True)

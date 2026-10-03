@@ -13,7 +13,7 @@ async function fixtures(page: Page) {
     permissions: ['system_diagnostics.view'], surface: 'msp', organization: null, mfa_enrollment_required: false,
   } }))
   await page.route('**/api/v1/system/diagnostics', (route) => route.fulfill({ json: {
-    status: 'degraded', checked_at: checkedAt, application_version: '0.8.46', database: 'ready',
+    status: 'degraded', checked_at: checkedAt, application_version: '0.9.0', database: 'ready',
     diagram_renderer: {
       status: 'stale', version: '@mermaid-js/mermaid-cli@11.16.0-with-a-deliberately-long-build-identifier-that-must-wrap',
       capacity: 8, queue: { waiting: 4, processing: 2, total: 6 },

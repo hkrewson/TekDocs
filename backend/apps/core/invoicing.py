@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import F, Max, Prefetch, QuerySet
+from django.db.models import F, Max, Prefetch, QuerySet, Sum
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -29,6 +29,7 @@ from .models import (
     EntityVisibility,
     Invoice,
     InvoiceArtifact,
+    InvoiceDocumentKind,
     InvoiceEventType,
     InvoiceLifecycleEvent,
     InvoiceLine,
@@ -73,12 +74,14 @@ class InvoiceLifecycle:
     state: str
     reconciliation_state: str
     paid_amount: Decimal
+    credited_amount: Decimal
     balance_amount: Decimal
     last_event_at: datetime | None
 
 
 def invoice_lifecycle(invoice: Invoice, *, today: date | None = None) -> InvoiceLifecycle:
     paid = Decimal("0")
+    credited = Decimal("0")
     reconciliation = "unsynchronized"
     terminal = ""
     last_event_at: datetime | None = None
@@ -99,10 +102,15 @@ def invoice_lifecycle(invoice: Invoice, *, today: date | None = None) -> Invoice
             reconciliation = "externally_changed"
         elif event.event_type == InvoiceEventType.VOIDED:
             terminal = "voided"
-        elif event.event_type == InvoiceEventType.CREDITED:
+        elif event.event_type == InvoiceEventType.CREDITED and event.related_invoice is not None:
+            credited += invoice_amounts(event.related_invoice).total
             terminal = "credited"
     total = invoice_amounts(invoice).total
-    balance = max(Decimal("0"), total - paid)
+    balance = (
+        Decimal("0")
+        if terminal == "voided" or invoice.document_kind == InvoiceDocumentKind.CREDIT_NOTE
+        else max(Decimal("0"), total - paid - credited)
+    )
     current_day = today or timezone.localdate()
     if terminal:
         state = terminal
@@ -118,7 +126,7 @@ def invoice_lifecycle(invoice: Invoice, *, today: date | None = None) -> Invoice
         state = "delivered"
     else:
         state = "issued"
-    return InvoiceLifecycle(state, reconciliation, paid, balance, last_event_at)
+    return InvoiceLifecycle(state, reconciliation, paid, credited, balance, last_event_at)
 
 
 def _issued_invoice(invoice: Invoice) -> Invoice:
@@ -150,6 +158,7 @@ def _safe_csv_cell(value: object) -> str:
 
 def invoice_csv_bytes(invoice: Invoice) -> bytes:
     issued = _issued_invoice(invoice)
+    source_invoice = issued.source_invoice
     output = io.StringIO(newline="")
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(
@@ -173,6 +182,8 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
             "invoice_tax",
             "invoice_total",
             "unit",
+            "document_kind",
+            "source_invoice_number",
         ]
     )
     amounts = invoice_amounts(issued)
@@ -199,6 +210,8 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
                 render_amount(amounts.tax_total, issued.currency),
                 render_amount(amounts.total, issued.currency),
                 _safe_csv_cell(line.unit),
+                issued.document_kind,
+                source_invoice.number if source_invoice is not None else "",
             ]
         )
     return output.getvalue().encode("utf-8")
@@ -206,9 +219,11 @@ def invoice_csv_bytes(invoice: Invoice) -> bytes:
 
 def invoice_accounting_export(invoice: Invoice) -> dict[str, object]:
     issued = _issued_invoice(invoice)
+    source_invoice = issued.source_invoice
     amounts = invoice_amounts(issued)
     return {
         "format": ACCOUNTING_EXPORT_FORMAT,
+        "document_kind": issued.document_kind,
         "idempotency_key": f"tekdocs:invoice:{issued.entity_id}:v1",
         "invoice_id": str(issued.entity_id),
         "number": issued.number,
@@ -238,6 +253,7 @@ def invoice_accounting_export(invoice: Invoice) -> dict[str, object]:
         "tax_total": render_amount(amounts.tax_total, issued.currency),
         "total": render_amount(amounts.total, issued.currency),
         "content_digest": issued.content_digest,
+        "source_invoice_id": str(source_invoice.entity_id) if source_invoice is not None else None,
     }
 
 
@@ -258,6 +274,11 @@ def record_invoice_event(
 ) -> InvoiceLifecycleEvent:
     locked = Invoice.objects.select_for_update().select_related("tenant", "organization").get(pk=invoice.pk)
     _issued_invoice(locked)
+    if locked.document_kind == InvoiceDocumentKind.CREDIT_NOTE and event_type in {
+        InvoiceEventType.PAYMENT_RECORDED,
+        InvoiceEventType.PAYMENT_REVERSED,
+    }:
+        raise InvoiceError("Payment events cannot be recorded against a credit note")
     existing = None
     if idempotency_key.strip():
         existing = InvoiceLifecycleEvent.objects.filter(
@@ -317,6 +338,8 @@ def deliver_invoice(*, invoice: Invoice, recipient: str, actor_id: UUID) -> Invo
         .get(pk=invoice.pk)
     )
     _issued_invoice(locked)
+    if locked.lifecycle_events.filter(event_type=InvoiceEventType.VOIDED).exists():
+        raise InvoiceError("A voided invoice cannot be delivered")
     pdf = invoice_pdf_bytes(locked)
     csv_export = invoice_csv_bytes(locked)
     issuer_name = str(locked.issuer_snapshot.get("legal_name", "")).strip()
@@ -448,9 +471,15 @@ def _follow_up_snapshot(
     return result
 
 
-def _series_values(profile: TenantBillingProfile) -> dict[str, object]:
+def _series_values(
+    profile: TenantBillingProfile, *, document_kind: str = InvoiceDocumentKind.INVOICE
+) -> dict[str, object]:
     return {
-        "prefix": profile.invoice_prefix,
+        "prefix": (
+            profile.credit_note_prefix
+            if document_kind == InvoiceDocumentKind.CREDIT_NOTE
+            else profile.invoice_prefix
+        ),
         "date_component": profile.invoice_date_component,
         "separator": profile.invoice_separator,
         "sequence_digits": profile.invoice_sequence_digits,
@@ -510,6 +539,7 @@ def configure_issue_settings(
         "default_currency",
         "payment_terms_days",
         "invoice_prefix",
+        "credit_note_prefix",
         "invoice_date_component",
         "invoice_separator",
         "invoice_sequence_digits",
@@ -519,18 +549,24 @@ def configure_issue_settings(
             setattr(profile, field, values[field])
     _validate(profile)
     profile.save()
-    series_values = _series_values(profile)
-    series = InvoiceNumberSeries.objects.select_for_update().filter(tenant=tenant, **series_values).first()
-    if series is None:
-        series = InvoiceNumberSeries(tenant=tenant, **series_values)
-    _validate(series)
-    series.save()
+    series = None
+    for document_kind in (InvoiceDocumentKind.INVOICE, InvoiceDocumentKind.CREDIT_NOTE):
+        series_values = _series_values(profile, document_kind=document_kind)
+        candidate = InvoiceNumberSeries.objects.select_for_update().filter(tenant=tenant, **series_values).first()
+        if candidate is None:
+            candidate = InvoiceNumberSeries(tenant=tenant, **series_values)
+        _validate(candidate)
+        candidate.save()
+        if document_kind == InvoiceDocumentKind.INVOICE:
+            series = candidate
     AuditEvent.objects.create(
         tenant=tenant,
         actor_id=actor_id,
         action="invoice.issue_settings_updated",
         metadata={},
     )
+    if series is None:
+        raise InvoiceError("The invoice numbering series could not be configured")
     return profile, series
 
 
@@ -570,9 +606,12 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     if any(line.tax_rate_value > 0 for line in lines) and not str(issuer.get("tax_registration", "")).strip():
         raise InvoiceError("Add the issuer tax registration before issuing a taxed invoice")
     try:
-        series = InvoiceNumberSeries.objects.select_for_update().get(tenant=locked.tenant, **_series_values(profile))
+        series = InvoiceNumberSeries.objects.select_for_update().get(
+            tenant=locked.tenant,
+            **_series_values(profile, document_kind=locked.document_kind),
+        )
     except InvoiceNumberSeries.DoesNotExist as exc:
-        raise InvoiceError("Configure the invoice numbering series before issuing") from exc
+        raise InvoiceError("Configure the document numbering series before issuing") from exc
 
     issue_period = _series_period(series, locked.invoice_date)
     if series.reset_period != "never":
@@ -585,6 +624,31 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
     sequence = series.next_number
     number = render_invoice_number(series, locked.invoice_date, sequence)
     amounts = calculate_invoice((line_amounts(line) for line in lines), locked.currency)
+    credit_source = None
+    if locked.document_kind == InvoiceDocumentKind.CREDIT_NOTE:
+        if locked.source_invoice_id is None or locked.source_kind != InvoiceSourceKind.CREDIT_NOTE:
+            raise InvoiceError("A credit note must reference its source invoice")
+        credit_source = (
+            Invoice.objects.select_for_update()
+            .select_related("entity")
+            .get(pk=locked.source_invoice_id)
+        )
+        if (
+            credit_source.state != InvoiceState.ISSUED
+            or credit_source.document_kind != InvoiceDocumentKind.INVOICE
+            or credit_source.tenant_id != locked.tenant_id
+            or credit_source.organization_id != locked.organization_id
+        ):
+            raise InvoiceError("A credit note must reference an issued invoice in the same Workspace")
+        if credit_source.lifecycle_events.filter(event_type=InvoiceEventType.VOIDED).exists():
+            raise InvoiceError("A voided invoice cannot receive a credit note")
+        existing_credit = (
+            credit_source.lifecycle_events.filter(event_type=InvoiceEventType.CREDITED)
+            .aggregate(total=Sum("related_invoice__total_amount"))["total"]
+            or Decimal("0")
+        )
+        if amounts.total > invoice_amounts(credit_source).total - existing_credit:
+            raise InvoiceError("The credit note exceeds the remaining creditable invoice total")
     issued_at = timezone.now()
     line_records = []
     for line in lines:
@@ -620,10 +684,12 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         subtotal=render_amount(amounts.subtotal, locked.currency),
         tax_total=render_amount(amounts.tax_total, locked.currency),
         total=render_amount(amounts.total, locked.currency),
+        document_kind=locked.document_kind,
     )
     artifact_checksum = hashlib.sha256(pdf).hexdigest()
     manifest = {
         "format": ISSUED_SIGNATURE_FORMAT,
+        "document_kind": locked.document_kind,
         "invoice_id": str(locked.entity_id),
         "number": number,
         "series_id": str(series.id),
@@ -643,6 +709,7 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         "issued_by": str(actor_id),
         "issued_at": issued_at.isoformat(),
         "pdf_checksum": artifact_checksum,
+        "source_invoice_id": str(credit_source.entity_id) if credit_source is not None else None,
     }
     digest = hashlib.sha256(_canonical_json(manifest)).digest()
     signing_key = publication_signing_key()
@@ -684,14 +751,15 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
 
     series.next_number = sequence + 1
     series.save(update_fields=("current_period", "next_number", "updated_at"))
-    locked.entity.display_name = f"Invoice {number}"
+    label = "Credit note" if locked.document_kind == InvoiceDocumentKind.CREDIT_NOTE else "Invoice"
+    locked.entity.display_name = f"{label} {number}"
     locked.entity.save(update_fields=("display_name", "updated_at"))
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,
         action="invoice.issued",
         entity_id=locked.entity_id,
-        metadata={},
+        metadata={"document_kind": locked.document_kind},
     )
     record_invoice_event(
         invoice=locked,
@@ -700,28 +768,39 @@ def issue_invoice(*, invoice: Invoice, actor_id: UUID) -> Invoice:
         actor_id=actor_id,
         idempotency_key=f"tekdocs:invoice:{locked.entity_id}:issued:v1",
     )
-    reminder_entity = Entity.objects.create(
-        tenant=locked.tenant,
-        workspace=workspace_for_owner(tenant=locked.tenant, organization=locked.organization),
-        organization=locked.organization,
-        entity_type="reminder_schedule",
-        display_name=f"Invoice {number} due",
-        visibility=EntityVisibility.MSP_PRIVATE,
-    )
-    ReminderSchedule.objects.create(
-        tenant=locked.tenant,
-        workspace=reminder_entity.workspace,
-        organization=locked.organization,
-        entity=reminder_entity,
-        source_entity=locked.entity,
-        domain=ReminderDomain.INVOICE,
-        kind="invoice_due",
-        title=f"Invoice {number} due",
-        due_on=locked.due_date,
-        lead_days=min(profile.payment_terms_days, 7),
-        recurrence=ReminderRecurrence.NONE,
-        created_by_id=actor_id,
-    )
+    if credit_source is not None:
+        record_invoice_event(
+            invoice=credit_source,
+            event_type=InvoiceEventType.CREDITED,
+            occurred_at=issued_at,
+            actor_id=actor_id,
+            idempotency_key=f"tekdocs:invoice:{credit_source.entity_id}:credit:{locked.entity_id}:v1",
+            related_invoice=locked,
+            note=f"Credit note {number} issued.",
+        )
+    if locked.document_kind == InvoiceDocumentKind.INVOICE:
+        reminder_entity = Entity.objects.create(
+            tenant=locked.tenant,
+            workspace=workspace_for_owner(tenant=locked.tenant, organization=locked.organization),
+            organization=locked.organization,
+            entity_type="reminder_schedule",
+            display_name=f"Invoice {number} due",
+            visibility=EntityVisibility.MSP_PRIVATE,
+        )
+        ReminderSchedule.objects.create(
+            tenant=locked.tenant,
+            workspace=reminder_entity.workspace,
+            organization=locked.organization,
+            entity=reminder_entity,
+            source_entity=locked.entity,
+            domain=ReminderDomain.INVOICE,
+            kind="invoice_due",
+            title=f"Invoice {number} due",
+            due_on=locked.due_date,
+            lead_days=min(profile.payment_terms_days, 7),
+            recurrence=ReminderRecurrence.NONE,
+            created_by_id=actor_id,
+        )
     return locked
 
 
@@ -817,18 +896,33 @@ def create_invoice_from_issued(
         .prefetch_related("lines")
         .get(pk=source.pk)
     )
-    if locked.state != InvoiceState.ISSUED:
+    if locked.state != InvoiceState.ISSUED or locked.document_kind != InvoiceDocumentKind.INVOICE:
         raise InvoiceError("Only an issued invoice can start a follow-up draft")
+    if locked.lifecycle_events.filter(event_type=InvoiceEventType.VOIDED).exists():
+        raise InvoiceError("A voided invoice cannot start a follow-up draft")
     today = timezone.localdate()
     profile = TenantBillingProfile.objects.filter(tenant=locked.tenant).first()
     terms = profile.payment_terms_days if profile is not None else max((locked.due_date - locked.invoice_date).days, 0)
-    label = "Supplement" if source_kind == InvoiceSourceKind.SUPPLEMENT else "Replacement"
+    labels: dict[str, str] = {
+        InvoiceSourceKind.SUPPLEMENT: "Supplement",
+        InvoiceSourceKind.REPLACEMENT: "Replacement",
+        InvoiceSourceKind.CREDIT_NOTE: "Credit",
+    }
+    label = labels[source_kind]
+    document_kind = (
+        InvoiceDocumentKind.CREDIT_NOTE
+        if source_kind == InvoiceSourceKind.CREDIT_NOTE
+        else InvoiceDocumentKind.INVOICE
+    )
     entity = Entity.objects.create(
         tenant=locked.tenant,
         workspace=workspace_for_owner(tenant=locked.tenant, organization=locked.organization),
         organization=locked.organization,
         entity_type="invoice",
-        display_name=f"Draft invoice · {today.isoformat()}",
+        display_name=(
+            f"Draft {'credit note' if document_kind == InvoiceDocumentKind.CREDIT_NOTE else 'invoice'}"
+            f" · {today.isoformat()}"
+        ),
         visibility=EntityVisibility.MSP_PRIVATE,
     )
     issuer_snapshot = dict(locked.issuer_snapshot)
@@ -851,6 +945,7 @@ def create_invoice_from_issued(
         tenant=locked.tenant,
         organization=locked.organization,
         entity=entity,
+        document_kind=document_kind,
         currency=locked.currency,
         invoice_date=today,
         due_date=today + timedelta(days=terms),
@@ -863,7 +958,7 @@ def create_invoice_from_issued(
     )
     _validate(draft)
     draft.save()
-    if source_kind == InvoiceSourceKind.REPLACEMENT:
+    if source_kind in {InvoiceSourceKind.REPLACEMENT, InvoiceSourceKind.CREDIT_NOTE}:
         for original in locked.lines.all():
             copied = InvoiceLine(
                 tenant=locked.tenant,
@@ -884,11 +979,46 @@ def create_invoice_from_issued(
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,
-        action="invoice.follow_up_draft_created",
+        action=(
+            "invoice.credit_note_draft_created"
+            if source_kind == InvoiceSourceKind.CREDIT_NOTE
+            else "invoice.follow_up_draft_created"
+        ),
         entity_id=entity.id,
         metadata={"source_invoice_id": str(locked.entity_id), "source_kind": source_kind},
     )
     return draft
+
+
+@transaction.atomic
+def void_invoice(*, invoice: Invoice, actor_id: UUID, reason: str) -> Invoice:
+    locked = (
+        Invoice.objects.select_for_update()
+        .select_related("tenant", "organization", "entity")
+        .prefetch_related("lifecycle_events")
+        .get(pk=invoice.pk)
+    )
+    if locked.state != InvoiceState.ISSUED or locked.document_kind != InvoiceDocumentKind.INVOICE:
+        raise InvoiceError("Only an issued invoice can be voided")
+    reason = reason.strip()
+    if not reason:
+        raise InvoiceError("Explain why the invoice is being voided")
+    if locked.delivery_count or locked.lifecycle_events.filter(
+        event_type=InvoiceEventType.DELIVERY_SUCCEEDED
+    ).exists():
+        raise InvoiceError("A delivered invoice cannot be voided; issue a credit note instead")
+    if locked.lifecycle_events.filter(event_type=InvoiceEventType.CREDITED).exists():
+        raise InvoiceError("An invoice with issued credit notes cannot be voided")
+    if not locked.lifecycle_events.filter(event_type=InvoiceEventType.VOIDED).exists():
+        record_invoice_event(
+            invoice=locked,
+            event_type=InvoiceEventType.VOIDED,
+            occurred_at=timezone.now(),
+            actor_id=actor_id,
+            idempotency_key=f"tekdocs:invoice:{locked.entity_id}:voided:v1",
+            note=reason,
+        )
+    return invoices_for_scope(DataScope.organization(locked.tenant, locked.organization)).get(pk=locked.pk)
 
 
 @transaction.atomic

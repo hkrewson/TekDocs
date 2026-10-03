@@ -23,6 +23,7 @@ from .models import (
     Entity,
     EntityVisibility,
     Invoice,
+    InvoiceEventType,
     InvoiceLifecycleEvent,
     InvoiceState,
     PublicationAudience,
@@ -98,6 +99,7 @@ def _portal_invoices(request) -> QuerySet[Invoice]:  # type: ignore[no-untyped-d
             organization=organization,
             state=InvoiceState.ISSUED,
         )
+        .exclude(lifecycle_events__event_type=InvoiceEventType.VOIDED)
         .select_related("entity", "organization", "artifact")
         .prefetch_related(
             "lines",

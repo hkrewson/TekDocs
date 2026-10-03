@@ -37,7 +37,7 @@ type LineForm = {
   tax_inclusive: boolean
 }
 type EventForm = {
-  event_type: 'payment_recorded' | 'payment_reversed' | 'accounting_synchronized' | 'accounting_rejected' | 'accounting_duplicate' | 'accounting_changed' | 'voided' | 'credited'
+  event_type: 'payment_recorded' | 'payment_reversed' | 'accounting_synchronized' | 'accounting_rejected' | 'accounting_duplicate' | 'accounting_changed'
   amount: string
   provider: string
   external_id: string
@@ -124,6 +124,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
   const [taxRates, setTaxRates] = useState<TaxRateChoice[]>([])
   const [canManage, setCanManage] = useState(false)
   const [canIssue, setCanIssue] = useState(false)
+  const [canVoid, setCanVoid] = useState(false)
   const [needsSettings, setNeedsSettings] = useState(false)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [editor, setEditor] = useState<'none' | 'new' | 'draft' | 'billing' | 'line' | 'delivery' | 'event'>('none')
@@ -135,9 +136,10 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deliveryRecipient, setDeliveryRecipient] = useState('')
-  const [confirmation, setConfirmation] = useState<'delete' | 'issue' | 'withdraw' | null>(null)
+  const [confirmation, setConfirmation] = useState<'delete' | 'issue' | 'withdraw' | 'void' | 'credit' | null>(null)
   const [withdrawalReason, setWithdrawalReason] = useState('')
-  const [reauthenticationAction, setReauthenticationAction] = useState<'issue' | 'withdraw' | null>(null)
+  const [correctionReason, setCorrectionReason] = useState('')
+  const [reauthenticationAction, setReauthenticationAction] = useState<'issue' | 'withdraw' | 'void' | 'credit' | null>(null)
   const [password, setPassword] = useState('')
   const selectedId = params.get('invoice')
   const selected = selectedRecord?.id === selectedId ? selectedRecord : null
@@ -166,6 +168,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
         setResult(result)
         setCanManage(result.can_manage)
         setCanIssue(result.can_issue)
+        setCanVoid(result.can_void)
         setOrigins(choices.origins)
         setTaxRates(choices.tax_rates)
         setPhase('ready')
@@ -276,6 +279,36 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
     } finally { setBusy(false) }
   }
 
+  async function createCreditNote() {
+    if (!selected || !correctionReason.trim()) return
+    setBusy(true)
+    setError(null)
+    try { replace(await client.createCreditNote(workspace, selected.id, correctionReason.trim())) }
+    catch (caught) {
+      if (caught instanceof InvoiceRequestError && caught.code === 'recent_authentication_required') {
+        setConfirmation(null)
+        setReauthenticationAction('credit')
+      } else {
+        setError(translate('accounting.creditNoteFailed'))
+      }
+    } finally { setBusy(false) }
+  }
+
+  async function voidSelected() {
+    if (!selected || !correctionReason.trim()) return
+    setBusy(true)
+    setError(null)
+    try { replace(await client.voidInvoice(workspace, selected.id, correctionReason.trim())) }
+    catch (caught) {
+      if (caught instanceof InvoiceRequestError && caught.code === 'recent_authentication_required') {
+        setConfirmation(null)
+        setReauthenticationAction('void')
+      } else {
+        setError(translate('accounting.voidFailed'))
+      }
+    } finally { setBusy(false) }
+  }
+
   async function confirmSensitivePassword(event: FormEvent) {
     event.preventDefault()
     const submittedPassword = password
@@ -286,13 +319,15 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
     try {
       await authClient.reauthenticate(submittedPassword)
     } catch {
-      setError(translate(action === 'withdraw' ? 'accounting.withdrawReauthenticationFailed' : 'accounting.issueReauthenticationFailed'))
+      setError(translate(action === 'withdraw' ? 'accounting.withdrawReauthenticationFailed' : action === 'issue' ? 'accounting.issueReauthenticationFailed' : 'accounting.correctionReauthenticationFailed'))
       setBusy(false)
       return
     }
     setReauthenticationAction(null)
     setBusy(false)
     if (action === 'withdraw') await withdrawSelected()
+    else if (action === 'void') await voidSelected()
+    else if (action === 'credit') await createCreditNote()
     else await issueSelected()
   }
 
@@ -350,7 +385,7 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
       <Link to={invoiceHref()}>{translate('accounting.return')}</Link>
       <section className="content-section inventory-detail">
         {selected ? <>
-          <div className="section-heading"><div><h2>{selected.number || `${translate('accounting.draft')} · ${formatPlainDate(selected.invoice_date)}`}</h2><p>{selected.reference || workspace.name}</p></div><span className="lifecycle-state">{translate(selected.recurring?.disposition === 'withdrawn' ? 'accounting.withdrawn' : selected.state === 'draft' ? 'accounting.draft' : 'accounting.issued')}</span></div>
+          <div className="section-heading"><div><h2>{selected.number || `${translate(selected.document_kind === 'credit_note' ? 'accounting.creditNoteDraft' : 'accounting.draft')} · ${formatPlainDate(selected.invoice_date)}`}</h2><p>{selected.reference || workspace.name}</p></div><span className="lifecycle-state">{selected.state === 'issued' && selected.lifecycle_state === 'voided' ? translate('accounting.lifecycle.voided') : translate(selected.recurring?.disposition === 'withdrawn' ? 'accounting.withdrawn' : selected.state === 'draft' ? 'accounting.draft' : selected.document_kind === 'credit_note' ? 'accounting.creditNote' : 'accounting.issued')}</span></div>
           <dl className="invoice-metadata">
             <div><dt>{translate('accounting.invoiceDate')}</dt><dd>{formatPlainDate(selected.invoice_date)}</dd></div>
             <div><dt>{translate('accounting.dueDate')}</dt><dd>{formatPlainDate(selected.due_date)}</dd></div>
@@ -362,27 +397,31 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
           {selected.state === 'draft' && selected.recurring?.disposition !== 'withdrawn' && <div className="form-actions">{canManage && <><button type="button" className="secondary-button" onClick={() => { setConfirmation(null); setDraft(draftForm(selected)); setEditor('draft') }}><Pencil size={15} />{translate('accounting.editDraft')}</button><button type="button" className="secondary-button" onClick={() => { setBilling({ issuer: selected.issuer ?? {}, bill_to: selected.bill_to ?? {} }); setEditor('billing') }}><Pencil size={15} />{translate('accounting.editBillingDetails')}</button>{selected.recurring ? <button type="button" className="danger-button" disabled={busy} onClick={() => { setWithdrawalReason(''); setConfirmation('withdraw') }}><History size={15} />{translate('accounting.withdrawDraft')}</button> : <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation('delete')}><Trash2 size={15} />{translate('accounting.deleteDraft')}</button>}</>}{canIssue && <button type="button" className="primary-button" disabled={busy || selected.lines.length === 0} onClick={() => { setReauthenticationAction(null); setConfirmation('issue') }}><FileCheck2 size={15} />{translate('accounting.reviewAndIssue')}</button>}</div>}
           {selected.state === 'draft' && confirmation === 'withdraw' && <div className="archive-confirmation" role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate('accounting.withdrawConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate('accounting.withdrawConfirmHelp')}</p><label><span>{translate('accounting.withdrawalReason')}</span><textarea autoFocus required maxLength={1000} rows={3} disabled={busy} value={withdrawalReason} onChange={(event) => setWithdrawalReason(event.target.value)} /></label></div><div className="form-actions"><button type="button" className="danger-button" disabled={busy || !withdrawalReason.trim()} onClick={() => { void withdrawSelected() }}>{busy ? translate('accounting.withdrawing') : translate('accounting.withdrawDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
           {selected.state === 'draft' && confirmation && confirmation !== 'withdraw' && <div className={`archive-confirmation${confirmation === 'issue' ? ' invoice-review' : ''}`} role="alertdialog" aria-labelledby="invoice-confirmation-heading" aria-describedby="invoice-confirmation-help"><div><strong id="invoice-confirmation-heading">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHeading' : 'accounting.deleteDraftConfirmHeading', { date: formatPlainDate(selected.invoice_date) })}</strong><p id="invoice-confirmation-help">{translate(confirmation === 'issue' ? 'accounting.issueConfirmHelp' : 'accounting.deleteDraftConfirmHelp')}</p>{confirmation === 'issue' && <><div className="invoice-review-parties"><InvoicePartySummary label={translate('accounting.from')} identity={selected.issuer} /><InvoicePartySummary label={translate('accounting.billTo')} identity={selected.bill_to} /></div><dl className="invoice-review-facts"><div><dt>{translate('accounting.invoiceDate')}</dt><dd>{formatPlainDate(selected.invoice_date)}</dd></div><div><dt>{translate('accounting.dueDate')}</dt><dd>{formatPlainDate(selected.due_date)}</dd></div><div><dt>{translate('accounting.total')}</dt><dd>{selected.currency} {selected.total}</dd></div><div><dt>{translate('accounting.items')}</dt><dd>{selected.lines.length}</dd></div></dl><ul className="invoice-review-lines" aria-label={translate('accounting.items')}>{selected.lines.map((item) => <li key={item.id}><span><strong>{item.description}</strong><small>{item.quantity} {item.unit} × {selected.currency} {item.unit_amount}</small></span><strong>{selected.currency} {item.total}</strong></li>)}</ul></>}</div><div className="form-actions"><button type="button" className={confirmation === 'delete' ? 'danger-button' : 'primary-button'} disabled={busy} onClick={() => { void (confirmation === 'issue' ? issueSelected() : removeDraft()) }}>{busy ? translate(confirmation === 'issue' ? 'accounting.issuing' : 'accounting.deleting') : translate(confirmation === 'issue' ? 'accounting.issue' : 'accounting.deleteDraft')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
-          {selected.state === 'draft' && reauthenticationAction && <form className="invoice-reauth-form invoice-issue-reauth" onSubmit={(event) => { void confirmSensitivePassword(event) }}>
-            <div><h3>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdraw' : 'accounting.confirmIssue')}</h3><p>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdrawHelp' : 'accounting.confirmIssueHelp')}</p></div>
+          {reauthenticationAction && <form className="invoice-reauth-form invoice-issue-reauth" onSubmit={(event) => { void confirmSensitivePassword(event) }}>
+            <div><h3>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdraw' : reauthenticationAction === 'issue' ? 'accounting.confirmIssue' : 'accounting.confirmCorrection')}</h3><p>{translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmWithdrawHelp' : reauthenticationAction === 'issue' ? 'accounting.confirmIssueHelp' : 'accounting.confirmCorrectionHelp')}</p></div>
             <label><span>{translate('accounting.currentPassword')}</span><input autoFocus required type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            <button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.confirming') : translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmAndWithdraw' : 'accounting.confirmAndIssue')}</button>
+            <button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.confirming') : translate(reauthenticationAction === 'withdraw' ? 'accounting.confirmAndWithdraw' : reauthenticationAction === 'issue' ? 'accounting.confirmAndIssue' : 'accounting.confirmAndContinue')}</button>
           </form>}
           {selected.state === 'issued' && selected.issued_at && <p className="workspace-area-note">{translate(selected.key_fingerprint ? 'accounting.issuedProofVerified' : 'accounting.issuedProof', { date: formatPlainDate(selected.issued_at.slice(0, 10)), fingerprint: selected.key_fingerprint?.slice(0, 12) ?? '' })}</p>}
           {selected.state === 'issued' && <div className="form-actions">
             <a className="secondary-button" href={client.pdfUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadPdf')}</a>
             <a className="secondary-button" href={client.csvUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.downloadCsv')}</a>
             <a className="secondary-button" href={client.accountingExportUrl(workspace, selected.id)}><Download size={15} aria-hidden="true" />{translate('accounting.accountingExport')}</a>
-            {canIssue && <button type="button" className="primary-button" disabled={busy} onClick={() => { setDeliveryRecipient(''); setEditor('delivery') }}><Mail size={15} aria-hidden="true" />{translate('accounting.deliver')}</button>}
-            {canIssue && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
-            {canManage && <button type="button" className="secondary-button" disabled={busy} onClick={() => { void createRevision() }}><Pencil size={15} aria-hidden="true" />{translate('accounting.reviseInvoice')}</button>}
+            {canIssue && selected.lifecycle_state !== 'voided' && <button type="button" className="primary-button" disabled={busy} onClick={() => { setDeliveryRecipient(''); setEditor('delivery') }}><Mail size={15} aria-hidden="true" />{translate('accounting.deliver')}</button>}
+            {canIssue && selected.document_kind === 'invoice' && selected.lifecycle_state !== 'voided' && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEventValue(emptyEvent()); setEditor('event') }}><History size={15} aria-hidden="true" />{translate('accounting.recordUpdate')}</button>}
+            {canManage && selected.document_kind === 'invoice' && selected.lifecycle_state !== 'voided' && <button type="button" className="secondary-button" disabled={busy} onClick={() => { void createRevision() }}><Pencil size={15} aria-hidden="true" />{translate('accounting.reviseInvoice')}</button>}
+            {canVoid && selected.document_kind === 'invoice' && selected.lifecycle_state !== 'voided' && Number(selected.balance_amount ?? '0') > 0 && <button type="button" className="secondary-button" disabled={busy} onClick={() => { setCorrectionReason(''); setConfirmation('credit') }}><History size={15} aria-hidden="true" />{translate('accounting.createCreditNote')}</button>}
+            {canVoid && selected.document_kind === 'invoice' && selected.lifecycle_state !== 'voided' && selected.lifecycle_state !== 'credited' && (selected.delivery_count ?? 0) === 0 && <button type="button" className="danger-button" disabled={busy} onClick={() => { setCorrectionReason(''); setConfirmation('void') }}><Trash2 size={15} aria-hidden="true" />{translate('accounting.voidInvoice')}</button>}
           </div>}
+          {selected.state === 'issued' && (confirmation === 'void' || confirmation === 'credit') && <div className="archive-confirmation" role="alertdialog" aria-labelledby="invoice-correction-heading" aria-describedby="invoice-correction-help"><div><strong id="invoice-correction-heading">{translate(confirmation === 'void' ? 'accounting.voidConfirmHeading' : 'accounting.creditConfirmHeading', { number: selected.number ?? '' })}</strong><p id="invoice-correction-help">{translate(confirmation === 'void' ? 'accounting.voidConfirmHelp' : 'accounting.creditConfirmHelp')}</p><label><span>{translate('accounting.correctionReason')}</span><textarea autoFocus required maxLength={240} rows={3} disabled={busy} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} /></label></div><div className="form-actions"><button type="button" className={confirmation === 'void' ? 'danger-button' : 'primary-button'} disabled={busy || !correctionReason.trim()} onClick={() => { void (confirmation === 'void' ? voidSelected() : createCreditNote()) }}>{busy ? translate('accounting.saving') : translate(confirmation === 'void' ? 'accounting.voidInvoice' : 'accounting.createCreditNote')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirmation(null)}>{translate('common.cancel')}</button></div></div>}
           {selected.state === 'issued' && selected.delivered_at && <p className="workspace-area-note">{translate((selected.delivery_count ?? 1) === 1 ? 'accounting.deliveredProof' : 'accounting.deliveredProofPlural', { date: formatPlainDate(selected.delivered_at.slice(0, 10)), count: selected.delivery_count ?? 1 })}</p>}
-          {selected.source && <p className="workspace-area-note">{translate(selected.source.kind === 'supplement' ? 'accounting.supplementsInvoice' : 'accounting.revisesInvoice', { number: selected.source.number })}</p>}
+          {selected.source && <p className="workspace-area-note">{translate(selected.source.kind === 'supplement' ? 'accounting.supplementsInvoice' : selected.source.kind === 'credit_note' ? 'accounting.creditsInvoice' : 'accounting.revisesInvoice', { number: selected.source.number })}</p>}
           {(selected.issuer || selected.bill_to) && <div className="invoice-party-grid">{selected.issuer && <section aria-labelledby="invoice-from-heading"><div className="section-heading"><h3 id="invoice-from-heading">{translate('accounting.from')}</h3></div><InvoiceBillTo identity={selected.issuer} /></section>}{selected.bill_to && <section aria-labelledby="invoice-bill-to-heading"><div className="section-heading"><h3 id="invoice-bill-to-heading">{translate('accounting.billTo')}</h3></div><InvoiceBillTo identity={selected.bill_to} /></section>}</div>}
           {selected.state === 'issued' && <dl className="invoice-metadata">
             <div><dt>{translate('accounting.lifecycle')}</dt><dd>{lifecycleLabel(selected.lifecycle_state ?? 'issued')}</dd></div>
             <div><dt>{translate('accounting.reconciliation')}</dt><dd>{reconciliationLabel(selected.reconciliation_state ?? 'unsynchronized')}</dd></div>
             <div><dt>{translate('accounting.paid')}</dt><dd>{selected.currency} {selected.paid_amount ?? '0.00'}</dd></div>
+            {selected.document_kind === 'invoice' && <div><dt>{translate('accounting.creditedAmount')}</dt><dd>{selected.currency} {selected.credited_amount ?? '0.00'}</dd></div>}
             <div><dt>{translate('accounting.balance')}</dt><dd>{selected.currency} {selected.balance_amount ?? selected.total}</dd></div>
           </dl>}
           {selected.state === 'issued' && (selected.lifecycle_events?.length ?? 0) > 0 && <section aria-labelledby="invoice-history-heading"><div className="section-heading"><h3 id="invoice-history-heading">{translate('accounting.history')}</h3></div><ol className="invoice-event-list">{[...(selected.lifecycle_events ?? [])].reverse().map((item) => <li key={item.id}><div><strong>{eventLabel(item.event_type)}</strong><span>{formatPlainDate(item.occurred_at.slice(0, 10))}{item.actor ? ` · ${item.actor}` : ''}</span></div><span>{item.amount ? `${item.currency} ${item.amount}` : item.provider || item.note}</span></li>)}</ol></section>}
@@ -400,26 +439,23 @@ export function Invoices({ workspace, client, preferenceClient = browserCollecti
     {editor === 'billing' && selected && <BillingEditor value={billing} setValue={setBilling} busy={busy} cancel={() => setEditor('none')} submit={() => { void perform(() => client.update(workspace, selected.id, billing)) }} />}
     {editor === 'line' && selected && <LineEditor value={line} setValue={setLine} origins={origins.filter((origin) => origin.currency === selected.currency)} taxRates={taxRates} currency={selected.currency} adjustsExistingStock={Boolean(editingLineId && selected.lines.find((item) => item.id === editingLineId)?.origin_type === 'stock_item')} busy={busy} cancel={() => setEditor('none')} submit={() => { const [origin_type, origin_id] = line.originKey.split(':'); const selectedTax = taxRates.find((rate) => rate.id === line.tax_rate_id); const values = editingLineId ? { description: line.description, quantity: line.quantity, unit: line.unit, unit_amount: line.unit_amount, tax_rate_name: selectedTax?.name ?? line.tax_rate_name, tax_rate_value: selectedTax?.rate ?? line.tax_rate_value, tax_inclusive: selectedTax?.inclusive ?? line.tax_inclusive } : line.originKey ? { origin_type, origin_id, description: line.description, quantity: line.quantity, unit: line.unit, tax_rate_id: line.tax_rate_id || null } : { description: line.description, quantity: line.quantity, unit: line.unit, unit_amount: line.unit_amount, tax_rate_id: line.tax_rate_id || null }; void perform(() => editingLineId ? client.updateLine(workspace, selected.id, editingLineId, values) : client.addLine(workspace, selected.id, values)) }} />}
     {editor === 'delivery' && selected && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-delivery-title"><form className="record-form" onSubmit={(event) => { void deliverSelected(event) }}><div className="section-heading"><h2 id="invoice-delivery-title">{translate('accounting.deliverTitle')}</h2></div><label><span>{translate('accounting.deliveryRecipient')}</span><input autoFocus type="email" required maxLength={254} autoComplete="email" value={deliveryRecipient} onChange={(event) => setDeliveryRecipient(event.target.value)} /></label><p>{translate('accounting.deliveryDescription')}</p><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setEditor('none')}>{translate('common.cancel')}</button><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.sending') : translate('accounting.send')}</button></div></form></section>}
-    {editor === 'event' && selected && <InvoiceEventEditor value={eventValue} setValue={setEventValue} invoices={records.filter((item) => item.state === 'issued' && item.id !== selected.id)} currency={selected.currency} busy={busy} cancel={() => setEditor('none')} submit={() => { const payment = eventValue.event_type === 'payment_recorded' || eventValue.event_type === 'payment_reversed'; const provider = eventValue.event_type.startsWith('accounting_'); void perform(() => client.recordEvent(workspace, selected.id, { event_type: eventValue.event_type, occurred_at: new Date().toISOString(), amount: payment ? eventValue.amount : null, currency: payment ? selected.currency : '', provider: provider ? eventValue.provider : '', external_id: provider ? eventValue.external_id : '', idempotency_key: provider ? eventValue.idempotency_key : `tekdocs:invoice:${selected.id}:${eventValue.event_type}:${crypto.randomUUID()}`, related_invoice_id: eventValue.related_invoice_id || null, note: eventValue.note }), 'accounting.updateFailed') }} />}
+    {editor === 'event' && selected && <InvoiceEventEditor value={eventValue} setValue={setEventValue} currency={selected.currency} busy={busy} cancel={() => setEditor('none')} submit={() => { const payment = eventValue.event_type === 'payment_recorded' || eventValue.event_type === 'payment_reversed'; const provider = eventValue.event_type.startsWith('accounting_'); void perform(() => client.recordEvent(workspace, selected.id, { event_type: eventValue.event_type, occurred_at: new Date().toISOString(), amount: payment ? eventValue.amount : null, currency: payment ? selected.currency : '', provider: provider ? eventValue.provider : '', external_id: provider ? eventValue.external_id : '', idempotency_key: provider ? eventValue.idempotency_key : `tekdocs:invoice:${selected.id}:${eventValue.event_type}:${crypto.randomUUID()}`, related_invoice_id: null, note: eventValue.note }), 'accounting.updateFailed') }} />}
   </>
 }
 
-function InvoiceEventEditor({ value, setValue, invoices, currency, busy, cancel, submit }: { value: EventForm; setValue: (value: EventForm) => void; invoices: InvoiceDraft[]; currency: string; busy: boolean; cancel: () => void; submit: () => void }) {
+function InvoiceEventEditor({ value, setValue, currency, busy, cancel, submit }: { value: EventForm; setValue: (value: EventForm) => void; currency: string; busy: boolean; cancel: () => void; submit: () => void }) {
   const payment = value.event_type === 'payment_recorded' || value.event_type === 'payment_reversed'
   const provider = value.event_type.startsWith('accounting_')
-  const linked = value.event_type === 'voided' || value.event_type === 'credited'
   return <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invoice-event-title"><form className="record-form" onSubmit={(formEvent) => { formEvent.preventDefault(); submit() }}><div className="section-heading"><h2 id="invoice-event-title">{translate('accounting.recordUpdate')}</h2></div><label><span>{translate('accounting.updateType')}</span><select autoFocus value={value.event_type} onChange={(event) => setValue({ ...value, event_type: event.target.value as EventForm['event_type'] })}>{EVENT_OPTIONS.map(([key, label]) => <option key={key} value={key}>{translate(label)}</option>)}</select></label>
     {payment && <label><span>{translate('accounting.paymentAmount')} ({currency})</span><input required type="number" min="0.0001" step="0.0001" value={value.amount} onChange={(event) => setValue({ ...value, amount: event.target.value })} /></label>}
     {provider && <><label><span>{translate('accounting.provider')}</span><input required maxLength={80} value={value.provider} onChange={(event) => setValue({ ...value, provider: event.target.value })} /></label><label><span>{translate('accounting.externalId')}</span><input required maxLength={160} value={value.external_id} onChange={(event) => setValue({ ...value, external_id: event.target.value })} /></label><label><span>{translate('accounting.idempotencyKey')}</span><input required maxLength={160} aria-describedby="invoice-update-id-help" value={value.idempotency_key} onChange={(event) => setValue({ ...value, idempotency_key: event.target.value })} /></label><p id="invoice-update-id-help" className="field-help wide-field">{translate('accounting.idempotencyHelp')}</p></>}
-    {linked && invoices.length > 0 && <label><span>{translate('accounting.relatedInvoice')}</span><select value={value.related_invoice_id} onChange={(event) => setValue({ ...value, related_invoice_id: event.target.value })}><option value="">{translate('accounting.noRelatedInvoice')}</option>{invoices.map((invoice) => <option key={invoice.id} value={invoice.id}>{invoice.number}</option>)}</select></label>}
-    <label><span>{translate('accounting.updateNote')}</span><textarea required={linked} maxLength={500} rows={3} value={value.note} onChange={(event) => setValue({ ...value, note: event.target.value })} /></label><div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.saving') : translate('accounting.recordUpdate')}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></form></section>
+    <label><span>{translate('accounting.updateNote')}</span><textarea maxLength={500} rows={3} value={value.note} onChange={(event) => setValue({ ...value, note: event.target.value })} /></label><div className="form-actions"><button type="submit" className="primary-button" disabled={busy}>{busy ? translate('accounting.saving') : translate('accounting.recordUpdate')}</button><button type="button" className="secondary-button" onClick={cancel}>{translate('common.cancel')}</button></div></form></section>
 }
 
 const EVENT_OPTIONS: ReadonlyArray<readonly [EventForm['event_type'], MessageId]> = [
   ['payment_recorded', 'accounting.paymentRecorded'], ['payment_reversed', 'accounting.paymentReversed'],
   ['accounting_synchronized', 'accounting.synchronized'], ['accounting_rejected', 'accounting.rejected'],
   ['accounting_duplicate', 'accounting.duplicate'], ['accounting_changed', 'accounting.externallyChanged'],
-  ['voided', 'accounting.voided'], ['credited', 'accounting.credited'],
 ]
 
 function eventLabel(value: string) { return translate(`accounting.event.${value}` as MessageId) }

@@ -17,7 +17,7 @@ async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: context }))
   await page.route('**/api/v1/notifications*', (route) => route.fulfill({ json: { results: [], count: 0 } }))
   await page.route('**/api/v1/system/diagnostics', (route) => route.fulfill({ json: {
-    status: 'ready', checked_at: '2026-09-22T05:00:00Z', application_version: '0.8.46', database: 'ready',
+    status: 'ready', checked_at: '2026-09-22T05:00:00Z', application_version: '0.9.0', database: 'ready',
     diagram_renderer: { status: 'ready', version: '11.16.1', capacity: 8, queue: { waiting: 0, processing: 0, total: 0 }, recent_failures: [], last_checked_at: Date.parse('2026-09-22T05:00:00Z') },
   } }))
 }

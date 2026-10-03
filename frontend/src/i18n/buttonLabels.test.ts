@@ -8,27 +8,12 @@ import { hardcodedButtonLabels } from './buttonLabels'
  *
  * `docs/LOCALIZATION.md` and `frontend/AGENTS.md` require interface copy to come
  * from the message catalog. This test is the control: every component surface must
- * be free of literal button labels, and the only permitted exceptions are the ones
- * listed below with a recorded count.
+ * be free of literal button labels. The former exception register reached zero in
+ * the 0.9.0 copy closeout, so every component is checked directly.
  *
- * The list is an exception register, not a to-do list you may extend. Adding a new
- * literal anywhere fails. Adding one to an exempt file fails too, because each
- * entry pins an exact count. Entries are removed as their labels become
- * parameterised messages; nothing is ever added.
- *
- * Every remaining entry interleaves data with text, which `translate()` supports
- * through named substitution (`"{first}-{last} of {count}"`). They were left out of
- * the mechanical migration deliberately: turning `Edit <span>{person.full_name}</span>`
- * or `{count} · retained` into a catalog message is a copy decision, and assembling
- * a sentence from fragments is exactly what the message contract forbids.
+ * Adding a new literal anywhere fails. Parameterised labels use one complete
+ * catalog message with named substitution rather than translated fragments.
  */
-const PENDING_PARAMETERISED_LABELS: Record<string, number> = {
-  'src/compliance/Compliance.tsx': 1,
-  'src/documentation/Documentation.tsx': 3,
-  'src/networks/NetworkAddressing.tsx': 1,
-  'src/networks/NetworkEndpoints.tsx': 1,
-}
-
 const sources = Object.entries(
   import.meta.glob<string>('../**/*.tsx', { query: '?raw', import: 'default', eager: true }),
 )
@@ -42,34 +27,10 @@ describe('button label catalog coverage', () => {
 
   it('allows no hardcoded button label outside the exception register', () => {
     const offenders = sources
-      .filter(([path]) => !(path in PENDING_PARAMETERISED_LABELS))
       .map(([path, source]) => ({ path, labels: hardcodedButtonLabels(source) }))
       .filter((entry) => entry.labels.length > 0)
 
     expect(offenders).toEqual([])
-  })
-
-  it('holds each exempt surface to its recorded count', () => {
-    const grown = sources
-      .filter(([path]) => path in PENDING_PARAMETERISED_LABELS)
-      .map(([path, source]) => ({
-        path,
-        found: hardcodedButtonLabels(source).length,
-        allowed: PENDING_PARAMETERISED_LABELS[path],
-      }))
-      .filter((entry) => entry.found > entry.allowed)
-
-    expect(grown).toEqual([])
-  })
-
-  it('keeps the exception register free of resolved entries', () => {
-    const byPath = new Map(sources)
-    const stale = Object.keys(PENDING_PARAMETERISED_LABELS).filter((path) => {
-      const source = byPath.get(path)
-      return source === undefined || hardcodedButtonLabels(source).length === 0
-    })
-
-    expect(stale, 'remove these from PENDING_PARAMETERISED_LABELS').toEqual([])
   })
 
   it('recognises catalog-backed and literal labels', () => {

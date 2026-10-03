@@ -1,6 +1,6 @@
 # Invoice review and follow-up drafts
 
-Status: implemented pre-1.0 foundation at version 0.8.46. This does not complete the issued credit-note and void workflow assigned to the corrections milestone.
+Status: complete in the frozen `0.9.0` database-first baseline, including issued credit notes, void-before-delivery, and supported recovery evidence.
 
 ## Problem and boundary
 
@@ -27,10 +27,14 @@ Issued PDF, CSV, accounting export, staff detail, and client portal continue to 
 
 The detail response exposes `issuer`, `bill_to`, and an optional source summary. Bounded collection summaries omit all three.
 
-## Remaining corrections work
+## Implemented corrections extension
 
-A delivered invoice that is financially wrong still requires a separately numbered, signed credit note with negative receivable effects. An undelivered invoice still requires the privileged void-before-delivery transition. Those documents must be implemented on the append-only lifecycle boundary before the corrections milestone can close. A replacement draft currently provides reviewed re-entry and lineage; it does not claim that the source has been voided or credited.
+A delivered or otherwise financially wrong invoice can now create an editable credit-note draft that copies immutable line snapshots without live origins. Issuance assigns the credit note its own transactional series and signed retained artifact, links it to the exact source invoice, and derives the source's credited amount and remaining balance from append-only lifecycle evidence. Cumulative credit notes cannot exceed the source total.
+
+An undelivered ordinary invoice can now be voided through its own privileged, recently authenticated action. The append-only void retains the issued row, number, and artifact, blocks later delivery, and removes the invoice from the client portal. Delivery prevents voiding and directs the operator to a credit note instead. Generic lifecycle updates can no longer synthesize void or credit events.
 
 ## Verification
 
-Focused coverage includes draft defaults and overrides, immutability after default changes, supplemental and replacement behavior, origin-free replacement lines, exact-Workspace denial, migration backfill, frontend review/edit actions, responsive party layouts, and retained failure states. OpenAPI, generated types, the project gate, Docker/PostgreSQL tests, and the supported upgrade/recovery gates remain required before release closure.
+Focused coverage includes draft defaults and overrides, immutability after default changes, supplemental and replacement behavior, origin-free replacement lines, exact-Workspace denial, migration backfill, frontend review/edit actions, responsive party layouts, and retained failure states. The correction extension additionally has service, database-trigger, authorization, portal, signed-artifact, OpenAPI, generated-type, UI and migration-cycle coverage.
+
+The billing-specific restore and supported encrypted recovery rehearsals restore issued invoices, credit notes, void evidence, numbering series and signed PDF bytes on clean stacks. The full composed `make check` gate also passes after normalizing the local product-boundary status contract. External issue, human and final-release evidence remain separate closeout work.

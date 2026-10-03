@@ -7,7 +7,7 @@ import { SystemStatus } from './SystemStatus'
 const diagnostics: SystemDiagnostics = {
   status: 'ready',
   checked_at: '2026-09-05T12:00:00Z',
-  application_version: '0.8.46',
+  application_version: '0.9.0',
   database: 'ready',
   diagram_renderer: {
     status: 'ready',
@@ -49,5 +49,5 @@ it('keeps service details visible when the system is degraded', async () => {
   render(<SystemStatus client={client} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('services need attention')
   expect(screen.getByText('Check overdue')).toBeInTheDocument()
-  expect(screen.getByText('Version 0.8.46')).toBeInTheDocument()
+  expect(screen.getByText('Version 0.9.0')).toBeInTheDocument()
 })

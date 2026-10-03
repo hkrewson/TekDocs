@@ -1342,7 +1342,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   // responsive surface against the real authorized endpoint.
   await page.goto('/system-status')
   await expect(page.getByRole('heading', { name: 'System status' })).toBeVisible()
-  await expect(page.getByText('Version 0.8.46')).toBeVisible()
+  await expect(page.getByText('Version 0.9.0')).toBeVisible()
   await expect(page.getByText('Primary application data store')).toBeVisible()
   await expect(page.getByRole('table')).toHaveCount(0)
   await page.getByRole('button', { name: 'Help for System status' }).click()

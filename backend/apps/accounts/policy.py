@@ -89,6 +89,7 @@ class PermissionKey(StrEnum):
     INVOICES_VIEW = "invoices.view"
     INVOICES_EDIT = "invoices.edit"
     INVOICES_ISSUE = "invoices.issue"
+    INVOICES_VOID = "invoices.void"
     CREDENTIAL_REFERENCES_VIEW = "credential_references.view"
     CREDENTIAL_REFERENCES_MANAGE = "credential_references.manage"
     CREDENTIAL_REFERENCES_OPEN = "credential_references.open"
@@ -188,6 +189,7 @@ PERMISSION_CATALOG = (
     _permission(PermissionKey.INVOICES_VIEW, "View invoices", "Accounting"),
     _permission(PermissionKey.INVOICES_EDIT, "Edit invoice drafts", "Accounting", mfa=True),
     _permission(PermissionKey.INVOICES_ISSUE, "Issue invoices", "Accounting", mfa=True),
+    _permission(PermissionKey.INVOICES_VOID, "Void invoices and issue credit notes", "Accounting", mfa=True),
     _permission(PermissionKey.CREDENTIAL_REFERENCES_VIEW, "View credential references", "Credential references"),
     _permission(
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
@@ -289,6 +291,7 @@ CUSTOM_ROLE_ASSIGNABLE_PERMISSIONS = frozenset(
         PermissionKey.COSTS_VIEW,
         PermissionKey.INVOICES_EDIT,
         PermissionKey.INVOICES_ISSUE,
+        PermissionKey.INVOICES_VOID,
         PermissionKey.CREDENTIAL_REFERENCES_VIEW,
         PermissionKey.CREDENTIAL_REFERENCES_MANAGE,
         PermissionKey.CREDENTIAL_REFERENCES_OPEN,

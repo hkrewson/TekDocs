@@ -42,9 +42,9 @@ Invoices are a bounded issuance capability with immutable artifacts, append-only
 The accepted [version 1 delivery plan](planning/v1-markdown-content-graph.md)
 makes Markdown documents and reusable fragments canonical in TekDocs-managed
 local Git repositories while PostgreSQL retains permissions, workflow,
-publications, audit and operational data. This is a planned `0.9.x` migration,
-not a claim about the current database-first `0.8.46` runtime, and it requires no
-GitHub organization or hosted Git service.
+publications, audit and operational data. The frozen `0.9.0` runtime remains the
+database-first migration baseline; repository implementation begins in `0.9.1`
+and requires no GitHub organization or hosted Git service.
 
 ## Production setup
 
@@ -114,7 +114,7 @@ Database migrations run through a one-shot owner container. The web, worker, and
 
 Production secrets are file-backed. Direct environment values and secret-file sources are mutually exclusive in the production profile.
 
-Required pre-1.0 interface work is tracked in the [responsive layouts implementation plan](planning/responsive-layouts/README.md). The [Assets reference layout checkpoint](planning/responsive-layouts/assets-layout.md) records the first visible migration and remaining acceptance work. Version remains 0.8.46 until explicitly changed; this plan supplements existing release obligations.
+Remaining pre-1.0 work is tracked in the [version 1 delivery plan](planning/v1-markdown-content-graph.md). The `0.9.0` baseline closes the database-first line and transfers final candidate interface, security, pilot, and recovery acceptance to the migrated system.
 
 ## Development gates
 

@@ -284,6 +284,7 @@ from apps.core.inventory_views import (
 )
 from apps.core.invoice_views import (
     InvoiceAccountingExportView,
+    InvoiceCreditNoteView,
     InvoiceCSVDownloadView,
     InvoiceDeliveryView,
     InvoiceDetailView,
@@ -296,6 +297,7 @@ from apps.core.invoice_views import (
     InvoiceOriginChoiceView,
     InvoicePDFDownloadView,
     InvoiceRecurringWithdrawalView,
+    InvoiceVoidView,
     MSPInvoiceSettingsView,
     ServiceRateDetailView,
     ServiceRateListCreateView,
@@ -1634,6 +1636,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/follow-up",
         InvoiceFollowUpView.as_view(),
         name="organization-invoice-follow-up",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/credit-note",
+        InvoiceCreditNoteView.as_view(),
+        name="organization-invoice-credit-note",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/void",
+        InvoiceVoidView.as_view(),
+        name="organization-invoice-void",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/invoices/<uuid:invoice_entity_id>/withdraw-recurring-draft",

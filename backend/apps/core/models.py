@@ -67,6 +67,7 @@ class TenantBillingProfile(TimestampedModel):
     default_currency = models.CharField(max_length=3, default="USD")
     payment_terms_days = models.PositiveSmallIntegerField(default=30)
     invoice_prefix = models.CharField(max_length=16, default="INV")
+    credit_note_prefix = models.CharField(max_length=16, default="CR")
     invoice_date_component = models.CharField(
         max_length=24,
         choices=(
@@ -119,10 +120,15 @@ class TenantBillingProfile(TimestampedModel):
             raise ValidationError({"default_currency": str(exc)}) from exc
         self.country_code = self.country_code.strip().upper()
         self.invoice_prefix = self.invoice_prefix.strip().upper()
+        self.credit_note_prefix = self.credit_note_prefix.strip().upper()
         if self.country_code and self.country_code not in COUNTRY_CODES:
             raise ValidationError({"country_code": "Choose a supported ISO country"})
         if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.invoice_prefix):
             raise ValidationError({"invoice_prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
+        if not re.fullmatch(r"[A-Z0-9-]{1,16}", self.credit_note_prefix):
+            raise ValidationError({"credit_note_prefix": "Prefix may contain uppercase letters, numbers, and hyphens"})
+        if self.credit_note_prefix == self.invoice_prefix:
+            raise ValidationError({"credit_note_prefix": "Credit notes require a separate numbering prefix"})
         if not 1 <= self.invoice_sequence_digits <= 12:
             raise ValidationError({"invoice_sequence_digits": "Sequence digits must be between 1 and 12"})
         if self.invoice_reset_period == "yearly" and self.invoice_date_component == "none":
@@ -246,9 +252,15 @@ class InvoiceState(models.TextChoices):
     ISSUED = "issued", "Issued"
 
 
+class InvoiceDocumentKind(models.TextChoices):
+    INVOICE = "invoice", "Invoice"
+    CREDIT_NOTE = "credit_note", "Credit note"
+
+
 class InvoiceSourceKind(models.TextChoices):
     SUPPLEMENT = "supplement", "Supplement"
     REPLACEMENT = "replacement", "Replacement"
+    CREDIT_NOTE = "credit_note", "Credit note"
 
 
 class InvoiceNumberSeries(TimestampedModel):
@@ -326,6 +338,9 @@ class Invoice(TimestampedModel):
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="invoices")
     organization = models.ForeignKey("Organization", on_delete=models.PROTECT, related_name="invoices")
     entity = models.OneToOneField("Entity", on_delete=models.PROTECT, related_name="invoice")
+    document_kind = models.CharField(
+        max_length=16, choices=InvoiceDocumentKind.choices, default=InvoiceDocumentKind.INVOICE
+    )
     state = models.CharField(max_length=16, choices=InvoiceState.choices, default=InvoiceState.DRAFT)
     number_series = models.ForeignKey(
         InvoiceNumberSeries,
@@ -388,9 +403,26 @@ class Invoice(TimestampedModel):
         constraints = [
             models.CheckConstraint(condition=models.Q(state__in=InvoiceState.values), name="invoice_state_valid"),
             models.CheckConstraint(
+                condition=models.Q(document_kind__in=InvoiceDocumentKind.values),
+                name="invoice_document_kind_valid",
+            ),
+            models.CheckConstraint(
                 condition=(
-                    models.Q(source_invoice__isnull=True, source_kind="")
-                    | models.Q(source_invoice__isnull=False, source_kind__in=InvoiceSourceKind.values)
+                    models.Q(
+                        document_kind=InvoiceDocumentKind.INVOICE,
+                        source_invoice__isnull=True,
+                        source_kind="",
+                    )
+                    | models.Q(
+                        document_kind=InvoiceDocumentKind.INVOICE,
+                        source_invoice__isnull=False,
+                        source_kind__in=(InvoiceSourceKind.SUPPLEMENT, InvoiceSourceKind.REPLACEMENT),
+                    )
+                    | models.Q(
+                        document_kind=InvoiceDocumentKind.CREDIT_NOTE,
+                        source_invoice__isnull=False,
+                        source_kind=InvoiceSourceKind.CREDIT_NOTE,
+                    )
                 ),
                 name="invoice_source_fields_consistent",
             ),
@@ -498,6 +530,14 @@ class Invoice(TimestampedModel):
         number_series = self.number_series
         if self.number_series_id and (number_series is None or number_series.tenant_id != self.tenant_id):
             raise ValidationError("Invoice number series must belong to its tenant")
+        source = self.source_invoice if self.source_invoice_id else None
+        if source is not None and (
+            source.tenant_id != self.tenant_id
+            or source.organization_id != self.organization_id
+            or source.state != InvoiceState.ISSUED
+            or source.document_kind != InvoiceDocumentKind.INVOICE
+        ):
+            raise ValidationError("Invoice source must be an issued invoice in the same Workspace")
 
 
 def invoice_artifact_upload_to(instance: "InvoiceArtifact", _filename: str) -> str:
@@ -860,6 +900,11 @@ class InvoiceLifecycleEvent(models.Model):
                 condition=~models.Q(provider="") & ~models.Q(external_id=""),
                 name="invoice_provider_event_unique",
             ),
+            models.UniqueConstraint(
+                fields=("related_invoice",),
+                condition=models.Q(event_type=InvoiceEventType.CREDITED, related_invoice__isnull=False),
+                name="invoice_credit_event_note_unique",
+            ),
             models.CheckConstraint(
                 condition=models.Q(event_type__in=InvoiceEventType.values),
                 name="invoice_event_type_valid",
@@ -906,6 +951,15 @@ class InvoiceLifecycleEvent(models.Model):
             or related_invoice.id == self.invoice_id
         ):
             raise ValidationError("Related invoice must be a different issued invoice in the same Workspace")
+        if self.event_type == InvoiceEventType.VOIDED and related_invoice is not None:
+            raise ValidationError("Void events cannot reference another invoice")
+        if self.event_type == InvoiceEventType.CREDITED and (
+            related_invoice is None
+            or related_invoice.document_kind != InvoiceDocumentKind.CREDIT_NOTE
+            or related_invoice.source_kind != InvoiceSourceKind.CREDIT_NOTE
+            or related_invoice.source_invoice_id != self.invoice_id
+        ):
+            raise ValidationError("Credit events require a credit note issued for this invoice")
         payment_types = {InvoiceEventType.PAYMENT_RECORDED, InvoiceEventType.PAYMENT_REVERSED}
         if self.event_type in payment_types:
             if self.amount is None or not self.currency:

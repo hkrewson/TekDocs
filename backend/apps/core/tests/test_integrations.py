@@ -38,14 +38,21 @@ from apps.core.models import (
     IntegrationObservation,
     IntegrationSyncJob,
     NetBoxReference,
+    NetworkDevice,
+    NetworkIPAddress,
+    NetworkMACAddress,
     NetworkSubnet,
     OrganizationKind,
     workspace_for_owner,
 )
 from apps.core.netbox_publication import preview_netbox_publication, publish_netbox_proposal
-from apps.core.network_addressing import create_subnet
+from apps.core.network_addressing import create_subnet, create_vlan, create_vrf
+from apps.core.network_endpoints import create_interface, create_ip_address, create_mac_address
+from apps.core.network_inventory import create_device, create_rack
 from apps.core.organizations import create_organization
+from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.workspaces import resolve_organization_workspace
 
 
@@ -104,6 +111,171 @@ def test_network_cleanup_rehearsal_is_report_only_by_default(installation):
     assert report["workspace"] == str(record.entity_id)
     assert report["applied"] is False
     assert report["blockers"] == []
+
+
+@pytest.mark.django_db
+def test_network_cleanup_rehearsal_backfills_only_stable_relationships_in_one_workspace(installation):
+    record = organization(installation, "Cleanup rehearsal client")
+    sibling = organization(installation, "Cleanup rehearsal sibling")
+    asset = create_network_hardware_asset(installation=installation, organization=record, name="Cleanup switch")
+    site = create_site(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup site",
+        code="CLEAN",
+        address_line_1="",
+        address_line_2="",
+        city="Madison",
+        region="WI",
+        postal_code="",
+        country_code="US",
+        timezone="America/Chicago",
+        phone="",
+    )
+    rack = create_rack(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup rack",
+        site_entity_id=site.entity_id,
+        location_entity_id=None,
+        unit_count=42,
+        status="active",
+    )
+    device = create_device(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup switch",
+        role="switch",
+        status="active",
+        hardware_asset_entity_id=asset.entity_id,
+        site_entity_id=None,
+        location_entity_id=None,
+        rack_entity_id=rack.entity_id,
+        rack_unit=10,
+        rack_units=2,
+    )
+    vlan = create_vlan(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup VLAN",
+        vlan_id=42,
+        description="",
+    )
+    vrf = create_vrf(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup VRF",
+        route_distinguisher="65000:42",
+        description="",
+    )
+    subnet = create_subnet(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Cleanup subnet",
+        cidr="192.0.2.0/24",
+        vrf_entity_id=vrf.entity_id,
+        vlan_entity_id=vlan.entity_id,
+        description="",
+    )
+    interface = create_interface(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Ethernet1",
+        device_entity_id=device.entity_id,
+        kind="physical",
+        status="active",
+        description="",
+    )
+    ip_address = create_ip_address(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        address="192.0.2.10",
+        subnet_entity_id=subnet.entity_id,
+        interface_entity_id=interface.entity_id,
+        status="active",
+        dns_name="",
+        description="",
+    )
+    mac_address = create_mac_address(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        address="02:00:00:00:00:10",
+        interface_entity_id=interface.entity_id,
+        description="",
+    )
+    NetworkSubnet.objects.filter(pk=subnet.pk).update(vlan_number=None)
+    NetworkDevice.objects.filter(pk=device.pk).update(
+        source_rack_name="", source_rack_position=None, source_rack_units=None
+    )
+
+    sibling_output = io.StringIO()
+    call_command("rehearse_network_model_cleanup", organization=str(sibling.entity_id), stdout=sibling_output)
+    assert json.loads(sibling_output.getvalue())["legacy"]["interfaces"] == 0
+
+    preview_output = io.StringIO()
+    call_command("rehearse_network_model_cleanup", organization=str(record.entity_id), stdout=preview_output)
+    preview = json.loads(preview_output.getvalue())
+    assert preview["legacy"] == {
+        "racks": 1,
+        "vlans": 1,
+        "vrfs": 1,
+        "interfaces": 1,
+        "circuits": 0,
+        "circuit_handoffs": 0,
+        "unbacked_devices": 0,
+    }
+    assert preview["legacy_relationships"] == {
+        "subnets_to_vlans": 1,
+        "subnets_to_vrfs": 1,
+        "devices_to_racks": 1,
+        "ip_addresses_to_interfaces": 1,
+        "mac_addresses_to_interfaces": 1,
+        "handoffs_to_interfaces": 0,
+    }
+    assert preview["planned_backfills"] == {
+        "network_vlan_numbers": 1,
+        "device_rack_facts": 1,
+        "ip_asset_assignments": 1,
+        "mac_asset_assignments": 1,
+    }
+    assert preview["blockers"] == []
+    assert preview["applied"] is False
+    assert NetworkIPAddress.objects.get(pk=ip_address.pk).hardware_asset_id is None
+    assert NetworkMACAddress.objects.get(pk=mac_address.pk).hardware_asset_id is None
+
+    apply_output = io.StringIO()
+    call_command(
+        "rehearse_network_model_cleanup",
+        organization=str(record.entity_id),
+        apply=True,
+        stdout=apply_output,
+    )
+    applied = json.loads(apply_output.getvalue())
+    assert applied["applied"] is True
+    subnet.refresh_from_db()
+    device.refresh_from_db()
+    ip_address.refresh_from_db()
+    mac_address.refresh_from_db()
+    assert subnet.vlan_number == 42
+    assert device.source_rack_name == "Cleanup rack"
+    assert device.source_rack_position == 10
+    assert device.source_rack_units == 2
+    assert ip_address.hardware_asset_id == asset.id
+    assert mac_address.hardware_asset_id == asset.id
+    assert preview["disposition"] == {
+        "legacy_records": "retained",
+        "destructive_removal": "requires_separate_deprecation_and_operator_approved_migration",
+    }
+    assert NetworkSubnet.objects.filter(pk=subnet.pk, vlan=vlan, vrf=vrf).exists()
 
 
 def connection(  # type: ignore[no-untyped-def]

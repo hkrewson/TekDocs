@@ -89,6 +89,7 @@ def render_invoice_pdf(
     subtotal: str,
     tax_total: str,
     total: str,
+    document_kind: str = "invoice",
 ) -> bytes:
     """Render one immutable, byte-deterministic US Letter invoice."""
 
@@ -131,11 +132,15 @@ def render_invoice_pdf(
         )
     )
     story.append(Spacer(1, 14))
+    document_label = "CREDIT NOTE" if document_kind == "credit_note" else "INVOICE"
+    date_label = "Credit date" if document_kind == "credit_note" else "Invoice date"
+    amount_label = "Credit total" if document_kind == "credit_note" else "Amount due"
     heading = Table(
         [
             [
                 Paragraph(
-                    f"<b>{issuer_name}</b><br/><font color='#56605A' size='8'>INVOICE</font>", styles["InvoiceHeading"]
+                    f"<b>{issuer_name}</b><br/><font color='#56605A' size='8'>{document_label}</font>",
+                    styles["InvoiceHeading"],
                 ),
                 Paragraph(f"<b>{_text(number)}</b>", styles["InvoiceHeading"]),
             ]
@@ -157,7 +162,7 @@ def render_invoice_pdf(
     metadata = Table(
         [
             [
-                Paragraph("Invoice date", styles["InvoiceLabel"]),
+                Paragraph(date_label, styles["InvoiceLabel"]),
                 Paragraph("Due date", styles["InvoiceLabel"]),
                 Paragraph("Currency", styles["InvoiceLabel"]),
                 Paragraph("Reference", styles["InvoiceLabel"]),
@@ -280,7 +285,7 @@ def render_invoice_pdf(
                 Paragraph(f"<b>{_text(currency)} {_text(total)}</b>", styles["InvoiceAmount"]),
             ],
             [
-                Paragraph("Amount due", styles["InvoiceValue"]),
+                Paragraph(amount_label, styles["InvoiceValue"]),
                 Paragraph(f"<b>{_text(currency)} {_text(total)}</b>", styles["InvoiceAmountDue"]),
             ],
         ],
@@ -303,7 +308,9 @@ def render_invoice_pdf(
     story.extend((totals, Spacer(1, 16)))
 
     payment = _multiline(issuer.get("payment_instructions"))
-    if not payment:
+    if document_kind == "credit_note":
+        payment = "This credit reduces the balance of the referenced invoice."
+    elif not payment:
         payment = f"Payment is due by {_date(due_date)}. Contact {issuer_email} for payment details."
     detail_cells: list[list[Flowable]] = []
     if notes.strip():
@@ -340,9 +347,9 @@ def render_invoice_pdf(
         leftMargin=54,
         topMargin=42,
         bottomMargin=48,
-        title=f"Invoice {number}",
+        title=f"{'Credit note' if document_kind == 'credit_note' else 'Invoice'} {number}",
         author=issuer_name,
-        subject=f"Invoice {number} from {issuer_name}",
+        subject=f"{'Credit note' if document_kind == 'credit_note' else 'Invoice'} {number} from {issuer_name}",
         creator="TekDocs",
     )
     timestamp = _issued_timestamp(issued_at)
@@ -358,7 +365,8 @@ def render_invoice_pdf(
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         canvas.setFillColor(MUTED)
-        canvas.drawString(54, 26, f"{issuer_name} · Invoice {number}")
+        footer_label = "Credit note" if document_kind == "credit_note" else "Invoice"
+        canvas.drawString(54, 26, f"{issuer_name} · {footer_label} {number}")
         canvas.drawRightString(558, 26, f"Page {doc.page}")
         canvas.restoreState()
 

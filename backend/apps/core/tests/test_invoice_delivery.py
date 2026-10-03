@@ -158,8 +158,8 @@ def test_portal_exposes_only_exact_client_issued_invoices_with_pdf_csv_parity(in
         assert csv_export["Content-Type"].startswith("text/csv")
         rendered_csv = csv_export.content.decode()
         assert "invoice_number" in rendered_csv
-        assert rendered_csv.splitlines()[0].endswith("invoice_total,unit")
-        assert rendered_csv.splitlines()[1].endswith("25.00,hour")
+        assert rendered_csv.splitlines()[0].endswith("invoice_total,unit,document_kind,source_invoice_number")
+        assert rendered_csv.splitlines()[1].endswith("25.00,hour,invoice,")
         assert "'=unsafe-reference" in rendered_csv
         assert "'=unsafe-description" in rendered_csv
 
@@ -296,33 +296,46 @@ def test_invoice_lifecycle_export_idempotency_and_portal_projection(invoice_deli
 
 
 @pytest.mark.django_db
-def test_void_and_credit_are_reference_events_not_invoice_mutations(invoice_delivery, monkeypatch):
-    installation, organization, _portal_user, _sibling_user, issued, sibling, _draft, _media_root = invoice_delivery
+def test_void_and_credit_use_bounded_correction_workflows(invoice_delivery, monkeypatch):
+    installation, organization, portal_user, _sibling_user, issued, sibling, _draft, _media_root = invoice_delivery
     staff = Client()
     staff.force_login(installation.owner)
-    url = reverse(
+    event_url = reverse(
         "organization-invoice-event-create",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": issued.entity_id},
+    )
+    void_url = reverse(
+        "organization-invoice-void",
         kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": issued.entity_id},
     )
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: False)
     denied = staff.post(
-        url, {"event_type": "voided", "note": "Entered in error"}, content_type="application/json"
+        void_url, {"reason": "Entered in error"}, content_type="application/json"
     )
     assert denied.status_code == 403
 
     monkeypatch.setattr("apps.core.invoice_views.did_recently_authenticate", lambda _request: True)
+    manual_event = staff.post(
+        event_url, {"event_type": "voided", "note": "Entered in error"}, content_type="application/json"
+    )
+    assert manual_event.status_code == 400
+    cross_workspace_url = reverse(
+        "organization-invoice-credit-note",
+        kwargs={"organization_entity_id": organization.entity_id, "invoice_entity_id": sibling.entity_id},
+    )
     cross_workspace = staff.post(
-        url,
-        {"event_type": "credited", "related_invoice_id": str(sibling.entity_id), "note": "Credit memo"},
-        content_type="application/json",
+        cross_workspace_url, {"reason": "Credit memo"}, content_type="application/json"
     )
     assert cross_workspace.status_code == 404
-    voided = staff.post(url, {"event_type": "voided", "note": "Entered in error"}, content_type="application/json")
-    assert voided.status_code == 201
+    voided = staff.post(void_url, {"reason": "Entered in error"}, content_type="application/json")
+    assert voided.status_code == 200
     assert voided.json()["lifecycle_state"] == "voided"
     issued.refresh_from_db()
     assert issued.state == "issued"
     assert issued.number
+    portal = Client()
+    portal.force_login(portal_user)
+    assert portal.get(reverse("client-portal-invoice-list")).json()["results"] == []
 
 
 @pytest.mark.django_db

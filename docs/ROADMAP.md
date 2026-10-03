@@ -1684,6 +1684,10 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
+`0.9.1` progress: repository identity and accepted-head authority (#92) are
+complete. Persistent local custody and initialization (#93) are next; no remote
+Git service is required or introduced by this boundary.
+
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 
 ## Stretch lane and post-1.0 boundary

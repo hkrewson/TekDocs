@@ -19,11 +19,20 @@ from .model_support import TimestampedModel
 from .scoping import OrganizationScopedManager, TenantScopedManager
 
 WORKSPACE_UUID_NAMESPACE = uuid.UUID("6890dc87-8d91-4f76-a6eb-99dfd06904a5")
+REPOSITORY_UUID_NAMESPACE = uuid.UUID("095583ae-b6a5-4d81-8fdf-a67a46f68d43")
 
 
 def workspace_identity_uuid(*, tenant_id: uuid.UUID, organization_id: uuid.UUID | None) -> uuid.UUID:
     owner = "msp" if organization_id is None else f"organization:{organization_id}"
     return uuid.uuid5(WORKSPACE_UUID_NAMESPACE, f"tenant:{tenant_id}:{owner}")
+
+
+def repository_identity_uuid(*, workspace_id: uuid.UUID) -> uuid.UUID:
+    return uuid.uuid5(REPOSITORY_UUID_NAMESPACE, f"workspace:{workspace_id}")
+
+
+def repository_storage_relative_path(*, repository_id: uuid.UUID) -> str:
+    return str(PurePosixPath("repositories") / f"{repository_id}.git")
 
 
 class Tenant(TimestampedModel):
@@ -1109,6 +1118,175 @@ def workspace_for_owner(*, tenant: Tenant, organization: "Organization | None") 
     if organization.tenant_id != tenant.id:
         raise ValidationError("Workspace organization must belong to its tenant")
     return Workspace.objects.get(tenant=tenant, kind=WorkspaceKind.ORGANIZATION, organization=organization)
+
+
+class RepositoryLifecycleState(models.TextChoices):
+    ACTIVE = "active", "Active"
+    READ_ONLY = "read_only", "Read only"
+    RETIRED = "retired", "Retired"
+
+
+class RepositoryHealthState(models.TextChoices):
+    UNKNOWN = "unknown", "Unknown"
+    HEALTHY = "healthy", "Healthy"
+    DEGRADED = "degraded", "Degraded"
+    BLOCKED = "blocked", "Blocked"
+
+
+class RepositoryReconciliationState(models.TextChoices):
+    NEVER = "never", "Never reconciled"
+    MATCHED = "matched", "Matched"
+    MISSING = "missing", "Accepted head missing"
+    ADVANCED = "advanced", "Repository advanced"
+    MISMATCHED = "mismatched", "Head mismatched"
+    UNAVAILABLE = "unavailable", "Repository unavailable"
+
+
+class RepositoryObjectFormat(models.TextChoices):
+    SHA1 = "sha1", "SHA-1"
+    SHA256 = "sha256", "SHA-256"
+
+
+class WorkspaceRepository(TimestampedModel):
+    """Stable control-plane identity for one Workspace's managed Git repository."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="workspace_repositories")
+    workspace = models.OneToOneField(Workspace, on_delete=models.PROTECT, related_name="repository")
+    storage_relative_path = models.CharField(max_length=160, unique=True)
+    lifecycle_state = models.CharField(
+        max_length=16,
+        choices=RepositoryLifecycleState.choices,
+        default=RepositoryLifecycleState.ACTIVE,
+    )
+    health_state = models.CharField(
+        max_length=16,
+        choices=RepositoryHealthState.choices,
+        default=RepositoryHealthState.UNKNOWN,
+    )
+    accepted_commit = models.ForeignKey(
+        "RepositoryCommit",
+        on_delete=models.PROTECT,
+        related_name="accepted_by_repositories",
+        null=True,
+        blank=True,
+    )
+    indexed_commit = models.ForeignKey(
+        "RepositoryCommit",
+        on_delete=models.PROTECT,
+        related_name="indexed_by_repositories",
+        null=True,
+        blank=True,
+    )
+    last_reconciliation_state = models.CharField(
+        max_length=16,
+        choices=RepositoryReconciliationState.choices,
+        default=RepositoryReconciliationState.NEVER,
+    )
+    last_reconciled_at = models.DateTimeField(null=True, blank=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(storage_relative_path__regex=r"^repositories/[0-9a-f-]{36}\.git$")
+                    & ~models.Q(storage_relative_path__contains="..")
+                    & ~models.Q(storage_relative_path__contains="\\")
+                ),
+                name="workspace_repository_path_safe",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "lifecycle_state"), name="core_repo_tenant_state_idx")]
+
+    def __str__(self) -> str:
+        return f"Repository {self.id} for {self.workspace_id}"
+
+    def clean(self) -> None:
+        if self.workspace_id and self.workspace.tenant_id != self.tenant_id:
+            raise ValidationError("Repository workspace must belong to its tenant")
+        expected_path = repository_storage_relative_path(repository_id=self.id)
+        if self.storage_relative_path != expected_path:
+            raise ValidationError({"storage_relative_path": "Repository storage path must use its stable identity"})
+        for field_name in ("accepted_commit", "indexed_commit"):
+            commit = getattr(self, field_name, None)
+            if commit is not None and (commit.repository_id != self.id or commit.tenant_id != self.tenant_id):
+                raise ValidationError({field_name: "Repository head must name a verified object in this repository"})
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if not self.storage_relative_path:
+            self.storage_relative_path = repository_storage_relative_path(repository_id=self.id)
+        if not self._state.adding:
+            previous = WorkspaceRepository.objects.only(
+                "tenant_id", "workspace_id", "storage_relative_path"
+            ).get(pk=self.pk)
+            if (
+                previous.tenant_id != self.tenant_id
+                or previous.workspace_id != self.workspace_id
+                or previous.storage_relative_path != self.storage_relative_path
+            ):
+                raise ValidationError("Repository ownership identity is immutable")
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository identities cannot be deleted")
+
+
+class RepositoryCommit(models.Model):
+    """A Git commit whose object identity has been verified inside one managed repository."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="repository_commits")
+    repository = models.ForeignKey(WorkspaceRepository, on_delete=models.PROTECT, related_name="verified_commits")
+    object_format = models.CharField(
+        max_length=8,
+        choices=RepositoryObjectFormat.choices,
+        default=RepositoryObjectFormat.SHA1,
+    )
+    object_id = models.CharField(max_length=64)
+    verified_at = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("repository", "object_format", "object_id"),
+                name="repository_commit_object_unique",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(object_format=RepositoryObjectFormat.SHA1, object_id__regex=r"^[0-9a-f]{40}$")
+                    | models.Q(object_format=RepositoryObjectFormat.SHA256, object_id__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="repository_commit_object_id_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("tenant", "repository"), name="core_repocommit_scope_idx")]
+
+    def __str__(self) -> str:
+        return self.object_id
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Verified repository objects are immutable")
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Verified repository objects are retained")
+
+    def clean(self) -> None:
+        if self.repository_id and self.repository.tenant_id != self.tenant_id:
+            raise ValidationError("Verified repository object must belong to its tenant")
+        expected_length = 40 if self.object_format == RepositoryObjectFormat.SHA1 else 64
+        if not re.fullmatch(rf"[0-9a-f]{{{expected_length}}}", self.object_id):
+            raise ValidationError({"object_id": "Object ID does not match its Git object format"})
 
 
 class EntityManager(models.Manager["Entity"]):

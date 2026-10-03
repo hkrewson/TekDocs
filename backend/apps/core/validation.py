@@ -40,6 +40,16 @@ TENANT_MODEL_CONTRACTS = tuple(
         "The stable owner identity is resolved before workspace-scoped domain data can be selected.",
     ),
     TenantModelContract(
+        "core_workspacerepository",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "The stable repository binding and accepted head are authoritative control-plane state.",
+    ),
+    TenantModelContract(
+        "core_repositorycommit",
+        IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
+        "Verified commit identities constrain which repository object may become authoritative.",
+    ),
+    TenantModelContract(
         "accounts_invitation",
         IsolationBoundary.AUTHORIZATION_CONTROL_PLANE,
         "Pre-authentication token redemption must discover its tenant from a digest.",
@@ -109,6 +119,8 @@ AUTHORIZATION_CONTROL_PLANE_TABLES = tuple(
 
 CONTROL_PLANE_GUARD_TRIGGERS = (
     "core_workspace_identity_guard",
+    "core_workspace_repository_guard",
+    "core_repository_commit_guard",
     "accounts_tenant_membership_guard",
     "accounts_invitation_scope_guard",
     "accounts_organization_access_assignment_actor_guard",

@@ -105,6 +105,8 @@ recovery cannot disappear inside a generic “add Git” task.
 
 ### `V1-REP-001` — Repository identity and accepted-head authority (#92)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** represent one managed repository for the MSP workspace and one for
 each organization workspace without making repository state an authorization
 authority.

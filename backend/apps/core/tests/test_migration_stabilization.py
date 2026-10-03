@@ -53,6 +53,7 @@ from apps.core.models import (
     Tenant,
     TenantBillingProfile,
     Workspace,
+    WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
 from apps.core.people import create_person
@@ -167,6 +168,29 @@ DOCUMENT_RLS_TABLES = {
     "core_importrow",
     "core_importexternalkey",
 }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_loss(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Repository-authority migration validation requires PostgreSQL")
+
+    call_command("migrate", "core", "0161_invoice_corrections", verbosity=0, interactive=False)
+    tenant = Tenant.objects.create(name="Repository Upgrade MSP", slug=f"repository-upgrade-{uuid.uuid4()}")
+    workspace = Workspace.objects.get(tenant=tenant, kind="msp")
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    assert Tenant.objects.filter(pk=tenant.id).exists()
+    assert Workspace.objects.filter(pk=workspace.id, tenant=tenant).exists()
+    assert not WorkspaceRepository.objects.filter(workspace=workspace).exists()
+
+    call_command("migrate", "core", "0161_invoice_corrections", verbosity=0, interactive=False)
+    assert Tenant.objects.filter(pk=tenant.id).exists()
+    assert Workspace.objects.filter(pk=workspace.id, tenant=tenant).exists()
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    assert Tenant.objects.filter(pk=tenant.id).exists()
+    assert Workspace.objects.filter(pk=workspace.id, tenant=tenant).exists()
 
 
 @pytest.mark.django_db(transaction=True)

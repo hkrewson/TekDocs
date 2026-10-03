@@ -81,6 +81,8 @@ if _image_variant == "production" and not TEKDOCS_CLAMAV_HOST:  # noqa: F405
     raise ImproperlyConfigured("Production deployments require TEKDOCS_CLAMAV_HOST")
 if _image_variant == "production" and TEKDOCS_DIAGRAM_JOB_DIRECTORY != "/app/diagram-jobs":  # noqa: F405
     raise ImproperlyConfigured("Production deployments require the isolated diagram renderer job directory")
+if _image_variant == "production" and TEKDOCS_REPOSITORY_ROOT != "/app/repositories":  # noqa: F405
+    raise ImproperlyConfigured("Production deployments require the managed repository volume")
 
 validate_production_email(
     backend=EMAIL_BACKEND,  # noqa: F405

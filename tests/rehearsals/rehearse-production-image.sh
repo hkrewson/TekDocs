@@ -111,6 +111,55 @@ if [ "$backend_user" != "tekdocs" ] && [ "$backend_user" != "10001" ]; then
   exit 1
 fi
 
+echo "Verifying restricted-runtime repository custody and persistence"
+production_compose exec -T backend /usr/bin/git --version >/dev/null
+production_compose exec -T backend python manage.py shell --no-imports -c \
+  'from apps.accounts.bootstrap import bootstrap_owner; bootstrap_owner(tenant_name="Repository Rehearsal MSP", owner_email="repository-rehearsal@example.invalid", owner_display_name="Repository Rehearsal Owner", password="Repository-rehearsal-only-Aa7-password")'
+production_compose exec -T backend python manage.py shell --no-imports -c \
+  'from apps.accounts.models import User; from apps.core.models import Tenant; from apps.core.organizations import create_organization; tenant=Tenant.objects.get(); actor=User.objects.get(); [create_organization(tenant=tenant, actor_id=actor.id, name=name, legal_name="", website="", classifications=()) for name in ("Repository Client One", "Repository Client Two")]'
+repository_ids=$(production_compose exec -T backend python manage.py shell --no-imports -c \
+  'from apps.core.models import WorkspaceRepository; print(" ".join(str(value) for value in WorkspaceRepository.objects.order_by("id").values_list("id", flat=True)))' | tr -d '\r')
+set -- $repository_ids
+[ "$#" -eq 3 ] || { echo "Production runtime did not create one repository per workspace" >&2; exit 1; }
+repository_id="$1"
+repository_path="/app/repositories/$repository_id.git"
+for repository_id in $repository_ids; do
+  repository_path="/app/repositories/$repository_id.git"
+  production_compose exec -T backend sh -c \
+    'test -d "$1" && test "$(stat -c %a "$1")" = 700 && test "$(stat -c %a "$1/HEAD")" = 600 && test "$(/usr/bin/git --git-dir="$1" rev-parse --is-bare-repository)" = true' \
+    sh "$repository_path"
+done
+repository_id="$1"
+repository_path="/app/repositories/$repository_id.git"
+repository_head_checksum=$(production_compose exec -T backend sha256sum "$repository_path/HEAD" | awk '{print $1}')
+
+repository_volume=""
+for service in migrate backend worker; do
+  container_id=$(production_compose ps -q --all "$service")
+  mount=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/repositories"}}{{.Name}}:{{.RW}}{{end}}{{end}}' "$container_id")
+  case "$mount" in
+    *:true) ;;
+    *) echo "Production $service must have a writable managed repository volume" >&2; exit 1 ;;
+  esac
+  current_volume=${mount%:true}
+  if [ -n "$repository_volume" ] && [ "$current_volume" != "$repository_volume" ]; then
+    echo "Production repository custody is not shared by its authorized services" >&2
+    exit 1
+  fi
+  repository_volume="$current_volume"
+done
+scheduler_id=$(production_compose ps -q --all scheduler)
+scheduler_repository_mount=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/app/repositories"}}{{.Name}}{{end}}{{end}}' "$scheduler_id")
+[ -z "$scheduler_repository_mount" ] || { echo "Production scheduler has unnecessary repository access" >&2; exit 1; }
+
+original_backend_id="$backend_id"
+production_compose up -d --force-recreate --no-deps --wait backend
+backend_id=$(production_compose ps -q backend)
+[ "$backend_id" != "$original_backend_id" ] || { echo "Backend recreation did not replace the container" >&2; exit 1; }
+recreated_head_checksum=$(production_compose exec -T backend sha256sum "$repository_path/HEAD" | awk '{print $1}')
+[ "$recreated_head_checksum" = "$repository_head_checksum" ] || { echo "Repository data changed during recreation" >&2; exit 1; }
+production_compose exec -T backend python manage.py initialize_workspace_repositories | grep -q '0 initialized, 3 retained'
+
 echo "Verifying production container isolation controls"
 for service in migrate backend worker scheduler; do
   container_id=$(production_compose ps -q --all "$service")

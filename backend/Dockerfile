@@ -9,6 +9,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
       curl \
+      git \
       libffi \
       libjpeg-turbo \
       openjpeg
@@ -28,7 +29,8 @@ COPY docker/entrypoint.sh /entrypoint.sh
 COPY docker/migrate.sh /migrate.sh
 RUN chmod 0555 /entrypoint.sh \
     && chmod 0555 /migrate.sh \
-    && mkdir -p /app/staticfiles /app/media /app/diagram-jobs \
+    && mkdir -p /app/staticfiles /app/media /app/diagram-jobs /app/repositories \
+    && chmod 0700 /app/repositories \
     && chown -R tekdocs:tekdocs /app
 
 FROM base AS development

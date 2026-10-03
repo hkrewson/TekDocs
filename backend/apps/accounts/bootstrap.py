@@ -59,4 +59,7 @@ def bootstrap_owner(*, tenant_name: str, owner_email: str, owner_display_name: s
             metadata={"method": "deployment_token"},
         )
 
+    from apps.core.repository_storage import ensure_workspace_repository
+
+    ensure_workspace_repository(tenant.workspaces.get(kind="msp"))
     return BootstrapResult(tenant=tenant, owner=owner)

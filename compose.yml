@@ -76,6 +76,7 @@ services:
       TEKDOCS_CLAMAV_PORT: ${TEKDOCS_CLAMAV_PORT:-3310}
       TEKDOCS_CLAMAV_TIMEOUT: ${TEKDOCS_CLAMAV_TIMEOUT:-10}
       TEKDOCS_DIAGRAM_JOB_DIRECTORY: /app/diagram-jobs
+      TEKDOCS_REPOSITORY_ROOT: /app/repositories
       TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS: ${TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS:-60}
       TEKDOCS_RDAP_BOOTSTRAP_URL: ${TEKDOCS_RDAP_BOOTSTRAP_URL:-https://data.iana.org/rdap/dns.json}
       TEKDOCS_DOH_URL: ${TEKDOCS_DOH_URL:-}
@@ -88,6 +89,7 @@ services:
     command: ["/migrate.sh"]
     volumes:
       - static_data:/app/staticfiles
+      - repository_data:/app/repositories
     depends_on:
       db: { condition: service_healthy }
       mailpit: { condition: service_healthy }
@@ -124,6 +126,7 @@ services:
       TEKDOCS_CLAMAV_PORT: ${TEKDOCS_CLAMAV_PORT:-3310}
       TEKDOCS_CLAMAV_TIMEOUT: ${TEKDOCS_CLAMAV_TIMEOUT:-10}
       TEKDOCS_DIAGRAM_JOB_DIRECTORY: /app/diagram-jobs
+      TEKDOCS_REPOSITORY_ROOT: /app/repositories
       TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS: ${TEKDOCS_DIAGRAM_RENDER_TIMEOUT_SECONDS:-60}
       TEKDOCS_OIDC_PROVIDER_ID: ${TEKDOCS_OIDC_PROVIDER_ID:-}
       TEKDOCS_RDAP_BOOTSTRAP_URL: ${TEKDOCS_RDAP_BOOTSTRAP_URL:-https://data.iana.org/rdap/dns.json}
@@ -152,6 +155,7 @@ services:
       - static_data:/app/staticfiles
       - media_data:/app/media
       - diagram_jobs:/app/diagram-jobs
+      - repository_data:/app/repositories
     depends_on:
       migrate: { condition: service_completed_successfully }
       diagram-renderer: { condition: service_healthy }
@@ -192,6 +196,8 @@ services:
     environment:
       <<: *backend-environment
     command: ["celery", "-A", "tekdocs", "worker", "--loglevel=INFO", "--concurrency=2"]
+    volumes:
+      - repository_data:/app/repositories
     depends_on:
       backend: { condition: service_healthy }
     restart: unless-stopped
@@ -227,6 +233,7 @@ volumes:
   media_data:
   mailpit_data:
   diagram_jobs:
+  repository_data:
 
 networks:
   internal:

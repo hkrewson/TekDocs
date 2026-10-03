@@ -126,6 +126,8 @@ inventory, forced-RLS/control-plane tests and OpenAPI drift check.
 
 ### `V1-REP-002` — Persistent repository custody and initialization (#93)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** create isolated local repositories in managed persistent storage for
 new and existing workspaces without requiring a remote service.
 

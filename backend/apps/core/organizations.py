@@ -104,6 +104,9 @@ def create_organization(
         )
         organization.full_clean()
         organization.save()
+        from .repository_storage import schedule_workspace_repository_initialization
+
+        schedule_workspace_repository_initialization(organization.ownership_workspace.id)
         # New organizations fail closed. Give an authorized MSP creator explicit
         # access so administrators do not create a workspace they cannot reopen.
         from apps.accounts.models import OrganizationAccessAssignment, TenantMembership

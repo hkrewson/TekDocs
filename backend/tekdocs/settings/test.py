@@ -10,3 +10,6 @@ TEKDOCS_BOOTSTRAP_TOKEN = secrets.token_urlsafe(32)
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+# Repository custody is opt-in per test so ordinary model fixtures never write to
+# a shared host or container volume.
+TEKDOCS_REPOSITORY_ROOT = ""

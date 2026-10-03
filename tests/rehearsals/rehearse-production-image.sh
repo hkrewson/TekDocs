@@ -131,9 +131,22 @@ for repository_id in $repository_ids; do
 done
 repository_id="$1"
 repository_path="/app/repositories/$repository_id.git"
+production_compose exec -T backend python manage.py shell --no-imports -c \
+  'import yaml; from apps.core.models import WorkspaceKind, WorkspaceRepository; from apps.core.repository_manifests import ORGANIZATION_DIRECTORY_PATH, REPOSITORY_MANIFEST_PATH, WORKSPACE_MANIFEST_PATH; from apps.core.repository_service import RepositoryFileNotFoundError, read_accepted_repository_file; repositories=list(WorkspaceRepository.objects.select_related("workspace__organization").order_by("id")); organizations=[value for value in repositories if value.workspace.kind == WorkspaceKind.ORGANIZATION]; msp=next(value for value in repositories if value.workspace.kind == WorkspaceKind.MSP); assert len(organizations) == 2
+for repository in repositories:
+    repository_manifest=yaml.safe_load(read_accepted_repository_file(repository_id=repository.id, path=REPOSITORY_MANIFEST_PATH)); workspace_manifest=yaml.safe_load(read_accepted_repository_file(repository_id=repository.id, path=WORKSPACE_MANIFEST_PATH)); assert repository_manifest["repository"] == {"id": str(repository.id), "workspace_id": str(repository.workspace_id)}; assert workspace_manifest["workspace"]["id"] == str(repository.workspace_id); assert workspace_manifest["workspace"]["kind"] == repository.workspace.kind
+    if repository.workspace.kind == WorkspaceKind.ORGANIZATION:
+        assert workspace_manifest["workspace"]["organization_id"] == str(repository.workspace.organization_id)
+        try:
+            read_accepted_repository_file(repository_id=repository.id, path=ORGANIZATION_DIRECTORY_PATH)
+        except RepositoryFileNotFoundError:
+            pass
+        else:
+            raise AssertionError("organization repository contains the MSP directory")
+directory=yaml.safe_load(read_accepted_repository_file(repository_id=msp.id, path=ORGANIZATION_DIRECTORY_PATH)); assert {entry["organization_id"] for entry in directory["organizations"]} == {str(value.workspace.organization_id) for value in organizations}'
 repository_commit=$(production_compose exec -T -e REHEARSAL_REPOSITORY_ID="$repository_id" backend \
   python manage.py shell --no-imports -c \
-  'import os; import uuid; from apps.core.repository_service import commit_repository_files, read_accepted_repository_file; repository_id=uuid.UUID(os.environ["REHEARSAL_REPOSITORY_ID"]); result=commit_repository_files(repository_id=repository_id, expected_base=None, changes={".tekdocs/rehearsal.md": b"# Production repository rehearsal\n"}, message="Verify production repository service"); assert read_accepted_repository_file(repository_id=repository_id, path=".tekdocs/rehearsal.md") == b"# Production repository rehearsal\n"; print(result.object_id)' | tr -d '\r')
+  'import os; import uuid; from apps.core.models import WorkspaceRepository; from apps.core.repository_service import commit_repository_files, read_accepted_repository_file; repository_id=uuid.UUID(os.environ["REHEARSAL_REPOSITORY_ID"]); repository=WorkspaceRepository.objects.select_related("accepted_commit").get(pk=repository_id); result=commit_repository_files(repository_id=repository_id, expected_base=repository.accepted_commit.object_id, changes={".tekdocs/rehearsal.md": b"# Production repository rehearsal\n"}, message="Verify production repository service"); assert read_accepted_repository_file(repository_id=repository_id, path=".tekdocs/rehearsal.md") == b"# Production repository rehearsal\n"; print(result.object_id)' | tr -d '\r')
 case "$repository_commit" in
   *[!0-9a-f]*|'') echo "Production repository service returned an invalid commit identity" >&2; exit 1 ;;
 esac

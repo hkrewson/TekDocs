@@ -66,6 +66,10 @@ class RepositoryInputError(RepositoryServiceError):
     pass
 
 
+class RepositoryFileNotFoundError(RepositoryInputError):
+    pass
+
+
 class RepositoryCommandError(RepositoryServiceError):
     pass
 
@@ -324,7 +328,7 @@ class _GitRepository:
         )
         expected_suffix = b"\t" + path.encode("utf-8") + b"\0"
         if not listing.endswith(expected_suffix) or listing.count(b"\0") != 1:
-            raise RepositoryInputError("Repository file does not exist")
+            raise RepositoryFileNotFoundError("Repository file does not exist")
         metadata = listing[: -len(expected_suffix)]
         fields = metadata.split(b" ")
         if len(fields) != 3 or fields[0] != REGULAR_FILE_MODE.encode() or fields[1] != b"blob":

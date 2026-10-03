@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.core.models import Workspace
+from apps.core.repository_manifests import synchronize_all_workspace_manifests
 from apps.core.repository_storage import (
     RepositoryStorageError,
     configured_repository_root,
@@ -33,4 +34,9 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         self.stdout.write(
             f"Workspace repository custody verified: {initialized} initialized, {retained} retained."
+        )
+        manifests = synchronize_all_workspace_manifests()
+        self.stdout.write(
+            f"Workspace manifests synchronized: {manifests.created} updated, "
+            f"{manifests.unchanged} unchanged."
         )

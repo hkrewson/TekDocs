@@ -165,6 +165,8 @@ logging-redaction and restricted-container tests.
 
 ### `V1-REP-004` — Portable workspace manifests and MSP organization directory (#95)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** make each repository self-describing while keeping PostgreSQL
 authoritative for organization identity and operational records.
 

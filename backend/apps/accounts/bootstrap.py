@@ -62,4 +62,7 @@ def bootstrap_owner(*, tenant_name: str, owner_email: str, owner_display_name: s
     from apps.core.repository_storage import ensure_workspace_repository
 
     ensure_workspace_repository(tenant.workspaces.get(kind="msp"))
+    from apps.core.repository_manifests import synchronize_tenant_manifests
+
+    synchronize_tenant_manifests(tenant.id)
     return BootstrapResult(tenant=tenant, owner=owner)

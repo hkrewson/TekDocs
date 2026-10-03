@@ -132,6 +132,9 @@ def create_organization(
             entity_id=entity.id,
             metadata={},
         )
+        from .repository_manifests import schedule_tenant_manifest_synchronization
+
+        schedule_tenant_manifest_synchronization(tenant.id)
         return organization
 
 
@@ -186,6 +189,9 @@ def update_organization(
         entity_id=organization.entity_id,
         metadata={},
     )
+    from .repository_manifests import schedule_tenant_manifest_synchronization
+
+    schedule_tenant_manifest_synchronization(organization.tenant_id)
     return organization
 
 

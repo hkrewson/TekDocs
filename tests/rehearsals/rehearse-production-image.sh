@@ -131,6 +131,26 @@ for repository_id in $repository_ids; do
 done
 repository_id="$1"
 repository_path="/app/repositories/$repository_id.git"
+repository_commit=$(production_compose exec -T -e REHEARSAL_REPOSITORY_ID="$repository_id" backend \
+  python manage.py shell --no-imports -c \
+  'import os; import uuid; from apps.core.repository_service import commit_repository_files, read_accepted_repository_file; repository_id=uuid.UUID(os.environ["REHEARSAL_REPOSITORY_ID"]); result=commit_repository_files(repository_id=repository_id, expected_base=None, changes={".tekdocs/rehearsal.md": b"# Production repository rehearsal\n"}, message="Verify production repository service"); assert read_accepted_repository_file(repository_id=repository_id, path=".tekdocs/rehearsal.md") == b"# Production repository rehearsal\n"; print(result.object_id)' | tr -d '\r')
+case "$repository_commit" in
+  *[!0-9a-f]*|'') echo "Production repository service returned an invalid commit identity" >&2; exit 1 ;;
+esac
+production_compose exec -T -e REHEARSAL_REPOSITORY_ID="$repository_id" backend \
+  python manage.py shell --no-imports -c \
+  'import os; import uuid; from apps.core.repository_service import RepositoryConflictError, commit_repository_files; repository_id=uuid.UUID(os.environ["REHEARSAL_REPOSITORY_ID"]); conflict=False
+try:
+    commit_repository_files(repository_id=repository_id, expected_base=None, changes={".tekdocs/rehearsal.md": b"stale overwrite\n"}, message="Reject stale production writer")
+except RepositoryConflictError:
+    conflict=True
+assert conflict'
+repository_identity=$(production_compose exec -T backend /usr/bin/git --git-dir="$repository_path" \
+  show -s '--format=%an <%ae>|%cn <%ce>' "$repository_commit" | tr -d '\r')
+[ "$repository_identity" = 'TekDocs Repository Service <repository-service@tekdocs.invalid>|TekDocs Repository Service <repository-service@tekdocs.invalid>' ] || {
+  echo "Production repository commits must use the deterministic service identity" >&2
+  exit 1
+}
 repository_head_checksum=$(production_compose exec -T backend sha256sum "$repository_path/HEAD" | awk '{print $1}')
 
 repository_volume=""
@@ -158,6 +178,9 @@ backend_id=$(production_compose ps -q backend)
 [ "$backend_id" != "$original_backend_id" ] || { echo "Backend recreation did not replace the container" >&2; exit 1; }
 recreated_head_checksum=$(production_compose exec -T backend sha256sum "$repository_path/HEAD" | awk '{print $1}')
 [ "$recreated_head_checksum" = "$repository_head_checksum" ] || { echo "Repository data changed during recreation" >&2; exit 1; }
+production_compose exec -T -e REHEARSAL_REPOSITORY_ID="$repository_id" backend \
+  python manage.py shell --no-imports -c \
+  'import os; import uuid; from apps.core.repository_service import read_accepted_repository_file; assert read_accepted_repository_file(repository_id=uuid.UUID(os.environ["REHEARSAL_REPOSITORY_ID"]), path=".tekdocs/rehearsal.md") == b"# Production repository rehearsal\n"'
 production_compose exec -T backend python manage.py initialize_workspace_repositories | grep -q '0 initialized, 3 retained'
 
 echo "Verifying production container isolation controls"

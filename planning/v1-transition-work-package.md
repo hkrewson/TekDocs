@@ -145,6 +145,8 @@ inspection and container-recreation rehearsal.
 
 ### `V1-REP-003` — Bounded repository service and commit protocol (#94)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** give application code one safe interface for repository reads and
 writes.
 

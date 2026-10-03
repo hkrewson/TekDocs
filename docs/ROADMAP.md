@@ -10,7 +10,10 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issue #92 is the next implementation boundary. Candidate security, pilot, interface, and release acceptance remain owned by `0.9.8` and must run against the migrated system.
+Repository foundation issues #92–#94 are complete. Portable workspace manifests
+and the MSP organization directory in #95 are the next implementation boundary.
+Candidate security, pilot, interface, and release acceptance remain owned by
+`0.9.8` and must run against the migrated system.
 
 The pre-1.0 responsive integration checkpoint now includes first-run NetBox adoption: unmatched observations show **Link to TekDocs** beside the missing local relationship, open on existing-record matching without retyping remote identity, and allow all six supported NetBox object types—racks, hardware devices, VLANs, prefixes, IP addresses, and MAC addresses—to create and link their canonical TekDocs record atomically after the operator supplies the required local context. Each current source row carries its own exact open review item, and Reconciliation filters open work before URL-backed search, type filtering, and 25-row paging, so retained decision history cannot hide actionable records. Endpoint assignment remains a separate explicit operation after adoption.
 
@@ -1684,9 +1687,10 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
-`0.9.1` progress: repository identity and accepted-head authority (#92), plus
-persistent local custody and initialization (#93), are complete. The bounded
-repository service and commit protocol (#94) are next; no remote Git service is
+`0.9.1` progress: repository identity and accepted-head authority (#92),
+persistent local custody and initialization (#93), and the bounded repository
+service and commit protocol (#94) are complete. Portable workspace manifests
+and the MSP organization directory (#95) are next; no remote Git service is
 required or introduced by this boundary.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.

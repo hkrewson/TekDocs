@@ -168,6 +168,22 @@ def _initialize_bare_repository(root: Path, destination: Path) -> bool:
             shutil.rmtree(temporary)
 
 
+def resolve_managed_repository_path(repository: WorkspaceRepository) -> tuple[Path, Path]:
+    root = configured_repository_root()
+    if root is None:
+        raise RepositoryStorageError("Managed repository storage is not configured")
+    ensure_repository_root(root)
+    if repository.workspace.tenant_id != repository.tenant_id:
+        raise RepositoryStorageError("Repository binding does not match its Workspace tenant")
+    destination = repository_path(
+        root=root,
+        repository_id=repository.id,
+        storage_relative_path=repository.storage_relative_path,
+    )
+    _validate_bare_repository(destination)
+    return root, destination
+
+
 def ensure_workspace_repository(workspace: Workspace) -> RepositoryInitialization | None:
     root = configured_repository_root()
     if root is None:

@@ -93,11 +93,13 @@ describe('editor feasibility spike', () => {
 
     const markdownTab = screen.getByRole('tab', { name: 'Markdown' })
     await user.click(markdownTab)
+    getMarkdown.mockClear()
     await user.keyboard('{ArrowRight}')
 
     const previewTab = screen.getByRole('tab', { name: 'Preview' })
     expect(previewTab).toHaveAttribute('aria-selected', 'true')
     expect(previewTab).toHaveFocus()
+    expect(getMarkdown).not.toHaveBeenCalled()
   })
 
   it('opens the diagram editor and shows the rendered preview after insertion', async () => {

@@ -91,7 +91,7 @@ export function EditorSpike({ initialMarkdown = markdownFixture, title = 'Firewa
   }
 
   const leaveEditor = (nextMode: Exclude<EditorMode, 'wysiwyg'>) => {
-    if (editor) {
+    if (mode === 'wysiwyg' && editor) {
       const normalized = normalizeTekDocsMarkdown(editor.getMarkdown())
       setMarkdown(normalized)
       markdownChange.current?.(normalized)

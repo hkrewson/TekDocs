@@ -5,6 +5,7 @@ const clientId = crypto.randomUUID()
 const invoiceId = crypto.randomUUID()
 const issuedInvoice = {
   id: invoiceId,
+  document_kind: 'invoice',
   state: 'issued',
   number: 'INV-2026-000042',
   currency: 'USD',

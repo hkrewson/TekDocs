@@ -127,6 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: make supported-recovery-rehearsal
+      - run: make repository-foundation-acceptance
       - name: Verify recurring invoice history after restore
         run: make recurring-invoice-backup-rehearsal
       - name: Write commit-bound evidence
@@ -134,7 +135,7 @@ jobs:
           python3 scripts/write_security_evidence.py
           --category backup_and_restore
           --scope-commit "$GITHUB_SHA"
-          --tool "TekDocs encrypted backup, separate-key, and clean restore rehearsal"
+          --tool "TekDocs encrypted recovery and repository-foundation acceptance rehearsals"
           --tool-version "recovery scripts at $GITHUB_SHA"
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:supported-recovery"

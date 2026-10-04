@@ -138,6 +138,13 @@ make test-e2e
 make production-image-rehearsal
 ```
 
+Prove the complete local repository foundation, including an interrupted write,
+container recreation, encrypted backup, and network-isolated restore:
+
+```bash
+make repository-foundation-acceptance
+```
+
 Run security checks:
 
 ```bash

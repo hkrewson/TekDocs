@@ -225,6 +225,8 @@ database/repository mismatch, network-isolation and exact-prior upgrade rehearsa
 
 ### `V1-REP-007` — Repository foundation composed acceptance (#98)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** prove the whole `0.9.1` boundary before parser or authoring work
 starts.
 
@@ -238,6 +240,13 @@ network-isolated stack.
 workspace and restored at the exact accepted head; derived/index state can be
 empty at this slice; GitHub credentials and network access are absent; all new
 risks have a disposition; setup, architecture, Wiki and release evidence agree.
+
+**Evidence:** `make repository-foundation-acceptance` creates one MSP, one
+client and one vendor repository; proves deterministic manifests and rejected
+cross-repository reads; injects and recovers an interrupted commit; recreates
+the repository-owning containers; and compares the exact accepted-head/content
+inventory after encrypted restore on a Docker-internal network. ADR 0109 records
+the residual-risk disposition and the explicit later-slice exclusions.
 
 ## Explicitly not in `0.9.1`
 

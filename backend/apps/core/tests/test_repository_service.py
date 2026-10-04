@@ -7,11 +7,22 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from django.db import close_old_connections
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError, close_old_connections, transaction
 from django.test import override_settings
 
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
-from apps.core.models import RepositoryCommit, Tenant, Workspace, WorkspaceKind
+from apps.core.models import (
+    AuditEvent,
+    RepositoryCommit,
+    RepositoryCommitAudit,
+    RepositoryHealthState,
+    RepositoryReconciliationState,
+    Tenant,
+    Workspace,
+    WorkspaceKind,
+)
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -319,3 +330,189 @@ def test_command_failures_do_not_log_repository_content(managed_repository, monk
         )
 
     assert sensitive_marker not in caplog.text
+
+
+def test_authenticated_audit_attribution_is_separate_from_git_identity(managed_repository):
+    repository, _, path = managed_repository
+    actor = User.objects.create_user(email="repository-actor@example.invalid", display_name="Repository Actor")
+    TenantMembership.objects.create(tenant=repository.tenant, user=actor, role=BuiltInRole.ADMINISTRATOR)
+    request_id = repository.id
+
+    result = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=None,
+        changes={"docs/guide.md": b"accepted"},
+        message="Accept attributed content",
+        attribution=repository_service.RepositoryAuditAttribution(
+            actor_id=actor.id,
+            action="repository.content.accepted",
+            request_id=request_id,
+        ),
+    )
+
+    attribution = RepositoryCommitAudit.objects.select_related("audit_event", "commit").get(
+        repository=repository
+    )
+    assert attribution.commit.object_id == result.object_id
+    assert attribution.audit_event.actor_id == actor.id
+    assert attribution.audit_event.action == "repository.content.accepted"
+    assert attribution.audit_event.request_id == request_id
+    commit_text = subprocess.run(  # noqa: S603  # nosec B603
+        ["/usr/bin/git", f"--git-dir={path}", "cat-file", "commit", result.object_id],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert actor.display_name not in commit_text
+    with pytest.raises(ValidationError, match="immutable"):
+        attribution.save()
+    with pytest.raises(ValidationError, match="append-only"):
+        attribution.audit_event.save()
+    with pytest.raises(DatabaseError, match="immutable"), transaction.atomic():
+        RepositoryCommitAudit.objects.filter(pk=attribution.pk).update(created_at=attribution.created_at)
+
+
+def test_unaccepted_advanced_head_blocks_writes_but_keeps_last_known_good_readable(
+    managed_repository, tmp_path
+):
+    repository, root, path = managed_repository
+    accepted = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=None,
+        changes={"docs/guide.md": b"accepted"},
+        message="Accept content",
+    )
+    git = repository_service._GitRepository(repository.id, path, accepted.object_format)
+    stage = tmp_path / "stage"
+    stage.mkdir(mode=0o700)
+    advanced, created = git.write_commit(
+        base=accepted.object_id,
+        changes={"docs/guide.md": b"unaccepted"},
+        message="Unaccepted crash-window commit",
+        stage_directory=stage,
+    )
+    assert created is True
+
+    diagnosis = repository_service.reconcile_workspace_repository(repository_id=repository.id)
+    assert diagnosis.state == RepositoryReconciliationState.ADVANCED
+    assert diagnosis.health == RepositoryHealthState.DEGRADED
+    assert diagnosis.repaired is False
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == accepted.object_id
+    assert git.raw_current_ref() == advanced
+    assert repository_service.read_accepted_repository_file(
+        repository_id=repository.id, path="docs/guide.md"
+    ) == b"accepted"
+    with pytest.raises(repository_service.RepositoryReconciliationError, match="requires reconciliation"):
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=accepted.object_id,
+            changes={"docs/guide.md": b"new write"},
+            message="Blocked until repaired",
+        )
+
+    repaired = repository_service.reconcile_workspace_repository(
+        repository_id=repository.id, repair_to_accepted=True
+    )
+    assert repaired.state == RepositoryReconciliationState.MATCHED
+    assert repaired.repaired is True
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == accepted.object_id
+    assert git.raw_current_ref() == accepted.object_id
+    assert not tuple(root.glob(f".{repository.id}.stage-*"))
+
+
+def test_missing_accepted_object_disables_reads_and_writes(managed_repository):
+    repository, _, path = managed_repository
+    accepted = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=None,
+        changes={"docs/guide.md": b"accepted"},
+        message="Accept content",
+    )
+    subprocess.run(  # noqa: S603  # nosec B603
+        ["/usr/bin/git", f"--git-dir={path}", "update-ref", "-d", repository_service.CANONICAL_REF],
+        check=True,
+    )
+    object_path = path / "objects" / accepted.object_id[:2] / accepted.object_id[2:]
+    object_path.unlink()
+
+    diagnosis = repository_service.reconcile_workspace_repository(repository_id=repository.id)
+    assert diagnosis.state == RepositoryReconciliationState.MISSING
+    with pytest.raises(repository_service.RepositoryReconciliationError, match="unavailable"):
+        repository_service.read_accepted_repository_file(repository_id=repository.id, path="docs/guide.md")
+    repaired = repository_service.reconcile_workspace_repository(
+        repository_id=repository.id, repair_to_accepted=True
+    )
+    assert repaired.repaired is False
+    assert repaired.state == RepositoryReconciliationState.MISSING
+
+
+def test_audit_attribution_rejects_actor_outside_tenant(managed_repository):
+    repository, _, _ = managed_repository
+    actor = User.objects.create_user(email="outsider@example.invalid", display_name="Outsider")
+
+    with pytest.raises(repository_service.RepositoryInputError, match="not authorized"):
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=None,
+            changes={"docs/guide.md": b"rejected"},
+            message="Reject outsider",
+            attribution=repository_service.RepositoryAuditAttribution(
+                actor_id=actor.id,
+                action="repository.content.accepted",
+            ),
+        )
+
+    assert not RepositoryCommit.objects.filter(repository=repository).exists()
+    assert not AuditEvent.objects.filter(actor=actor).exists()
+
+
+def test_non_commit_head_is_corrupt_and_explicit_repair_restores_accepted_head(managed_repository):
+    repository, _, path = managed_repository
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=None,
+        changes={"docs/guide.md": b"accepted"},
+        message="Accept content",
+    )
+    blob_id = subprocess.run(  # noqa: S603  # nosec B603
+        ["/usr/bin/git", f"--git-dir={path}", "hash-object", "-w", "--stdin"],
+        input=b"not a commit",
+        check=True,
+        capture_output=True,
+    ).stdout.decode().strip()
+    (path / "refs" / "heads" / "main").write_text(f"{blob_id}\n", encoding="ascii")
+
+    diagnosis = repository_service.reconcile_workspace_repository(repository_id=repository.id)
+    assert diagnosis.state == RepositoryReconciliationState.CORRUPT
+    assert diagnosis.health == RepositoryHealthState.BLOCKED
+    assert repository_service.read_accepted_repository_file(
+        repository_id=repository.id, path="docs/guide.md"
+    ) == b"accepted"
+    repaired = repository_service.reconcile_workspace_repository(
+        repository_id=repository.id, repair_to_accepted=True
+    )
+    assert repaired.repaired is True
+    assert repaired.state == RepositoryReconciliationState.MATCHED
+
+
+def test_unavailable_repository_records_bounded_health(managed_repository, monkeypatch, caplog):
+    repository, _, _ = managed_repository
+    sensitive_marker = "private-repository-path"
+    monkeypatch.setattr(
+        repository_service,
+        "_load_repository",
+        lambda repository_id: (_ for _ in ()).throw(
+            repository_service.RepositoryServiceError(sensitive_marker)
+        ),
+    )
+
+    with caplog.at_level(logging.WARNING):
+        diagnosis = repository_service.reconcile_workspace_repository(repository_id=repository.id)
+
+    assert diagnosis.state == RepositoryReconciliationState.UNAVAILABLE
+    assert diagnosis.health == RepositoryHealthState.BLOCKED
+    assert sensitive_marker not in caplog.text
+    repository.refresh_from_db()
+    assert repository.last_reconciliation_state == RepositoryReconciliationState.UNAVAILABLE

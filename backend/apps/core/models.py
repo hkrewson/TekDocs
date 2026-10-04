@@ -1139,6 +1139,7 @@ class RepositoryReconciliationState(models.TextChoices):
     MISSING = "missing", "Accepted head missing"
     ADVANCED = "advanced", "Repository advanced"
     MISMATCHED = "mismatched", "Head mismatched"
+    CORRUPT = "corrupt", "Repository corrupt"
     UNAVAILABLE = "unavailable", "Repository unavailable"
 
 
@@ -1287,6 +1288,59 @@ class RepositoryCommit(models.Model):
         expected_length = 40 if self.object_format == RepositoryObjectFormat.SHA1 else 64
         if not re.fullmatch(rf"[0-9a-f]{{{expected_length}}}", self.object_id):
             raise ValidationError({"object_id": "Object ID does not match its Git object format"})
+
+
+class RepositoryCommitAudit(models.Model):
+    """Immutable attribution from a TekDocs audit action to one accepted Git commit."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="repository_commit_audits")
+    repository = models.ForeignKey(
+        WorkspaceRepository,
+        on_delete=models.PROTECT,
+        related_name="commit_audits",
+    )
+    commit = models.OneToOneField(
+        RepositoryCommit,
+        on_delete=models.PROTECT,
+        related_name="audit_attribution",
+    )
+    audit_event = models.OneToOneField(
+        "AuditEvent",
+        on_delete=models.PROTECT,
+        related_name="repository_commit_attribution",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
+    class Meta:
+        indexes = [models.Index(fields=("tenant", "repository"), name="core_repocommitaudit_scope_idx")]
+
+    def __str__(self) -> str:
+        return f"Attribution for {self.commit_id}"
+
+    def save(self, *args, **kwargs) -> None:  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository commit attribution is immutable")
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository commit attribution is retained")
+
+    def clean(self) -> None:
+        if self.repository_id and self.repository.tenant_id != self.tenant_id:
+            raise ValidationError("Repository attribution must belong to its tenant")
+        if self.commit_id and (
+            self.commit.tenant_id != self.tenant_id or self.commit.repository_id != self.repository_id
+        ):
+            raise ValidationError("Repository attribution commit must belong to its repository")
+        if self.audit_event_id and (
+            self.audit_event.tenant_id != self.tenant_id or self.audit_event.actor_id is None
+        ):
+            raise ValidationError("Repository attribution requires an authenticated tenant audit event")
 
 
 class EntityManager(models.Manager["Entity"]):

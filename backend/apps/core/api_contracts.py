@@ -63,12 +63,35 @@ class DiagramRendererDiagnosticsSerializer(serializers.Serializer):
     last_checked_at = serializers.IntegerField(min_value=1, allow_null=True)
 
 
+class RepositoryStateCountsSerializer(serializers.Serializer):
+    never = serializers.IntegerField(min_value=0)
+    matched = serializers.IntegerField(min_value=0)
+    missing = serializers.IntegerField(min_value=0)
+    advanced = serializers.IntegerField(min_value=0)
+    mismatched = serializers.IntegerField(min_value=0)
+    corrupt = serializers.IntegerField(min_value=0)
+    unavailable = serializers.IntegerField(min_value=0)
+
+
+class RepositoryDiagnosticsSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("ready", "degraded", "unavailable", "not_configured"))
+    total = serializers.IntegerField(min_value=0)
+    healthy = serializers.IntegerField(min_value=0)
+    degraded = serializers.IntegerField(min_value=0)
+    blocked = serializers.IntegerField(min_value=0)
+    unknown = serializers.IntegerField(min_value=0)
+    states = RepositoryStateCountsSerializer()
+    last_checked_at = serializers.DateTimeField(allow_null=True)
+    repair = serializers.ChoiceField(choices=("reconcile_to_accepted",), allow_null=True)
+
+
 class SystemDiagnosticsSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=("ready", "degraded"))
     checked_at = serializers.DateTimeField()
     application_version = serializers.CharField()
     database = serializers.ChoiceField(choices=("ready",))
     diagram_renderer = DiagramRendererDiagnosticsSerializer()
+    repositories = RepositoryDiagnosticsSerializer()
 
 
 IDEMPOTENCY_KEY_PARAMETER = OpenApiParameter(

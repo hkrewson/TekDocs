@@ -185,6 +185,8 @@ tests, cross-organization negative tests and rename/upgrade tests.
 
 ### `V1-REP-005` — Audit attribution, health and reconciliation (#96)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** distinguish Git history from TekDocs audit evidence and expose safe
 operational health.
 

@@ -18,11 +18,17 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from django.db import transaction
+from django.utils import timezone
 
 from .models import (
+    AuditEvent,
+    InstallationState,
     RepositoryCommit,
+    RepositoryCommitAudit,
+    RepositoryHealthState,
     RepositoryLifecycleState,
     RepositoryObjectFormat,
+    RepositoryReconciliationState,
     WorkspaceRepository,
 )
 from .repository_storage import (
@@ -78,12 +84,31 @@ class RepositoryResourceLimitError(RepositoryServiceError):
     pass
 
 
+class RepositoryReconciliationError(RepositoryServiceError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class RepositoryCommitResult:
     repository_id: uuid.UUID
     object_id: str
     object_format: str
     created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryAuditAttribution:
+    actor_id: uuid.UUID
+    action: str
+    request_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RepositoryReconciliationResult:
+    repository_id: uuid.UUID
+    state: str
+    health: str
+    repaired: bool
 
 
 def _validate_path(value: str) -> str:
@@ -124,6 +149,19 @@ def _validate_message(value: str) -> str:
         or any(ord(character) < 32 or ord(character) == 127 for character in value)
     ):
         raise RepositoryInputError("Repository commit message is invalid")
+    return value
+
+
+def _validate_attribution(value: RepositoryAuditAttribution | None) -> RepositoryAuditAttribution | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value.actor_id, uuid.UUID)
+        or not isinstance(value.action, str)
+        or not re.fullmatch(r"[a-z][a-z0-9_.-]{0,119}", value.action)
+        or (value.request_id is not None and not isinstance(value.request_id, uuid.UUID))
+    ):
+        raise RepositoryInputError("Repository audit attribution is invalid")
     return value
 
 
@@ -300,6 +338,41 @@ class _GitRepository:
             output_limit=128,
         )
         return None if returncode == 1 else self._parse_object(output)
+
+    def raw_current_ref(self) -> str | None:
+        returncode, output = self._run(
+            "read_raw_head",
+            ("rev-parse", "--verify", "--quiet", CANONICAL_REF),
+            allowed_returncodes=frozenset({0, 1}),
+            output_limit=128,
+        )
+        return None if returncode == 1 else self._parse_object(output)
+
+    def commit_present(self, object_id: str) -> bool:
+        _, output = self._run(
+            "inspect_commit",
+            ("cat-file", "--batch-check=%(objectname) %(objecttype)"),
+            input_bytes=f"{object_id}\n".encode("ascii"),
+            output_limit=160,
+        )
+        try:
+            value = output.decode("ascii").strip()
+        except UnicodeDecodeError as exc:
+            raise RepositoryCommandError("Managed repository returned invalid object metadata") from exc
+        if value == f"{object_id} missing":
+            return False
+        if value == f"{object_id} commit":
+            return True
+        raise RepositoryCommandError("Managed repository returned invalid object metadata")
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool:
+        returncode, _ = self._run(
+            "compare_commits",
+            ("merge-base", "--is-ancestor", ancestor, descendant),
+            allowed_returncodes=frozenset({0, 1}),
+            output_limit=0,
+        )
+        return returncode == 0
 
     def verify_commit(self, object_id: str) -> None:
         self._run("verify_commit", ("cat-file", "-e", f"{object_id}^{{commit}}"), output_limit=0)
@@ -511,7 +584,7 @@ def _accept_commit(
     repository: WorkspaceRepository,
     object_format: str,
     commit_id: str,
-) -> None:
+) -> RepositoryCommit:
     commit, _ = RepositoryCommit.objects.get_or_create(
         tenant=repository.tenant,
         repository=repository,
@@ -520,6 +593,94 @@ def _accept_commit(
     )
     repository.accepted_commit = commit
     repository.save(update_fields=("accepted_commit", "updated_at"))
+    return commit
+
+
+def _health_for_reconciliation(state: str) -> str:
+    if state == RepositoryReconciliationState.MATCHED:
+        return RepositoryHealthState.HEALTHY
+    if state in {RepositoryReconciliationState.MISSING, RepositoryReconciliationState.ADVANCED}:
+        return RepositoryHealthState.DEGRADED
+    if state == RepositoryReconciliationState.NEVER:
+        return RepositoryHealthState.UNKNOWN
+    return RepositoryHealthState.BLOCKED
+
+
+def _record_reconciliation(repository: WorkspaceRepository, state: str) -> None:
+    repository.health_state = _health_for_reconciliation(state)
+    repository.last_reconciliation_state = state
+    repository.last_reconciled_at = timezone.now()
+    repository.save(
+        update_fields=("health_state", "last_reconciliation_state", "last_reconciled_at", "updated_at")
+    )
+
+
+def _classify_reconciliation(git: _GitRepository, accepted: str | None) -> tuple[str, bool]:
+    try:
+        current = git.raw_current_ref()
+        if accepted is None:
+            if current is None:
+                return RepositoryReconciliationState.MATCHED, True
+            if not git.commit_present(current):
+                return RepositoryReconciliationState.CORRUPT, False
+            return RepositoryReconciliationState.ADVANCED, False
+        if not git.commit_present(accepted):
+            return RepositoryReconciliationState.MISSING, False
+        if current is None:
+            return RepositoryReconciliationState.MISSING, True
+        if current == accepted:
+            return RepositoryReconciliationState.MATCHED, True
+        if not git.commit_present(current):
+            return RepositoryReconciliationState.CORRUPT, True
+        if git.is_ancestor(accepted, current):
+            return RepositoryReconciliationState.ADVANCED, True
+        return RepositoryReconciliationState.MISMATCHED, True
+    except RepositoryCommandError:
+        return RepositoryReconciliationState.CORRUPT, accepted is not None
+
+
+def _accepted_object(repository: WorkspaceRepository, object_format: str) -> str | None:
+    if repository.accepted_commit_id is None:
+        return None
+    commit = RepositoryCommit.objects.get(pk=repository.accepted_commit_id)
+    if commit.repository_id != repository.id or commit.object_format != object_format:
+        raise RepositoryServiceError("Accepted repository object is invalid")
+    return commit.object_id
+
+
+def _record_commit_attribution(
+    *,
+    repository: WorkspaceRepository,
+    commit: RepositoryCommit,
+    attribution: RepositoryAuditAttribution,
+) -> None:
+    from apps.accounts.models import TenantMembership
+
+    is_owner = InstallationState.objects.filter(
+        pk=InstallationState.SINGLETON_ID,
+        tenant_id=repository.tenant_id,
+        owner_id=attribution.actor_id,
+    ).exists()
+    is_member = TenantMembership.objects.filter(
+        tenant_id=repository.tenant_id,
+        user_id=attribution.actor_id,
+    ).exists()
+    if not (is_owner or is_member):
+        raise RepositoryInputError("Repository audit actor is not authorized for this tenant")
+    event = AuditEvent.objects.create(
+        tenant_id=repository.tenant_id,
+        actor_id=attribution.actor_id,
+        action=attribution.action,
+        entity_id=repository.workspace_id,
+        request_id=attribution.request_id,
+        metadata={},
+    )
+    RepositoryCommitAudit.objects.create(
+        tenant_id=repository.tenant_id,
+        repository=repository,
+        commit=commit,
+        audit_event=event,
+    )
 
 
 def commit_repository_files(
@@ -528,67 +689,74 @@ def commit_repository_files(
     expected_base: str | None,
     changes: Mapping[str, bytes | None],
     message: str,
+    attribution: RepositoryAuditAttribution | None = None,
 ) -> RepositoryCommitResult:
     validated_changes = _validate_changes(changes)
     validated_message = _validate_message(message)
+    validated_attribution = _validate_attribution(attribution)
     repository, root, path, object_format = _load_repository(repository_id)
     if expected_base is not None:
         _validate_object_id(expected_base, object_format)
 
     with _repository_lock(root, repository.id, exclusive=True):
         _cleanup_staging_directories(root, repository.id)
+        reconciliation_error = False
         with transaction.atomic():
             locked = WorkspaceRepository.objects.select_for_update().get(pk=repository.id)
             if locked.lifecycle_state != RepositoryLifecycleState.ACTIVE:
                 raise RepositoryServiceError("Managed repository does not accept writes")
-            if locked.accepted_commit_id is None:
-                accepted = None
-            else:
-                accepted_commit = RepositoryCommit.objects.get(pk=locked.accepted_commit_id)
-                if (
-                    accepted_commit.repository_id != locked.id
-                    or accepted_commit.object_format != object_format
-                ):
-                    raise RepositoryServiceError("Accepted repository object is invalid")
-                accepted = accepted_commit.object_id
+            accepted = _accepted_object(locked, object_format)
             git = _GitRepository(locked.id, path, object_format)
-            git.recover_ref(accepted, git.current_ref())
-            if expected_base != accepted:
+            reconciliation, _ = _classify_reconciliation(git, accepted)
+            _record_reconciliation(locked, reconciliation)
+            if reconciliation != RepositoryReconciliationState.MATCHED:
+                reconciliation_error = True
+            elif expected_base != accepted:
                 raise RepositoryConflictError("Repository base changed")
-            if accepted is None and not any(content is not None for content in validated_changes.values()):
+            elif accepted is None and not any(content is not None for content in validated_changes.values()):
                 raise RepositoryInputError("Initial repository commit cannot be empty")
-
-            stage_directory = Path(tempfile.mkdtemp(prefix=f".{locked.id}.stage-", dir=root))
-            stage_directory.chmod(DIRECTORY_MODE)
-            advanced = False
-            commit_id = accepted
-            try:
-                commit_id, created = git.write_commit(
-                    base=accepted,
-                    changes=validated_changes,
-                    message=validated_message,
-                    stage_directory=stage_directory,
-                )
-                advanced = created
-                if created:
-                    _accept_commit(
-                        repository=locked,
-                        object_format=object_format,
-                        commit_id=commit_id,
-                    )
-            except BaseException:
-                if advanced and commit_id is not None:
-                    try:
-                        git.rollback_ref(current=commit_id, previous=accepted)
-                    except RepositoryServiceError:
-                        logger.critical("repository_ref_rollback_failed repository=%s", locked.id)
-                raise
-            finally:
+            if not reconciliation_error:
+                stage_directory = Path(tempfile.mkdtemp(prefix=f".{locked.id}.stage-", dir=root))
+                stage_directory.chmod(DIRECTORY_MODE)
+                advanced = False
+                commit_id = accepted
                 try:
-                    _cleanup_staging_directories(root, locked.id)
-                except RepositoryServiceError as exc:
-                    logger.error("repository_stage_cleanup_failed repository=%s", locked.id)
-                    raise RepositoryServiceError("Repository staging cleanup failed") from exc
+                    commit_id, created = git.write_commit(
+                        base=accepted,
+                        changes=validated_changes,
+                        message=validated_message,
+                        stage_directory=stage_directory,
+                    )
+                    advanced = created
+                    if created:
+                        commit = _accept_commit(
+                            repository=locked,
+                            object_format=object_format,
+                            commit_id=commit_id,
+                        )
+                        if validated_attribution is not None:
+                            _record_commit_attribution(
+                                repository=locked,
+                                commit=commit,
+                                attribution=validated_attribution,
+                            )
+                    _record_reconciliation(locked, RepositoryReconciliationState.MATCHED)
+                except BaseException:
+                    if advanced and commit_id is not None:
+                        try:
+                            git.rollback_ref(current=commit_id, previous=accepted)
+                        except RepositoryServiceError:
+                            logger.critical("repository_ref_rollback_failed repository=%s", locked.id)
+                    raise
+                finally:
+                    try:
+                        _cleanup_staging_directories(root, locked.id)
+                    except RepositoryServiceError as exc:
+                        logger.error("repository_stage_cleanup_failed repository=%s", locked.id)
+                        raise RepositoryServiceError("Repository staging cleanup failed") from exc
+
+        if reconciliation_error:
+            raise RepositoryReconciliationError("Managed repository requires reconciliation")
 
     if commit_id is None:  # pragma: no cover - an initial empty commit is rejected above
         raise RepositoryServiceError("Managed repository did not produce a commit")
@@ -607,10 +775,107 @@ def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> byt
         repository.refresh_from_db(fields=("accepted_commit",))
         if repository.accepted_commit_id is None:
             raise RepositoryInputError("Repository has no accepted content")
-        commit = RepositoryCommit.objects.get(pk=repository.accepted_commit_id)
-        if commit.repository_id != repository.id or commit.object_format != object_format:
-            raise RepositoryServiceError("Accepted repository object is invalid")
+        accepted = _accepted_object(repository, object_format)
+        if accepted is None:  # pragma: no cover - guarded above
+            raise RepositoryInputError("Repository has no accepted content")
         git = _GitRepository(repository.id, repository_path, object_format)
-        if git.current_ref() != commit.object_id:
-            raise RepositoryServiceError("Repository head does not match accepted content")
-        return git.read_file(commit.object_id, validated_path)
+        reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
+        _record_reconciliation(repository, reconciliation)
+        if not accepted_usable:
+            raise RepositoryReconciliationError("Accepted repository content is unavailable")
+        return git.read_file(accepted, validated_path)
+
+
+def reconcile_workspace_repository(
+    *, repository_id: uuid.UUID, repair_to_accepted: bool = False
+) -> RepositoryReconciliationResult:
+    try:
+        repository, root, path, object_format = _load_repository(repository_id)
+    except RepositoryServiceError:
+        WorkspaceRepository.objects.filter(pk=repository_id).update(
+            health_state=RepositoryHealthState.BLOCKED,
+            last_reconciliation_state=RepositoryReconciliationState.UNAVAILABLE,
+            last_reconciled_at=timezone.now(),
+        )
+        logger.warning("repository_reconciliation repository=%s state=unavailable", repository_id)
+        return RepositoryReconciliationResult(
+            repository_id,
+            RepositoryReconciliationState.UNAVAILABLE,
+            RepositoryHealthState.BLOCKED,
+            False,
+        )
+
+    repaired = False
+    with _repository_lock(root, repository.id, exclusive=repair_to_accepted):
+        with transaction.atomic():
+            locked = WorkspaceRepository.objects.select_for_update().get(pk=repository.id)
+            accepted = _accepted_object(locked, object_format)
+            git = _GitRepository(locked.id, path, object_format)
+            state, accepted_usable = _classify_reconciliation(git, accepted)
+            if repair_to_accepted and state != RepositoryReconciliationState.MATCHED:
+                can_repair = accepted is None or accepted_usable
+                if can_repair:
+                    current = git.raw_current_ref()
+                    git.recover_ref(accepted, current)
+                    state, _ = _classify_reconciliation(git, accepted)
+                    repaired = state == RepositoryReconciliationState.MATCHED
+            _record_reconciliation(locked, state)
+            health = locked.health_state
+    logger.info(
+        "repository_reconciliation repository=%s state=%s repaired=%s",
+        repository.id,
+        state,
+        repaired,
+    )
+    return RepositoryReconciliationResult(repository.id, state, health, repaired)
+
+
+def reconcile_all_workspace_repositories(
+    *, repair_to_accepted: bool = False
+) -> tuple[RepositoryReconciliationResult, ...]:
+    return tuple(
+        reconcile_workspace_repository(repository_id=repository_id, repair_to_accepted=repair_to_accepted)
+        for repository_id in WorkspaceRepository.objects.order_by("id").values_list("id", flat=True)
+    )
+
+
+def repository_health_diagnostics() -> dict[str, object]:
+    from django.conf import settings
+    from django.db.models import Count, Max
+
+    if not settings.TEKDOCS_REPOSITORY_ROOT:
+        return {
+            "status": "not_configured",
+            "total": 0,
+            "healthy": 0,
+            "degraded": 0,
+            "blocked": 0,
+            "unknown": 0,
+            "states": {state: 0 for state in RepositoryReconciliationState.values},
+            "last_checked_at": None,
+            "repair": None,
+        }
+    health_counts = {
+        row["health_state"]: row["count"]
+        for row in WorkspaceRepository.objects.values("health_state").annotate(count=Count("id"))
+    }
+    state_counts = {
+        row["last_reconciliation_state"]: row["count"]
+        for row in WorkspaceRepository.objects.values("last_reconciliation_state").annotate(count=Count("id"))
+    }
+    total = sum(health_counts.values())
+    blocked = health_counts.get(RepositoryHealthState.BLOCKED, 0)
+    degraded = health_counts.get(RepositoryHealthState.DEGRADED, 0)
+    unknown = health_counts.get(RepositoryHealthState.UNKNOWN, 0)
+    status = "unavailable" if blocked else "degraded" if degraded or unknown else "ready"
+    return {
+        "status": status,
+        "total": total,
+        "healthy": health_counts.get(RepositoryHealthState.HEALTHY, 0),
+        "degraded": degraded,
+        "blocked": blocked,
+        "unknown": unknown,
+        "states": {state: state_counts.get(state, 0) for state in RepositoryReconciliationState.values},
+        "last_checked_at": WorkspaceRepository.objects.aggregate(value=Max("last_reconciled_at"))["value"],
+        "repair": "reconcile_to_accepted" if status != "ready" else None,
+    }

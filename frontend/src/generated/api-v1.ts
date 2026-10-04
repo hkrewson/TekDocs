@@ -14608,6 +14608,38 @@ export interface components {
             /** @default 1440 */
             readonly check_interval_minutes: number;
         };
+        readonly RepositoryDiagnostics: {
+            /**
+             * @description * `ready` - ready
+             *     * `degraded` - degraded
+             *     * `unavailable` - unavailable
+             *     * `not_configured` - not_configured
+             * @enum {string}
+             */
+            readonly status: "ready" | "degraded" | "unavailable" | "not_configured";
+            readonly total: number;
+            readonly healthy: number;
+            readonly degraded: number;
+            readonly blocked: number;
+            readonly unknown: number;
+            readonly states: components["schemas"]["RepositoryStateCounts"];
+            /** Format: date-time */
+            readonly last_checked_at: string | null;
+            /**
+             * @description * `reconcile_to_accepted` - reconcile_to_accepted
+             * @enum {string|null}
+             */
+            readonly repair: "reconcile_to_accepted" | null;
+        };
+        readonly RepositoryStateCounts: {
+            readonly never: number;
+            readonly matched: number;
+            readonly missing: number;
+            readonly advanced: number;
+            readonly mismatched: number;
+            readonly corrupt: number;
+            readonly unavailable: number;
+        };
         readonly ReuseAudience: {
             /** Format: uuid */
             readonly document_id: string;
@@ -15088,6 +15120,7 @@ export interface components {
              */
             readonly database: "ready";
             readonly diagram_renderer: components["schemas"]["DiagramRendererDiagnostics"];
+            readonly repositories: components["schemas"]["RepositoryDiagnostics"];
         };
         readonly Taxonomy: {
             /** Format: uuid */

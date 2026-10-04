@@ -47171,6 +47171,93 @@ components:
           default: 1440
       required:
       - url
+    RepositoryDiagnostics:
+      type: object
+      properties:
+        status:
+          enum:
+          - ready
+          - degraded
+          - unavailable
+          - not_configured
+          type: string
+          description: |-
+            * `ready` - ready
+            * `degraded` - degraded
+            * `unavailable` - unavailable
+            * `not_configured` - not_configured
+          x-spec-enum-id: 0f93b07f8f9887ee
+        total:
+          type: integer
+          minimum: 0
+        healthy:
+          type: integer
+          minimum: 0
+        degraded:
+          type: integer
+          minimum: 0
+        blocked:
+          type: integer
+          minimum: 0
+        unknown:
+          type: integer
+          minimum: 0
+        states:
+          $ref: '#/components/schemas/RepositoryStateCounts'
+        last_checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        repair:
+          enum:
+          - reconcile_to_accepted
+          - null
+          type: string
+          description: '* `reconcile_to_accepted` - reconcile_to_accepted'
+          x-spec-enum-id: f5bed5d0a53dd687
+          nullable: true
+      required:
+      - blocked
+      - degraded
+      - healthy
+      - last_checked_at
+      - repair
+      - states
+      - status
+      - total
+      - unknown
+    RepositoryStateCounts:
+      type: object
+      properties:
+        never:
+          type: integer
+          minimum: 0
+        matched:
+          type: integer
+          minimum: 0
+        missing:
+          type: integer
+          minimum: 0
+        advanced:
+          type: integer
+          minimum: 0
+        mismatched:
+          type: integer
+          minimum: 0
+        corrupt:
+          type: integer
+          minimum: 0
+        unavailable:
+          type: integer
+          minimum: 0
+      required:
+      - advanced
+      - corrupt
+      - matched
+      - mismatched
+      - missing
+      - never
+      - unavailable
     ReuseAudience:
       type: object
       properties:
@@ -48329,11 +48416,14 @@ components:
           x-spec-enum-id: d28c4d24a671a61e
         diagram_renderer:
           $ref: '#/components/schemas/DiagramRendererDiagnostics'
+        repositories:
+          $ref: '#/components/schemas/RepositoryDiagnostics'
       required:
       - application_version
       - checked_at
       - database
       - diagram_renderer
+      - repositories
       - status
     Taxonomy:
       type: object

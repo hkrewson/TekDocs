@@ -9,7 +9,14 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.core.models import InstallationState
+from apps.core import repository_storage
+from apps.core.models import (
+    InstallationState,
+    RepositoryHealthState,
+    RepositoryReconciliationState,
+    Workspace,
+    WorkspaceKind,
+)
 from tekdocs.version import VERSION
 
 
@@ -62,6 +69,7 @@ def test_readiness_fails_closed_without_bootstrap_token_before_owner_claim(clien
         "status": "unavailable",
         "database": "ready",
         "bootstrap": "unavailable",
+        "repositories": "ready",
         "version": VERSION,
     }
 
@@ -156,3 +164,42 @@ def test_system_diagnostics_allow_administrators_but_not_read_only_members(clien
         assert client.get(reverse("system-diagnostics")).status_code == 200
         client.force_login(reader)
         assert client.get(reverse("system-diagnostics")).status_code == 403
+
+
+@pytest.mark.django_db
+@override_settings(TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
+def test_repository_health_is_coarse_and_blocks_readiness(client, tmp_path):
+    result = bootstrap_owner(
+        tenant_name="Repository Health MSP",
+        owner_email="repository-health@example.invalid",
+        owner_display_name="Repository Health Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    workspace = Workspace.objects.get(tenant=result.tenant, kind=WorkspaceKind.MSP)
+    repository_root = tmp_path / "private-repositories"
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(repository_root)):
+        initialized = repository_storage.ensure_workspace_repository(workspace)
+        assert initialized is not None
+        initialized.repository.health_state = RepositoryHealthState.DEGRADED
+        initialized.repository.last_reconciliation_state = RepositoryReconciliationState.ADVANCED
+        initialized.repository.save(
+            update_fields=("health_state", "last_reconciliation_state", "updated_at")
+        )
+
+        readiness = client.get(reverse("health-ready"))
+        assert readiness.status_code == 503
+        assert readiness.json()["repositories"] == "degraded"
+
+        client.force_login(result.owner)
+        diagnostics = client.get(reverse("system-diagnostics"))
+
+    assert diagnostics.status_code == 200
+    payload = diagnostics.json()["repositories"]
+    assert payload["status"] == "degraded"
+    assert payload["total"] == 1
+    assert payload["degraded"] == 1
+    assert payload["states"]["advanced"] == 1
+    assert payload["repair"] == "reconcile_to_accepted"
+    serialized = diagnostics.content.decode()
+    assert str(repository_root) not in serialized
+    assert str(initialized.repository.id) not in serialized

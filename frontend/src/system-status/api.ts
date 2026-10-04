@@ -14,6 +14,25 @@ export type SystemDiagnostics = {
     recent_failures: RendererFailure[]
     last_checked_at: number | null
   }
+  repositories: {
+    status: 'ready' | 'degraded' | 'unavailable' | 'not_configured'
+    total: number
+    healthy: number
+    degraded: number
+    blocked: number
+    unknown: number
+    states: {
+      never: number
+      matched: number
+      missing: number
+      advanced: number
+      mismatched: number
+      corrupt: number
+      unavailable: number
+    }
+    last_checked_at: string | null
+    repair: 'reconcile_to_accepted' | null
+  }
 }
 
 export interface SystemStatusClient {

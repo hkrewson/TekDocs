@@ -12,6 +12,7 @@ from apps.accounts.policy import PermissionKey, require_permission
 from apps.core.api_contracts import ApiRootSerializer, SystemDiagnosticsSerializer
 from apps.core.diagram_exports import diagram_renderer_diagnostics, diagram_renderer_health
 from apps.core.models import InstallationState
+from apps.core.repository_service import repository_health_diagnostics
 from tekdocs.version import VERSION
 
 
@@ -67,10 +68,23 @@ class ReadyHealthView(APIView):
         except Exception:  # noqa: BLE001
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
         renderer = diagram_renderer_health()
+        repositories = repository_health_diagnostics()
         renderer_status = {} if renderer == "not_configured" else {"diagram_renderer": renderer}
-        if renderer not in {"not_configured", "ready"}:
+        repository_status = (
+            {} if repositories["status"] == "not_configured" else {"repositories": repositories["status"]}
+        )
+        if renderer not in {"not_configured", "ready"} or repositories["status"] not in {
+            "not_configured",
+            "ready",
+        }:
             return Response(
-                {"status": "unavailable", "database": "ready", **renderer_status, "version": VERSION},
+                {
+                    "status": "unavailable",
+                    "database": "ready",
+                    **renderer_status,
+                    **repository_status,
+                    "version": VERSION,
+                },
                 status=503,
             )
         bootstrap_required = InstallationState.objects.filter(
@@ -83,11 +97,14 @@ class ReadyHealthView(APIView):
                     "database": "ready",
                     "bootstrap": "unavailable",
                     **renderer_status,
+                    **repository_status,
                     "version": VERSION,
                 },
                 status=503,
             )
-        return Response({"status": "ok", "database": "ready", **renderer_status, "version": VERSION})
+        return Response(
+            {"status": "ok", "database": "ready", **renderer_status, **repository_status, "version": VERSION}
+        )
 
 
 class SystemDiagnosticsView(APIView):
@@ -98,12 +115,18 @@ class SystemDiagnosticsView(APIView):
             cursor.execute("SELECT 1")
             cursor.fetchone()
         renderer = diagram_renderer_diagnostics()
+        repositories = repository_health_diagnostics()
         return Response(
             {
-                "status": "ready" if renderer["status"] == "ready" else "degraded",
+                "status": (
+                    "ready"
+                    if renderer["status"] == "ready" and repositories["status"] in {"ready", "not_configured"}
+                    else "degraded"
+                ),
                 "checked_at": timezone.now(),
                 "application_version": VERSION,
                 "database": "ready",
                 "diagram_renderer": renderer,
+                "repositories": repositories,
             }
         )

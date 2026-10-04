@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.core.models import Workspace
 from apps.core.repository_manifests import synchronize_all_workspace_manifests
+from apps.core.repository_service import reconcile_all_workspace_repositories
 from apps.core.repository_storage import (
     RepositoryStorageError,
     configured_repository_root,
@@ -39,4 +40,10 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Workspace manifests synchronized: {manifests.created} updated, "
             f"{manifests.unchanged} unchanged."
+        )
+        reconciliation = reconcile_all_workspace_repositories()
+        matched = sum(result.state == "matched" for result in reconciliation)
+        self.stdout.write(
+            f"Workspace repositories reconciled: {matched} matched, "
+            f"{len(reconciliation) - matched} require attention."
         )

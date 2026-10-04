@@ -10,8 +10,8 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issues #92–#95 are complete. Audit attribution, repository
-health and accepted-head reconciliation in #96 are the next implementation boundary.
+Repository foundation issues #92–#96 are complete. Repository-inclusive backup
+and network-isolated restore in #97 are the next implementation boundary.
 Candidate security, pilot, interface, and release acceptance remain owned by
 `0.9.8` and must run against the migrated system.
 
@@ -1689,10 +1689,11 @@ Evidence: `docs/releases/0.8.46.md`.
 
 `0.9.1` progress: repository identity and accepted-head authority (#92),
 persistent local custody and initialization (#93), the bounded repository
-service and commit protocol (#94), and portable workspace manifests plus the
-MSP organization directory (#95) are complete. Audit attribution, repository
-health and accepted-head reconciliation (#96) are next; no remote Git service
-is required or introduced by this boundary.
+service and commit protocol (#94), portable workspace manifests plus the MSP
+organization directory (#95), and audit attribution, safe health and
+accepted-head reconciliation (#96) are complete. Repository-inclusive backup
+and network-isolated restore (#97) are next; no remote Git service is required
+or introduced by this boundary.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

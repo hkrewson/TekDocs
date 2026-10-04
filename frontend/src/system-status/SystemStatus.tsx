@@ -9,6 +9,7 @@ function label(value: string) {
     ready: 'systemStatus.ready',
     stale: 'systemStatus.stale',
     unavailable: 'systemStatus.unavailable',
+    degraded: 'systemStatus.needsAttention',
     not_configured: 'systemStatus.notConfigured',
   }
   return translate(labels[value] ?? 'systemStatus.unavailable')
@@ -55,6 +56,7 @@ export function SystemStatus({ client = browserSystemStatusClient }: { client?: 
           <li><div><strong>{translate('systemStatus.tekdocs')}</strong><span>{translate('systemStatus.versionSummary', { version: diagnostics.application_version })}</span></div><strong>{label('ready')}</strong></li>
           <li><div><strong>{translate('systemStatus.database')}</strong><span>{translate('systemStatus.databaseHelp')}</span></div><strong>{label(diagnostics.database)}</strong></li>
           <li><div><strong>{translate('systemStatus.diagramService')}</strong><span style={{ overflowWrap: 'anywhere' }}>{diagnostics.diagram_renderer.version ?? translate('systemStatus.notReported')}</span><span>{translate('systemStatus.capacityUsed', { used: diagnostics.diagram_renderer.queue.total, capacity: diagnostics.diagram_renderer.capacity })} · {translate('systemStatus.queueSummary', { waiting: diagnostics.diagram_renderer.queue.waiting, processing: diagnostics.diagram_renderer.queue.processing })}</span><span>{translate('systemStatus.lastDiagramCheck')}: {diagnostics.diagram_renderer.last_checked_at ? formatDateTime(new Date(diagnostics.diagram_renderer.last_checked_at)) : translate('systemStatus.notReported')}</span></div><strong>{label(diagnostics.diagram_renderer.status)}</strong></li>
+          <li><div><strong>{translate('systemStatus.repositories')}</strong><span>{translate('systemStatus.repositorySummary', { healthy: diagnostics.repositories.healthy, total: diagnostics.repositories.total, attention: diagnostics.repositories.degraded + diagnostics.repositories.blocked + diagnostics.repositories.unknown })}</span><span>{translate('systemStatus.lastRepositoryCheck')}: {diagnostics.repositories.last_checked_at ? formatDateTime(new Date(diagnostics.repositories.last_checked_at)) : translate('systemStatus.notReported')}</span>{diagnostics.repositories.repair && <span>{translate('systemStatus.repositoryRepairHelp')}</span>}</div><strong>{label(diagnostics.repositories.status)}</strong></li>
         </ol>
         <section className="system-status-errors" aria-labelledby="renderer-errors-heading">
           <div className="section-heading"><h2 id="renderer-errors-heading">{translate('systemStatus.recentDiagramErrors')}</h2></div>

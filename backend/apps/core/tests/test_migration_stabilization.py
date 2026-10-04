@@ -58,6 +58,10 @@ from apps.core.models import (
 from apps.core.organizations import create_organization
 from apps.core.people import create_person
 from apps.core.publications import publish_document, verify_publication
+from apps.core.repository_recovery import (
+    create_repository_recovery_archive,
+    validate_repository_recovery_archive,
+)
 from apps.core.rls_contract import RLS_TABLES
 from apps.core.scoping import DataScope
 from apps.core.sites import archive_site, create_location, create_site
@@ -171,7 +175,9 @@ DOCUMENT_RLS_TABLES = {
 
 
 @pytest.mark.django_db(transaction=True)
-def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_loss(migration_head_restored):
+def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_loss(
+    migration_head_restored, tmp_path
+):
     if connection.vendor != "postgresql":
         pytest.skip("Repository-authority migration validation requires PostgreSQL")
 
@@ -191,6 +197,15 @@ def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_lo
     call_command("migrate", "core", verbosity=0, interactive=False)
     assert Tenant.objects.filter(pk=tenant.id).exists()
     assert Workspace.objects.filter(pk=workspace.id, tenant=tenant).exists()
+
+    repository_root = tmp_path / "repositories"
+    archive = tmp_path / "repositories.tar"
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(repository_root)):
+        call_command("initialize_workspace_repositories", verbosity=0)
+        repository = WorkspaceRepository.objects.get(workspace=workspace)
+        assert repository.accepted_commit is not None
+        manifest = create_repository_recovery_archive(archive)
+        assert validate_repository_recovery_archive(archive) == manifest
 
 
 @pytest.mark.django_db(transaction=True)

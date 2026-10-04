@@ -10,8 +10,8 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issues #92–#96 are complete. Repository-inclusive backup
-and network-isolated restore in #97 are the next implementation boundary.
+Repository foundation issues #92–#97 are complete. The composed repository
+foundation acceptance in #98 is the next implementation boundary.
 Candidate security, pilot, interface, and release acceptance remain owned by
 `0.9.8` and must run against the migrated system.
 

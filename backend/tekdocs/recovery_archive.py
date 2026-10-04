@@ -127,7 +127,11 @@ def main() -> int:
         if arguments.operation == "encrypt":
             if not arguments.label:
                 raise RecoveryArchiveError("Encryption requires an artifact label.")
-            encrypt_stream(sys.stdin.buffer, sys.stdout.buffer, key=key, label=arguments.label)
+            if arguments.input is None:
+                encrypt_stream(sys.stdin.buffer, sys.stdout.buffer, key=key, label=arguments.label)
+            else:
+                with arguments.input.open("rb") as source:
+                    encrypt_stream(source, sys.stdout.buffer, key=key, label=arguments.label)
         elif arguments.operation == "decrypt":
             if not arguments.label or arguments.input is None or arguments.output is None:
                 raise RecoveryArchiveError("Decryption requires a label, input, and output.")

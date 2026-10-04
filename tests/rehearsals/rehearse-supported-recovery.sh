@@ -71,6 +71,8 @@ compose_for "$source_environment" "$source_secrets" up -d --build --wait backend
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  backend python manage.py initialize_workspace_repositories
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
@@ -105,14 +107,32 @@ if ! grep -Eq 'authentication failed|manifest authentication failed' "$work_dire
 fi
 [ ! -e "$restored_secrets-wrong" ]
 
-echo "Restoring into independently named database, media, and secret custody"
+echo "Checking truncated repository artifact rejection before destructive work"
+corrupt_backup="$work_directory/corrupt-backup"
+cp -R "$backup_directory" "$corrupt_backup"
+repositories_size=$(wc -c < "$corrupt_backup/repositories.tdr" | tr -d '[:space:]')
+dd if="$corrupt_backup/repositories.tdr" of="$corrupt_backup/repositories.tdr.truncated" \
+  bs=1 count=$((repositories_size - 1)) 2>/dev/null
+mv "$corrupt_backup/repositories.tdr.truncated" "$corrupt_backup/repositories.tdr"
+if "$repository_root/scripts/tekdocs-restore.sh" --env-file "$restore_environment" \
+  --backup "$corrupt_backup" --key-file "$recovery_key" \
+  --secret-output "$restored_secrets-corrupt" --confirm-destroy "$restore_project" \
+  --network-isolated > "$work_directory/corrupt-repository.log" 2>&1; then
+  echo "Restore accepted a truncated managed-repository artifact." >&2
+  exit 1
+fi
+grep -Eq 'checksum validation failed|authentication failed|truncated' "$work_directory/corrupt-repository.log"
+[ ! -e "$restored_secrets-corrupt" ]
+[ -z "$(compose_for "$restore_environment" "$restored_secrets" ps -q 2>/dev/null)" ]
+
+echo "Restoring without external network access into independent database, media, repository, and secret custody"
 "$repository_root/scripts/tekdocs-restore.sh" --env-file "$restore_environment" \
   --backup "$backup_directory" --key-file "$recovery_key" \
-  --secret-output "$restored_secrets" --confirm-destroy "$restore_project"
+  --secret-output "$restored_secrets" --confirm-destroy "$restore_project" --network-isolated
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported encrypted backup, separate-key, destructive-guard, and restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

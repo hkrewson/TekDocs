@@ -29,6 +29,38 @@ def test_authenticated_archive_round_trip_and_tamper_rejection(tmp_path):
     assert not restored.exists()
 
 
+def test_encrypt_cli_accepts_a_private_input_file(tmp_path, monkeypatch):
+    key = os.urandom(32)
+    key_file = tmp_path / "recovery.key"
+    key_file.write_bytes(base64.urlsafe_b64encode(key))
+    key_file.chmod(0o600)
+    source = tmp_path / "repositories.tar"
+    source.write_bytes(b"repository recovery archive")
+    encrypted = io.BytesIO()
+    monkeypatch.setattr(recovery_archive.sys, "stdout", type("Output", (), {"buffer": encrypted})())
+    monkeypatch.setattr(
+        recovery_archive.sys,
+        "argv",
+        [
+            "recovery_archive",
+            "encrypt",
+            "--key-file",
+            str(key_file),
+            "--label",
+            "repositories",
+            "--input",
+            str(source),
+        ],
+    )
+
+    assert recovery_archive.main() == 0
+    artifact = tmp_path / "repositories.tdr"
+    artifact.write_bytes(encrypted.getvalue())
+    restored = tmp_path / "restored.tar"
+    decrypt_file(artifact, restored, key=key, label="repositories")
+    assert restored.read_bytes() == source.read_bytes()
+
+
 def test_key_and_manifest_contract(tmp_path):
     key = os.urandom(32)
     key_file = tmp_path / "recovery.key"

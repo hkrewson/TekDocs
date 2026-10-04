@@ -205,6 +205,8 @@ permission-denial, logging and health API/browser tests.
 
 ### `V1-REP-006` — Repository-inclusive backup and network-isolated restore (#97)
 
+**Status: complete and locally validated 2026-10-03.**
+
 **Outcome:** extend supported encrypted recovery to the new canonical authored
 content before any content migrates into it.
 

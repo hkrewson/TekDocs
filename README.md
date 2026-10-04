@@ -169,6 +169,16 @@ make supported-recovery-rehearsal
 
 Store the recovery key separately from the backup. Neither is sufficient without the other.
 
+Current recovery sets include PostgreSQL, managed media, every managed local Git
+repository, and the allowlisted deployment secrets. Backup briefly pauses active
+TekDocs writers to keep accepted Git heads aligned with the database snapshot.
+Restore validates all encrypted components and repository bundles before
+destructive work, then verifies the restored repositories against PostgreSQL.
+Use `--network-isolated` during a recovery rehearsal or controlled restore to
+keep the restored stack off external networks until verification is complete.
+GitHub and other optional remotes are replication targets, not backups, and are
+never required for restore.
+
 ## API
 
 The generated API reference is available on a running installation at:

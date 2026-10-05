@@ -91,6 +91,8 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_contentnode",
     "core_contentproperty",
     "core_contentlink",
+    "core_contentinclude",
+    "core_contenttemplatesource",
     "core_contentfinding",
     "core_contentindexattempt",
     "core_dataflow",

@@ -21,6 +21,8 @@ from apps.accounts.models import (
     TenantMembership,
     User,
 )
+from apps.core import repository_service, repository_storage
+from apps.core.content_index import index_repository_content
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
 from apps.core.documents import create_document
@@ -34,6 +36,7 @@ from apps.core.invoicing import (
 )
 from apps.core.models import (
     AuditEvent,
+    ContentNode,
     CustomFieldDefinition,
     DataFlowRevision,
     DataFlowSnapshot,
@@ -333,6 +336,61 @@ def migration_head_restored(transactional_db):
                     cursor.execute("CHECKPOINT")
             except DatabaseError:  # pragma: no cover - requires a non-superuser test role
                 pass
+
+
+@pytest.mark.django_db(transaction=True)
+def test_fragment_composition_upgrade_rebuilds_existing_index_from_accepted_git(
+    migration_head_restored, tmp_path
+):
+    if connection.vendor != "postgresql":
+        pytest.skip("Composition upgrade validation requires PostgreSQL")
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Composition Upgrade MSP",
+            owner_email=f"composition-upgrade-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Composition Upgrade Owner",
+            password=f"{secrets.token_urlsafe(24)}Aa7!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, organization=None)
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        base = repository.accepted_commit.object_id if repository.accepted_commit_id else None
+        content_id = uuid.uuid4()
+        commit = repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=base,
+            changes={
+                "docs/upgrade.md": (
+                    "---\n"
+                    "schema: tekdocs.content/v1\n"
+                    f"id: {content_id}\n"
+                    "kind: document\n"
+                    "title: Upgrade guide\n"
+                    "---\n"
+                    "Content survives migration.\n"
+                ).encode()
+            },
+            message="Add composition upgrade fixture",
+        )
+        index_repository_content(repository_id=repository.id)
+        repository.refresh_from_db()
+        assert repository.indexed_commit.object_id == commit.object_id
+
+        call_command("migrate", "core", "0165_content_graph_index", verbosity=0, interactive=False)
+        call_command("migrate", "core", verbosity=0, interactive=False)
+
+        repository.refresh_from_db()
+        assert repository.indexed_commit_id is None
+        assert ContentNode.objects.get(repository=repository, content_id=content_id).markdown == (
+            "Content survives migration.\n"
+        )
+        index_repository_content(repository_id=repository.id)
+        repository.refresh_from_db()
+        assert repository.indexed_commit.object_id == commit.object_id
+        assert ContentNode.objects.get(repository=repository, content_id=content_id).composition_variants["all"][
+            "markdown"
+        ] == "Content survives migration.\n"
 
 
 @pytest.mark.django_db(transaction=True)

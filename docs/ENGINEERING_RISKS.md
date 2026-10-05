@@ -218,6 +218,24 @@ cross-repository targets remain unresolved without revealing foreign content.
 The index does not transclude. Directed acyclic ordered inclusion, expansion
 budgets and live/pinned/copy semantics remain explicitly owned by `0.9.3`.
 
+## 0.9.3 fragment-composition disposition
+
+`TD-RISK-071` is mitigated for the composition boundary with later recurrence.
+Only ordered outgoing `includes` expand Markdown. Pinned references read exact
+retained commits in the same repository; live references use the accepted
+snapshot. Parsing rejects unresolved targets, duplicate identities and
+unsupported metadata. Expansion rejects cycles, audience widening, excessive
+depth, node count and bytes. All failures retain the prior indexed graph, and
+where-used backlinks never control rendering. Client portal users cannot read
+the raw repository graph; later authorized read paths and publication parity
+remain assigned to `0.9.4` and `0.9.7`.
+
+`TD-RISK-069` remains mitigated for indexing. A schema migration invalidates
+the old indexed-head marker so existing repositories rebuild the new derived
+composition projection from their accepted commit. It does not change Git
+authority or legacy document storage. `TD-RISK-070` retains the repository
+custody and future audience-read owners named above.
+
 ## 0.8.43 money-foundation disposition
 
 `TD-RISK-063` is **mitigated with recurring owners through `0.9.0`**. One arithmetic module now rejects floats, unknown/withdrawn codes, excess minor-unit precision, and non-finite values; its registry exactly matches the usable numeric-minor-unit entries in the ISO maintenance agency's 2026-01-01 List One. Explicit commercial rounding and full-registry property generation prove rendered line, tax, subtotal, and total strings reconcile. `TD-RISK-064` through `TD-RISK-066` remain future invoice-numbering, immutability, and client-disclosure obligations; this slice creates no invoice, number, issue, delivery, payment, or portal path.

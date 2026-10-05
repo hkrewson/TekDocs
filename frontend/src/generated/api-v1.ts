@@ -9296,6 +9296,11 @@ export interface components {
             /** @default 60 */
             readonly sync_interval_minutes: number;
         };
+        readonly ContentDerivedFrom: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly commit: string;
+        };
         readonly ContentGraph: {
             readonly accepted_commit: string | null;
             readonly indexed_commit: string | null;
@@ -9332,6 +9337,13 @@ export interface components {
             readonly topic: {
                 readonly [key: string]: unknown;
             } | null;
+            readonly composition: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly derived_from: components["schemas"]["ContentDerivedFrom"] | null;
+            readonly includes: readonly components["schemas"]["ContentInclude"][];
+            readonly included_by: readonly string[];
+            readonly template_sources: readonly components["schemas"]["ContentTemplateSource"][];
             readonly outgoing_links: readonly components["schemas"]["ContentGraphLink"][];
             readonly backlinks: readonly string[];
             readonly findings: readonly components["schemas"]["ContentGraphFinding"][];
@@ -9340,6 +9352,26 @@ export interface components {
             /** @default false */
             readonly force: boolean;
         };
+        readonly ContentInclude: {
+            /** Format: uuid */
+            readonly target_id: string;
+            /**
+             * @description * `live` - live
+             *     * `pinned` - pinned
+             * @enum {string}
+             */
+            readonly mode: "live" | "pinned";
+            /**
+             * @description * `shared` - shared
+             *     * `msp_internal` - msp_internal
+             *     * `client_visible` - client_visible
+             * @enum {string}
+             */
+            readonly audience: "shared" | "msp_internal" | "client_visible";
+            readonly pinned_commit: string | null;
+            readonly resolved_commit: string;
+            readonly resolved_digest: string;
+        };
         readonly ContentIndexAttempt: {
             readonly commit: string;
             readonly status: string;
@@ -9347,6 +9379,22 @@ export interface components {
                 readonly [key: string]: unknown;
             }[];
             readonly projection_digest: string | null;
+        };
+        readonly ContentTemplateSource: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly commit: string;
+            readonly pinned_digest: string;
+            readonly current_digest: string | null;
+            readonly title: string;
+            /**
+             * @description * `current` - current
+             *     * `changed` - changed
+             *     * `missing` - missing
+             * @enum {string}
+             */
+            readonly state: "current" | "changed" | "missing";
+            readonly change_preview: string;
         };
         readonly Contract: {
             /** Format: uuid */
@@ -22801,7 +22849,14 @@ export interface operations {
     };
     readonly content_graph_msp_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `all` - all
+                 *     * `msp_internal` - msp_internal
+                 *     * `client_visible` - client_visible
+                 */
+                readonly audience?: "all" | "msp_internal" | "client_visible";
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -29276,7 +29331,14 @@ export interface operations {
     };
     readonly content_graph_organization_retrieve: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /**
+                 * @description * `all` - all
+                 *     * `msp_internal` - msp_internal
+                 *     * `client_visible` - client_visible
+                 */
+                readonly audience?: "all" | "msp_internal" | "client_visible";
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

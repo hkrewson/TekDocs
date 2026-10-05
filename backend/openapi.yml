@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.2
+  version: 0.9.3
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -9118,6 +9118,22 @@ paths:
   /api/v1/workspaces/msp/content-graph:
     get:
       operationId: content_graph_msp_retrieve
+      parameters:
+      - in: query
+        name: audience
+        schema:
+          enum:
+          - all
+          - msp_internal
+          - client_visible
+          type: string
+          x-spec-enum-id: 71238796a6f8f8ed
+          default: all
+          minLength: 1
+        description: |-
+          * `all` - all
+          * `msp_internal` - msp_internal
+          * `client_visible` - client_visible
       tags:
       - workspaces
       security:
@@ -18464,6 +18480,21 @@ paths:
     get:
       operationId: content_graph_organization_retrieve
       parameters:
+      - in: query
+        name: audience
+        schema:
+          enum:
+          - all
+          - msp_internal
+          - client_visible
+          type: string
+          x-spec-enum-id: 71238796a6f8f8ed
+          default: all
+          minLength: 1
+        description: |-
+          * `all` - all
+          * `msp_internal` - msp_internal
+          * `client_visible` - client_visible
       - in: path
         name: organization_entity_id
         schema:
@@ -34986,6 +35017,17 @@ components:
       required:
       - name
       - provider
+    ContentDerivedFrom:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        commit:
+          type: string
+      required:
+      - commit
+      - id
     ContentGraph:
       type: object
       properties:
@@ -35065,6 +35107,27 @@ components:
           type: object
           additionalProperties: {}
           nullable: true
+        composition:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        derived_from:
+          allOf:
+          - $ref: '#/components/schemas/ContentDerivedFrom'
+          nullable: true
+        includes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentInclude'
+        included_by:
+          type: array
+          items:
+            type: string
+            format: uuid
+        template_sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentTemplateSource'
         outgoing_links:
           type: array
           items:
@@ -35080,14 +35143,19 @@ components:
             $ref: '#/components/schemas/ContentGraphFinding'
       required:
       - backlinks
+      - composition
+      - derived_from
       - findings
       - id
+      - included_by
+      - includes
       - kind
       - markdown
       - outgoing_links
       - path
       - properties
       - taxonomies
+      - template_sources
       - title
       - topic
     ContentGraphRebuild:
@@ -35096,6 +35164,46 @@ components:
         force:
           type: boolean
           default: false
+    ContentInclude:
+      type: object
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        mode:
+          enum:
+          - live
+          - pinned
+          type: string
+          description: |-
+            * `live` - live
+            * `pinned` - pinned
+          x-spec-enum-id: 82c1e4db01ac712d
+        audience:
+          enum:
+          - shared
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `shared` - shared
+            * `msp_internal` - msp_internal
+            * `client_visible` - client_visible
+          x-spec-enum-id: afc42d5bc04abd63
+        pinned_commit:
+          type: string
+          nullable: true
+        resolved_commit:
+          type: string
+        resolved_digest:
+          type: string
+      required:
+      - audience
+      - mode
+      - pinned_commit
+      - resolved_commit
+      - resolved_digest
+      - target_id
     ContentIndexAttempt:
       type: object
       properties:
@@ -35116,6 +35224,42 @@ components:
       - diagnostics
       - projection_digest
       - status
+    ContentTemplateSource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        commit:
+          type: string
+        pinned_digest:
+          type: string
+        current_digest:
+          type: string
+          nullable: true
+        title:
+          type: string
+        state:
+          enum:
+          - current
+          - changed
+          - missing
+          type: string
+          description: |-
+            * `current` - current
+            * `changed` - changed
+            * `missing` - missing
+          x-spec-enum-id: 5f68406dc1db3b1b
+        change_preview:
+          type: string
+      required:
+      - change_preview
+      - commit
+      - current_digest
+      - id
+      - pinned_digest
+      - state
+      - title
     Contract:
       type: object
       properties:

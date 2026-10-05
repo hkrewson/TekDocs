@@ -10,9 +10,10 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issues #92–#98 and Markdown/index issue #101 are complete,
-and the application is at the `0.9.2` content-index checkpoint. File-backed
-reusable fragment composition in #102 is the next implementation boundary.
+Repository foundation issues #92–#98, Markdown/index issue #101 and reusable
+fragment composition issue #102 are complete. The application is at the
+`0.9.3` composition checkpoint. Operational entity context and read paths in
+#103 are the next implementation boundary.
 Candidate security, pilot, interface, and release acceptance remain owned by
 `0.9.8` and must run against the migrated system.
 
@@ -46,6 +47,7 @@ Core-code decomposition under #40 produced the seams needed for the migration: p
 | `0.9.0` | Current-line closeout: invoice boundary, non-document acceptance and explicit transfer of storage-specific work. |
 | `0.9.1` | Isolated managed local repositories, accepted-head authority, portable identity, reconciliation and complete network-independent recovery. |
 | `0.9.2` | Strict portable Markdown/frontmatter, bounded wikilinks, and a deterministic authorization-scoped projection of accepted Git content. |
+| `0.9.3` | Ordered live and pinned fragment inclusion, independent-copy provenance, audience expansion, where-used backlinks and exact template-source previews. |
 | `1.0.0` | Git-backed Markdown content graph, migrated reusable composition and a proven authorization/recovery contract. |
 
 ## Foundation and authentication: `0.0.x` → `0.1.0`
@@ -1698,7 +1700,11 @@ properties, outgoing links, backlinks, unresolved-link findings and indexed
 commit identity. Full rebuild is deterministic, invalid commits retain the
 last-known-good projection, and forced RLS plus centralized document policy
 protect both index and API reads. Existing database-authored documents have not
-yet migrated. Issue #102 owns ordered fragment composition in `0.9.3`.
+yet migrated. `0.9.3` adds ordered, nested live/pinned fragment inclusion,
+independent-copy provenance, bounded audience-specific expansion, where-used
+backlinks, exact source manifests, and current/changed/missing template-source
+previews. Invalid composition preserves the last-known-good index. Issue #103
+owns operational entity context and authorized reading/search in `0.9.4`.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

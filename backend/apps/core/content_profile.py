@@ -22,13 +22,31 @@ MAX_FRONTMATTER_DEPTH = 8
 MAX_FRONTMATTER_NODES = 512
 MAX_LINKS = 256
 MAX_PROPERTIES = 64
+MAX_INCLUDES = 128
+MAX_TEMPLATE_SOURCES = 128
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
 FRAGMENT_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,119}$")
+GIT_OBJECT_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 WIKILINK_PATTERN = re.compile(
     r"\[\[(?P<target>[0-9a-fA-F-]{36})(?:#(?P<fragment>[a-z][a-z0-9_-]{0,119}))?"
     r"(?:\|(?P<label>[^\]\r\n]{1,240}))?\]\]"
 )
-ALLOWED_FIELDS = frozenset({"schema", "id", "kind", "title", "topic", "taxonomies", "properties"})
+ALLOWED_FIELDS = frozenset(
+    {
+        "schema",
+        "id",
+        "kind",
+        "title",
+        "topic",
+        "taxonomies",
+        "properties",
+        "includes",
+        "derived_from",
+        "template_sources",
+    }
+)
+INCLUDE_MODES = frozenset({"live", "pinned"})
+AUDIENCE_PROFILES = frozenset({"shared", "msp_internal", "client_visible"})
 
 
 class ContentProfileError(ValueError):
@@ -66,6 +84,28 @@ class ParsedLink:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedInclude:
+    target_content_id: uuid.UUID
+    mode: str
+    audience: str
+    pinned_object_id: str
+    ordinal: int
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedContentReference:
+    content_id: uuid.UUID
+    object_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedTemplateSource:
+    content_id: uuid.UUID
+    object_id: str
+    ordinal: int
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedContent:
     content_id: uuid.UUID
     kind: str
@@ -77,6 +117,9 @@ class ParsedContent:
     topic_type: str
     topic_schema_version: int | None
     links: tuple[ParsedLink, ...]
+    includes: tuple[ParsedInclude, ...]
+    derived_from: ParsedContentReference | None
+    template_sources: tuple[ParsedTemplateSource, ...]
     findings: tuple[dict[str, Any], ...]
     content_digest: str
 
@@ -180,13 +223,88 @@ def _parse_links(markdown: str) -> tuple[ParsedLink, ...]:
     return tuple(links)
 
 
+def _uuid(value: Any, *, code: str, message: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError) as exc:
+        raise ContentProfileError(code, message) from exc
+
+
+def _object_id(value: Any, *, code: str, message: str) -> str:
+    if not isinstance(value, str) or GIT_OBJECT_PATTERN.fullmatch(value) is None:
+        raise ContentProfileError(code, message)
+    return value
+
+
+def _parse_includes(value: Any) -> tuple[ParsedInclude, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > MAX_INCLUDES:
+        raise ContentProfileError("include.shape", "Includes must be a bounded ordered list")
+    includes: list[ParsedInclude] = []
+    for ordinal, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ContentProfileError("include.shape", "Each include must be a mapping")
+        mode = item.get("mode")
+        expected_fields = {"id", "mode", "audience", "commit"} if mode == "pinned" else {"id", "mode", "audience"}
+        if set(item) != expected_fields or mode not in INCLUDE_MODES:
+            raise ContentProfileError("include.shape", "Include fields or resolution mode are invalid")
+        audience = item.get("audience")
+        if audience not in AUDIENCE_PROFILES:
+            raise ContentProfileError("include.audience", "Include audience is unsupported")
+        includes.append(
+            ParsedInclude(
+                target_content_id=_uuid(item.get("id"), code="include.target", message="Include target must be a UUID"),
+                mode=mode,
+                audience=audience,
+                pinned_object_id=(
+                    _object_id(
+                        item.get("commit"),
+                        code="include.commit",
+                        message="Pinned include commit is invalid",
+                    )
+                    if mode == "pinned"
+                    else ""
+                ),
+                ordinal=ordinal,
+            )
+        )
+    return tuple(includes)
+
+
+def _parse_reference(value: Any, *, field: str) -> ParsedContentReference | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or set(value) != {"id", "commit"}:
+        raise ContentProfileError(f"{field}.shape", f"{field} must contain an id and exact commit")
+    return ParsedContentReference(
+        content_id=_uuid(value.get("id"), code=f"{field}.target", message=f"{field} target must be a UUID"),
+        object_id=_object_id(value.get("commit"), code=f"{field}.commit", message=f"{field} commit is invalid"),
+    )
+
+
+def _parse_template_sources(value: Any) -> tuple[ParsedTemplateSource, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > MAX_TEMPLATE_SOURCES:
+        raise ContentProfileError("template_source.shape", "Template sources must be a bounded ordered list")
+    sources: list[ParsedTemplateSource] = []
+    for ordinal, item in enumerate(value):
+        reference = _parse_reference(item, field="template_source")
+        if reference is None:  # pragma: no cover - list entries cannot be null
+            raise ContentProfileError("template_source.shape", "Template source is invalid")
+        sources.append(ParsedTemplateSource(reference.content_id, reference.object_id, ordinal))
+    return tuple(sources)
+
+
 def parse_content(source: bytes) -> ParsedContent:
     frontmatter_text, markdown = _split_source(source)
     frontmatter = _parse_frontmatter(frontmatter_text)
     try:
-        content_id = uuid.UUID(str(frontmatter["id"]))
-    except (KeyError, ValueError, TypeError) as exc:
+        raw_content_id = frontmatter["id"]
+    except KeyError as exc:
         raise ContentProfileError("frontmatter.id", "Content id must be a UUID") from exc
+    content_id = _uuid(raw_content_id, code="frontmatter.id", message="Content id must be a UUID")
     kind = frontmatter.get("kind")
     if kind not in ContentNodeKind.values:
         raise ContentProfileError("frontmatter.kind", "Content kind must be document or fragment")
@@ -231,6 +349,13 @@ def parse_content(source: bytes) -> ParsedContent:
         findings.extend(inspect_markdown(topic_type, markdown))
 
     links = _parse_links(markdown)
+    includes = _parse_includes(frontmatter.get("includes"))
+    derived_from = _parse_reference(frontmatter.get("derived_from"), field="derived_from")
+    template_sources = _parse_template_sources(frontmatter.get("template_sources"))
+    if derived_from is not None and kind != ContentNodeKind.FRAGMENT:
+        raise ContentProfileError("derived_from.kind", "Only fragments may record independent-copy provenance")
+    if template_sources and kind != ContentNodeKind.DOCUMENT:
+        raise ContentProfileError("template_source.kind", "Only documents may define template sources")
     canonical = {
         "frontmatter": frontmatter,
         "links": [
@@ -256,6 +381,9 @@ def parse_content(source: bytes) -> ParsedContent:
         topic_type=topic_type,
         topic_schema_version=topic_version,
         links=links,
+        includes=includes,
+        derived_from=derived_from,
+        template_sources=template_sources,
         findings=tuple(findings),
         content_digest=digest,
     )

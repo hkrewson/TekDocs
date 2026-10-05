@@ -7,8 +7,9 @@ Release baseline: version `0.9.0`, committed with this completed work package
 Owning plan: [`v1-markdown-content-graph.md`](v1-markdown-content-graph.md)
 
 Implementation update: issues #92–#98 completed the `0.9.1` repository
-foundation, and issue #101 completed the `0.9.2` Markdown profile and rebuildable
-index on 2026-10-05. Issue #102 is now the next ordered boundary.
+foundation, issue #101 completed the `0.9.2` Markdown profile and rebuildable
+index, and issue #102 completed `0.9.3` fragment composition on 2026-10-05.
+Issue #103 is now the next ordered boundary.
 
 ## Outcome
 
@@ -332,3 +333,28 @@ tests have a named local target and remain part of the release gate's sharded
 PostgreSQL suite. Existing database document authoring is unchanged; composition
 moves to #102, authorized entity context and search to #103, managed writes to
 #104, and migration to #105.
+
+## `0.9.3` implementation closeout — issue #102
+
+`V1-COMP-001` is complete and locally validated. Documents and fragments now
+own explicit ordered outgoing `includes` with live or exact retained-commit
+pins and three audience profiles. Nested expansion uses a bounded directed
+graph and records an exact source manifest. Independent copies have new UUIDs
+with optional original ID/commit provenance. Template source manifests retain
+exact Git references and project current, changed or missing previews; legacy
+enrollment and rollout decisions stay in PostgreSQL.
+
+Cycle, depth, node-count, byte, audience, scope and pin failures reject the
+whole accepted commit and preserve the previous graph. Derived include and
+template rows have exact-workspace database guards and forced RLS. The raw
+graph API remains restricted to MSP staff; client portal reads continue through
+approved publication paths. A new migration clears the prior indexed-head
+marker so existing repositories rebuild the expanded projection from their
+accepted Git commit. Existing database-authored documents remain untouched.
+
+The focused composition gate covers parser, nested resolution, pins, copies,
+audiences, template previews, deterministic rebuild, rollback, client denial,
+cross-repository rejection and runtime-role isolation. The migration upgrade
+test covers an indexed pre-composition repository through reindexing. Issue
+#103 owns operational entity context and authorized read/search paths; #104
+owns managed Git authoring; #105 owns document migration.

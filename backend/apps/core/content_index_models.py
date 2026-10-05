@@ -20,6 +20,23 @@ class ContentIndexStatus(models.TextChoices):
     REJECTED = "rejected", "Rejected"
 
 
+class ContentIncludeMode(models.TextChoices):
+    LIVE = "live", "Live"
+    PINNED = "pinned", "Pinned"
+
+
+class ContentAudienceProfile(models.TextChoices):
+    SHARED = "shared", "Shared"
+    MSP_INTERNAL = "msp_internal", "MSP internal"
+    CLIENT_VISIBLE = "client_visible", "Client visible"
+
+
+class ContentTemplateSourceState(models.TextChoices):
+    CURRENT = "current", "Current"
+    CHANGED = "changed", "Changed"
+    MISSING = "missing", "Missing"
+
+
 class ContentNode(TimestampedModel):
     """One parsed document or reusable fragment at a repository's indexed head."""
 
@@ -41,6 +58,9 @@ class ContentNode(TimestampedModel):
     topic_type = models.CharField(max_length=32, blank=True)
     topic_schema_version = models.PositiveSmallIntegerField(null=True, blank=True)
     content_digest = models.CharField(max_length=64)
+    composition_variants = models.JSONField(default=dict)
+    derived_from_content_id = models.UUIDField(null=True, blank=True)
+    derived_from_object_id = models.CharField(max_length=64, blank=True)
 
     objects = models.Manager()
     scoped = OrganizationScopedManager()
@@ -114,6 +134,98 @@ class ContentLink(models.Model):
 
     def __str__(self) -> str:
         return f"{self.source_id}:{self.ordinal}"
+
+
+class ContentInclude(models.Model):
+    """One ordered reusable-fragment edge and its exact resolved source."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="content_includes")
+    organization = models.ForeignKey(
+        "core.Organization", on_delete=models.CASCADE, related_name="content_includes", null=True, blank=True
+    )
+    workspace = models.ForeignKey("core.Workspace", on_delete=models.CASCADE, related_name="content_includes")
+    source = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="includes")
+    target = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="included_by", null=True, blank=True)
+    target_content_id = models.UUIDField()
+    ordinal = models.PositiveIntegerField()
+    resolution_mode = models.CharField(max_length=12, choices=ContentIncludeMode.choices)
+    audience_profile = models.CharField(max_length=24, choices=ContentAudienceProfile.choices)
+    pinned_object_id = models.CharField(max_length=64, blank=True)
+    resolved_object_id = models.CharField(max_length=64)
+    resolved_content_digest = models.CharField(max_length=64)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("source_id", "ordinal", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "ordinal"), name="content_include_ordinal_unique"),
+            models.CheckConstraint(
+                condition=models.Q(resolution_mode__in=ContentIncludeMode.values),
+                name="content_include_mode_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(audience_profile__in=ContentAudienceProfile.values),
+                name="content_include_audience_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(resolution_mode=ContentIncludeMode.LIVE, pinned_object_id="")
+                    | (models.Q(resolution_mode=ContentIncludeMode.PINNED) & ~models.Q(pinned_object_id=""))
+                ),
+                name="content_include_pin_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "target_content_id"), name="core_contentincl_target_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.source_id}:{self.ordinal}"
+
+
+class ContentTemplateSource(models.Model):
+    """An exact Git-backed template source plus its current conflict preview."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="content_template_sources")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.CASCADE,
+        related_name="content_template_sources",
+        null=True,
+        blank=True,
+    )
+    workspace = models.ForeignKey("core.Workspace", on_delete=models.CASCADE, related_name="content_template_sources")
+    template = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="template_sources")
+    current_target = models.ForeignKey(
+        ContentNode, on_delete=models.CASCADE, related_name="template_source_for", null=True, blank=True
+    )
+    source_content_id = models.UUIDField()
+    ordinal = models.PositiveIntegerField()
+    pinned_object_id = models.CharField(max_length=64)
+    pinned_content_digest = models.CharField(max_length=64)
+    pinned_title = models.CharField(max_length=240)
+    current_content_digest = models.CharField(max_length=64, blank=True)
+    state = models.CharField(max_length=16, choices=ContentTemplateSourceState.choices)
+    change_preview = models.TextField(blank=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("template_id", "ordinal", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("template", "ordinal"), name="content_template_source_ordinal_unique"),
+            models.CheckConstraint(
+                condition=models.Q(state__in=ContentTemplateSourceState.values),
+                name="content_template_source_state_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "source_content_id"), name="core_contenttplsrc_target_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.template_id}:{self.ordinal}"
 
 
 class ContentFinding(models.Model):

@@ -56,6 +56,7 @@ MAX_FILE_BYTES = 1024 * 1024
 MAX_COMMIT_BYTES = 4 * 1024 * 1024
 MAX_COMMIT_PATHS = 128
 MAX_INDEX_PATHS = 2048
+MAX_PINNED_SNAPSHOT_BYTES = 16 * 1024 * 1024
 MAX_PATH_BYTES = 512
 MAX_MESSAGE_BYTES = 240
 REGULAR_FILE_MODE = "100644"
@@ -833,6 +834,39 @@ def read_accepted_repository_markdown_files(
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         return commit, tuple((path, git.read_file(accepted, path)) for path in git.markdown_paths(accepted))
+
+
+def read_repository_markdown_files_at_commit(
+    *, repository_id: uuid.UUID, object_id: str
+) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
+    """Read one retained commit from the selected repository without widening its scope."""
+
+    repository, root, repository_path, object_format = _load_repository(repository_id)
+    validated_object_id = _validate_object_id(object_id, object_format)
+    with _repository_lock(root, repository.id, exclusive=False):
+        repository.refresh_from_db(fields=("accepted_commit",))
+        accepted = _accepted_object(repository, object_format)
+        if accepted is None:
+            raise RepositoryInputError("Repository has no accepted content")
+        git = _GitRepository(repository.id, repository_path, object_format)
+        reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
+        _record_reconciliation(repository, reconciliation)
+        if not accepted_usable:
+            raise RepositoryReconciliationError("Accepted repository content is unavailable")
+        try:
+            commit = RepositoryCommit.objects.get(repository=repository, object_id=validated_object_id)
+        except RepositoryCommit.DoesNotExist as exc:
+            raise RepositoryFileNotFoundError("Repository commit is unavailable") from exc
+        git.verify_commit(validated_object_id)
+        files: list[tuple[str, bytes]] = []
+        total_bytes = 0
+        for path in git.markdown_paths(validated_object_id):
+            content = git.read_file(validated_object_id, path)
+            total_bytes += len(content)
+            if total_bytes > MAX_PINNED_SNAPSHOT_BYTES:
+                raise RepositoryResourceLimitError("Pinned repository snapshot exceeds its size limit")
+            files.append((path, content))
+        return commit, tuple(files)
 
 
 def reconcile_workspace_repository(

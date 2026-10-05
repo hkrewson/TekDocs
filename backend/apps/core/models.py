@@ -9,13 +9,18 @@ from django.db import models, transaction
 from django.db.models.functions import Lower
 from django.utils import timezone
 
+from .content_index_models import ContentAudienceProfile as ContentAudienceProfile
 from .content_index_models import ContentFinding as ContentFinding
+from .content_index_models import ContentInclude as ContentInclude
+from .content_index_models import ContentIncludeMode as ContentIncludeMode
 from .content_index_models import ContentIndexAttempt as ContentIndexAttempt
 from .content_index_models import ContentIndexStatus as ContentIndexStatus
 from .content_index_models import ContentLink as ContentLink
 from .content_index_models import ContentNode as ContentNode
 from .content_index_models import ContentNodeKind as ContentNodeKind
 from .content_index_models import ContentProperty as ContentProperty
+from .content_index_models import ContentTemplateSource as ContentTemplateSource
+from .content_index_models import ContentTemplateSourceState as ContentTemplateSourceState
 from .document_key_models import DocumentKeyBinding as DocumentKeyBinding
 from .document_source_models import DocumentRemoteObservation as DocumentRemoteObservation
 from .document_source_models import DocumentRemoteSource as DocumentRemoteSource

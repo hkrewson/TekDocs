@@ -59,3 +59,59 @@ def test_malformed_wikilinks_fail_while_code_examples_remain_literal():
 
     parsed = parse_content(_source(content_id=uuid.uuid4(), body="```text\n[[not-an-id]]\n```\n"))
     assert parsed.links == ()
+
+
+def test_profile_parses_ordered_live_pinned_copy_and_template_source_metadata():
+    live_id = uuid.uuid4()
+    pinned_id = uuid.uuid4()
+    source_id = uuid.uuid4()
+    pinned_commit = "a" * 40
+    parsed = parse_content(
+        _source(
+            content_id=uuid.uuid4(),
+            extra=(
+                "includes:\n"
+                f"  - id: {live_id}\n"
+                "    mode: live\n"
+                "    audience: shared\n"
+                f"  - id: {pinned_id}\n"
+                "    mode: pinned\n"
+                "    audience: msp_internal\n"
+                f"    commit: {pinned_commit}\n"
+                "template_sources:\n"
+                f"  - id: {source_id}\n"
+                f"    commit: {pinned_commit}\n"
+            ),
+            body="Template body.\n",
+        )
+    )
+
+    assert [(item.target_content_id, item.mode, item.audience) for item in parsed.includes] == [
+        (live_id, "live", "shared"),
+        (pinned_id, "pinned", "msp_internal"),
+    ]
+    assert parsed.includes[1].pinned_object_id == pinned_commit
+    assert [(item.content_id, item.object_id) for item in parsed.template_sources] == [(source_id, pinned_commit)]
+
+
+@pytest.mark.parametrize(
+    ("extra", "code"),
+    (
+        (
+            f"includes:\n  - id: {uuid.uuid4()}\n    mode: live\n    audience: shared\n    commit: {'a' * 40}\n",
+            "include.shape",
+        ),
+        (
+            f"includes:\n  - id: {uuid.uuid4()}\n    mode: pinned\n    audience: everyone\n    commit: {'a' * 40}\n",
+            "include.audience",
+        ),
+        (
+            f"derived_from:\n  id: {uuid.uuid4()}\n  commit: {'A' * 40}\n",
+            "derived_from.commit",
+        ),
+    ),
+)
+def test_profile_rejects_ambiguous_or_unbounded_composition_metadata(extra: str, code: str):
+    with pytest.raises(ContentProfileError) as captured:
+        parse_content(_source(content_id=uuid.uuid4(), body="Body.\n", extra=extra))
+    assert captured.value.code == code

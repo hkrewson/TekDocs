@@ -81,6 +81,34 @@ the backend container. Add `--force` to verify and replace an already-current
 projection. Normal managed authoring will invoke this service in a later
 checkpoint; `0.9.2` does not migrate the existing document store.
 
+### Version 1 fragment composition
+
+The `0.9.3` checkpoint adds ordered `includes` to document and fragment
+frontmatter. Each include names a fragment UUID, a `shared`, `msp_internal`, or
+`client_visible` audience, and a `live` or `pinned` resolution mode. Pinned
+includes also name the exact retained Git commit. Fragment files live under
+the reserved `fragments/` directory. For example:
+
+```yaml
+includes:
+  - id: fa31a88f-c766-47d1-82bf-6a91859f2ef0
+    mode: live
+    audience: shared
+  - id: 18849678-16a8-460a-a887-69d0b3c275ae
+    mode: pinned
+    audience: msp_internal
+    commit: 0123456789abcdef0123456789abcdef01234567
+```
+
+An independent copy is a new fragment with its own UUID and optional
+`derived_from: {id, commit}` provenance. A document may also list exact
+`template_sources: [{id, commit}]`; the index reports whether each source is
+current, changed, or missing without changing template enrollment decisions.
+The index stores exact source manifests and audience-specific expansions, and
+rejects cycles, missing or foreign pins, audience widening, excessive depth,
+node count, or expanded size. The current database-backed editor remains in
+place until the managed authoring and migration checkpoints.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

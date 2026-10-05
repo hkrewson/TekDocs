@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.1
+  version: 0.9.2
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -9108,6 +9108,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceRisk'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph:
+    get:
+      operationId: content_graph_msp_retrieve
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: content_graph_msp_rebuild
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentGraph'
           description: ''
           headers:
             X-Request-ID:
@@ -18401,6 +18453,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceRisk'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph:
+    get:
+      operationId: content_graph_organization_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: content_graph_organization_rebuild
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContentGraphRebuild'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentGraph'
           description: ''
           headers:
             X-Request-ID:
@@ -34868,6 +34986,136 @@ components:
       required:
       - name
       - provider
+    ContentGraph:
+      type: object
+      properties:
+        accepted_commit:
+          type: string
+          nullable: true
+        indexed_commit:
+          type: string
+          nullable: true
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentGraphNode'
+        latest_attempt:
+          allOf:
+          - $ref: '#/components/schemas/ContentIndexAttempt'
+          nullable: true
+      required:
+      - accepted_commit
+      - indexed_commit
+      - latest_attempt
+      - nodes
+    ContentGraphFinding:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+        detail:
+          type: object
+          additionalProperties: {}
+      required:
+      - code
+      - detail
+      - severity
+    ContentGraphLink:
+      type: object
+      properties:
+        target_id:
+          type: string
+          format: uuid
+        fragment:
+          type: string
+          nullable: true
+        label:
+          type: string
+          nullable: true
+        resolved:
+          type: boolean
+      required:
+      - fragment
+      - label
+      - resolved
+      - target_id
+    ContentGraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+        markdown:
+          type: string
+        properties:
+          type: object
+          additionalProperties: {}
+        taxonomies:
+          type: object
+          additionalProperties: {}
+        topic:
+          type: object
+          additionalProperties: {}
+          nullable: true
+        outgoing_links:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentGraphLink'
+        backlinks:
+          type: array
+          items:
+            type: string
+            format: uuid
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentGraphFinding'
+      required:
+      - backlinks
+      - findings
+      - id
+      - kind
+      - markdown
+      - outgoing_links
+      - path
+      - properties
+      - taxonomies
+      - title
+      - topic
+    ContentGraphRebuild:
+      type: object
+      properties:
+        force:
+          type: boolean
+          default: false
+    ContentIndexAttempt:
+      type: object
+      properties:
+        commit:
+          type: string
+        status:
+          type: string
+        diagnostics:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        projection_digest:
+          type: string
+          nullable: true
+      required:
+      - commit
+      - diagnostics
+      - projection_digest
+      - status
     Contract:
       type: object
       properties:

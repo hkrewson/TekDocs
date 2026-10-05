@@ -198,6 +198,26 @@ The implementation audit corrected the historical `0.5.0` generated-topology cla
 | `TD-RISK-070` | Raw repository access can bypass TekDocs authorization and retain sensitive history. | Filesystem or remote Git readers do not pass through workspace policy, RLS, client audience checks or deletion workflows. Git also preserves earlier bytes after a normal edit or deletion. A shared repository, broadly mounted volume or casually configured remote could expose one client's documentation, secrets or historical sensitive text to another. | Use one protected managed repository per MSP/client workspace, keep secrets and managed attachments outside canonical Markdown, expose normal reads only through policy-aware TekDocs services, and document raw repository access as operator-equivalent custody rather than an application role. Keep sanitized export separate from canonical repository access and require an explicit reviewed process for destructive history rewriting if legally necessary. | Custody boundary `0.9.1`; entity/audience reads `0.9.4`; operations and recovery `0.9.7`; final recurrence `0.9.8` |
 | `TD-RISK-071` | Content-graph composition can create cycles, unbounded expansion or unauthorized transclusion. | A fragment may include another fragment, and links/backlinks may cross many records. If incoming links drive rendering, resolution ignores workspace/audience policy, or recursion is unbounded, a small edit can produce nondeterministic documents, denial of service or disclosure of content the viewer could not open directly. | Render only explicit ordered outgoing inclusions; backlinks are informational. Validate a directed acyclic inclusion graph, bound depth, node count and expanded bytes, and authorize every resolved node for the selected workspace and audience. Live inclusions resolve one accepted graph snapshot; pinned inclusions and publications resolve exact retained Git objects. Reject unresolved, cyclic and denied inclusions with deterministic diagnostics. | Parser/index `0.9.2`; composition `0.9.3`; authorized reads `0.9.4`; publication proof `0.9.7`; final recurrence `0.9.8` |
 
+## 0.9.2 Markdown/index disposition
+
+`TD-RISK-069` is mitigated for the index boundary with later recurrence. The
+index reads only the database-accepted commit, atomically replaces the complete
+repository projection, stores its exact commit and deterministic digest, and
+retains the last-known-good projection when a newer accepted commit is invalid.
+It never infers authority from the newest Git object. Recovery and publication
+still own their later cross-store proofs.
+
+`TD-RISK-070` remains open through authorized entity/audience reads and final
+operations. The new projection tables are forced-RLS organization data, normal
+API reads require the centralized document permission, and links resolve only
+inside one repository. Raw repository custody remains operator-equivalent.
+
+`TD-RISK-071` is partially mitigated. Wikilinks and file/frontmatter structures
+are bounded, backlinks are informational, unresolved targets are findings, and
+cross-repository targets remain unresolved without revealing foreign content.
+The index does not transclude. Directed acyclic ordered inclusion, expansion
+budgets and live/pinned/copy semantics remain explicitly owned by `0.9.3`.
+
 ## 0.8.43 money-foundation disposition
 
 `TD-RISK-063` is **mitigated with recurring owners through `0.9.0`**. One arithmetic module now rejects floats, unknown/withdrawn codes, excess minor-unit precision, and non-finite values; its registry exactly matches the usable numeric-minor-unit entries in the ISO maintenance agency's 2026-01-01 List One. Explicit commercial rounding and full-registry property generation prove rendered line, tax, subtotal, and total strings reconcile. `TD-RISK-064` through `TD-RISK-066` remain future invoice-numbering, immutability, and client-disclosure obligations; this slice creates no invoice, number, issue, delivery, payment, or portal path.

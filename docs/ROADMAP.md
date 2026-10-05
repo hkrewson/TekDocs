@@ -10,9 +10,9 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issues #92–#98 are complete and the application is at the
-`0.9.1` repository-foundation checkpoint. The Markdown profile, parser and
-rebuildable index in #101 are the next implementation boundary.
+Repository foundation issues #92–#98 and Markdown/index issue #101 are complete,
+and the application is at the `0.9.2` content-index checkpoint. File-backed
+reusable fragment composition in #102 is the next implementation boundary.
 Candidate security, pilot, interface, and release acceptance remain owned by
 `0.9.8` and must run against the migrated system.
 
@@ -45,6 +45,7 @@ Core-code decomposition under #40 produced the seams needed for the migration: p
 | `0.8.0` | Compliance evidence plus domain inventory, renewal tracking, DNS observations, and safe certificate monitoring. |
 | `0.9.0` | Current-line closeout: invoice boundary, non-document acceptance and explicit transfer of storage-specific work. |
 | `0.9.1` | Isolated managed local repositories, accepted-head authority, portable identity, reconciliation and complete network-independent recovery. |
+| `0.9.2` | Strict portable Markdown/frontmatter, bounded wikilinks, and a deterministic authorization-scoped projection of accepted Git content. |
 | `1.0.0` | Git-backed Markdown content graph, migrated reusable composition and a proven authorization/recovery contract. |
 
 ## Foundation and authentication: `0.0.x` → `0.1.0`
@@ -1689,13 +1690,15 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
-`0.9.1` progress: repository identity and accepted-head authority (#92),
-persistent local custody and initialization (#93), the bounded repository
-service and commit protocol (#94), portable workspace manifests plus the MSP
-organization directory (#95), and audit attribution, safe health and
-accepted-head reconciliation (#96) are complete. Repository-inclusive backup
-and network-isolated restore (#97) are next; no remote Git service is required
-or introduced by this boundary.
+`0.9.2` is complete: accepted repository commits are parsed under the strict
+`tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore
+code literals; current taxonomy keys and structured-topic schemas are checked;
+and an exact-workspace PostgreSQL projection supplies nodes, portable
+properties, outgoing links, backlinks, unresolved-link findings and indexed
+commit identity. Full rebuild is deterministic, invalid commits retain the
+last-known-good projection, and forced RLS plus centralized document policy
+protect both index and API reads. Existing database-authored documents have not
+yet migrated. Issue #102 owns ordered fragment composition in `0.9.3`.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

@@ -6,6 +6,10 @@ Architecture input baseline: `35e93ca` at version `0.8.46`
 Release baseline: version `0.9.0`, committed with this completed work package
 Owning plan: [`v1-markdown-content-graph.md`](v1-markdown-content-graph.md)
 
+Implementation update: issues #92–#98 completed the `0.9.1` repository
+foundation, and issue #101 completed the `0.9.2` Markdown profile and rebuildable
+index on 2026-10-05. Issue #102 is now the next ordered boundary.
+
 ## Outcome
 
 The current 1.0 milestone is larger on GitHub than the remaining pre-transition
@@ -306,3 +310,25 @@ backup work then compose through #98.
   missing MAC-to-asset projection, and passes both `0.4.9` upgrade and clean
   backup/restore rehearsals. Destructive removal is explicitly outside this
   boundary; all legacy records remain intact.
+
+## `0.9.2` implementation closeout — issue #101
+
+`V1-CONTENT-001` is complete and locally validated. `tekdocs.content/v1`
+frontmatter gives every repository-backed document or fragment a portable UUID,
+kind, title, bounded portable properties, stable taxonomy keys and optional
+structured-topic schema. Markdown UUID wikilinks are parsed from prose while
+code remains literal.
+
+The accepted Git commit is projected into forced-RLS PostgreSQL nodes,
+properties, outgoing links, backlinks, findings and index-attempt records.
+Projection replacement is atomic and deterministic. Invalid schema, identity,
+taxonomy or link input records sanitized diagnostics but retains the prior
+indexed commit and readable last-known-good graph. The API uses the existing
+`documents.view` and `documents.edit` policy boundaries and never resolves a
+link outside the exact repository.
+
+Focused parser, rebuild, invalid-commit, permission and runtime-role isolation
+tests have a named local target and remain part of the release gate's sharded
+PostgreSQL suite. Existing database document authoring is unchanged; composition
+moves to #102, authorized entity context and search to #103, managed writes to
+#104, and migration to #105.

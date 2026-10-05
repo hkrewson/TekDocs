@@ -46,6 +46,41 @@ publications, audit and operational data. The frozen `0.9.0` runtime remains the
 database-first migration baseline; repository implementation begins in `0.9.1`
 and requires no GitHub organization or hosted Git service.
 
+### Version 1 repository content profile
+
+The `0.9.2` checkpoint defines the first canonical repository content contract.
+Every authored `*.md` file starts with strict, versioned YAML frontmatter and is
+either a `document` or a reusable `fragment`:
+
+```markdown
+---
+schema: tekdocs.content/v1
+id: 8eb6ae2c-0e92-41e9-b0d6-f4e2eab1bfcc
+kind: document
+title: Laptop enrollment
+properties:
+  lifecycle: active
+taxonomies:
+  service-area:
+    - endpoint-management
+---
+
+See [[fa31a88f-c766-47d1-82bf-6a91859f2ef0|Enrollment prerequisites]].
+```
+
+IDs and metadata remain portable in Git. PostgreSQL holds a disposable,
+authorization-scoped projection of the accepted commit: nodes, portable
+properties, outgoing links, backlinks, unresolved-link findings, topic checks,
+and the indexed commit. Rebuilding the projection produces the same digest and
+API result. A structurally invalid accepted commit is recorded as rejected and
+does not replace the last-known-good projection.
+
+For an operator-directed rebuild, run
+`python manage.py index_workspace_content --repository <repository-uuid>` in
+the backend container. Add `--force` to verify and replace an already-current
+projection. Normal managed authoring will invoke this service in a later
+checkpoint; `0.9.2` does not migrate the existing document store.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

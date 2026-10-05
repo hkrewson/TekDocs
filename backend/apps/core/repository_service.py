@@ -55,6 +55,7 @@ MAX_CONFIG_BYTES = 8 * 1024
 MAX_FILE_BYTES = 1024 * 1024
 MAX_COMMIT_BYTES = 4 * 1024 * 1024
 MAX_COMMIT_PATHS = 128
+MAX_INDEX_PATHS = 2048
 MAX_PATH_BYTES = 512
 MAX_MESSAGE_BYTES = 240
 REGULAR_FILE_MODE = "100644"
@@ -422,6 +423,32 @@ class _GitRepository:
             raise RepositoryCommandError("Managed repository returned an incomplete file")
         return content
 
+    def markdown_paths(self, commit_id: str) -> tuple[str, ...]:
+        self.verify_commit(commit_id)
+        _, listing = self._run(
+            "list_markdown_files",
+            ("ls-tree", "-r", "-z", "--full-tree", commit_id),
+            output_limit=MAX_GIT_OUTPUT_BYTES,
+        )
+        paths: list[str] = []
+        for record in listing.split(b"\0"):
+            if not record:
+                continue
+            try:
+                metadata, encoded_path = record.split(b"\t", 1)
+                mode, object_type, _object_id = metadata.split(b" ", 2)
+                path = encoded_path.decode("utf-8")
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise RepositoryCommandError("Managed repository returned an invalid tree") from exc
+            if mode != REGULAR_FILE_MODE.encode() or object_type != b"blob":
+                raise RepositoryInputError("Repository file type is not supported")
+            _validate_path(path)
+            if path.casefold().endswith(".md"):
+                paths.append(path)
+                if len(paths) > MAX_INDEX_PATHS:
+                    raise RepositoryResourceLimitError("Repository exceeds its Markdown file limit")
+        return tuple(sorted(paths))
+
     def write_commit(
         self,
         *,
@@ -784,6 +811,28 @@ def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> byt
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         return git.read_file(accepted, validated_path)
+
+
+def read_accepted_repository_markdown_files(
+    *, repository_id: uuid.UUID
+) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
+    """Read a bounded, stable Markdown snapshot from exactly one accepted commit."""
+
+    repository, root, repository_path, object_format = _load_repository(repository_id)
+    with _repository_lock(root, repository.id, exclusive=False):
+        repository.refresh_from_db(fields=("accepted_commit",))
+        if repository.accepted_commit_id is None:
+            raise RepositoryInputError("Repository has no accepted content")
+        commit = RepositoryCommit.objects.get(pk=repository.accepted_commit_id)
+        accepted = _accepted_object(repository, object_format)
+        if accepted is None:  # pragma: no cover - guarded above
+            raise RepositoryInputError("Repository has no accepted content")
+        git = _GitRepository(repository.id, repository_path, object_format)
+        reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
+        _record_reconciliation(repository, reconciliation)
+        if not accepted_usable:
+            raise RepositoryReconciliationError("Accepted repository content is unavailable")
+        return commit, tuple((path, git.read_file(accepted, path)) for path in git.markdown_paths(accepted))
 
 
 def reconcile_workspace_repository(

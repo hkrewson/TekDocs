@@ -2661,6 +2661,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_graph_msp_retrieve"];
+        readonly put?: never;
+        readonly post: operations["content_graph_msp_rebuild"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/contracts": {
         readonly parameters: {
             readonly query?: never;
@@ -4994,6 +5010,22 @@ export interface paths {
         readonly get?: never;
         readonly put?: never;
         readonly post: operations["organization_compliance_risk_review"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_graph_organization_retrieve"];
+        readonly put?: never;
+        readonly post: operations["content_graph_organization_rebuild"];
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -9263,6 +9295,58 @@ export interface components {
             readonly api_token: string;
             /** @default 60 */
             readonly sync_interval_minutes: number;
+        };
+        readonly ContentGraph: {
+            readonly accepted_commit: string | null;
+            readonly indexed_commit: string | null;
+            readonly nodes: readonly components["schemas"]["ContentGraphNode"][];
+            readonly latest_attempt: components["schemas"]["ContentIndexAttempt"] | null;
+        };
+        readonly ContentGraphFinding: {
+            readonly code: string;
+            readonly severity: string;
+            readonly detail: {
+                readonly [key: string]: unknown;
+            };
+        };
+        readonly ContentGraphLink: {
+            /** Format: uuid */
+            readonly target_id: string;
+            readonly fragment: string | null;
+            readonly label: string | null;
+            readonly resolved: boolean;
+        };
+        readonly ContentGraphNode: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly kind: string;
+            readonly title: string;
+            readonly path: string;
+            readonly markdown: string;
+            readonly properties: {
+                readonly [key: string]: unknown;
+            };
+            readonly taxonomies: {
+                readonly [key: string]: unknown;
+            };
+            readonly topic: {
+                readonly [key: string]: unknown;
+            } | null;
+            readonly outgoing_links: readonly components["schemas"]["ContentGraphLink"][];
+            readonly backlinks: readonly string[];
+            readonly findings: readonly components["schemas"]["ContentGraphFinding"][];
+        };
+        readonly ContentGraphRebuild: {
+            /** @default false */
+            readonly force: boolean;
+        };
+        readonly ContentIndexAttempt: {
+            readonly commit: string;
+            readonly status: string;
+            readonly diagnostics: readonly {
+                readonly [key: string]: unknown;
+            }[];
+            readonly projection_digest: string | null;
         };
         readonly Contract: {
             /** Format: uuid */
@@ -22715,6 +22799,54 @@ export interface operations {
             };
         };
     };
+    readonly content_graph_msp_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentGraph"];
+                };
+            };
+        };
+    };
+    readonly content_graph_msp_rebuild: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ContentGraphRebuild"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ContentGraphRebuild"];
+                readonly "multipart/form-data": components["schemas"]["ContentGraphRebuild"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentGraph"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
@@ -29138,6 +29270,58 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ComplianceRisk"];
+                };
+            };
+        };
+    };
+    readonly content_graph_organization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentGraph"];
+                };
+            };
+        };
+    };
+    readonly content_graph_organization_rebuild: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ContentGraphRebuild"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ContentGraphRebuild"];
+                readonly "multipart/form-data": components["schemas"]["ContentGraphRebuild"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentGraph"];
                 };
             };
         };

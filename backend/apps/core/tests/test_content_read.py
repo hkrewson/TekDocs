@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import uuid
+
+import pytest
+from django.db import transaction
+from django.test import Client, override_settings
+from django.urls import reverse
+
+from apps.accounts.bootstrap import bootstrap_owner
+from apps.core import repository_service, repository_storage
+from apps.core.content_index import index_repository_content
+from apps.core.models import ContentEntityLink, InstallationState, Tenant, Workspace, WorkspaceKind
+from apps.core.organizations import create_organization
+from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
+from apps.core.scoping import DataScope
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
+
+pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def _content(*, content_id: uuid.UUID, title: str, body: str, metadata: str = "", kind: str = "document") -> bytes:
+    return (
+        f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: {kind}\ntitle: {title}\n{metadata}---\n{body}"
+    ).encode()
+
+
+@pytest.fixture
+def read_context(tmp_path):
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Content read MSP",
+            owner_email="content-read-owner@example.invalid",
+            owner_display_name="Content Reader",
+            password="ContentReadPassword-2026!",
+        )
+        organization = create_organization(
+            tenant=installation.tenant,
+            actor_id=installation.owner.id,
+            name="Reader client",
+            legal_name="Reader client",
+            website="https://example.invalid",
+            classifications=["client"],
+        )
+        asset = create_network_hardware_asset(
+            installation=installation, organization=organization, name="Reader laptop"
+        )
+        workspace = Workspace.objects.get(
+            tenant=installation.tenant, kind=WorkspaceKind.ORGANIZATION, organization=organization
+        )
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        yield installation, organization, asset, repository
+
+
+def test_asset_backlinks_classification_and_document_context_use_stable_ids(read_context, django_runtime_role):
+    installation, organization, asset, repository = read_context
+    exact_id, model_id, class_id, fragment_id, repair_id, unresolved_id = (uuid.uuid4() for _ in range(6))
+    fragment_commit = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        changes={
+            "fragments/repair.md": _content(
+                content_id=fragment_id,
+                title="Repair steps",
+                kind="fragment",
+                metadata=f"entity_links:\n  - id: {asset.entity_id}\n    relationship: repair_event\n",
+                body="Record the repair outcome.\n",
+            )
+        },
+        message="Add repair fragment",
+    )
+    commit = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=fragment_commit.object_id,
+        changes={
+            "docs/setup.md": _content(
+                content_id=exact_id,
+                title="Laptop setup",
+                metadata=f"entity_links:\n  - id: {asset.entity_id}\n    relationship: setup\n",
+                body=f"Set up [this device](tekdocs://entity/{asset.entity_id}).\n",
+            ),
+            "docs/model.md": _content(
+                content_id=model_id,
+                title="Model enrollment",
+                metadata=f"entity_links:\n  - id: {asset.model.entity_id}\n    relationship: enrollment\n",
+                body="Enroll supported laptops.\n",
+            ),
+            "docs/class.md": _content(
+                content_id=class_id,
+                title="Product troubleshooting",
+                metadata=f"entity_links:\n  - id: {asset.product.entity_id}\n    relationship: troubleshooting\n",
+                body="Check power.\n",
+            ),
+            "docs/repair.md": _content(
+                content_id=repair_id,
+                title="Repair event guide",
+                metadata=(
+                    f"includes:\n  - id: {fragment_id}\n    mode: pinned\n"
+                    f"    audience: shared\n    commit: {fragment_commit.object_id}\n"
+                ),
+                body="Follow the retained repair steps.\n",
+            ),
+            "docs/unresolved.md": _content(
+                content_id=unresolved_id,
+                title="Needs a reference",
+                body=f"See [[{uuid.uuid4()}]] for details.\n",
+            ),
+        },
+        message="Link content to one asset and its catalog context",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    kwargs = {"organization_entity_id": organization.entity_id}
+    entity_url = reverse("organization-content-entity-documentation", kwargs={**kwargs, "entity_id": asset.entity_id})
+    response = browser.get(entity_url)
+    assert response.status_code == 200, response.content
+    assert {(row["title"], row["relationship"], row["scope"]) for row in response.json()["documents"]} == {
+        ("Laptop setup", "setup", "exact"),
+        ("Laptop setup", "mention", "exact"),
+        ("Model enrollment", "enrollment", "model"),
+        ("Product troubleshooting", "troubleshooting", "class"),
+        ("Repair steps", "repair_event", "exact"),
+        ("Repair event guide", "repair_event", "exact"),
+    }
+    detail_url = reverse("organization-content-document-detail", kwargs={**kwargs, "content_id": exact_id})
+    detail = browser.get(detail_url)
+    assert detail.status_code == 200, detail.content
+    assert detail.json()["indexed_commit"] == commit.object_id
+    assert detail.json()["entity_context"][0]["display_name"] == "Reader laptop"
+    assert "Reader laptop" in detail.json()["sanitized_html"]
+    assert "tekdocs://entity/" not in detail.json()["sanitized_html"]
+
+    asset.entity.display_name = "Renamed laptop"
+    asset.entity.save(update_fields=["display_name"])
+    renamed = browser.get(detail_url).json()
+    assert renamed["entity_context"][0]["display_name"] == "Renamed laptop"
+    assert "Reader laptop" not in renamed["sanitized_html"]
+
+    collection = browser.get(reverse("organization-content-documents", kwargs=kwargs), {"q": "Laptop"}).json()
+    assert collection["count"] == 2
+    assert {row["id"] for row in collection["results"]} == {str(exact_id), str(model_id)}
+    assert browser.get(reverse("organization-content-documents", kwargs=kwargs), {"page_size": 101}).status_code == 400
+    health = browser.get(reverse("organization-content-documents", kwargs=kwargs), {"has_findings": "true"}).json()
+    assert [row["id"] for row in health["results"]] == [str(unresolved_id)]
+    unresolved = browser.get(
+        reverse("organization-content-documents", kwargs=kwargs), {"unresolved_only": "true"}
+    ).json()
+    assert unresolved["results"] == health["results"]
+
+    foreign = Tenant.objects.create(name="Other content read MSP", slug=f"other-{uuid.uuid4()}")
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(installation.tenant, organization),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+        )
+        assert ContentEntityLink.objects.count() == 6
+        bind_local_rls_scope(DataScope.tenant(foreign), organization_mode=OrganizationRLSMode.MSP_ONLY)
+        assert ContentEntityLink.objects.count() == 0
+
+
+def test_cross_organization_entity_and_content_are_unavailable(read_context):
+    installation, organization, asset, repository = read_context
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        changes={"docs/private.md": _content(content_id=document_id, title="Private guide", body="Private.\n")},
+        message="Add scoped content",
+    )
+    index_repository_content(repository_id=repository.id)
+    other = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Other client",
+        legal_name="Other client",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    assert (
+        browser.get(
+            reverse(
+                "organization-content-document-detail",
+                kwargs={"organization_entity_id": other.entity_id, "content_id": document_id},
+            )
+        ).status_code
+        == 404
+    )
+    assert (
+        browser.get(
+            reverse(
+                "organization-content-entity-documentation",
+                kwargs={"organization_entity_id": other.entity_id, "entity_id": asset.entity_id},
+            )
+        ).status_code
+        == 404
+    )
+    assert Client().get(
+        reverse("organization-content-documents", kwargs={"organization_entity_id": organization.entity_id})
+    ).status_code in {401, 403}

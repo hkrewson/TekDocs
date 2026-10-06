@@ -28,6 +28,7 @@ class ResolvedComposition:
     markdown: str
     digest: str
     manifest: tuple[dict[str, Any], ...]
+    entity_links: tuple[dict[str, Any], ...]
 
 
 SnapshotLoader = Callable[[str], dict[uuid.UUID, ParsedContent]]
@@ -59,6 +60,7 @@ class ContentCompositionResolver:
             raise ContentCompositionError("composition.root", "Composition root is unavailable")
         parts: list[str] = []
         manifest: list[dict[str, Any]] = []
+        entity_links: list[dict[str, Any]] = []
         expanded_bytes = 0
         expanded_nodes = 0
 
@@ -86,6 +88,17 @@ class ContentCompositionResolver:
                 raise ContentCompositionError("include.size", "Fragment composition exceeds its expanded-size limit")
             if markdown:
                 parts.append(markdown)
+            for link in parsed.entity_links:
+                entity_links.append(
+                    {
+                        "id": str(link.target_entity_id),
+                        "relationship": link.relationship,
+                        "origin": link.origin,
+                        "source_id": str(parsed.content_id),
+                        "commit": object_id,
+                        "ordinal_path": list(ordinal_path) + [link.ordinal],
+                    }
+                )
             next_stack = stack + (key,)
             for include in parsed.includes:
                 if parent_audience not in {None, "shared"} and include.audience != parent_audience:
@@ -133,6 +146,11 @@ class ContentCompositionResolver:
             markdown += "\n"
         if len(markdown.encode("utf-8")) > MAX_EXPANDED_BYTES:
             raise ContentCompositionError("include.size", "Fragment composition exceeds its expanded-size limit")
-        payload = {"manifest": manifest, "markdown": markdown}
+        payload = {"manifest": manifest, "markdown": markdown, "entity_links": entity_links}
         digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        return ResolvedComposition(markdown=markdown, digest=digest, manifest=tuple(manifest))
+        return ResolvedComposition(
+            markdown=markdown,
+            digest=digest,
+            manifest=tuple(manifest),
+            entity_links=tuple(entity_links),
+        )

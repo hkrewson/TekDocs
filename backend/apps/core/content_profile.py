@@ -24,9 +24,11 @@ MAX_LINKS = 256
 MAX_PROPERTIES = 64
 MAX_INCLUDES = 128
 MAX_TEMPLATE_SOURCES = 128
+MAX_ENTITY_LINKS = 256
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
 FRAGMENT_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,119}$")
 GIT_OBJECT_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+ENTITY_URI_PATTERN = re.compile(r"^tekdocs://entity/([0-9a-fA-F-]{36})$")
 WIKILINK_PATTERN = re.compile(
     r"\[\[(?P<target>[0-9a-fA-F-]{36})(?:#(?P<fragment>[a-z][a-z0-9_-]{0,119}))?"
     r"(?:\|(?P<label>[^\]\r\n]{1,240}))?\]\]"
@@ -43,10 +45,12 @@ ALLOWED_FIELDS = frozenset(
         "includes",
         "derived_from",
         "template_sources",
+        "entity_links",
     }
 )
 INCLUDE_MODES = frozenset({"live", "pinned"})
 AUDIENCE_PROFILES = frozenset({"shared", "msp_internal", "client_visible"})
+ENTITY_RELATIONSHIPS = frozenset({"setup", "enrollment", "maintenance", "troubleshooting", "repair_event", "mention"})
 
 
 class ContentProfileError(ValueError):
@@ -106,6 +110,14 @@ class ParsedTemplateSource:
 
 
 @dataclass(frozen=True, slots=True)
+class ParsedEntityLink:
+    target_entity_id: uuid.UUID
+    relationship: str
+    origin: str
+    ordinal: int
+
+
+@dataclass(frozen=True, slots=True)
 class ParsedContent:
     content_id: uuid.UUID
     kind: str
@@ -120,6 +132,7 @@ class ParsedContent:
     includes: tuple[ParsedInclude, ...]
     derived_from: ParsedContentReference | None
     template_sources: tuple[ParsedTemplateSource, ...]
+    entity_links: tuple[ParsedEntityLink, ...]
     findings: tuple[dict[str, Any], ...]
     content_digest: str
 
@@ -297,6 +310,52 @@ def _parse_template_sources(value: Any) -> tuple[ParsedTemplateSource, ...]:
     return tuple(sources)
 
 
+def _parse_entity_links(value: Any, markdown: str) -> tuple[ParsedEntityLink, ...]:
+    if value is None:
+        value = []
+    if not isinstance(value, list) or len(value) > MAX_ENTITY_LINKS:
+        raise ContentProfileError("entity_link.shape", "Entity links must be a bounded ordered list")
+    links: list[ParsedEntityLink] = []
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"id", "relationship"}:
+            raise ContentProfileError("entity_link.shape", "Each entity link needs an id and relationship")
+        relationship = item.get("relationship")
+        if relationship not in ENTITY_RELATIONSHIPS:
+            raise ContentProfileError("entity_link.relationship", "Entity relationship is unsupported")
+        links.append(
+            ParsedEntityLink(
+                target_entity_id=_uuid(item.get("id"), code="entity_link.target", message="Entity id must be a UUID"),
+                relationship=relationship,
+                origin="typed",
+                ordinal=len(links),
+            )
+        )
+    parser = MarkdownIt("commonmark", {"html": False})
+    for token in parser.parse(markdown):
+        if token.type != "inline" or token.children is None:
+            continue
+        for child in token.children:
+            if child.type != "link_open":
+                continue
+            href = child.attrGet("href")
+            if not isinstance(href, str) or not href.startswith("tekdocs://entity/"):
+                continue
+            match = ENTITY_URI_PATTERN.fullmatch(href)
+            if match is None:
+                raise ContentProfileError("entity_link.uri", "Entity link URI is invalid")
+            links.append(
+                ParsedEntityLink(
+                    target_entity_id=_uuid(match.group(1), code="entity_link.uri", message="Entity URI is invalid"),
+                    relationship="mention",
+                    origin="narrative",
+                    ordinal=len(links),
+                )
+            )
+            if len(links) > MAX_ENTITY_LINKS:
+                raise ContentProfileError("entity_link.limit", "Content exceeds its entity-link limit")
+    return tuple(links)
+
+
 def parse_content(source: bytes) -> ParsedContent:
     frontmatter_text, markdown = _split_source(source)
     frontmatter = _parse_frontmatter(frontmatter_text)
@@ -352,6 +411,7 @@ def parse_content(source: bytes) -> ParsedContent:
     includes = _parse_includes(frontmatter.get("includes"))
     derived_from = _parse_reference(frontmatter.get("derived_from"), field="derived_from")
     template_sources = _parse_template_sources(frontmatter.get("template_sources"))
+    entity_links = _parse_entity_links(frontmatter.get("entity_links"), markdown)
     if derived_from is not None and kind != ContentNodeKind.FRAGMENT:
         raise ContentProfileError("derived_from.kind", "Only fragments may record independent-copy provenance")
     if template_sources and kind != ContentNodeKind.DOCUMENT:
@@ -368,6 +428,15 @@ def parse_content(source: bytes) -> ParsedContent:
             for link in links
         ],
         "markdown": markdown,
+        "entity_links": [
+            {
+                "id": str(link.target_entity_id),
+                "relationship": link.relationship,
+                "origin": link.origin,
+                "ordinal": link.ordinal,
+            }
+            for link in entity_links
+        ],
     }
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return ParsedContent(
@@ -384,6 +453,7 @@ def parse_content(source: bytes) -> ParsedContent:
         includes=includes,
         derived_from=derived_from,
         template_sources=template_sources,
+        entity_links=entity_links,
         findings=tuple(findings),
         content_digest=digest,
     )

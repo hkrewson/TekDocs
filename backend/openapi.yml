@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.3
+  version: 0.9.4
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -9176,6 +9176,143 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/documents:
+    get:
+      operationId: content_read_msp_list
+      parameters:
+      - in: query
+        name: has_findings
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - document
+          - fragment
+          type: string
+          x-spec-enum-id: d0aabc1c1577cf9d
+          default: ''
+          minLength: 1
+        description: "* `` - \n* `document` - document\n* `fragment` - fragment"
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: property_key
+        schema:
+          type: string
+          default: ''
+          pattern: ^[a-z][a-z0-9_-]{0,79}$
+      - in: query
+        name: property_value
+        schema:
+          type: string
+          default: ''
+          maxLength: 200
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 200
+      - in: query
+        name: topic
+        schema:
+          type: string
+          default: ''
+          maxLength: 32
+      - in: query
+        name: unresolved_only
+        schema:
+          type: boolean
+          default: false
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentReadCollection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/documents/{content_id}:
+    get:
+      operationId: content_read_msp_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentReadDetail'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/entities/{entity_id}/documentation:
+    get:
+      operationId: content_entity_msp_retrieve
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityContent'
           description: ''
           headers:
             X-Request-ID:
@@ -18550,6 +18687,161 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/documents:
+    get:
+      operationId: content_read_organization_list
+      parameters:
+      - in: query
+        name: has_findings
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: kind
+        schema:
+          enum:
+          - ''
+          - document
+          - fragment
+          type: string
+          x-spec-enum-id: d0aabc1c1577cf9d
+          default: ''
+          minLength: 1
+        description: "* `` - \n* `document` - document\n* `fragment` - fragment"
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 25
+      - in: query
+        name: property_key
+        schema:
+          type: string
+          default: ''
+          pattern: ^[a-z][a-z0-9_-]{0,79}$
+      - in: query
+        name: property_value
+        schema:
+          type: string
+          default: ''
+          maxLength: 200
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 200
+      - in: query
+        name: topic
+        schema:
+          type: string
+          default: ''
+          maxLength: 32
+      - in: query
+        name: unresolved_only
+        schema:
+          type: boolean
+          default: false
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentReadCollection'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/documents/{content_id}:
+    get:
+      operationId: content_read_organization_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentReadDetail'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/entities/{entity_id}/documentation:
+    get:
+      operationId: content_entity_organization_retrieve
+      parameters:
+      - in: path
+        name: entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityContent'
           description: ''
           headers:
             X-Request-ID:
@@ -35028,6 +35320,40 @@ components:
       required:
       - commit
       - id
+    ContentEntityContext:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        relationship:
+          type: string
+        origin:
+          type: string
+        display_name:
+          type: string
+        entity_type:
+          type: string
+      required:
+      - display_name
+      - entity_type
+      - id
+      - origin
+      - relationship
+    ContentFindingRead:
+      type: object
+      properties:
+        code:
+          type: string
+        severity:
+          type: string
+        detail:
+          type: object
+          additionalProperties: {}
+      required:
+      - code
+      - detail
+      - severity
     ContentGraph:
       type: object
       properties:
@@ -35224,6 +35550,95 @@ components:
       - diagnostics
       - projection_digest
       - status
+    ContentReadCollection:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentReadItem'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        accepted_commit:
+          type: string
+          nullable: true
+        indexed_commit:
+          type: string
+          nullable: true
+      required:
+      - accepted_commit
+      - count
+      - has_more
+      - indexed_commit
+      - page
+      - page_size
+      - results
+    ContentReadDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+        indexed_commit:
+          type: string
+        markdown:
+          type: string
+        sanitized_html:
+          type: string
+        entity_context:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentEntityContext'
+        findings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentFindingRead'
+      required:
+      - entity_context
+      - findings
+      - id
+      - indexed_commit
+      - kind
+      - markdown
+      - path
+      - sanitized_html
+      - title
+    ContentReadItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+        topic:
+          type: string
+          nullable: true
+        finding_count:
+          type: integer
+      required:
+      - finding_count
+      - id
+      - kind
+      - path
+      - title
+      - topic
     ContentTemplateSource:
       type: object
       properties:
@@ -38621,6 +39036,52 @@ components:
             $ref: '#/components/schemas/EligibleCatalogPublication'
       required:
       - results
+    EntityContent:
+      type: object
+      properties:
+        entity_id:
+          type: string
+          format: uuid
+        documents:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntityContentItem'
+        indexed_commit:
+          type: string
+          nullable: true
+      required:
+      - documents
+      - entity_id
+      - indexed_commit
+    EntityContentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          type: string
+        relationship:
+          type: string
+        scope:
+          enum:
+          - exact
+          - model
+          - class
+          type: string
+          description: |-
+            * `exact` - exact
+            * `model` - model
+            * `class` - class
+          x-spec-enum-id: 0e721333a5f83b99
+      required:
+      - id
+      - kind
+      - relationship
+      - scope
+      - title
     EntityCustomField:
       type: object
       properties:

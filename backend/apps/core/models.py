@@ -10,6 +10,9 @@ from django.db.models.functions import Lower
 from django.utils import timezone
 
 from .content_index_models import ContentAudienceProfile as ContentAudienceProfile
+from .content_index_models import ContentEntityLink as ContentEntityLink
+from .content_index_models import ContentEntityLinkOrigin as ContentEntityLinkOrigin
+from .content_index_models import ContentEntityRelationship as ContentEntityRelationship
 from .content_index_models import ContentFinding as ContentFinding
 from .content_index_models import ContentInclude as ContentInclude
 from .content_index_models import ContentIncludeMode as ContentIncludeMode

@@ -82,6 +82,14 @@ from apps.core.compliance_risk_views import (
     OrganizationComplianceRiskReviewView,
 )
 from apps.core.content_graph_views import MSPContentGraphView, OrganizationContentGraphView
+from apps.core.content_read_views import (
+    MSPContentReadCollectionView,
+    MSPContentReadDetailView,
+    MSPEntityContentView,
+    OrganizationContentReadCollectionView,
+    OrganizationContentReadDetailView,
+    OrganizationEntityContentView,
+)
 from apps.core.credential_reference_views import (
     MSPCredentialReferenceDetailView,
     MSPCredentialReferenceListCreateView,
@@ -473,9 +481,39 @@ urlpatterns = [
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/workspaces/msp/content-graph", MSPContentGraphView.as_view(), name="msp-content-graph"),
     path(
+        "api/v1/workspaces/msp/content-graph/documents",
+        MSPContentReadCollectionView.as_view(),
+        name="msp-content-documents",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/documents/<uuid:content_id>",
+        MSPContentReadDetailView.as_view(),
+        name="msp-content-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/entities/<uuid:entity_id>/documentation",
+        MSPEntityContentView.as_view(),
+        name="msp-content-entity-documentation",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph",
         OrganizationContentGraphView.as_view(),
         name="organization-content-graph",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents",
+        OrganizationContentReadCollectionView.as_view(),
+        name="organization-content-documents",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>",
+        OrganizationContentReadDetailView.as_view(),
+        name="organization-content-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/entities/<uuid:entity_id>/documentation",
+        OrganizationEntityContentView.as_view(),
+        name="organization-content-entity-documentation",
     ),
     path("api/v1/bootstrap/status", BootstrapStatusView.as_view(), name="bootstrap-status"),
     path("api/v1/bootstrap/owner", OwnerBootstrapView.as_view(), name="bootstrap-owner"),

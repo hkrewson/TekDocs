@@ -12,6 +12,21 @@ export type AssetDocument = {
   verification: { valid: boolean; digest_valid: boolean; signature_valid: boolean; key_fingerprint_valid: boolean }
   artifacts: Array<{ id: string; kind: string; filename: string; media_type: string; size: number; checksum: string }>
 }
+export type ContentRelationship = 'setup' | 'enrollment' | 'maintenance' | 'troubleshooting' | 'repair_event' | 'mention'
+
+export type ContentDocumentation = {
+  entity_id: string
+  indexed_commit: string | null
+  documents: Array<{ id: string; title: string; kind: 'document' | 'fragment'; relationship: ContentRelationship; scope: 'exact' | 'model' | 'class' }>
+}
+export type ContentDocument = {
+  id: string
+  title: string
+  kind: 'document' | 'fragment'
+  indexed_commit: string
+  sanitized_html: string
+  entity_context: Array<{ id: string; relationship: ContentRelationship; origin: string; display_name: string; entity_type: string }>
+}
 export type ClientAsset = {
   id: string
   name: string
@@ -105,6 +120,8 @@ export type AssetCsvPreview = {
 }
 
 export interface InventoryClient {
+  listContentDocumentation?(workspace: WorkspaceContext, entityId: string, signal?: AbortSignal): Promise<ContentDocumentation>
+  readContentDocument?(workspace: WorkspaceContext, contentId: string, signal?: AbortSignal): Promise<ContentDocument>
   listAssets(workspace: WorkspaceContext, page: number, signal?: AbortSignal): Promise<{ results: ClientAsset[]; page: number; page_size: number; count: number; has_more: boolean; can_manage: boolean; can_view_relationships: boolean; can_create_relationships: boolean; can_archive_relationships: boolean }>
   listModelChoices(workspace: WorkspaceContext, query: string, signal?: AbortSignal): Promise<{ results: ModelChoice[] }>
   createAsset(workspace: WorkspaceContext, modelId: string, name: string): Promise<ClientAsset>
@@ -184,6 +201,8 @@ async function mutateForm<T>(path: string, body: FormData): Promise<T> {
 }
 
 export const browserInventoryClient: InventoryClient = {
+  listContentDocumentation: (workspace, entityId, signal) => get(`${basePath(workspace)}/content-graph/entities/${encodeURIComponent(entityId)}/documentation`, signal),
+  readContentDocument: (workspace, contentId, signal) => get(`${basePath(workspace)}/content-graph/documents/${encodeURIComponent(contentId)}`, signal),
   listAssets: (workspace, page, signal) => get(`${basePath(workspace)}/assets?page=${page}&page_size=50`, signal),
   listModelChoices: (workspace, query, signal) => get(`${basePath(workspace)}/assets/model-choices?q=${encodeURIComponent(query)}`, signal),
   async createAsset(workspace, modelId, name) {

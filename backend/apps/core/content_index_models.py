@@ -37,6 +37,20 @@ class ContentTemplateSourceState(models.TextChoices):
     MISSING = "missing", "Missing"
 
 
+class ContentEntityLinkOrigin(models.TextChoices):
+    TYPED = "typed", "Typed"
+    NARRATIVE = "narrative", "Narrative"
+
+
+class ContentEntityRelationship(models.TextChoices):
+    SETUP = "setup", "Setup"
+    ENROLLMENT = "enrollment", "Enrollment"
+    MAINTENANCE = "maintenance", "Maintenance"
+    TROUBLESHOOTING = "troubleshooting", "Troubleshooting"
+    REPAIR_EVENT = "repair_event", "Repair/event"
+    MENTION = "mention", "Mention"
+
+
 class ContentNode(TimestampedModel):
     """One parsed document or reusable fragment at a repository's indexed head."""
 
@@ -226,6 +240,43 @@ class ContentTemplateSource(models.Model):
 
     def __str__(self) -> str:
         return f"{self.template_id}:{self.ordinal}"
+
+
+class ContentEntityLink(models.Model):
+    """Rebuildable content-to-operational-entity edge; labels stay in PostgreSQL."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.CASCADE, related_name="content_entity_links")
+    organization = models.ForeignKey(
+        "core.Organization", on_delete=models.CASCADE, related_name="content_entity_links", null=True, blank=True
+    )
+    workspace = models.ForeignKey("core.Workspace", on_delete=models.CASCADE, related_name="content_entity_links")
+    source = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="entity_links")
+    target_entity_id = models.UUIDField()
+    relationship = models.CharField(max_length=24, choices=ContentEntityRelationship.choices)
+    origin = models.CharField(max_length=12, choices=ContentEntityLinkOrigin.choices)
+    ordinal = models.PositiveIntegerField()
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("source_id", "ordinal", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "ordinal"), name="content_entity_link_ordinal_unique"),
+            models.CheckConstraint(
+                condition=models.Q(relationship__in=ContentEntityRelationship.values),
+                name="content_entity_link_relationship_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(origin__in=ContentEntityLinkOrigin.values),
+                name="content_entity_link_origin_valid",
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "target_entity_id"), name="core_contententity_target_idx")]
+
+    def __str__(self) -> str:
+        return f"{self.source_id}:{self.ordinal}"
 
 
 class ContentFinding(models.Model):

@@ -10,6 +10,7 @@ import { SoftwareInstallation } from './SoftwareInstallation'
 import { SoftwareHistory } from './SoftwareHistory'
 import { AssetSpecifications } from './AssetSpecifications'
 import { AssetRelationships } from './AssetRelationships'
+import { AssetDocumentation } from './AssetDocumentation'
 import { RelationshipGraph } from '../relationships/RelationshipGraph'
 import { browserRelationshipsClient } from '../relationships/api'
 
@@ -29,7 +30,7 @@ export function AssetRecord({ asset, workspace, client, canManage, access, secti
   access: { view: boolean; create: boolean; archive: boolean }; section: string
   href: (section: string) => string; onChange: (asset: ClientAsset) => void
 }) {
-  const tabs: Array<'overview' | 'specifications' | 'network' | 'installation' | 'related' | 'history'> = ['overview', 'specifications', asset.kind === 'hardware' ? 'network' : 'installation', ...(access.view ? ['related' as const] : []), 'history']
+  const tabs: Array<'overview' | 'specifications' | 'documentation' | 'network' | 'installation' | 'related' | 'history'> = ['overview', 'specifications', 'documentation', asset.kind === 'hardware' ? 'network' : 'installation', ...(access.view ? ['related' as const] : []), 'history']
   const current = tabs.find((tab) => tab === section) ?? 'overview'
   const expired = asset.hardware?.warranty_ends_on && asset.hardware.warranty_ends_on < new Date().toISOString().slice(0, 10)
   const [graph, setGraph] = useState(false)
@@ -43,6 +44,7 @@ export function AssetRecord({ asset, workspace, client, canManage, access, secti
         {asset.kind === 'hardware' ? <HardwareLifecycle key={asset.id} asset={asset} workspace={workspace} client={client} canManage={canManage} showHistory={false} onChange={(hardware) => onChange({ ...asset, hardware })} /> : <AssetFacts asset={asset} />}
       </>}
       {current === 'specifications' && <AssetSpecifications key={asset.id} selected={asset} workspace={workspace} client={client} />}
+      {current === 'documentation' && <AssetDocumentation key={asset.id} workspace={workspace} assetId={asset.id} client={client} />}
       {current === 'network' && <><AssetNetworkAddresses key={`${asset.id}-ip`} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(ip_addresses) => onChange({ ...asset, ip_addresses })} /><HardwareAddresses key={`${asset.id}-mac`} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(mac_addresses) => onChange({ ...asset, mac_addresses })} /></>}
       {current === 'installation' && <SoftwareInstallation key={asset.id} asset={asset} workspace={workspace} client={client} canManage={canManage} onChange={(software_installation) => onChange({ ...asset, software_installation })} />}
       {current === 'history' && <AssetHistory key={asset.id} asset={asset} workspace={workspace} client={client} />}

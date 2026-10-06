@@ -236,6 +236,20 @@ composition projection from their accepted commit. It does not change Git
 authority or legacy document storage. `TD-RISK-070` retains the repository
 custody and future audience-read owners named above.
 
+## 0.9.4 operational-context disposition
+
+`TD-RISK-070` is mitigated for staff read paths: collection, detail, search,
+health and entity backlinks resolve only from the exact workspace's accepted
+index, and operational names are fetched under entity visibility policy at
+read time. Client portal raw repository reads are denied. The old database
+editor and publication paths remain separate until `0.9.6` and `0.9.7`.
+
+`TD-RISK-071` is mitigated for asset context: stable UUID links are bounded,
+incoming links cannot select content for rendering, and included-fragment
+links are projected only from authorized composition. Cross-workspace content
+is not returned by these read routes. Publication dependency freezing and
+end-to-end recurrence remain `0.9.7` and `0.9.8` owners.
+
 ## 0.8.43 money-foundation disposition
 
 `TD-RISK-063` is **mitigated with recurring owners through `0.9.0`**. One arithmetic module now rejects floats, unknown/withdrawn codes, excess minor-unit precision, and non-finite values; its registry exactly matches the usable numeric-minor-unit entries in the ISO maintenance agency's 2026-01-01 List One. Explicit commercial rounding and full-registry property generation prove rendered line, tax, subtotal, and total strings reconcile. `TD-RISK-064` through `TD-RISK-066` remain future invoice-numbering, immutability, and client-disclosure obligations; this slice creates no invoice, number, issue, delivery, payment, or portal path.

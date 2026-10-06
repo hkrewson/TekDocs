@@ -14,6 +14,7 @@ from django.db import transaction
 
 from .content_composition import ContentCompositionError, ContentCompositionResolver
 from .content_index_models import (
+    ContentEntityLink,
     ContentFinding,
     ContentInclude,
     ContentIndexAttempt,
@@ -328,6 +329,7 @@ def _resolve_compositions(
                     "digest": resolved.digest,
                     "manifest": list(resolved.manifest),
                     "markdown": resolved.markdown,
+                    "entity_links": list(resolved.entity_links),
                 }
             compositions[content_id] = variants
         except ContentCompositionError as exc:
@@ -376,6 +378,15 @@ def _projection_payload(
                     "ordinal": include.ordinal,
                 }
                 for include in parsed.includes
+            ],
+            "entity_links": [
+                {
+                    "id": str(link.target_entity_id),
+                    "relationship": link.relationship,
+                    "origin": link.origin,
+                    "ordinal": link.ordinal,
+                }
+                for link in parsed.entity_links
             ],
             "path": path,
             "properties": parsed.properties,
@@ -595,6 +606,20 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
         ContentInclude.objects.bulk_create(includes)
         ContentTemplateSource.objects.bulk_create(template_source_rows)
         ContentFinding.objects.bulk_create(template_findings)
+        ContentEntityLink.objects.bulk_create(
+            [
+                ContentEntityLink(
+                    **scope,
+                    source=nodes[parsed.content_id],
+                    target_entity_id=uuid.UUID(link["id"]),
+                    relationship=link["relationship"],
+                    origin=link["origin"],
+                    ordinal=ordinal,
+                )
+                for _path, parsed in sorted(parsed_by_path.items())
+                for ordinal, link in enumerate(compositions[parsed.content_id]["msp_internal"]["entity_links"])
+            ]
+        )
         ContentIndexAttempt.objects.update_or_create(
             repository=locked,
             commit=commit,
@@ -637,6 +662,7 @@ def content_graph_projection(*, repository: WorkspaceRepository, audience: str |
             "includes",
             "included_by__source",
             "template_sources",
+            "entity_links",
         )
         .order_by("source_path", "content_id")
     )
@@ -684,6 +710,15 @@ def content_graph_projection(*, repository: WorkspaceRepository, audience: str |
                         "change_preview": source.change_preview,
                     }
                     for source in node.template_sources.all()
+                ],
+                "entity_links": [
+                    {
+                        "id": str(link.target_entity_id),
+                        "relationship": link.relationship,
+                        "origin": link.origin,
+                        "ordinal": link.ordinal,
+                    }
+                    for link in node.entity_links.all()
                 ],
                 "outgoing_links": [
                     {

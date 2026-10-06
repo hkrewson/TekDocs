@@ -1703,8 +1703,12 @@ protect both index and API reads. Existing database-authored documents have not
 yet migrated. `0.9.3` adds ordered, nested live/pinned fragment inclusion,
 independent-copy provenance, bounded audience-specific expansion, where-used
 backlinks, exact source manifests, and current/changed/missing template-source
-previews. Invalid composition preserves the last-known-good index. Issue #103
-owns operational entity context and authorized reading/search in `0.9.4`.
+previews. Invalid composition preserves the last-known-good index. `0.9.4`
+adds stable operational-entity links in portable metadata and Markdown,
+rebuildable included-fragment references, authorized workspace
+reads/search/health, and asset documentation backlinks with exact/model/class
+distinctions. The current database editor has not yet moved to Git; issue #104
+owns managed authoring in `0.9.5`.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

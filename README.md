@@ -109,6 +109,20 @@ rejects cycles, missing or foreign pins, audience widening, excessive depth,
 node count, or expanded size. The current database-backed editor remains in
 place until the managed authoring and migration checkpoints.
 
+### Version 1 operational context and read paths
+
+The `0.9.4` checkpoint adds portable `entity_links: [{id, relationship}]`
+metadata and narrative `[label](tekdocs://entity/<uuid>)` references. Valid
+relationships are `setup`, `enrollment`, `maintenance`, `troubleshooting`,
+`repair_event`, and `mention`. The accepted Git commit yields a rebuildable
+entity-link projection, including links in composed fragments. Authorized
+staff reads resolve current entity names instead of storing mutable labels or
+serials in the relationship. Asset Documentation distinguishes exact-device,
+model, and product-class guidance. Collection/search/health and document-detail
+routes read the current workspace's index; raw repository content remains
+unavailable to client portal users. The legacy editor and publication flow
+remain unchanged until later checkpoints.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

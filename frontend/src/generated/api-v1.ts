@@ -2677,6 +2677,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph/documents": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_read_msp_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/content-graph/documents/{content_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_read_msp_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/content-graph/entities/{entity_id}/documentation": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_entity_msp_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/contracts": {
         readonly parameters: {
             readonly query?: never;
@@ -5026,6 +5074,54 @@ export interface paths {
         readonly get: operations["content_graph_organization_retrieve"];
         readonly put?: never;
         readonly post: operations["content_graph_organization_rebuild"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/documents": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_read_organization_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/documents/{content_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_read_organization_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/entities/{entity_id}/documentation": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_entity_organization_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -9301,6 +9397,21 @@ export interface components {
             readonly id: string;
             readonly commit: string;
         };
+        readonly ContentEntityContext: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly relationship: string;
+            readonly origin: string;
+            readonly display_name: string;
+            readonly entity_type: string;
+        };
+        readonly ContentFindingRead: {
+            readonly code: string;
+            readonly severity: string;
+            readonly detail: {
+                readonly [key: string]: unknown;
+            };
+        };
         readonly ContentGraph: {
             readonly accepted_commit: string | null;
             readonly indexed_commit: string | null;
@@ -9379,6 +9490,36 @@ export interface components {
                 readonly [key: string]: unknown;
             }[];
             readonly projection_digest: string | null;
+        };
+        readonly ContentReadCollection: {
+            readonly results: readonly components["schemas"]["ContentReadItem"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly accepted_commit: string | null;
+            readonly indexed_commit: string | null;
+        };
+        readonly ContentReadDetail: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly kind: string;
+            readonly title: string;
+            readonly path: string;
+            readonly indexed_commit: string;
+            readonly markdown: string;
+            readonly sanitized_html: string;
+            readonly entity_context: readonly components["schemas"]["ContentEntityContext"][];
+            readonly findings: readonly components["schemas"]["ContentFindingRead"][];
+        };
+        readonly ContentReadItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly kind: string;
+            readonly title: string;
+            readonly path: string;
+            readonly topic: string | null;
+            readonly finding_count: number;
         };
         readonly ContentTemplateSource: {
             /** Format: uuid */
@@ -10795,6 +10936,26 @@ export interface components {
         };
         readonly EligibleCatalogPublicationResult: {
             readonly results: readonly components["schemas"]["EligibleCatalogPublication"][];
+        };
+        readonly EntityContent: {
+            /** Format: uuid */
+            readonly entity_id: string;
+            readonly documents: readonly components["schemas"]["EntityContentItem"][];
+            readonly indexed_commit: string | null;
+        };
+        readonly EntityContentItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly kind: string;
+            readonly relationship: string;
+            /**
+             * @description * `exact` - exact
+             *     * `model` - model
+             *     * `class` - class
+             * @enum {string}
+             */
+            readonly scope: "exact" | "model" | "class";
         };
         readonly EntityCustomField: {
             readonly definition: components["schemas"]["CustomFieldDefinition"];
@@ -22902,6 +23063,88 @@ export interface operations {
             };
         };
     };
+    readonly content_read_msp_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly has_findings?: boolean;
+                /**
+                 * @description * `` -
+                 *     * `document` - document
+                 *     * `fragment` - fragment
+                 */
+                readonly kind?: "" | "document" | "fragment";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly property_key?: string;
+                readonly property_value?: string;
+                readonly q?: string;
+                readonly topic?: string;
+                readonly unresolved_only?: boolean;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentReadCollection"];
+                };
+            };
+        };
+    };
+    readonly content_read_msp_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentReadDetail"];
+                };
+            };
+        };
+    };
+    readonly content_entity_msp_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["EntityContent"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_contracts_retrieve_list: {
         readonly parameters: {
             readonly query?: {
@@ -29384,6 +29627,92 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ContentGraph"];
+                };
+            };
+        };
+    };
+    readonly content_read_organization_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly has_findings?: boolean;
+                /**
+                 * @description * `` -
+                 *     * `document` - document
+                 *     * `fragment` - fragment
+                 */
+                readonly kind?: "" | "document" | "fragment";
+                readonly page?: number;
+                readonly page_size?: number;
+                readonly property_key?: string;
+                readonly property_value?: string;
+                readonly q?: string;
+                readonly topic?: string;
+                readonly unresolved_only?: boolean;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentReadCollection"];
+                };
+            };
+        };
+    };
+    readonly content_read_organization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentReadDetail"];
+                };
+            };
+        };
+    };
+    readonly content_entity_organization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["EntityContent"];
                 };
             };
         };

@@ -115,3 +115,34 @@ def test_profile_rejects_ambiguous_or_unbounded_composition_metadata(extra: str,
     with pytest.raises(ContentProfileError) as captured:
         parse_content(_source(content_id=uuid.uuid4(), body="Body.\n", extra=extra))
     assert captured.value.code == code
+
+
+def test_profile_parses_typed_and_narrative_entity_links_without_code_examples():
+    asset_id = uuid.uuid4()
+    model_id = uuid.uuid4()
+    ignored = uuid.uuid4()
+    parsed = parse_content(
+        _source(
+            content_id=uuid.uuid4(),
+            extra=f"entity_links:\n  - id: {asset_id}\n    relationship: setup\n",
+            body=(f"See [model setup](tekdocs://entity/{model_id}).\n\n`[example](tekdocs://entity/{ignored})`\n"),
+        )
+    )
+    assert [(link.target_entity_id, link.relationship, link.origin) for link in parsed.entity_links] == [
+        (asset_id, "setup", "typed"),
+        (model_id, "mention", "narrative"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("extra", "body", "code"),
+    (
+        (f"entity_links:\n  - id: {uuid.uuid4()}\n    relationship: unknown\n", "Body.\n", "entity_link.relationship"),
+        ("entity_links:\n  - id: nope\n    relationship: setup\n", "Body.\n", "entity_link.target"),
+        ("", "[bad](tekdocs://entity/not-a-uuid)\n", "entity_link.uri"),
+    ),
+)
+def test_profile_rejects_invalid_entity_link_metadata(extra: str, body: str, code: str):
+    with pytest.raises(ContentProfileError) as captured:
+        parse_content(_source(content_id=uuid.uuid4(), body=body, extra=extra))
+    assert captured.value.code == code

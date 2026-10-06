@@ -36,6 +36,7 @@ from apps.core.invoicing import (
 )
 from apps.core.models import (
     AuditEvent,
+    ContentEntityLink,
     ContentNode,
     CustomFieldDefinition,
     DataFlowRevision,
@@ -178,9 +179,7 @@ DOCUMENT_RLS_TABLES = {
 
 
 @pytest.mark.django_db(transaction=True)
-def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_loss(
-    migration_head_restored, tmp_path
-):
+def test_repository_authority_upgrades_from_exact_090_and_cycles_without_data_loss(migration_head_restored, tmp_path):
     if connection.vendor != "postgresql":
         pytest.skip("Repository-authority migration validation requires PostgreSQL")
 
@@ -339,9 +338,7 @@ def migration_head_restored(transactional_db):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_fragment_composition_upgrade_rebuilds_existing_index_from_accepted_git(
-    migration_head_restored, tmp_path
-):
+def test_fragment_composition_upgrade_rebuilds_existing_index_from_accepted_git(migration_head_restored, tmp_path):
     if connection.vendor != "postgresql":
         pytest.skip("Composition upgrade validation requires PostgreSQL")
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
@@ -388,9 +385,63 @@ def test_fragment_composition_upgrade_rebuilds_existing_index_from_accepted_git(
         index_repository_content(repository_id=repository.id)
         repository.refresh_from_db()
         assert repository.indexed_commit.object_id == commit.object_id
-        assert ContentNode.objects.get(repository=repository, content_id=content_id).composition_variants["all"][
-            "markdown"
-        ] == "Content survives migration.\n"
+        assert (
+            ContentNode.objects.get(repository=repository, content_id=content_id).composition_variants["all"][
+                "markdown"
+            ]
+            == "Content survives migration.\n"
+        )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_entity_link_upgrade_rebuilds_from_accepted_git(migration_head_restored, tmp_path):
+    if connection.vendor != "postgresql":
+        pytest.skip("Entity link upgrade validation requires PostgreSQL")
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Entity Link Upgrade MSP",
+            owner_email=f"entity-link-upgrade-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Entity Link Upgrade Owner",
+            password=f"{secrets.token_urlsafe(24)}Aa7!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, organization=None)
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        content_id, target_id = uuid.uuid4(), uuid.uuid4()
+        commit = repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+            changes={
+                "docs/upgrade.md": (
+                    "---\n"
+                    "schema: tekdocs.content/v1\n"
+                    f"id: {content_id}\n"
+                    "kind: document\n"
+                    "title: Entity link upgrade\n"
+                    "entity_links:\n"
+                    f"  - id: {target_id}\n"
+                    "    relationship: maintenance\n"
+                    "---\n"
+                    "The link is rebuildable.\n"
+                ).encode()
+            },
+            message="Add entity link upgrade fixture",
+        )
+        index_repository_content(repository_id=repository.id)
+        assert ContentEntityLink.objects.filter(source__repository=repository, target_entity_id=target_id).exists()
+
+        call_command("migrate", "core", "0166_file_backed_fragment_composition", verbosity=0, interactive=False)
+        call_command("migrate", "core", verbosity=0, interactive=False)
+
+        repository.refresh_from_db()
+        assert repository.indexed_commit_id is None
+        index_repository_content(repository_id=repository.id)
+        repository.refresh_from_db()
+        assert repository.indexed_commit.object_id == commit.object_id
+        assert ContentEntityLink.objects.get(
+            source__repository=repository, target_entity_id=target_id
+        ).relationship == ("maintenance")
 
 
 @pytest.mark.django_db(transaction=True)
@@ -1002,16 +1053,13 @@ def test_invoice_correction_upgrade_creates_a_distinct_credit_note_series(migrat
     call_command("migrate", "core", "0160_complete_legacy_invoice_revisions", verbosity=0, interactive=False)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name='core_invoice' AND column_name='document_kind'"
+            "SELECT 1 FROM information_schema.columns WHERE table_name='core_invoice' AND column_name='document_kind'"
         )
         assert cursor.fetchone() is None
 
 
 @pytest.mark.django_db(transaction=True)
-def test_legacy_supplement_drafts_upgrade_to_complete_revisions(
-    migration_head_restored, tmp_path, monkeypatch
-):
+def test_legacy_supplement_drafts_upgrade_to_complete_revisions(migration_head_restored, tmp_path, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("Invoice upgrade validation requires PostgreSQL")
 

@@ -174,6 +174,14 @@ def _parse_snapshot(
             identities[parsed.content_id] = path
         diagnostics.extend(_validate_taxonomies(repository=repository, path=path, parsed=parsed))
         parsed_by_path[path] = parsed
+    claimed_paths = set(parsed_by_path)
+    for path, parsed in sorted(parsed_by_path.items()):
+        for alias in parsed.frontmatter.get("aliases", []):
+            if alias in claimed_paths:
+                diagnostics.append(
+                    _diagnostic(path=path, code="alias.collision", message="Alias collides with another content path")
+                )
+            claimed_paths.add(alias)
     return parsed_by_path, tuple(sorted(diagnostics, key=lambda item: (item["path"], item["code"], item["message"])))
 
 
@@ -422,6 +430,25 @@ def _digest(
         separators=(",", ":"),
     ).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def validate_candidate_snapshot(*, repository: WorkspaceRepository, files: tuple[tuple[str, bytes], ...]) -> None:
+    """Reject an authoring candidate before Git advances its accepted ref.
+
+    The synthetic identity cannot occur in versioned frontmatter, so pinned
+    references always resolve from retained commits rather than candidate files.
+    The final commit is indexed normally after the repository CAS succeeds.
+    """
+
+    parsed_by_path, diagnostics = _parse_snapshot(repository=repository, files=files)
+    if not diagnostics:
+        _compositions, _includes, _templates, diagnostics = _resolve_compositions(
+            repository=repository,
+            accepted_object_id="candidate:uncommitted",
+            parsed_by_path=parsed_by_path,
+        )
+    if diagnostics:
+        raise ContentIndexValidationError(diagnostics)
 
 
 def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -> ContentIndexResult:

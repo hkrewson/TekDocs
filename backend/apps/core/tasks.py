@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from uuid import UUID
 
@@ -5,6 +6,8 @@ from celery import shared_task
 from django.utils import timezone
 
 from .certificate_monitoring import process_certificate_monitoring_run, schedule_due_certificate_monitoring
+from .content_index import ContentIndexError, ContentIndexValidationError, index_repository_content
+from .content_index_models import ContentIndexAttempt, ContentIndexStatus
 from .document_source_models import DocumentRemoteSource
 from .document_sources import fetch_remote_document
 from .domain_monitoring import process_domain_monitoring_run, schedule_due_domain_monitoring
@@ -18,6 +21,7 @@ from .models import (
     IntegrationJobState,
     IntegrationSyncJob,
     Workspace,
+    WorkspaceRepository,
 )
 from .notification_email import dispatch_due_notification_emails
 from .outbox import dispatch_due_outbox_events
@@ -26,6 +30,40 @@ from .scoping import DataScope
 from .webhooks import dispatch_due_webhooks
 
 INTEGRATION_DISPATCH_LEASE = timedelta(minutes=2)
+logger = logging.getLogger(__name__)
+
+
+@shared_task(ignore_result=True)  # type: ignore[untyped-decorator]
+def reconcile_content_indexes() -> int:
+    """Use durable accepted/indexed commit markers as the retry queue."""
+
+    installation = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    if installation.tenant is None:
+        return 0
+    rebuilt = 0
+    for workspace in Workspace.objects.filter(tenant=installation.tenant).order_by("id"):
+        scope = DataScope(installation.tenant.id, workspace.id, workspace.organization_id)
+        mode = OrganizationRLSMode.ORGANIZATION if workspace.organization_id else OrganizationRLSMode.MSP_ONLY
+        with system_rls_scope(scope, organization_mode=mode):
+            repository = WorkspaceRepository.objects.filter(workspace=workspace).first()
+            if (
+                repository is None
+                or repository.accepted_commit_id is None
+                or repository.accepted_commit_id == repository.indexed_commit_id
+                or ContentIndexAttempt.objects.filter(
+                    repository=repository, commit_id=repository.accepted_commit_id, status=ContentIndexStatus.REJECTED
+                ).exists()
+            ):
+                continue
+            try:
+                index_repository_content(repository_id=repository.id)
+            except ContentIndexValidationError:
+                logger.warning("content_index_reconciliation_rejected repository=%s", repository.id)
+            except ContentIndexError:
+                logger.warning("content_index_reconciliation_pending repository=%s", repository.id)
+            else:
+                rebuilt += 1
+    return rebuilt
 
 
 @shared_task(ignore_result=True)  # type: ignore[untyped-decorator]

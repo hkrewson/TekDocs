@@ -7,6 +7,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 
 import yaml
@@ -25,6 +26,9 @@ MAX_PROPERTIES = 64
 MAX_INCLUDES = 128
 MAX_TEMPLATE_SOURCES = 128
 MAX_ENTITY_LINKS = 256
+MAX_ALIASES = 32
+# Keep aliases inside the repository service's 512-byte managed-path limit.
+MAX_ALIAS_PATH_BYTES = 512
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
 FRAGMENT_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,119}$")
 GIT_OBJECT_PATTERN = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
@@ -46,6 +50,7 @@ ALLOWED_FIELDS = frozenset(
         "derived_from",
         "template_sources",
         "entity_links",
+        "aliases",
     }
 )
 INCLUDE_MODES = frozenset({"live", "pinned"})
@@ -182,6 +187,28 @@ def _portable_value(value: Any, *, key: str) -> Any:
         if all(item is None or isinstance(item, bool | int | str) for item in value):
             return value
     raise ContentProfileError("property.value", f"Property {key} has an unsupported value")
+
+
+def _valid_alias(value: Any) -> bool:
+    if not isinstance(value, str) or not value.endswith(".md"):
+        return False
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    path = PurePosixPath(value)
+    return bool(
+        value
+        and len(encoded) <= MAX_ALIAS_PATH_BYTES
+        and not value.startswith("-")
+        and not value.endswith("/")
+        and "\\" not in value
+        and ":" not in value
+        and not any(ord(character) < 32 or ord(character) == 127 for character in value)
+        and not path.is_absolute()
+        and str(path) == value
+        and all(part not in {"", ".", ".."} and part.casefold() != ".git" for part in path.parts)
+    )
 
 
 def _mapping(value: Any, *, code: str, label: str) -> dict[str, Any]:
@@ -412,6 +439,14 @@ def parse_content(source: bytes) -> ParsedContent:
     derived_from = _parse_reference(frontmatter.get("derived_from"), field="derived_from")
     template_sources = _parse_template_sources(frontmatter.get("template_sources"))
     entity_links = _parse_entity_links(frontmatter.get("entity_links"), markdown)
+    aliases = frontmatter.get("aliases", [])
+    if (
+        not isinstance(aliases, list)
+        or len(aliases) > MAX_ALIASES
+        or not all(_valid_alias(alias) for alias in aliases)
+        or len(aliases) != len(set(aliases))
+    ):
+        raise ContentProfileError("alias.shape", "Aliases must be unique, bounded Markdown paths")
     if derived_from is not None and kind != ContentNodeKind.FRAGMENT:
         raise ContentProfileError("derived_from.kind", "Only fragments may record independent-copy provenance")
     if template_sources and kind != ContentNodeKind.DOCUMENT:

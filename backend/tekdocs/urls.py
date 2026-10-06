@@ -81,6 +81,14 @@ from apps.core.compliance_risk_views import (
     OrganizationComplianceRiskListCreateView,
     OrganizationComplianceRiskReviewView,
 )
+from apps.core.content_authoring_views import (
+    MSPContentAuthoringSourceView,
+    MSPContentAuthoringView,
+    MSPContentPathResolveView,
+    OrganizationContentAuthoringSourceView,
+    OrganizationContentAuthoringView,
+    OrganizationContentPathResolveView,
+)
 from apps.core.content_graph_views import MSPContentGraphView, OrganizationContentGraphView
 from apps.core.content_read_views import (
     MSPContentReadCollectionView,
@@ -481,6 +489,21 @@ urlpatterns = [
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/workspaces/msp/content-graph", MSPContentGraphView.as_view(), name="msp-content-graph"),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring",
+        MSPContentAuthoringView.as_view(),
+        name="msp-content-authoring",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>",
+        MSPContentAuthoringSourceView.as_view(),
+        name="msp-content-authoring-source",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/resolve-path",
+        MSPContentPathResolveView.as_view(),
+        name="msp-content-resolve-path",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/documents",
         MSPContentReadCollectionView.as_view(),
         name="msp-content-documents",
@@ -499,6 +522,21 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph",
         OrganizationContentGraphView.as_view(),
         name="organization-content-graph",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",
+        OrganizationContentAuthoringView.as_view(),
+        name="organization-content-authoring",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>",
+        OrganizationContentAuthoringSourceView.as_view(),
+        name="organization-content-authoring-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/resolve-path",
+        OrganizationContentPathResolveView.as_view(),
+        name="organization-content-resolve-path",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents",

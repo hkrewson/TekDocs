@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.4
+  version: 0.9.5
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -9176,6 +9176,108 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring:
+    post:
+      operationId: content_authoring_msp_write
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringConflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}:
+    get:
+      operationId: content_authoring_msp_source
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/resolve-path:
+    get:
+      operationId: content_authoring_msp_resolve_path
+      parameters:
+      - in: query
+        name: path
+        schema:
+          type: string
+          maxLength: 512
+          minLength: 1
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
           description: ''
           headers:
             X-Request-ID:
@@ -18687,6 +18789,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentGraph'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring:
+    post:
+      operationId: content_authoring_organization_write
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContentAuthoringMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringConflict'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}:
+    get:
+      operationId: content_authoring_organization_source
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/resolve-path:
+    get:
+      operationId: content_authoring_organization_resolve_path
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: path
+        schema:
+          type: string
+          maxLength: 512
+          minLength: 1
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
           description: ''
           headers:
             X-Request-ID:
@@ -35309,6 +35532,125 @@ components:
       required:
       - name
       - provider
+    ContentAuthoringConflict:
+      type: object
+      properties:
+        reason:
+          type: string
+        base:
+          type: string
+          nullable: true
+        current:
+          type: string
+          nullable: true
+        proposed:
+          type: string
+          nullable: true
+        base_commit:
+          type: string
+          nullable: true
+        current_commit:
+          type: string
+          nullable: true
+        current_blob:
+          type: string
+          nullable: true
+      required:
+      - base
+      - base_commit
+      - current
+      - current_blob
+      - current_commit
+      - proposed
+      - reason
+    ContentAuthoringMutation:
+      type: object
+      properties:
+        operation:
+          enum:
+          - create
+          - update
+          - move
+          type: string
+          description: |-
+            * `create` - create
+            * `update` - update
+            * `move` - move
+          x-spec-enum-id: 4ab54f9bb79b0d09
+        content_id:
+          type: string
+          format: uuid
+        base_commit:
+          type: string
+          nullable: true
+          maxLength: 64
+        base_blob:
+          type: string
+          nullable: true
+          maxLength: 64
+        kind:
+          enum:
+          - document
+          - fragment
+          - null
+          type: string
+          description: |-
+            * `document` - document
+            * `fragment` - fragment
+          x-spec-enum-id: d0aabc1c1577cf9d
+          nullable: true
+        path:
+          type: string
+          nullable: true
+          maxLength: 512
+        title:
+          type: string
+          nullable: true
+          maxLength: 240
+        markdown:
+          type: string
+          nullable: true
+          maxLength: 1048576
+        metadata_patch:
+          type: object
+          additionalProperties: {}
+      required:
+      - content_id
+      - operation
+    ContentAuthoringSource:
+      type: object
+      properties:
+        content_id:
+          type: string
+          format: uuid
+        path:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+        markdown:
+          type: string
+        source:
+          type: string
+        source_blob:
+          type: string
+        accepted_commit:
+          type: string
+          nullable: true
+        indexed_commit:
+          type: string
+          nullable: true
+      required:
+      - accepted_commit
+      - content_id
+      - indexed_commit
+      - kind
+      - markdown
+      - path
+      - source
+      - source_blob
+      - title
     ContentDerivedFrom:
       type: object
       properties:

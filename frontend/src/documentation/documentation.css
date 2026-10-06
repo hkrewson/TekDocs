@@ -205,3 +205,36 @@
 .pdf-viewer form[role="search"] { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .pdf-viewer input[type="search"] { min-width: 0; max-width: 100%; }
 @media (max-width: 600px) { .document-files li { align-items: flex-start; flex-direction: column; } }
+.repository-authoring-grid {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.repository-authoring-grid > section {
+  min-width: 0;
+}
+
+.repository-authoring-grid label,
+.repository-editor-fields {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.repository-authoring-grid input,
+.repository-authoring-grid select,
+.repository-authoring-grid textarea {
+  width: 100%;
+}
+
+.repository-authoring-grid pre {
+  max-height: 20rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 48rem) {
+  .repository-authoring-grid { grid-template-columns: minmax(0, 1fr); }
+}

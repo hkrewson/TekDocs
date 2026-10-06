@@ -296,6 +296,10 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_BEAT_SCHEDULE = {
+    "reconcile-content-indexes": {
+        "task": "apps.core.tasks.reconcile_content_indexes",
+        "schedule": 60.0,
+    },
     "schedule-remote-document-sources": {
         "task": "apps.core.tasks.schedule_remote_document_sources",
         "schedule": 300.0,

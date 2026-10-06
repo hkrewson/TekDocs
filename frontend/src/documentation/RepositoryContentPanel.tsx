@@ -1,0 +1,149 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { translate } from '../i18n/localization'
+import { useUnsavedChanges } from '../navigation/navigationGuard'
+import {
+  browserRepositoryClient, RepositoryConflictError,
+  type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
+} from './repositoryApi'
+
+type Draft = {
+  id: string
+  kind: 'document' | 'fragment'
+  title: string
+  markdown: string
+  path: string
+  metadataText: string
+}
+
+function draftFromSource(source: RepositorySource): Draft {
+  return { id: source.content_id, kind: source.kind, title: source.title, markdown: source.markdown, path: source.path, metadataText: '{}' }
+}
+
+export function RepositoryContentPanel({ organizationId, onClose, client = browserRepositoryClient }: {
+  organizationId?: string
+  onClose: () => void
+  client?: RepositoryClient
+}) {
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const [listing, setListing] = useState<RepositoryListing | null>(null)
+  const [query, setQuery] = useState('')
+  const [reload, setReload] = useState(0)
+  const [source, setSource] = useState<RepositorySource | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
+  const dirty = useMemo(() => draft !== null && (
+    source === null || draft.title !== source.title || draft.markdown !== source.markdown
+    || draft.path !== source.path || draft.metadataText !== '{}'
+  ), [draft, source])
+  const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null)
+
+  useEffect(() => { headingRef.current?.focus() }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      void client.list(organizationId, query, controller.signal)
+        .then((result) => { if (!controller.signal.aborted) { setListing(result); setLoading(false) } })
+        .catch(() => { if (!controller.signal.aborted) { setError(translate('repository.loadFailed')); setLoading(false) } })
+    }, 150)
+    return () => { window.clearTimeout(timer); controller.abort() }
+  }, [client, organizationId, query, reload])
+
+  function open(id: string) {
+    attempt(() => {
+      setError(''); setMessage(''); setConflict(null); setBusy(true)
+      void client.source(id, organizationId)
+        .then((result) => { setSource(result); setDraft(draftFromSource(result)) })
+        .catch(() => setError(translate('repository.sourceFailed')))
+        .finally(() => setBusy(false))
+    })
+  }
+
+  function create() {
+    attempt(() => {
+      setSource(null)
+      setDraft({ id: crypto.randomUUID(), kind: 'document', title: '', markdown: '', path: '', metadataText: '{}' })
+      setError(''); setMessage(''); setConflict(null)
+    })
+  }
+
+  async function save() {
+    if (!draft || busy) return
+    let metadata: Record<string, unknown>
+    try {
+      const parsed: unknown = JSON.parse(draft.metadataText)
+      if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error()
+      metadata = parsed as Record<string, unknown>
+    } catch {
+      setError(translate('repository.metadataInvalid'))
+      return
+    }
+    setBusy(true); setError(''); setMessage(''); setConflict(null)
+    try {
+      const saved = await client.save({
+        operation: source ? (draft.path !== source.path ? 'move' : 'update') : 'create',
+        content_id: draft.id,
+        base_commit: source?.accepted_commit ?? listing?.accepted_commit ?? null,
+        base_blob: source?.source_blob ?? null,
+        kind: draft.kind,
+        path: draft.path || null,
+        title: source === null || draft.title !== source.title ? draft.title : undefined,
+        markdown: source === null || draft.markdown !== source.markdown ? draft.markdown : undefined,
+        metadata_patch: metadata,
+      }, organizationId)
+      setSource(saved); setDraft(draftFromSource(saved)); setReload((value) => value + 1)
+      setMessage(saved.accepted_commit === saved.indexed_commit ? translate('repository.saved') : translate('repository.indexPending'))
+    } catch (caught) {
+      if (caught instanceof RepositoryConflictError) setConflict(caught.conflict)
+      else setError(caught instanceof Error ? caught.message : translate('repository.saveFailed'))
+    } finally { setBusy(false) }
+  }
+
+  async function rebase() {
+    if (!draft) return
+    setBusy(true)
+    try {
+      if (source) {
+        const latest = await client.source(draft.id, organizationId)
+        setSource(latest)
+      } else {
+        setListing(await client.list(organizationId, query))
+      }
+      setConflict(null)
+      setMessage(translate('repository.reviewRebase'))
+    } catch { setError(translate('repository.sourceFailed')) }
+    finally { setBusy(false) }
+  }
+
+  return <section className="repository-authoring">
+    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
+    {error && <p role="alert" className="form-message error">{error}</p>}
+    {message && <p role="status" className="form-message success">{message}</p>}
+    {listing && listing.accepted_commit !== listing.indexed_commit && <p role="status" className="form-message">{translate('repository.indexPending')}</p>}
+    <div className="repository-authoring-grid">
+      <section aria-label={translate('repository.files')}>
+        <label>{translate('repository.search')}<input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setLoading(true) }} /></label>
+        {loading && <p role="status">{translate('repository.loading')}</p>}
+        {!loading && listing?.results.length === 0 && <p className="empty-state">{translate('repository.empty')}</p>}
+        {!loading && listing && <ul className="document-title-list">{listing.results.map((item) => <li key={item.id}><button type="button" aria-current={draft?.id === item.id ? 'true' : undefined} onClick={() => open(item.id)}><span><strong>{item.title}</strong><small>{item.kind === 'fragment' ? translate('repository.fragment') : translate('repository.document')} · {item.path}</small></span></button></li>)}</ul>}
+        {listing?.has_more && <p>{translate('repository.moreResults')}</p>}
+      </section>
+      <section aria-label={translate('repository.editor')}>
+        {!draft && <p className="empty-state">{translate('repository.choose')}</p>}
+        {draft && <><div className="repository-editor-fields">
+          {!source && <label>{translate('repository.kind')}<select value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as Draft['kind'] })}><option value="document">{translate('repository.document')}</option><option value="fragment">{translate('repository.fragment')}</option></select></label>}
+          <label>{translate('repository.title')}<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+          <label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label>
+          <label>{translate('repository.markdown')}<textarea rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} /></label>
+          <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
+        </div>
+        {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
+        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button><button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
+      </section>
+    </div>
+  </section>
+}

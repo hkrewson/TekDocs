@@ -1686,7 +1686,7 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.2` | Portable Markdown/frontmatter profile, wikilink parser, commit indexer, unresolved links and deterministic index rebuild. |
 | `0.9.3` | File-backed reusable fragments with ordered live/pinned/copy composition and template-source parity. |
 | `0.9.4` | Authorized operational-entity context, asset documentation backlinks, content-graph reads, search, health and views. |
-| `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. |
+| `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. Implemented; release acceptance in `docs/releases/0.9.5.md`. |
 | `0.9.6` | Dry-run migration, mixed-store compatibility window, deterministic import, rollback and legacy-write retirement. |
 | `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity and repository-inclusive encrypted recovery. |
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
@@ -1707,8 +1707,11 @@ previews. Invalid composition preserves the last-known-good index. `0.9.4`
 adds stable operational-entity links in portable metadata and Markdown,
 rebuildable included-fragment references, authorized workspace
 reads/search/health, and asset documentation backlinks with exact/model/class
-distinctions. The current database editor has not yet moved to Git; issue #104
-owns managed authoring in `0.9.5`.
+distinctions. `0.9.5` adds a permission-scoped repository editor and API for
+document/fragment creation, targeted metadata and body edits, in-repository
+moves with aliases, exact base-blob conflict checks, three-way review and
+accepted/indexed reconciliation. The original database editor remains separate
+until the `0.9.6` migration and `0.9.7` publication checkpoints.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

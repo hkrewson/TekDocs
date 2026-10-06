@@ -28,6 +28,7 @@ import { useDocumentCollectionState } from './useDocumentCollectionState'
 import { useDocumentCollection } from './useDocumentCollection'
 import { TemplateLibrary } from './TemplateLibrary'
 import { TemplateUpdateReview } from './TemplateUpdateReview'
+import { RepositoryContentPanel } from './RepositoryContentPanel'
 import { useNavigationGuard, useUnsavedChanges } from '../navigation/navigationGuard'
 import './documentation.css'
 
@@ -129,6 +130,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     clearFilters: clearDocumentFilters,
   } = collectionState
   const [selected, setSelected] = useState<DocumentRecord | 'new' | null>(null)
+  const [repositoryOpen, setRepositoryOpen] = useState(false)
+  const repositoryButtonRef = useRef<HTMLButtonElement>(null)
   const [newDocumentMode, setNewDocumentMode] = useState<'write' | 'file'>('write')
   const [newPrimaryFile, setNewPrimaryFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
@@ -1062,8 +1065,8 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
   ]
   const showLibrary = !selected && !publicationView
 
-  return <>
-    {showLibrary && <header className="page-header"><div><h1>{translate('documentation.heading')}</h1></div><div className="page-actions"><button className="secondary-button" type="button" aria-label={indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')} title={indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')} aria-pressed={indexMode === 'health'} onClick={() => attemptNavigation(() => { setIndexMode((value) => value === 'health' ? 'browse' : 'health'); setDocumentPage(1) })}><CalendarCheck2 size={16} aria-hidden="true" /><span className="button-label">{indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')}</span></button><input ref={importInput} aria-label={translate('documentation.importFile')} className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => attemptNavigation(() => importInput.current?.click())}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={() => attemptNavigation(create)}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>}
+  return repositoryOpen ? <RepositoryContentPanel key={scopeKey} organizationId={workspace?.kind === 'organization' ? workspace.id : undefined} onClose={() => { setRepositoryOpen(false); window.requestAnimationFrame(() => repositoryButtonRef.current?.focus()) }} /> : <>
+    {showLibrary && <header className="page-header"><div><h1>{translate('documentation.heading')}</h1></div><div className="page-actions"><button ref={repositoryButtonRef} className="secondary-button" type="button" onClick={() => attemptNavigation(() => setRepositoryOpen(true))}>{translate('repository.open')}</button><button className="secondary-button" type="button" aria-label={indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')} title={indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')} aria-pressed={indexMode === 'health'} onClick={() => attemptNavigation(() => { setIndexMode((value) => value === 'health' ? 'browse' : 'health'); setDocumentPage(1) })}><CalendarCheck2 size={16} aria-hidden="true" /><span className="button-label">{indexMode === 'health' ? translate('documentation.browse') : translate('documentation.contentHealth')}</span></button><input ref={importInput} aria-label={translate('documentation.importFile')} className="sr-only" type="file" accept=".md,text/markdown" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importMarkdown(file) }} /><button className="secondary-button" type="button" aria-label={translate('documentation.import')} title={translate('documentation.import')} disabled={saving} onClick={() => attemptNavigation(() => importInput.current?.click())}><FileUp size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.import')}</span></button><button className="primary-button" type="button" aria-label={translate('documentation.new')} title={translate('documentation.new')} onClick={() => attemptNavigation(create)}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('documentation.new')}</span></button></div></header>}
     {error && <div className="form-message error" role="alert">{error}</div>}
     {message && <div className="form-message success" role="status">{message}</div>}
     {showLibrary && <>

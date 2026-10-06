@@ -2677,6 +2677,54 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["content_authoring_msp_write"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_msp_source"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/resolve-path": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_msp_resolve_path"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/content-graph/documents": {
         readonly parameters: {
             readonly query?: never;
@@ -5074,6 +5122,54 @@ export interface paths {
         readonly get: operations["content_graph_organization_retrieve"];
         readonly put?: never;
         readonly post: operations["content_graph_organization_rebuild"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["content_authoring_organization_write"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_organization_source"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/resolve-path": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_organization_resolve_path"];
+        readonly put?: never;
+        readonly post?: never;
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
@@ -9391,6 +9487,52 @@ export interface components {
             readonly api_token: string;
             /** @default 60 */
             readonly sync_interval_minutes: number;
+        };
+        readonly ContentAuthoringConflict: {
+            readonly reason: string;
+            readonly base: string | null;
+            readonly current: string | null;
+            readonly proposed: string | null;
+            readonly base_commit: string | null;
+            readonly current_commit: string | null;
+            readonly current_blob: string | null;
+        };
+        readonly ContentAuthoringMutation: {
+            /**
+             * @description * `create` - create
+             *     * `update` - update
+             *     * `move` - move
+             * @enum {string}
+             */
+            readonly operation: "create" | "update" | "move";
+            /** Format: uuid */
+            readonly content_id: string;
+            readonly base_commit?: string | null;
+            readonly base_blob?: string | null;
+            /**
+             * @description * `document` - document
+             *     * `fragment` - fragment
+             * @enum {string|null}
+             */
+            readonly kind?: "document" | "fragment" | null;
+            readonly path?: string | null;
+            readonly title?: string | null;
+            readonly markdown?: string | null;
+            readonly metadata_patch?: {
+                readonly [key: string]: unknown;
+            };
+        };
+        readonly ContentAuthoringSource: {
+            /** Format: uuid */
+            readonly content_id: string;
+            readonly path: string;
+            readonly kind: string;
+            readonly title: string;
+            readonly markdown: string;
+            readonly source: string;
+            readonly source_blob: string;
+            readonly accepted_commit: string | null;
+            readonly indexed_commit: string | null;
         };
         readonly ContentDerivedFrom: {
             /** Format: uuid */
@@ -23063,6 +23205,89 @@ export interface operations {
             };
         };
     };
+    readonly content_authoring_msp_write: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ContentAuthoringMutation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ContentAuthoringMutation"];
+                readonly "multipart/form-data": components["schemas"]["ContentAuthoringMutation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringConflict"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_msp_source: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_msp_resolve_path: {
+        readonly parameters: {
+            readonly query: {
+                readonly path: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
     readonly content_read_msp_list: {
         readonly parameters: {
             readonly query?: {
@@ -29627,6 +29852,94 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ContentGraph"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_write: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["ContentAuthoringMutation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["ContentAuthoringMutation"];
+                readonly "multipart/form-data": components["schemas"]["ContentAuthoringMutation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringConflict"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_source: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_resolve_path: {
+        readonly parameters: {
+            readonly query: {
+                readonly path: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
                 };
             };
         };

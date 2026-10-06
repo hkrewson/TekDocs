@@ -78,8 +78,9 @@ does not replace the last-known-good projection.
 For an operator-directed rebuild, run
 `python manage.py index_workspace_content --repository <repository-uuid>` in
 the backend container. Add `--force` to verify and replace an already-current
-projection. Normal managed authoring will invoke this service in a later
-checkpoint; `0.9.2` does not migrate the existing document store.
+projection. Managed authoring indexes each accepted write and retries an
+unfinished projection in the background. Existing database documents are not
+yet migrated.
 
 ### Version 1 fragment composition
 
@@ -107,7 +108,7 @@ current, changed, or missing without changing template enrollment decisions.
 The index stores exact source manifests and audience-specific expansions, and
 rejects cycles, missing or foreign pins, audience widening, excessive depth,
 node count, or expanded size. The current database-backed editor remains in
-place until the managed authoring and migration checkpoints.
+place through the later migration checkpoint.
 
 ### Version 1 operational context and read paths
 
@@ -122,6 +123,25 @@ model, and product-class guidance. Collection/search/health and document-detail
 routes read the current workspace's index; raw repository content remains
 unavailable to client portal users. The legacy editor and publication flow
 remain unchanged until later checkpoints.
+
+### Managed repository authoring
+
+The `0.9.5` checkpoint adds a separate **Repository content** editor under
+Documentation for staff with document-edit permission. It creates Markdown
+documents and reusable fragments, updates body and portable metadata, and
+moves files while retaining old paths as same-repository aliases. Stable UUID
+wikilinks and includes do not need rewriting when a file moves. The original
+database-backed document editor remains available during the migration window;
+editing it does not change the repository copy.
+
+Each save names the exact accepted Git commit and source blob the editor read.
+Unrelated repository changes may be merged safely, but concurrent changes to
+the same file return base/current/proposed source for explicit review and
+rebase. The service validates the entire candidate content graph before an
+accepted commit, preserving comments and untouched frontmatter where possible.
+If indexing is interrupted after acceptance, the accepted/indexed markers
+show the lag and a scheduled retry rebuilds the projection without rewriting
+Git. This is local managed Git; remote GitHub integration is not required.
 
 ## Production setup
 

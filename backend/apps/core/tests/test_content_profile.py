@@ -61,6 +61,13 @@ def test_malformed_wikilinks_fail_while_code_examples_remain_literal():
     assert parsed.links == ()
 
 
+@pytest.mark.parametrize("alias", ("docs/../other.md", "docs/.GIT/config.md", "-unsafe.md", "docs//other.md"))
+def test_aliases_obey_repository_path_safety(alias: str):
+    with pytest.raises(ContentProfileError) as captured:
+        parse_content(_source(content_id=uuid.uuid4(), extra=f"aliases:\n  - {alias}\n", body="Guide.\n"))
+    assert captured.value.code == "alias.shape"
+
+
 def test_profile_parses_ordered_live_pinned_copy_and_template_source_metadata():
     live_id = uuid.uuid4()
     pinned_id = uuid.uuid4()

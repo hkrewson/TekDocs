@@ -26,6 +26,7 @@ def repository_publication_preflight(
     topic_type: str,
     frozen_attachment_ids: set[UUID] | None = None,
     frozen_entity_ids: set[UUID] | None = None,
+    frozen_key_targets: set[str] | None = None,
 ) -> dict[str, Any]:
     """Return deterministic, content-free blocker and warning codes."""
 
@@ -64,6 +65,8 @@ def repository_publication_preflight(
                 else:
                     if target == f"tekdocs://entity/{entity_id}" and entity_id in frozen_entity_ids:
                         continue
+            if kind == "key" and frozen_key_targets is not None and target in frozen_key_targets:
+                continue
             blockers.add(
                 {
                     "attachment": "repository.attachment.unfrozen",

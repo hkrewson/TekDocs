@@ -1729,6 +1729,12 @@ client-audience snapshot. Its signed display-name/type/workspace-label cards
 remain verifiable after live entity names change. Foreign, unavailable, or
 private client-audience targets fail closed. No operational object is copied
 to Git, and this still does not create a distributable publication.
+The following field-key slice accepts only portable bindings that exactly match
+the active same-Workspace legacy document. It freezes audience-authorized field
+values and provenance into protected, signed evidence while leaving Git-authored
+Markdown and portable metadata value-free. Content expansion and withheld or
+unavailable keys remain blocked. It does not create a distribution path or move
+document-write authority.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

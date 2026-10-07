@@ -33,6 +33,10 @@ from apps.accounts.policy import (
 from .content_index_models import ContentNode, ContentNodeKind
 from .content_publication_sources import pinned_git_document_dependencies
 from .document_attachments import copy_attachment_content
+from .document_key_freeze import KeyFreezeConflict, freeze_document_keys, verify_frozen_field_keys
+from .document_key_models import DocumentKeyBinding
+from .document_keys import key_targets_in_markdown
+from .document_migration_keys import DocumentMigrationKeyError, portable_document_keys
 from .entity_mentions import resolve_entity_mentions
 from .models import (
     AuditEvent,
@@ -133,6 +137,56 @@ def evidence_payload(*, manifest: dict[str, Any], markdown: str) -> bytes:
     return bytes(payload)
 
 
+def _frozen_key_snapshot(
+    *, repository: WorkspaceRepository, node: ContentNode, document: Document | None,
+    markdown: str, audience: str, actor: User, signed_at: str,
+) -> dict[str, Any] | None:
+    """Freeze only portable field keys whose authored bindings match the live owner."""
+    if not key_targets_in_markdown(markdown):
+        return None
+    if document is None:
+        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.unavailable")
+    # Hold active binding identities stable through portable parity and resolution.
+    list(DocumentKeyBinding.objects.select_for_update().filter(document=document, archived_at__isnull=True))
+    try:
+        bindings, _identities = portable_document_keys(document, markdown)
+        if bindings != node.frontmatter.get("key_bindings", {}):
+            raise RepositoryPublicationEvidenceError(
+                "Repository publication preflight blocked: repository.key.binding_mismatch"
+            )
+        organization = repository.workspace.organization
+        workspace = (
+            resolve_organization_workspace(actor, entity_id=organization.entity_id)
+            if organization is not None else resolve_msp_workspace(actor)
+        )
+        frozen = freeze_document_keys(
+            workspace=workspace,
+            document=document,
+            markdown=markdown,
+            audience=(
+                DataAudience.CLIENT_PORTAL
+                if audience == PublicationAudience.CLIENT_VISIBLE
+                else DataAudience.MSP_STAFF
+            ),
+            resolved_at=signed_at,
+            lock=True,
+        )
+    except (DocumentMigrationKeyError, KeyFreezeConflict) as exc:
+        raise RepositoryPublicationEvidenceError(
+            "Repository publication preflight blocked: repository.key.unavailable"
+        ) from exc
+    if len(frozen.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
+        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.limit")
+    snapshot = {
+        "markdown": frozen.markdown,
+        "sha256": hashlib.sha256(frozen.markdown.encode("utf-8")).hexdigest(),
+        "records": list(frozen.manifest_records),
+    }
+    if not verify_frozen_field_keys(markdown, snapshot):
+        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.unavailable")
+    return snapshot
+
+
 def retain_repository_publication_evidence(
     *, repository_id: uuid.UUID, content_id: uuid.UUID, audience: str, actor: User
 ) -> RepositoryPublicationEvidence:
@@ -190,6 +244,8 @@ def _retain_pinned_evidence(
         if not isinstance(variant, dict) or not isinstance(variant.get("markdown"), str):
             raise RepositoryPublicationEvidenceError("Indexed repository composition is unavailable")
         markdown = variant["markdown"]
+        signed_at = timezone.now()
+        signed_at_text = signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
         if (
             len(markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES
             or hashlib.sha256(markdown.encode("utf-8")).hexdigest() != source["markdown_sha256"]
@@ -197,12 +253,14 @@ def _retain_pinned_evidence(
         ):
             raise RepositoryPublicationEvidenceError("Indexed repository composition differs from its Git source")
         attachment_ids = attachment_ids_in_markdown(markdown)
+        key_targets = key_targets_in_markdown(markdown)
         if len(attachment_ids) > MAX_RETAINED_ATTACHMENTS:
             raise RepositoryPublicationEvidenceError(
                 "Repository publication preflight blocked: repository.attachment.limit"
             )
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
-        if attachment_ids:
+        document: Document | None = None
+        if attachment_ids or key_targets:
             document = (
                 Document.objects.select_for_update()
                 .filter(
@@ -216,8 +274,10 @@ def _retain_pinned_evidence(
             )
             if document is None:
                 raise RepositoryPublicationEvidenceError(
-                    "Repository publication preflight blocked: repository.attachment.unavailable"
+                    "Repository publication preflight blocked: "
+                    + ("repository.attachment.unavailable" if attachment_ids else "repository.key.unavailable")
                 )
+        if attachment_ids:
             attachments = (
                 DocumentAttachment.objects.select_for_update()
                 .filter(
@@ -249,6 +309,10 @@ def _retain_pinned_evidence(
                         "Repository publication preflight blocked: repository.attachment.limit"
                     )
                 retained.append((attachment, content, uuid.uuid4()))
+        key_snapshot = _frozen_key_snapshot(
+            repository=repository, node=node, document=document,
+            markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
+        )
         entity_cards = _frozen_entity_cards(
             repository=repository, markdown=markdown, audience=audience, actor=actor, member=member
         )
@@ -258,6 +322,7 @@ def _retain_pinned_evidence(
             topic_type=node.topic_type,
             frozen_attachment_ids={item.id for item, _content, _id in retained},
             frozen_entity_ids={uuid.UUID(item["id"]) for item in entity_cards},
+            frozen_key_targets=set(key_targets) if key_snapshot is not None else None,
         )
         if preflight["blockers"]:
             raise RepositoryPublicationEvidenceError(
@@ -265,7 +330,6 @@ def _retain_pinned_evidence(
             )
 
         evidence_id = uuid.uuid4()
-        signed_at = timezone.now()
         source_commit = repository.accepted_commit
         if source_commit is None:  # pragma: no cover - guarded above
             raise RepositoryPublicationEvidenceError("Repository accepted commit is unavailable")
@@ -277,7 +341,7 @@ def _retain_pinned_evidence(
             "source_commit": source_commit.object_id,
             "content_id": str(content_id),
             "audience": audience,
-            "signed_at": signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z"),
+            "signed_at": signed_at_text,
             "signed_by": str(actor.id),
             "source": source,
             "preflight": preflight,
@@ -293,6 +357,8 @@ def _retain_pinned_evidence(
             ],
             "entity_cards": entity_cards,
         }
+        if key_snapshot is not None:
+            manifest["key_snapshot"] = key_snapshot
         digest = hashlib.sha256(evidence_payload(manifest=manifest, markdown=markdown)).digest()
         key = publication_signing_key()
         raw_public_key = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -396,6 +462,11 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
             and [card["id"] for card in cards] == [str(entity_id) for entity_id in sorted(requested_entities)]
         )
     )
+    key_snapshot = manifest.get("key_snapshot") if isinstance(manifest, dict) else None
+    key_snapshot_valid = (
+        not key_targets_in_markdown(evidence.canonical_markdown)
+        if key_snapshot is None else verify_frozen_field_keys(evidence.canonical_markdown, key_snapshot)
+    )
     attachments_valid = True
     descriptors = manifest.get("attachments") if isinstance(manifest, dict) else None
     if descriptors is not None:
@@ -468,6 +539,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         and evidence.signature_algorithm == SIGNATURE_ALGORITHM
         and attachments_valid
         and entity_cards_valid
+        and key_snapshot_valid
     )
     return {
         "valid": valid,
@@ -479,4 +551,5 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "preflight_attested": valid and preflight_attested,
         "attachments_valid": attachments_valid,
         "entity_cards_valid": entity_cards_valid,
+        "key_snapshot_valid": key_snapshot_valid,
     }

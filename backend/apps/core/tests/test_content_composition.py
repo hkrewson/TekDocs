@@ -28,6 +28,7 @@ from apps.core.content_publication_sources import (
     pinned_git_document_dependencies,
 )
 from apps.core.document_attachments import create_document_attachment
+from apps.core.document_key_models import DocumentKeyBinding
 from apps.core.documents import create_document
 from apps.core.models import (
     ContentInclude,
@@ -54,6 +55,7 @@ from apps.core.repository_publication_preflight import repository_publication_pr
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
+from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -427,6 +429,102 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
         message="Advance live fragment",
     )
     assert verify_repository_publication_evidence(evidence)["valid"]
+
+
+def test_repository_evidence_freezes_portable_field_keys_without_changing_git(composition_repository):
+    installation, _msp_workspace, _msp_repository = composition_repository
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Key evidence client",
+        legal_name="Key evidence client",
+        website="",
+        classifications=["client"],
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=organization)
+    repository = repository_storage.ensure_workspace_repository(workspace).repository
+    asset = create_network_hardware_asset(installation=installation, organization=organization, name="First laptop")
+    document = create_document(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        title="Laptop guide",
+        markdown="Device <tekdocs://key/subject.name>.\n",
+    )
+    binding = DocumentKeyBinding.objects.create(
+        tenant=installation.tenant,
+        workspace=workspace,
+        organization=organization,
+        document=document,
+        name="subject",
+        target_entity=asset.entity,
+        created_by=installation.owner,
+    )
+    body = "Device <tekdocs://key/subject.name>.\n"
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/laptop.md": _content(
+                content_id=document.id,
+                title="Laptop guide",
+                metadata=f"key_bindings:\n  subject: {asset.entity_id}\n",
+                body=body,
+            )
+        },
+        message="Add portable key document",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id,
+        content_id=document.id,
+        audience="msp_internal",
+        actor=installation.owner,
+    )
+    snapshot = evidence.manifest["key_snapshot"]
+    assert evidence.canonical_markdown == body
+    assert snapshot["markdown"] == "Device First laptop.\n"
+    assert snapshot["records"][0]["value"] == "First laptop"
+    assert verify_repository_publication_evidence(evidence)["key_snapshot_valid"]
+
+    asset.entity.display_name = "Renamed laptop"
+    asset.entity.save(update_fields=("display_name", "updated_at"))
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    evidence.manifest["key_snapshot"]["markdown"] = "Device forged.\n"
+    assert not verify_repository_publication_evidence(evidence)["key_snapshot_valid"]
+    evidence.refresh_from_db()
+
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.key.unavailable"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="client_visible",
+            actor=installation.owner,
+        )
+    replacement = create_network_hardware_asset(
+        installation=installation, organization=organization, name="Replacement laptop"
+    )
+    binding.target_entity = replacement.entity
+    binding.save(update_fields=("target_entity", "updated_at"))
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.key.binding_mismatch"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+    binding.name = "other"
+    binding.save(update_fields=("name", "updated_at"))
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.key.unavailable"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
 
 
 def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_repository, tmp_path):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from functools import partial
@@ -133,6 +134,46 @@ def _replace_key_autolinks(markdown: str, replacements: dict[str, str]) -> str:
             index += 1
         output.append("".join(rendered))
     return "".join(output)
+
+
+def verify_frozen_field_keys(markdown: str, snapshot: object) -> bool:
+    """Reconstruct a retained field-only projection without reading live records."""
+    if not isinstance(snapshot, dict) or set(snapshot) != {"markdown", "sha256", "records"}:
+        return False
+    frozen = snapshot["markdown"]
+    digest = snapshot["sha256"]
+    records = snapshot["records"]
+    targets = set(key_targets_in_markdown(markdown))
+    keys, malformed = keys_in_markdown(markdown)
+    if (
+        not targets
+        or malformed
+        or len(keys) > MAXIMUM_KEYS_PER_DOCUMENT
+        or not isinstance(frozen, str)
+        or not isinstance(digest, str)
+        or not isinstance(records, list)
+        or len(records) != len(keys)
+        or any(key.path == ("content",) for key in keys)
+    ):
+        return False
+    replacements: dict[str, str] = {}
+    for record in records:
+        if not isinstance(record, dict) or record.get("kind") != KeyResolutionKind.FIELD.value:
+            return False
+        expression, value = record.get("expression"), record.get("value")
+        if not isinstance(expression, str) or not isinstance(value, str):
+            return False
+        target = f"tekdocs://key/{expression}"
+        if target not in targets or target in replacements:
+            return False
+        replacements[target] = _safe_inline_value(value)
+    return (
+        set(replacements) == targets
+        and _replace_key_autolinks(markdown, replacements) == frozen
+        and hashlib.sha256(frozen.encode("utf-8")).hexdigest() == digest
+        and len(frozen.encode("utf-8")) <= MAXIMUM_FROZEN_MARKDOWN_BYTES
+        and not key_targets_in_markdown(frozen)
+    )
 
 
 def _manifest_record(

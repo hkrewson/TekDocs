@@ -1692,6 +1692,14 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
+The first `0.9.7` foundation produces a deterministic internal dependency
+proof for one repository document: the accepted commit, exact root and
+audience-visible included fragment paths/blob IDs, per-source SHA-256 digests,
+composition digest, and Markdown digest. It refuses an unindexed or divergent
+accepted head and unavailable pinned objects. This is not yet part of a signed
+STATIC manifest; legacy publication, portal, export and write authority remain
+unchanged. The `0.9.7` release exit condition remains open.
+
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore
 code literals; current taxonomy keys and structured-topic schemas are checked;

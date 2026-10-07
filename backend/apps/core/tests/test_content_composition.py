@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import uuid
 
 import pytest
@@ -9,10 +10,11 @@ from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.core import content_composition, repository_service, repository_storage
+from apps.core import content_composition, content_publication_sources, repository_service, repository_storage
 from apps.core.content_composition import ContentCompositionError, ContentCompositionResolver
 from apps.core.content_index import ContentIndexValidationError, content_graph_projection, index_repository_content
 from apps.core.content_profile import parse_content
+from apps.core.content_publication_sources import ContentPublicationSourceError, freeze_git_document_dependencies
 from apps.core.models import (
     ContentInclude,
     ContentNode,
@@ -23,6 +25,7 @@ from apps.core.models import (
     WorkspaceKind,
 )
 from apps.core.organizations import create_organization
+from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 
@@ -66,6 +69,120 @@ def composition_repository(tmp_path):
 def _accepted(repository) -> str | None:  # type: ignore[no-untyped-def]
     repository.refresh_from_db()
     return repository.accepted_commit.object_id if repository.accepted_commit_id else None
+
+
+def test_publication_source_freeze_pins_exact_git_blobs_and_audience(composition_repository, monkeypatch):
+    _installation, _workspace, repository = composition_repository
+    source_id = uuid.uuid4()
+    nested_id = uuid.uuid4()
+    document_id = uuid.uuid4()
+    first_source = _content(
+        content_id=source_id,
+        title="Shared procedure",
+        kind="fragment",
+        metadata="includes:\n" + _include(content_id=nested_id, mode="live", audience="shared"),
+        body="First source.\n",
+    )
+    first_nested = _content(content_id=nested_id, title="Nested", kind="fragment", body="First nested.\n")
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"fragments/source.md": first_source, "fragments/nested.md": first_nested},
+        message="Add first source versions",
+    )
+    second_source = _content(
+        content_id=source_id,
+        title="Shared procedure",
+        kind="fragment",
+        metadata="includes:\n" + _include(content_id=nested_id, mode="live", audience="msp_internal"),
+        body="Second source.\n",
+    )
+    second_nested = _content(content_id=nested_id, title="Nested", kind="fragment", body="Second nested.\n")
+    document_source = _content(
+        content_id=document_id,
+        title="Publication candidate",
+        metadata=(
+            "includes:\n"
+            + _include(content_id=source_id, mode="pinned", audience="shared", commit=first.object_id)
+            + _include(content_id=source_id, mode="live", audience="msp_internal")
+        ),
+        body="Root body.\n",
+    )
+    second = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={
+            "fragments/source.md": second_source,
+            "fragments/nested.md": second_nested,
+            "documents/candidate.md": document_source,
+        },
+        message="Add publication candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+
+    internal = freeze_git_document_dependencies(
+        repository_id=repository.id, content_id=document_id, audience="msp_internal"
+    )
+    assert internal == freeze_git_document_dependencies(
+        repository_id=repository.id, content_id=document_id, audience="msp_internal"
+    )
+    assert internal["accepted_commit"] == second.object_id
+    assert [item["commit"] for item in internal["sources"]] == [
+        second.object_id,
+        first.object_id,
+        first.object_id,
+        second.object_id,
+        second.object_id,
+    ]
+    assert [item["ordinal_path"] for item in internal["sources"]] == [[], [0], [0, 0], [1], [1, 0]]
+    assert internal["sources"][1]["blob"] != internal["sources"][3]["blob"]
+    assert internal["sources"][1]["path"] == "fragments/source.md"
+    assert internal["sources"][0]["path"] == "documents/candidate.md"
+    blob_input = f"blob {len(document_source)}\0".encode() + document_source
+    assert internal["sources"][0]["blob"] == hashlib.sha1(blob_input).hexdigest()  # noqa: S324  # Git identity
+    assert internal["sources"][0]["source_sha256"] == hashlib.sha256(document_source).hexdigest()
+
+    client = freeze_git_document_dependencies(
+        repository_id=repository.id, content_id=document_id, audience="client_visible"
+    )
+    assert [item["commit"] for item in client["sources"]] == [
+        second.object_id,
+        first.object_id,
+        first.object_id,
+    ]
+    assert client["sources"][1:3] == internal["sources"][1:3]
+
+    def missing_pinned_commit(*, repository_id, object_id):  # type: ignore[no-untyped-def]
+        raise RepositoryFileNotFoundError("Pinned object is missing")
+
+    monkeypatch.setattr(content_publication_sources, "read_repository_markdown_files_at_commit", missing_pinned_commit)
+    with pytest.raises(ContentPublicationSourceError, match="source objects are unavailable"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+
+def test_publication_source_freeze_rejects_stale_or_tampered_projection(composition_repository):
+    _installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="First.\n")},
+        message="Add candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    ContentNode.objects.filter(repository=repository, content_id=document_id).update(composition_variants={})
+    with pytest.raises(ContentPublicationSourceError, match="composition differs"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+    index_repository_content(repository_id=repository.id, force=True)
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="Second.\n")},
+        message="Advance candidate without indexing",
+    )
+    with pytest.raises(ContentPublicationSourceError, match="index is not current"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
 
 
 def test_file_backed_composition_preserves_pins_audiences_copy_provenance_and_template_preview(

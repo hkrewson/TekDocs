@@ -208,6 +208,12 @@ documents are deferred visibly. The fresh/0.8.46 upgrade rehearsal proves
 stable IDs and reversible first-wave copies; publication, full document-read
 and write parity, and repository-inclusive recovery remain later gates.
 
+The first `0.9.7` publication foundation mitigates one part of `TD-RISK-071`:
+an internal freeze rejects stale projections and unavailable pinned sources and
+records exact Git blob identities for audience-filtered composition. It does
+not yet put that proof in an append-only signed publication, authorize a new
+publication route, or complete the `TD-RISK-069` repository-inclusive restore.
+
 ## 0.9.2 Markdown/index disposition
 
 `TD-RISK-069` is mitigated for the index boundary with later recurrence. The

@@ -448,6 +448,15 @@ Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or
 GitHub access.
 
+First foundation (implemented, not the exit condition): an internal source
+freezer re-reads the exact accepted Git snapshot, recomputes the audience
+composition, compares it with the indexed projection, and records root and
+included fragment commit/path/blob identities. Missing historical objects,
+index lag and projection drift fail closed. The legacy STATIC publisher is not
+switched by this proof; transactional head pinning, signed manifest integration,
+file/export/portal parity and repository-inclusive recovery remain in this
+milestone.
+
 ### `0.9.8` — version 1 acceptance
 
 - Complete transferred responsive Documentation/Files work and issue #60

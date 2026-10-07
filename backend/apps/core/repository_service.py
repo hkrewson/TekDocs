@@ -914,8 +914,6 @@ def pin_accepted_repository_for_publication(repository_id: uuid.UUID) -> Iterato
     writer cannot advance the accepted ref between proof and retention.
     """
 
-    if transaction.get_connection().in_atomic_block:
-        raise RepositoryServiceError("Publication source pin must begin outside a database transaction")
     repository, root, path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
         with transaction.atomic():

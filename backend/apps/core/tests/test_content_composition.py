@@ -6,9 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 
 import pytest
-from django.db import transaction
+from allauth.mfa.models import Authenticator
+from allauth.mfa.totp.internal.auth import generate_totp_secret
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError, connection, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
+from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
@@ -26,12 +30,17 @@ from apps.core.models import (
     ContentNode,
     ContentTemplateSource,
     InstallationState,
+    RepositoryPublicationEvidence,
     Tenant,
     Workspace,
     WorkspaceKind,
     WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
+from apps.core.repository_publication_evidence import (
+    retain_repository_publication_evidence,
+    verify_repository_publication_evidence,
+)
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
@@ -227,6 +236,42 @@ def test_publication_source_pin_blocks_head_advance_until_retention_finishes(com
     assert _accepted(repository) != first.object_id
 
 
+def test_publication_source_pin_holds_database_row_through_outer_request_commit(composition_repository):
+    _installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="First.\n")},
+        message="Add candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    started = Event()
+
+    def advance_head():
+        started.set()
+        return repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=first.object_id,
+            changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="Next.\n")},
+            message="Advance candidate",
+        )
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with transaction.atomic():
+            with pinned_git_document_dependencies(
+                repository_id=repository.id, content_id=document_id, audience="msp_internal"
+            ) as proof:
+                assert proof["accepted_commit"] == first.object_id
+                future = pool.submit(advance_head)
+                assert started.wait(5)
+                with pytest.raises(TimeoutError):
+                    future.result(timeout=0.2)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=0.2)
+        assert future.result(timeout=10).created
+
+
 def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(composition_repository):
     _installation, _workspace, repository = composition_repository
     document_id = uuid.uuid4()
@@ -254,11 +299,10 @@ def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(compo
     assert repository.indexed_commit_id == repository.accepted_commit_id
 
     with transaction.atomic():
-        with pytest.raises(ContentPublicationSourceError, match="cannot be pinned"):
-            with pinned_git_document_dependencies(
-                repository_id=repository.id, content_id=document_id, audience="msp_internal"
-            ):
-                pytest.fail("The pin must reject a caller that acquired database locks first")
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document_id, audience="msp_internal"
+        ) as proof:
+            assert proof["accepted_commit"] == first.object_id
 
     repository_service.commit_repository_files(
         repository_id=repository.id,
@@ -272,6 +316,186 @@ def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(compo
         ):
             pytest.fail("An unindexed source must never enter publication retention")
 
+
+def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(
+    composition_repository, django_runtime_role,
+):
+    installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    fragment_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/candidate.md": _content(
+                content_id=document_id,
+                title="Candidate",
+                metadata="includes:\n" + _include(content_id=fragment_id, mode="live", audience="shared"),
+                body="Root.\n",
+            ),
+            "fragments/part.md": _content(
+                content_id=fragment_id, title="Part", kind="fragment", body="Included.\n"
+            ),
+        },
+        message="Add publication candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    with pytest.raises(PermissionDenied):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document_id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+    assert RepositoryPublicationEvidence.objects.count() == 0
+
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id,
+        content_id=document_id,
+        audience="msp_internal",
+        actor=installation.owner,
+    )
+    assert evidence.manifest["source"]["accepted_commit"] == first.object_id
+    assert len(evidence.manifest["source"]["sources"]) == 2
+    assert "Included." in evidence.canonical_markdown
+    assert verify_repository_publication_evidence(evidence)["valid"]
+
+    foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
+        )
+        assert RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+        bind_local_rls_scope(DataScope.tenant(foreign_tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
+        assert not RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+
+    evidence.canonical_markdown += "Tampered."
+    assert not verify_repository_publication_evidence(evidence)["valid"]
+    evidence.refresh_from_db()
+    evidence.manifest["source"]["sources"][1]["blob"] = "0" * 40
+    assert not verify_repository_publication_evidence(evidence)["valid"]
+    evidence.refresh_from_db()
+    with pytest.raises(ValidationError, match="append-only"):
+        evidence.save()
+    with pytest.raises(ValidationError, match="append-only"):
+        evidence.delete()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        RepositoryPublicationEvidence.objects.filter(pk=evidence.id).update(canonical_markdown="Tampered")
+    with pytest.raises(DatabaseError), transaction.atomic():
+        RepositoryPublicationEvidence.objects.filter(pk=evidence.id).delete()
+    forged = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    forged.pk = uuid.uuid4()
+    forged.manifest["evidence_id"] = str(forged.pk)
+    forged.manifest["source"]["accepted_commit"] = "0" * 40
+    with pytest.raises(DatabaseError), transaction.atomic():
+        RepositoryPublicationEvidence.objects.bulk_create([forged])
+
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={
+            "fragments/part.md": _content(
+                content_id=fragment_id, title="Part", kind="fragment", body="Changed later.\n"
+            )
+        },
+        message="Advance live fragment",
+    )
+    assert verify_repository_publication_evidence(evidence)["valid"]
+
+
+def test_repository_publication_evidence_is_exact_client_workspace_scoped(composition_repository, django_runtime_role):
+    installation, _workspace, _repository = composition_repository
+    client = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Evidence Client",
+        legal_name="Evidence Client LLC",
+        website="",
+        classifications=["client"],
+    )
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Evidence Sibling",
+        legal_name="Evidence Sibling LLC",
+        website="",
+        classifications=["client"],
+    )
+    client_workspace = Workspace.objects.get(tenant=installation.tenant, organization=client)
+    client_repository = repository_storage.ensure_workspace_repository(client_workspace).repository
+    client_repository.refresh_from_db()
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=client_repository.id,
+        expected_base=_accepted(client_repository),
+        changes={
+            "documents/client-guide.md": _content(
+                content_id=document_id, title="Client guide", body="Private client instructions.\n"
+            )
+        },
+        message="Add client publication candidate",
+    )
+    index_repository_content(repository_id=client_repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    client_user = User.objects.create_user(
+        email="evidence-client@example.invalid", display_name="Evidence Client Reader"
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=client_user, role=BuiltInRole.CLIENT_USER, organization=client
+    )
+    with pytest.raises(PermissionDenied):
+        retain_repository_publication_evidence(
+            repository_id=client_repository.id,
+            content_id=document_id,
+            audience="client_visible",
+            actor=client_user,
+        )
+    evidence = retain_repository_publication_evidence(
+        repository_id=client_repository.id,
+        content_id=document_id,
+        audience="client_visible",
+        actor=installation.owner,
+    )
+    assert verify_repository_publication_evidence(evidence)["valid"]
+
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(installation.tenant, client), organization_mode=OrganizationRLSMode.ORGANIZATION
+        )
+        assert RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+        bind_local_rls_scope(
+            DataScope.organization(installation.tenant, sibling), organization_mode=OrganizationRLSMode.ORGANIZATION
+        )
+        assert not RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+
+
+def test_repository_publication_evidence_upgrade_installs_forced_rls_and_append_only_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0167_contententitylink")])
+        assert "core_repositorypublicationevidence" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorypublicationevidence'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger WHERE tgrelid = 'core_repositorypublicationevidence'::regclass "
+                "AND tgname IN ('core_repositorypublicationevidence_validate', "
+                "'core_repositorypublicationevidence_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
 
 def test_file_backed_composition_preserves_pins_audiences_copy_provenance_and_template_preview(
     composition_repository, django_runtime_role,

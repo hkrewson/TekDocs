@@ -452,11 +452,13 @@ First foundation (implemented, not the exit condition): an internal source
 freezer re-reads the exact accepted Git snapshot, recomputes the audience
 composition, compares it with the indexed projection, and records root and
 included fragment commit/path/blob identities. Missing historical objects,
-index lag and projection drift fail closed. The legacy STATIC publisher is not
-switched by this proof. A second internal foundation now holds the accepted
-Git head and database row stable around a future append-only publication
-insert. Signed manifest integration, file/export/portal parity and
-repository-inclusive recovery remain in this milestone.
+index lag and projection drift fail closed. A second foundation holds the
+accepted Git head and database row stable through evidence retention, including
+inside request transactions. A third foundation signs the exact source proof
+and composed Markdown into a separate append-only, exact-Workspace record that
+verifies without live Git. It is not a distributable STATIC publication: the
+legacy publisher remains authoritative, and approval, artifacts, file/export/
+portal parity and repository-inclusive recovery remain in this milestone.
 
 ### `0.9.8` — version 1 acceptance
 

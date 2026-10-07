@@ -210,11 +210,13 @@ and write parity, and repository-inclusive recovery remain later gates.
 
 The first `0.9.7` publication foundation mitigates one part of `TD-RISK-071`:
 an internal freeze rejects stale projections and unavailable pinned sources and
-records exact Git blob identities for audience-filtered composition. It does
-not yet put that proof in an append-only signed publication, authorize a new
-publication route, or complete the `TD-RISK-069` repository-inclusive restore.
-The follow-on transactional pin prevents an accepted-head race during a future
-repository publication insert but does not close those remaining risks.
+records exact Git blob identities for audience-filtered composition. A
+transactional pin prevents an accepted-head race, including during an
+authenticated request, and a separate append-only signed record now retains
+the composed Markdown and exact source proof under forced Workspace RLS.
+Verification needs the retained bytes and trusted key, not live Git. This is
+not yet a distributable STATIC publication: approval, artifacts, portal and
+export parity remain open, as does `TD-RISK-069` repository-inclusive restore.
 
 ## 0.9.2 Markdown/index disposition
 

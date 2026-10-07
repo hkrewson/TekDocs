@@ -1,5 +1,7 @@
+import hashlib
 import re
 import uuid
+from datetime import UTC
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -5006,6 +5008,123 @@ class DocumentPublication(models.Model):
             (successor for successor in successors if PublicationControlAction.APPROVED in successor.control_actions),
             None,
         )
+
+
+class RepositoryPublicationEvidence(models.Model):
+    """Append-only signed source snapshot; not yet a distributable STATIC publication."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="repository_publication_evidence")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.PROTECT,
+        related_name="repository_publication_evidence",
+        null=True,
+        blank=True,
+    )
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT, related_name="publication_evidence")
+    repository = models.ForeignKey(
+        WorkspaceRepository, on_delete=models.PROTECT, related_name="publication_evidence"
+    )
+    source_commit = models.ForeignKey(
+        RepositoryCommit, on_delete=models.PROTECT, related_name="publication_evidence"
+    )
+    content_id = models.UUIDField()
+    audience = models.CharField(max_length=24, choices=PublicationAudience.choices)
+    canonical_markdown = models.TextField()
+    manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    signature = models.TextField()
+    signature_algorithm = models.CharField(max_length=20, default="Ed25519")
+    public_key = models.TextField()
+    key_fingerprint = models.CharField(max_length=64)
+    signed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="repository_publication_evidence",
+    )
+    signed_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-signed_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(audience__in=PublicationAudience.values),
+                name="repository_publication_evidence_audience_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(audience=PublicationAudience.MSP_INTERNAL) | models.Q(organization__isnull=False),
+                name="repository_publication_evidence_client_scoped",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(content_digest__regex=r"^[0-9a-f]{64}$"),
+                name="repository_publication_evidence_digest_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(key_fingerprint__regex=r"^[0-9a-f]{64}$"),
+                name="repository_publication_evidence_key_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("workspace", "content_id", "signed_at"),
+                name="core_repubevid_source_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository publication evidence is append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository publication evidence is append-only")
+
+    def clean(self) -> None:
+        if self.repository_id and (
+            self.repository.tenant_id != self.tenant_id
+            or self.repository.workspace_id != self.workspace_id
+            or self.workspace.organization_id != self.organization_id
+        ):
+            raise ValidationError("Publication evidence must belong to one exact workspace repository")
+        if self.source_commit_id and (
+            self.source_commit.repository_id != self.repository_id
+            or self.source_commit.tenant_id != self.tenant_id
+        ):
+            raise ValidationError("Publication evidence commit must belong to its repository")
+        source = self.manifest.get("source") if isinstance(self.manifest, dict) else None
+        if (
+            self.audience not in PublicationAudience.values
+            or (self.audience == PublicationAudience.CLIENT_VISIBLE and self.organization_id is None)
+            or self.signature_algorithm != "Ed25519"
+            or not isinstance(source, dict)
+            or self.manifest.get("format") != "tekdocs-repository-publication-evidence/v1"
+            or self.manifest.get("evidence_id") != str(self.id)
+            or self.manifest.get("workspace_id") != str(self.workspace_id)
+            or self.manifest.get("repository_id") != str(self.repository_id)
+            or self.manifest.get("content_id") != str(self.content_id)
+            or self.manifest.get("audience") != self.audience
+            or self.manifest.get("signed_by") != str(self.signed_by_id)
+            or self.manifest.get("signed_at")
+            != self.signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+            or self.manifest.get("source_commit") != self.source_commit.object_id
+            or source.get("format") != "tekdocs.git-dependencies/v1"
+            or source.get("repository_id") != str(self.repository_id)
+            or source.get("workspace_id") != str(self.workspace_id)
+            or source.get("content_id") != str(self.content_id)
+            or source.get("audience") != self.audience
+            or source.get("accepted_commit") != self.source_commit.object_id
+            or source.get("object_format") != self.source_commit.object_format
+            or source.get("markdown_sha256")
+            != hashlib.sha256(self.canonical_markdown.encode("utf-8")).hexdigest()
+        ):
+            raise ValidationError("Publication evidence manifest does not match its retained source")
 
 
 class DocumentPublicationControlEvent(models.Model):

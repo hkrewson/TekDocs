@@ -1701,10 +1701,13 @@ STATIC manifest; legacy publication, portal, export and write authority remain
 unchanged. The `0.9.7` release exit condition remains open.
 
 The second foundation pins the accepted Git head and indexed database row in
-the same transaction that a future repository publication must use for its
-append-only insert. It follows repository-write lock order, blocks concurrent
-head advances until retention finishes, and rolls back if the pinned state
-changes. No repository publication is retained or exposed yet.
+the same transaction that a repository evidence insert uses. It follows
+repository-write lock order, blocks concurrent head advances until retention
+finishes, and rolls back if the pinned state changes. The third foundation
+retains composed Markdown and exact source proof in a separate signed,
+append-only, exact-Workspace evidence table. It can verify retained bytes
+without live Git, but has no distribution approval, artifact, portal, or
+export path. The legacy publisher and authority remain unchanged.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

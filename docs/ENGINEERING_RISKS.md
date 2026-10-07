@@ -213,6 +213,8 @@ an internal freeze rejects stale projections and unavailable pinned sources and
 records exact Git blob identities for audience-filtered composition. It does
 not yet put that proof in an append-only signed publication, authorize a new
 publication route, or complete the `TD-RISK-069` repository-inclusive restore.
+The follow-on transactional pin prevents an accepted-head race during a future
+repository publication insert but does not close those remaining risks.
 
 ## 0.9.2 Markdown/index disposition
 

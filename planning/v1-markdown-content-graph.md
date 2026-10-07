@@ -453,9 +453,10 @@ freezer re-reads the exact accepted Git snapshot, recomputes the audience
 composition, compares it with the indexed projection, and records root and
 included fragment commit/path/blob identities. Missing historical objects,
 index lag and projection drift fail closed. The legacy STATIC publisher is not
-switched by this proof; transactional head pinning, signed manifest integration,
-file/export/portal parity and repository-inclusive recovery remain in this
-milestone.
+switched by this proof. A second internal foundation now holds the accepted
+Git head and database row stable around a future append-only publication
+insert. Signed manifest integration, file/export/portal parity and
+repository-inclusive recovery remain in this milestone.
 
 ### `0.9.8` — version 1 acceptance
 

@@ -905,6 +905,40 @@ def read_repository_markdown_files_at_commit(
         return commit, tuple(files)
 
 
+@contextmanager
+def pin_accepted_repository_for_publication(repository_id: uuid.UUID) -> Iterator[WorkspaceRepository]:
+    """Hold the Git and database head stable through one publication insert.
+
+    A publisher must do its append-only insert inside this context. The lock
+    order matches repository writes (filesystem first, database second), so a
+    writer cannot advance the accepted ref between proof and retention.
+    """
+
+    if transaction.get_connection().in_atomic_block:
+        raise RepositoryServiceError("Publication source pin must begin outside a database transaction")
+    repository, root, path, object_format = _load_repository(repository_id)
+    with _repository_lock(root, repository.id, exclusive=False):
+        with transaction.atomic():
+            locked = WorkspaceRepository.objects.select_for_update().get(pk=repository.id)
+            if locked.lifecycle_state != RepositoryLifecycleState.ACTIVE:
+                raise RepositoryServiceError("Managed repository does not accept publication")
+            accepted = _accepted_object(locked, object_format)
+            if accepted is None or locked.indexed_commit_id != locked.accepted_commit_id:
+                raise RepositoryServiceError("Repository accepted content is not indexed")
+            git = _GitRepository(locked.id, path, object_format)
+            reconciliation, _ = _classify_reconciliation(git, accepted)
+            if reconciliation != RepositoryReconciliationState.MATCHED:
+                raise RepositoryReconciliationError("Managed repository requires reconciliation")
+            pinned_commit_id = locked.accepted_commit_id
+            yield locked
+            locked.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
+            if locked.accepted_commit_id != pinned_commit_id or locked.indexed_commit_id != pinned_commit_id:
+                raise RepositoryConflictError("Repository accepted head changed during publication")
+            reconciliation, _ = _classify_reconciliation(git, accepted)
+            if reconciliation != RepositoryReconciliationState.MATCHED:
+                raise RepositoryReconciliationError("Managed repository changed during publication")
+
+
 def reconcile_workspace_repository(
     *, repository_id: uuid.UUID, repair_to_accepted: bool = False
 ) -> RepositoryReconciliationResult:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 
 import pytest
 from django.db import transaction
@@ -14,7 +16,11 @@ from apps.core import content_composition, content_publication_sources, reposito
 from apps.core.content_composition import ContentCompositionError, ContentCompositionResolver
 from apps.core.content_index import ContentIndexValidationError, content_graph_projection, index_repository_content
 from apps.core.content_profile import parse_content
-from apps.core.content_publication_sources import ContentPublicationSourceError, freeze_git_document_dependencies
+from apps.core.content_publication_sources import (
+    ContentPublicationSourceError,
+    freeze_git_document_dependencies,
+    pinned_git_document_dependencies,
+)
 from apps.core.models import (
     ContentInclude,
     ContentNode,
@@ -23,6 +29,7 @@ from apps.core.models import (
     Tenant,
     Workspace,
     WorkspaceKind,
+    WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
 from apps.core.repository_service import RepositoryFileNotFoundError
@@ -183,6 +190,87 @@ def test_publication_source_freeze_rejects_stale_or_tampered_projection(composit
     )
     with pytest.raises(ContentPublicationSourceError, match="index is not current"):
         freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+
+def test_publication_source_pin_blocks_head_advance_until_retention_finishes(composition_repository):
+    _installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="First.\n")},
+        message="Add candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    started = Event()
+
+    def advance_head():
+        started.set()
+        return repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=first.object_id,
+            changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="Next.\n")},
+            message="Advance candidate",
+        )
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document_id, audience="msp_internal"
+        ) as proof:
+            assert proof["accepted_commit"] == first.object_id
+            future = pool.submit(advance_head)
+            assert started.wait(5)
+            with pytest.raises(TimeoutError):
+                future.result(timeout=0.2)
+            assert _accepted(repository) == first.object_id
+        assert future.result(timeout=10).created
+    assert _accepted(repository) != first.object_id
+
+
+def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(composition_repository):
+    _installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="First.\n")},
+        message="Add candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    with pytest.raises(RuntimeError, match="retention failed"):
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document_id, audience="msp_internal"
+        ):
+            ContentNode.objects.filter(repository=repository, content_id=document_id).update(title="Unretained")
+            raise RuntimeError("retention failed")
+    assert ContentNode.objects.get(repository=repository, content_id=document_id).title == "Candidate"
+
+    with pytest.raises(ContentPublicationSourceError, match="cannot be pinned"):
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document_id, audience="msp_internal"
+        ):
+            WorkspaceRepository.objects.filter(pk=repository.id).update(indexed_commit=None)
+    repository.refresh_from_db()
+    assert repository.indexed_commit_id == repository.accepted_commit_id
+
+    with transaction.atomic():
+        with pytest.raises(ContentPublicationSourceError, match="cannot be pinned"):
+            with pinned_git_document_dependencies(
+                repository_id=repository.id, content_id=document_id, audience="msp_internal"
+            ):
+                pytest.fail("The pin must reject a caller that acquired database locks first")
+
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="Next.\n")},
+        message="Advance without indexing",
+    )
+    with pytest.raises(ContentPublicationSourceError, match="cannot be pinned"):
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document_id, audience="msp_internal"
+        ):
+            pytest.fail("An unindexed source must never enter publication retention")
 
 
 def test_file_backed_composition_preserves_pins_audiences_copy_provenance_and_template_preview(

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from .content_index import (
@@ -22,6 +24,7 @@ from .models import RepositoryObjectFormat, WorkspaceRepository
 from .repository_service import (
     MAX_PINNED_SNAPSHOT_BYTES,
     RepositoryServiceError,
+    pin_accepted_repository_for_publication,
     read_accepted_repository_markdown_files,
     read_repository_markdown_files_at_commit,
 )
@@ -195,3 +198,26 @@ def freeze_git_document_dependencies(
         "markdown_sha256": hashlib.sha256(str(variant["markdown"]).encode("utf-8")).hexdigest(),
         "sources": evidence,
     }
+
+
+@contextmanager
+def pinned_git_document_dependencies(
+    *, repository_id: uuid.UUID, content_id: uuid.UUID, audience: str
+) -> Iterator[dict[str, Any]]:
+    """Yield source proof while the accepted Git head and DB row are pinned.
+
+    A repository-backed publisher must sign and insert its append-only record
+    before this context exits. This does not authorize the caller or create a
+    publication by itself.
+    """
+
+    try:
+        with pin_accepted_repository_for_publication(repository_id) as locked:
+            proof = freeze_git_document_dependencies(
+                repository_id=repository_id, content_id=content_id, audience=audience
+            )
+            if locked.accepted_commit is None or proof["accepted_commit"] != locked.accepted_commit.object_id:
+                raise ContentPublicationSourceError("Repository accepted head changed during publication")
+            yield proof
+    except RepositoryServiceError as exc:
+        raise ContentPublicationSourceError("Repository source cannot be pinned for publication") from exc

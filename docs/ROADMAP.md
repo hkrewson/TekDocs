@@ -1700,6 +1700,12 @@ accepted head and unavailable pinned objects. This is not yet part of a signed
 STATIC manifest; legacy publication, portal, export and write authority remain
 unchanged. The `0.9.7` release exit condition remains open.
 
+The second foundation pins the accepted Git head and indexed database row in
+the same transaction that a future repository publication must use for its
+append-only insert. It follows repository-write lock order, blocks concurrent
+head advances until retention finishes, and rolls back if the pinned state
+changes. No repository publication is retained or exposed yet.
+
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore
 code literals; current taxonomy keys and structured-topic schemas are checked;

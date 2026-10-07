@@ -584,6 +584,11 @@ test('authorized operators can inspect value-free renderer diagnostics', async (
       recent_failures: [{ code: 'renderer_timeout', occurred_at: Date.parse('2026-09-05T11:30:00Z') }],
       last_checked_at: Date.parse('2026-09-05T11:59:59Z'),
     },
+    repositories: {
+      status: 'ready', total: 2, healthy: 2, degraded: 0, blocked: 0, unknown: 0,
+      states: { never: 0, matched: 2, missing: 0, advanced: 0, mismatched: 0, corrupt: 0, unavailable: 0 },
+      last_checked_at: '2026-09-05T11:59:59Z', repair: null,
+    },
   } }))
 
   await page.goto('/overview')

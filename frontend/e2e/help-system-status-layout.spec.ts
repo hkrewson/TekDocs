@@ -20,6 +20,11 @@ async function fixtures(page: Page) {
       recent_failures: [{ code: 'renderer_timeout_with_a_deliberately_long_operational_identifier_that_must_wrap', occurred_at: Date.parse(checkedAt) }],
       last_checked_at: Date.parse(checkedAt),
     },
+    repositories: {
+      status: 'ready', total: 2, healthy: 2, degraded: 0, blocked: 0, unknown: 0,
+      states: { never: 0, matched: 2, missing: 0, advanced: 0, mismatched: 0, corrupt: 0, unavailable: 0 },
+      last_checked_at: checkedAt, repair: null,
+    },
   } }))
 }
 

@@ -93,9 +93,10 @@ def _read(request, content_id: UUID, organization_entity_id: UUID | None = None)
 
 
 def _resolve(request, organization_entity_id: UUID | None = None) -> Response:  # type: ignore[no-untyped-def]
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
     query = ContentPathQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
-    repository = repository_for_reader(_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW))
+    repository = repository_for_reader(workspace)
     try:
         result = resolve_authored_path(repository=repository, path=query.validated_data["path"])
     except (RepositoryFileNotFoundError, RepositoryInputError):

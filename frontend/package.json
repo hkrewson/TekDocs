@@ -24,7 +24,7 @@
     "@milkdown/kit": "^7.22.0",
     "@milkdown/react": "^7.22.0",
     "cytoscape": "^3.33.1",
-    "dompurify": "3.4.13",
+    "dompurify": "3.4.16",
     "lucide-react": "^1.29.0",
     "mermaid": "11.16.1",
     "openapi-fetch": "^0.17.0",

@@ -19,6 +19,11 @@ async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/system/diagnostics', (route) => route.fulfill({ json: {
     status: 'ready', checked_at: '2026-09-22T05:00:00Z', application_version: '0.9.0', database: 'ready',
     diagram_renderer: { status: 'ready', version: '11.16.1', capacity: 8, queue: { waiting: 0, processing: 0, total: 0 }, recent_failures: [], last_checked_at: Date.parse('2026-09-22T05:00:00Z') },
+    repositories: {
+      status: 'ready', total: 2, healthy: 2, degraded: 0, blocked: 0, unknown: 0,
+      states: { never: 0, matched: 2, missing: 0, advanced: 0, mismatched: 0, corrupt: 0, unavailable: 0 },
+      last_checked_at: '2026-09-22T05:00:00Z', repair: null,
+    },
   } }))
 }
 

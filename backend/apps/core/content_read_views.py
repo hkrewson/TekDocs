@@ -106,10 +106,11 @@ class MSPContentReadCollectionView(APIView):
         responses={200: ContentReadCollectionSerializer},
     )
     def get(self, request):  # type: ignore[no-untyped-def]
+        workspace = _scope(request)
         query = ContentReadQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         return Response(
-            ContentReadCollectionSerializer(document_collection(workspace=_scope(request), **query.validated_data)).data
+            ContentReadCollectionSerializer(document_collection(workspace=workspace, **query.validated_data)).data
         )
 
 
@@ -120,11 +121,12 @@ class OrganizationContentReadCollectionView(APIView):
         responses={200: ContentReadCollectionSerializer},
     )
     def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        workspace = _scope(request, organization_entity_id)
         query = ContentReadQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
         return Response(
             ContentReadCollectionSerializer(
-                document_collection(workspace=_scope(request, organization_entity_id), **query.validated_data)
+                document_collection(workspace=workspace, **query.validated_data)
             ).data
         )
 

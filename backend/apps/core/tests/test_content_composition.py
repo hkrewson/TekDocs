@@ -10,6 +10,7 @@ import pytest
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -26,11 +27,14 @@ from apps.core.content_publication_sources import (
     freeze_git_document_dependencies,
     pinned_git_document_dependencies,
 )
+from apps.core.document_attachments import create_document_attachment
+from apps.core.documents import create_document
 from apps.core.models import (
     ContentInclude,
     ContentNode,
     ContentTemplateSource,
     InstallationState,
+    RepositoryEvidenceAttachment,
     RepositoryPublicationEvidence,
     Tenant,
     Workspace,
@@ -323,7 +327,8 @@ def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(compo
 
 
 def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(
-    composition_repository, django_runtime_role,
+    composition_repository,
+    django_runtime_role,
 ):
     installation, _workspace, repository = composition_repository
     document_id = uuid.uuid4()
@@ -338,9 +343,7 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
                 metadata="includes:\n" + _include(content_id=fragment_id, mode="live", audience="shared"),
                 body="Root.\n",
             ),
-            "fragments/part.md": _content(
-                content_id=fragment_id, title="Part", kind="fragment", body="Included.\n"
-            ),
+            "fragments/part.md": _content(content_id=fragment_id, title="Part", kind="fragment", body="Included.\n"),
         },
         message="Add publication candidate",
     )
@@ -383,9 +386,7 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
 
     foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
     with django_runtime_role(), transaction.atomic():
-        bind_local_rls_scope(
-            DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY
-        )
+        bind_local_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
         assert RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
         bind_local_rls_scope(DataScope.tenant(foreign_tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
         assert not RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
@@ -427,6 +428,136 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert verify_repository_publication_evidence(evidence)["valid"]
 
 
+def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_repository, tmp_path):
+    installation, workspace, repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = create_document(
+            tenant=installation.tenant,
+            organization=None,
+            actor_id=installation.owner.id,
+            title="Attachment guide",
+            markdown="Legacy source.\n",
+        )
+        attachment = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("guide.txt", b"Original attachment bytes"),
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={
+                "documents/attachment-guide.md": _content(
+                    content_id=document.id,
+                    title="Attachment guide",
+                    body=f"[Guide](tekdocs://attachment/{attachment.id})\n",
+                )
+            },
+            message="Add attachment guide",
+        )
+        index_repository_content(repository_id=repository.id)
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(evidence=evidence)
+        assert artifact.workspace_id == workspace.id
+        assert (
+            evidence.manifest["attachments"][0]["checksum"] == hashlib.sha256(b"Original attachment bytes").hexdigest()
+        )
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        attachment.file.storage.delete(attachment.file.name)
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.integrity"):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=document.id,
+                audience="msp_internal", actor=installation.owner,
+            )
+        assert RepositoryPublicationEvidence.objects.count() == 1
+        artifact.file.storage.delete(artifact.file.name)
+        assert not verify_repository_publication_evidence(evidence)["attachments_valid"]
+        with pytest.raises(DatabaseError), transaction.atomic():
+            RepositoryEvidenceAttachment.objects.filter(pk=artifact.pk).update(checksum="0" * 64)
+
+
+def test_repository_evidence_rejects_attachment_without_exact_document(composition_repository):
+    installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/unowned.md": _content(
+                content_id=document_id,
+                title="Unowned",
+                body=f"[Guide](tekdocs://attachment/{uuid.uuid4()})\n",
+            )
+        },
+        message="Add unowned attachment reference",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.unavailable"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document_id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+    assert RepositoryPublicationEvidence.objects.count() == 0
+
+
+def test_repository_evidence_rejects_sibling_client_attachment(composition_repository, tmp_path):
+    installation, _workspace, _repository = composition_repository
+    owner = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Attachment owner", legal_name="Attachment owner LLC",
+        website="", classifications=["client"],
+    )
+    sibling = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Attachment sibling", legal_name="Attachment sibling LLC",
+        website="", classifications=["client"],
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        foreign_document = create_document(
+            tenant=installation.tenant, organization=owner, actor_id=installation.owner.id,
+            title="Owner guide", markdown="Private.\n",
+        )
+        foreign_attachment = create_document_attachment(
+            document=foreign_document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("guide.txt", b"Owner bytes"),
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, organization=sibling)
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=_accepted(repository),
+            changes={"documents/sibling.md": _content(
+                content_id=foreign_document.id, title="Sibling guide",
+                body=f"[File](tekdocs://attachment/{foreign_attachment.id})\n",
+            )}, message="Add sibling reference",
+        )
+        index_repository_content(repository_id=repository.id)
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP,
+            data={"secret": generate_totp_secret()},
+        )
+        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.unavailable"):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=foreign_document.id,
+                audience="client_visible", actor=installation.owner,
+            )
+        assert RepositoryPublicationEvidence.objects.count() == 0
+
+
 @pytest.mark.parametrize(
     ("markdown", "code"),
     [
@@ -447,9 +578,7 @@ def test_repository_publication_preflight_classifies_unfrozen_dependencies(markd
 
 def test_repository_publication_preflight_ignores_literal_examples_and_blocks_topic_gaps():
     literal = "`[Example](tekdocs://attachment/example)`\n\n```text\n![Example](https://example.invalid/a.png)\n```"
-    assert repository_publication_preflight(markdown=literal, audience="msp_internal", topic_type="")[
-        "blockers"
-    ] == []
+    assert repository_publication_preflight(markdown=literal, audience="msp_internal", topic_type="")["blockers"] == []
     topic = repository_publication_preflight(markdown="Body.\n", audience="msp_internal", topic_type="procedure")
     assert "topic.section.missing" in topic["blockers"]
 
@@ -457,7 +586,7 @@ def test_repository_publication_preflight_ignores_literal_examples_and_blocks_to
 @pytest.mark.parametrize(
     ("body", "code"),
     [
-        (f"[File](tekdocs://attachment/{uuid.uuid4()})\n", "repository.attachment.unfrozen"),
+        (f"[File](tekdocs://attachment/{uuid.uuid4()})\n", "repository.attachment.unavailable"),
         ("```mermaid\nflowchart LR\nA-->B\n```\n", "repository.diagram.unfrozen"),
     ],
 )
@@ -575,8 +704,34 @@ def test_repository_publication_evidence_upgrade_installs_forced_rls_and_append_
     finally:
         MigrationExecutor(connection).migrate(head)
 
+
+def test_repository_evidence_attachment_upgrade_installs_forced_rls_and_append_only_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0168_repositorypublicationevidence")])
+        assert "core_repositoryevidenceattachment" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositoryevidenceattachment'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger WHERE tgrelid = 'core_repositoryevidenceattachment'::regclass "
+                "AND tgname IN ('core_repositoryevidenceattachment_validate', "
+                "'core_repositoryevidenceattachment_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
 def test_file_backed_composition_preserves_pins_audiences_copy_provenance_and_template_preview(
-    composition_repository, django_runtime_role,
+    composition_repository,
+    django_runtime_role,
 ):
     installation, _workspace, repository = composition_repository
     source_id = uuid.uuid4()

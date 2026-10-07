@@ -5127,6 +5127,67 @@ class RepositoryPublicationEvidence(models.Model):
             raise ValidationError("Publication evidence manifest does not match its retained source")
 
 
+def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
+    return str(
+        PurePosixPath("repository-evidence-attachments")
+        / str(instance.tenant_id)
+        / str(instance.evidence_id)
+        / str(instance.id)
+    )
+
+
+class RepositoryEvidenceAttachment(models.Model):
+    """Independent retained bytes for an attachment named by signed repository evidence."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, null=True, blank=True)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    evidence = models.ForeignKey(RepositoryPublicationEvidence, on_delete=models.PROTECT, related_name="attachments")
+    source_attachment = models.ForeignKey(DocumentAttachment, on_delete=models.PROTECT)
+    file = models.FileField(upload_to=repository_evidence_attachment_upload_to, max_length=500)
+    media_type = models.CharField(max_length=120)
+    size = models.PositiveBigIntegerField()
+    checksum = models.CharField(max_length=64)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("evidence", "source_attachment"), name="one_repo_evidence_attachment"),
+            models.CheckConstraint(
+                condition=models.Q(checksum__regex=r"^[0-9a-f]{64}$"),
+                name="repo_evidence_attachment_checksum_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository evidence attachments are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository evidence attachments are append-only")
+
+    def clean(self) -> None:
+        if self.evidence_id and (
+            self.evidence.tenant_id != self.tenant_id
+            or self.evidence.workspace_id != self.workspace_id
+            or self.evidence.organization_id != self.organization_id
+        ):
+            raise ValidationError("Retained attachment must share its evidence scope")
+        if self.source_attachment_id and (
+            self.source_attachment.tenant_id != self.tenant_id
+            or self.source_attachment.organization_id != self.organization_id
+            or self.source_attachment.document_id != self.evidence.content_id
+        ):
+            raise ValidationError("Retained attachment must belong to the evidence document")
+
+
 class DocumentPublicationControlEvent(models.Model):
     """An append-only distribution decision for one immutable STATIC publication."""
 

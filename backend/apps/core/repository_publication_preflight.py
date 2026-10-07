@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 from typing import Any
+from uuid import UUID
 
 from markdown_it import MarkdownIt
 
@@ -18,7 +19,9 @@ PREFLIGHT_FORMAT = "tekdocs-repository-publication-preflight/v1"
 _MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
 
 
-def repository_publication_preflight(*, markdown: str, audience: str, topic_type: str) -> dict[str, Any]:
+def repository_publication_preflight(
+    *, markdown: str, audience: str, topic_type: str, frozen_attachment_ids: set[UUID] | None = None
+) -> dict[str, Any]:
     """Return deterministic, content-free blocker and warning codes."""
 
     blockers: set[str] = set()
@@ -40,6 +43,14 @@ def repository_publication_preflight(*, markdown: str, audience: str, topic_type
             if not isinstance(target, str) or not target.casefold().startswith("tekdocs://"):
                 continue
             kind = target[len("tekdocs://") :].split("/", 1)[0].casefold()
+            if kind == "attachment" and frozen_attachment_ids is not None:
+                try:
+                    attachment_id = UUID(target[len("tekdocs://attachment/") :])
+                except ValueError:
+                    pass
+                else:
+                    if target == f"tekdocs://attachment/{attachment_id}" and attachment_id in frozen_attachment_ids:
+                        continue
             blockers.add(
                 {
                     "attachment": "repository.attachment.unfrozen",

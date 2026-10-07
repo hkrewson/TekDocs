@@ -30,6 +30,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_collectionpreference"
         else "Append-only signed repository source evidence; exact-workspace RLS and source-identity guard."
         if table == "core_repositorypublicationevidence"
+        else "Append-only retained repository evidence bytes; exact-workspace RLS and source-attachment guard."
+        if table == "core_repositoryevidenceattachment"
         else "Exact-client recurring enrollment, approved terms, and permanent period claims."
         if table.startswith("core_recurringinvoice")
         else "Tenant-owned entity-domain data.",

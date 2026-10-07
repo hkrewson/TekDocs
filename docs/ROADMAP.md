@@ -1713,6 +1713,15 @@ audience composition, or one containing dynamic attachment, key, entity-card,
 image, unsupported TekDocs-link, or Mermaid dependencies that repository
 publication cannot yet retain. It signs value-free preflight codes with the
 source proof; those dependencies move to the remaining `0.9.7` packaging work.
+The next bounded attachment-custody slice permits stable managed-attachment
+links only for an active, clean attachment owned by the exact matching legacy
+document. It verifies source bytes, copies them outside Git under a separate
+append-only, exact-Workspace evidence record, and signs artifact identity,
+size, checksum and media type. Evidence verification rechecks retained bytes
+without reading the mutable original. Missing, foreign, corrupt, primary-file,
+or over-limit references still fail closed. This remains internal evidence,
+not a distributable STATIC publication; repository-native attachment ownership,
+other dynamic dependencies, and file/export parity remain open.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

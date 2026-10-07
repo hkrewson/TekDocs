@@ -140,6 +140,10 @@ from apps.core.document_key_views import (
     OrganizationDocumentKeyReportView,
     OrganizationKeyBindingBrowserView,
 )
+from apps.core.document_migration_views import (
+    MSPDocumentMigrationStatusView,
+    OrganizationDocumentMigrationStatusView,
+)
 from apps.core.document_source_views import (
     MSPDocumentRemoteObservationApplyView,
     MSPDocumentRemoteObservationView,
@@ -728,6 +732,11 @@ urlpatterns = [
         "api/v1/documents/<uuid:document_entity_id>",
         MSPDocumentDetailView.as_view(),
         name="msp-document-detail",
+    ),
+    path(
+        "api/v1/documents/<uuid:document_entity_id>/migration-status",
+        MSPDocumentMigrationStatusView.as_view(),
+        name="msp-document-migration-status",
     ),
     path(
         "api/v1/documents/<uuid:document_entity_id>/preflight",
@@ -2268,6 +2277,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>",
         OrganizationDocumentDetailView.as_view(),
         name="organization-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/migration-status",
+        OrganizationDocumentMigrationStatusView.as_view(),
+        name="organization-document-migration-status",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/documents/<uuid:document_entity_id>/preflight",

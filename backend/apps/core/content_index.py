@@ -32,6 +32,7 @@ from .repository_service import (
     read_accepted_repository_markdown_files,
     read_repository_markdown_files_at_commit,
 )
+from .topic_schemas import inspect_markdown
 
 logger = logging.getLogger(__name__)
 MAX_PINNED_SNAPSHOTS = 32
@@ -351,6 +352,14 @@ def _resolve_compositions(
     )
 
 
+def _effective_findings(
+    parsed: ParsedContent, compositions: dict[uuid.UUID, dict[str, dict[str, Any]]]
+) -> list[dict[str, object]]:
+    if parsed.topic_type and parsed.kind == "document":
+        return inspect_markdown(parsed.topic_type, compositions[parsed.content_id]["all"]["markdown"])
+    return list(parsed.findings)
+
+
 def _projection_payload(
     parsed_by_path: dict[str, ParsedContent],
     compositions: dict[uuid.UUID, dict[str, dict[str, Any]]],
@@ -366,7 +375,7 @@ def _projection_payload(
                 if parsed.derived_from is not None
                 else None
             ),
-            "findings": list(parsed.findings),
+            "findings": _effective_findings(parsed, compositions),
             "kind": parsed.kind,
             "links": [
                 {
@@ -547,7 +556,7 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                         severity=str(finding["severity"]),
                         detail={key: value for key, value in finding.items() if key not in {"code", "severity"}},
                     )
-                    for finding in parsed.findings
+                    for finding in _effective_findings(parsed, compositions)
                 ]
             )
 

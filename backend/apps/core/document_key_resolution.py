@@ -165,7 +165,7 @@ def _read(record: object, field: ResolvableField) -> str:
 
 def _bindings(document: Document, names: set[str], *, lock: bool) -> dict[str, DocumentKeyBinding]:
     queryset = (
-        DocumentKeyBinding.objects.filter(document=document, name__in=names)
+        DocumentKeyBinding.objects.filter(document=document, name__in=names, archived_at__isnull=True)
         .select_related("target_entity")
         .order_by("name", "id")
     )
@@ -205,9 +205,7 @@ def _records_by_entity(entities: Sequence[Entity], *, lock: bool) -> dict[UUID, 
             list(
                 BlockRevision.objects.select_for_update()
                 .filter(
-                    id__in=[
-                        block.current_revision_id for block in content if block.current_revision_id is not None
-                    ]
+                    id__in=[block.current_revision_id for block in content if block.current_revision_id is not None]
                 )
                 .order_by("id")
             )
@@ -248,16 +246,18 @@ def _records_by_entity(entities: Sequence[Entity], *, lock: bool) -> dict[UUID, 
 def _observed_fingerprints(entity_ids: set[UUID], *, lock: bool) -> dict[UUID, tuple[str, datetime]]:
     if not entity_ids:
         return {}
-    queryset = NetBoxReference.objects.filter(
-        entity_id__in=entity_ids,
-        archived_at__isnull=True,
-    ).exclude(observed_fingerprint="").order_by("entity_id", "id")
+    queryset = (
+        NetBoxReference.objects.filter(
+            entity_id__in=entity_ids,
+            archived_at__isnull=True,
+        )
+        .exclude(observed_fingerprint="")
+        .order_by("entity_id", "id")
+    )
     if lock:
         queryset = queryset.select_for_update(of=("self",))
     fingerprints: dict[UUID, tuple[str, datetime]] = {}
-    for entity_id, fingerprint, updated_at in queryset.values_list(
-        "entity_id", "observed_fingerprint", "updated_at"
-    ):
+    for entity_id, fingerprint, updated_at in queryset.values_list("entity_id", "observed_fingerprint", "updated_at"):
         fingerprints.setdefault(entity_id, (fingerprint, updated_at))
     return fingerprints
 

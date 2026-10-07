@@ -74,13 +74,41 @@ properties, outgoing links, backlinks, unresolved-link findings, topic checks,
 and the indexed commit. Rebuilding the projection produces the same digest and
 API result. A structurally invalid accepted commit is recorded as rejected and
 does not replace the last-known-good projection.
+During the `0.9.6` migration window, a document may also carry a bounded
+`key_bindings` mapping from field-key names to stable Entity IDs. Git stores
+neither resolved values nor secret data; matching legacy bindings and the
+reader's field permissions still control live resolution until repository
+binding authority is implemented.
+
+The read-only migration-status endpoint reports copy parity and explicit
+`handoff_blockers`. For an `in_sync` copy, `read_projection_state` also checks
+the permission-scoped repository detail route against the legacy title,
+composed Markdown and reader-visible rendered HTML, plus viewer-visible
+outgoing legacy `references` links.
+This is a narrow shadow check, not full read parity or an
+authority transition: legacy reads and writes remain authoritative until their
+parity and publication gates are implemented and verified.
+Copy parity also checks indexed portable properties, taxonomies, topic identity,
+title and Markdown against the parsed repository source; a stale derived row is
+reported as `diverged` until the index is rebuilt. Ordered include edges must
+also retain their targets, audience, resolution mode and live source digest.
+Indexed wikilinks must retain their order, labels, fragments and resolved
+backlink pointers; missing targets remain unresolved rather than fabricated.
+Composed operational-entity links must agree with their indexed relationship
+rows, and the document root must agree with the export's independently resolved
+link list. A stale entity-context projection is `diverged`, not cutover-ready.
+During the copy window, same-workspace legacy `references` links to supported
+operational entities become neutral, permission-filtered repository mentions;
+foreign or ambiguous relationships remain migration blockers.
 
 For an operator-directed rebuild, run
 `python manage.py index_workspace_content --repository <repository-uuid>` in
 the backend container. Add `--force` to verify and replace an already-current
 projection. Managed authoring indexes each accepted write and retries an
 unfinished projection in the background. Existing database documents are not
-yet migrated.
+automatically migrated. The bounded `0.9.6` operator procedure is in
+[Legacy document copy](docs/DOCUMENT_MIGRATION.md); a copy never changes
+legacy read or write authority.
 
 ### Version 1 fragment composition
 

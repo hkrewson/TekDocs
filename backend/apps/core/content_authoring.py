@@ -32,7 +32,7 @@ from .repository_service import (
 )
 
 MAX_AUTHORING_SOURCE = 1024 * 1024
-EDITABLE_FIELDS = ALLOWED_FIELDS - {"schema", "id", "kind", "aliases"}
+EDITABLE_FIELDS = ALLOWED_FIELDS - {"schema", "id", "kind", "aliases", "key_bindings"}
 TOP_LEVEL_FIELD = re.compile(r"^([a-z][a-z0-9_]*):")
 logger = logging.getLogger(__name__)
 

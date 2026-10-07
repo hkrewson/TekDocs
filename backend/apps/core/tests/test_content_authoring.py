@@ -11,6 +11,8 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.core import repository_service, repository_storage
 from apps.core.content_authoring import (
     ContentAuthoringConflict,
+    ContentAuthoringError,
+    _validate_patch,
     author_content,
     read_authored_content,
     resolve_authored_path,
@@ -21,6 +23,11 @@ from apps.core.organizations import create_organization
 from apps.core.tasks import reconcile_content_indexes
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def test_managed_authoring_does_not_change_legacy_key_bindings():
+    with pytest.raises(ContentAuthoringError, match="unsupported fields"):
+        _validate_patch({"key_bindings": {"subject": str(uuid.uuid4())}})
 
 
 @pytest.fixture

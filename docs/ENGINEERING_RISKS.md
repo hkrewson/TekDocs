@@ -199,6 +199,15 @@ The implementation audit corrected the historical `0.5.0` generated-topology cla
 | `TD-RISK-071` | Content-graph composition can create cycles, unbounded expansion or unauthorized transclusion. | A fragment may include another fragment, and links/backlinks may cross many records. If incoming links drive rendering, resolution ignores workspace/audience policy, or recursion is unbounded, a small edit can produce nondeterministic documents, denial of service or disclosure of content the viewer could not open directly. | Render only explicit ordered outgoing inclusions; backlinks are informational. Validate a directed acyclic inclusion graph, bound depth, node count and expanded bytes, and authorize every resolved node for the selected workspace and audience. Live inclusions resolve one accepted graph snapshot; pinned inclusions and publications resolve exact retained Git objects. Reject unresolved, cyclic and denied inclusions with deterministic diagnostics. | Parser/index `0.9.2`; composition `0.9.3`; authorized reads `0.9.4`; publication proof `0.9.7`; final recurrence `0.9.8` |
 | `TD-RISK-072` | Concurrent authoring or a post-commit crash can lose Markdown or leave a misleading projection. | Browser drafts and direct repository operators may start from different Git commits. A blind save can overwrite another author, while Git acceptance can succeed before PostgreSQL indexing and cannot be rolled back with a database transaction. | Require exact base commit/blob, reject changed-file saves with base/current/proposed comparison, validate the complete candidate graph before Git CAS, preserve untouched source text, and use accepted/indexed markers for idempotent retry. Keep dirty drafts protected and expose indexing lag. Never treat newest Git ref as accepted authority. | ADR 0113; authoring `0.9.5`; recovery recurrence `0.9.7`; final acceptance `0.9.8` |
 
+The `0.9.6` migration copy mitigates the mixed-store portion of `TD-RISK-069`
+without declaring authority transferred. Preview binds exact legacy revisions,
+source digests and accepted head; import uses Git compare-and-swap, verifies the
+indexed graph, and exposes interrupted or divergent states. Rollback is a new
+audited commit and refuses stale or externally referenced files. Unsupported
+documents are deferred visibly. The fresh/0.8.46 upgrade rehearsal proves
+stable IDs and reversible first-wave copies; publication, full document-read
+and write parity, and repository-inclusive recovery remain later gates.
+
 ## 0.9.2 Markdown/index disposition
 
 `TD-RISK-069` is mitigated for the index boundary with later recurrence. The

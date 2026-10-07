@@ -31,6 +31,32 @@ def test_version_one_profile_parses_portable_metadata_and_bounded_wikilinks():
     assert len(parsed.content_digest) == 64
 
 
+def test_key_binding_metadata_requires_document_name_and_uuid():
+    target = uuid.uuid4()
+    parsed = parse_content(
+        _source(
+            content_id=uuid.uuid4(),
+            body="Serial <tekdocs://key/subject.serial_number>.\n",
+            extra=f"key_bindings:\n  subject: {target}\n",
+        )
+    )
+    assert parsed.frontmatter["key_bindings"] == {"subject": str(target)}
+    for extra, code in (
+        ("key_bindings:\n  Subject: 00000000-0000-4000-8000-000000000001\n", "key_binding.name"),
+        ("key_bindings:\n  subject: not-a-uuid\n", "key_binding.target"),
+        ("key_bindings:\n  - subject\n", "key_binding.shape"),
+    ):
+        with pytest.raises(ContentProfileError) as captured:
+            parse_content(_source(content_id=uuid.uuid4(), body="Body.\n", extra=extra))
+        assert captured.value.code == code
+    fragment = _source(content_id=uuid.uuid4(), body="Body.\n", extra="key_bindings: {}\n").replace(
+        b"kind: document", b"kind: fragment"
+    )
+    with pytest.raises(ContentProfileError) as captured:
+        parse_content(fragment)
+    assert captured.value.code == "key_binding.shape"
+
+
 @pytest.mark.parametrize(
     ("source", "code"),
     (

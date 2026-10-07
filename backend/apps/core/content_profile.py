@@ -15,6 +15,7 @@ from markdown_it import MarkdownIt
 from yaml.constructor import ConstructorError
 
 from .content_index_models import ContentNodeKind
+from .document_keys import BINDING_NAME_PATTERN
 from .topic_schemas import SCHEMA_VERSION, SCHEMAS, inspect_markdown
 
 CONTENT_SCHEMA = "tekdocs.content/v1"
@@ -27,6 +28,7 @@ MAX_INCLUDES = 128
 MAX_TEMPLATE_SOURCES = 128
 MAX_ENTITY_LINKS = 256
 MAX_ALIASES = 32
+MAX_KEY_BINDINGS = 64
 # Keep aliases inside the repository service's 512-byte managed-path limit.
 MAX_ALIAS_PATH_BYTES = 512
 KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_-]{0,79}$")
@@ -50,6 +52,7 @@ ALLOWED_FIELDS = frozenset(
         "derived_from",
         "template_sources",
         "entity_links",
+        "key_bindings",
         "aliases",
     }
 )
@@ -433,6 +436,19 @@ def parse_content(source: bytes) -> ParsedContent:
         topic_type = topic_type_value
         topic_version = SCHEMA_VERSION
         findings.extend(inspect_markdown(topic_type, markdown))
+
+    key_bindings = frontmatter.get("key_bindings", {})
+    if "key_bindings" in frontmatter:
+        if (
+            kind != ContentNodeKind.DOCUMENT
+            or not isinstance(key_bindings, dict)
+            or len(key_bindings) > MAX_KEY_BINDINGS
+        ):
+            raise ContentProfileError("key_binding.shape", "Key bindings must be a bounded document mapping")
+        for name, target in key_bindings.items():
+            if not isinstance(name, str) or re.fullmatch(BINDING_NAME_PATTERN, name) is None:
+                raise ContentProfileError("key_binding.name", "Key binding name is invalid")
+            _uuid(target, code="key_binding.target", message="Key binding target must be a UUID")
 
     links = _parse_links(markdown)
     includes = _parse_includes(frontmatter.get("includes"))

@@ -1687,8 +1687,8 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.3` | File-backed reusable fragments with ordered live/pinned/copy composition and template-source parity. |
 | `0.9.4` | Authorized operational-entity context, asset documentation backlinks, content-graph reads, search, health and views. |
 | `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. Implemented; release acceptance in `docs/releases/0.9.5.md`. |
-| `0.9.6` | Dry-run migration, mixed-store compatibility window, deterministic import, rollback and legacy-write retirement. |
-| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity and repository-inclusive encrypted recovery. |
+| `0.9.6` | Complete as a local development checkpoint: dry-run inventory, deterministic first-wave copy, explicit deferrals, mixed-store read-only parity, and guarded rollback. Legacy reads and writes remain authoritative. The aggregate local gate passed and [public migration guidance](https://github.com/hkrewson/TekDocs/wiki/Imports-and-migration) was published; no deployment or authority handoff is claimed. |
+| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity and repository-inclusive encrypted recovery; make authority transition and legacy-write retirement available only after all dependent read/write paths pass. |
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
@@ -1712,6 +1712,35 @@ document/fragment creation, targeted metadata and body edits, in-repository
 moves with aliases, exact base-blob conflict checks, three-way review and
 accepted/indexed reconciliation. The original database editor remains separate
 until the `0.9.6` migration and `0.9.7` publication checkpoints.
+The `0.9.6` copy path now includes schema-v1 structured topics whose composed
+Markdown passes required-section checks. The repository index evaluates topic
+findings on composed document content, not the empty root file. Missing or
+duplicate sections and unknown topic versions remain deferred; this does not
+switch legacy editing or publication authority.
+Ordinary attachment references are checked for exact document ownership and
+stored-file integrity during preview/import, then resolved through existing
+authorized downloads in repository detail reads; file bytes remain outside
+Git and rollback does not remove them. Primary-file version chains remain
+deferred for `0.9.7` file/publication parity.
+The `0.9.6` copy profile also carries active same-workspace field-key binding
+names and target IDs without resolved values; preview binds those identities,
+and repository reads use the existing per-reader authorization only while the
+portable map matches live legacy bindings. Content-expanding keys remain
+deferred; database scope guards already reject cross-workspace bindings.
+The copy path now carries neutral outgoing `references` mentions for supported
+same-workspace operational entities, while ambiguous, incoming, archived and
+foreign links remain deferred. Migration status exercises a shadow repository
+detail read for title, composed Markdown, reader-visible rendered HTML and
+outgoing legacy `references` links; a match does not switch authority
+or certify complete read, write and publication parity.
+Its `in_sync` state also requires the indexed title, Markdown, topic,
+taxonomies and portable properties to agree with the parsed repository files;
+ordered include edges must retain their targets, audience, resolution mode and
+live source digest. Stale derived metadata or include edges are `diverged` until
+a rebuild repairs them. Wikilink edges must also retain ordered source targets,
+labels, fragments and resolved backlink pointers; unresolved targets stay null.
+Composed operational-entity links must match their indexed relationship rows;
+the copied document root is also checked against the export's resolved links.
 
 Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, artifact-bound and publication-trust/antivirus remediations remain implemented foundations. Exact-image provenance, full recovery/outage evidence, accessibility/performance/browser/DAST recurrence and candidate review move to `0.9.8` so they validate the architecture that will ship as 1.0 rather than the superseded database-only document store.
 

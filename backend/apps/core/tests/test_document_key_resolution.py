@@ -10,6 +10,7 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.db import close_old_connections
 from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
@@ -104,6 +105,27 @@ def _resolve(installation, *, document, markdown, audience, organization, user=N
         audience=audience,
         organization=organization,
     )
+
+
+@pytest.mark.django_db
+def test_archived_binding_no_longer_resolves(installation):
+    organization = _organization(installation.tenant, "Archived binding client")
+    asset = _asset_with_serial(installation, organization, name="Old firewall", serial="ARCHIVED-KEY")
+    markdown = "Serial <tekdocs://key/subject.serial_number>."
+    document = _document(installation, organization, "Old guide", markdown)
+    binding = _bind(installation, document=document, target=asset.entity, organization=organization)
+    binding.archived_at = timezone.now()
+    binding.save(update_fields=("archived_at", "updated_at"))
+
+    result = _resolve(
+        installation,
+        document=document,
+        markdown=markdown,
+        audience=DataAudience.MSP_STAFF,
+        organization=organization,
+    )["tekdocs://key/subject.serial_number"]
+    assert result.state == ResolutionState.UNRESOLVABLE
+    assert result.reason == UnresolvableReason.NO_BINDING
 
 
 # ---------------------------------------------------------------------------
@@ -478,9 +500,7 @@ def test_many_content_keys_read_their_block_revisions_in_one_batch(installation,
             organization=client,
         )
 
-    assert {resolution.value for resolution in resolutions.values()} == {
-        f"Procedure {index}." for index in range(8)
-    }
+    assert {resolution.value for resolution in resolutions.values()} == {f"Procedure {index}." for index in range(8)}
 
 
 @pytest.mark.django_db
@@ -694,12 +714,15 @@ def test_export_freezes_the_same_resolved_key_and_provenance(installation):
     assert snapshot.manifest["key_resolutions"][0]["value"] == "EXP-0001"
     assert snapshot.manifest["key_resolutions"][0]["source_entity_id"] == str(asset.entity_id)
     assert snapshot.manifest["key_resolutions"] == repeated.manifest["key_resolutions"]
-    assert snapshot.manifest["key_resolutions"][0]["resolved_at"] == max(
-        document.updated_at,
-        binding.updated_at,
-        asset.entity.updated_at,
-        asset.hardware.updated_at,
-    ).isoformat()
+    assert (
+        snapshot.manifest["key_resolutions"][0]["resolved_at"]
+        == max(
+            document.updated_at,
+            binding.updated_at,
+            asset.entity.updated_at,
+            asset.hardware.updated_at,
+        ).isoformat()
+    )
 
 
 @pytest.mark.django_db

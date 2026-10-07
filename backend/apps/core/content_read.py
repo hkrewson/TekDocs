@@ -10,7 +10,11 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from .content_index_models import ContentEntityLink, ContentFinding, ContentNode, ContentProperty
-from .models import ClientAsset, Entity, WorkspaceRepository, workspace_for_owner
+from .document_attachments import resolve_rendered_attachments
+from .document_key_models import DocumentKeyBinding
+from .document_key_resolution import resolve_rendered_keys
+from .document_keys import key_targets_in_markdown
+from .models import ClientAsset, Document, Entity, WorkspaceRepository, workspace_for_owner
 from .relationships import entity_for_workspace, entity_projection, visible_entities_for_workspace
 from .rendering import RenderedEntityMention, render_markdown
 from .workspaces import ResolvedWorkspace
@@ -47,6 +51,27 @@ def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audi
     }
     composition = node.composition_variants.get(audience)
     markdown = str(composition.get("markdown", "")) if isinstance(composition, dict) else node.markdown
+    legacy_document = (
+        Document.objects.filter(
+            id=node.content_id,
+            tenant=workspace.member.tenant,
+            organization=workspace.organization,
+            entity__workspace=repository.workspace,
+            archived_at__isnull=True,
+        ).first()
+        if node.kind == "document"
+        else None
+    )
+    key_document = None
+    if legacy_document is not None and key_targets_in_markdown(markdown):
+        active_key_bindings = {
+            name: str(target_id)
+            for name, target_id in DocumentKeyBinding.objects.filter(
+                document=legacy_document, archived_at__isnull=True
+            ).values_list("name", "target_entity_id")
+        }
+        if node.frontmatter.get("key_bindings", {}) == active_key_bindings:
+            key_document = legacy_document
     return {
         "id": node.content_id,
         "kind": node.kind,
@@ -54,7 +79,20 @@ def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audi
         "path": node.source_path,
         "indexed_commit": node.indexed_commit.object_id,
         "markdown": markdown,
-        "sanitized_html": render_markdown(markdown, entity_mentions=mentions),
+        "sanitized_html": render_markdown(
+            markdown,
+            entity_mentions=mentions,
+            attachments=resolve_rendered_attachments(
+                workspace=workspace,
+                document=legacy_document,
+                markdown=markdown,
+            ),
+            key_resolutions=resolve_rendered_keys(
+                workspace=workspace,
+                document=key_document,
+                markdown=markdown,
+            ),
+        ),
         "entity_context": [
             {
                 "id": link.target_entity_id,

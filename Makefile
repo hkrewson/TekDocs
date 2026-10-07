@@ -15,7 +15,7 @@ BACKEND_IMAGE_GATES := check security \
 	test-isolation test-rls test-organizations test-workspaces test-people \
 	test-sites test-custom-fields test-relationships test-recovery test-stabilization \
 	test-public-beta-performance test-entity-rbac-validation test-documentation-validation \
-	test-file-export-stabilization test-content-index test-content-composition test-content-read test-content-authoring test-diagram-exports \
+	test-file-export-stabilization test-content-index test-content-composition test-content-read test-content-authoring test-document-migration-inventory test-diagram-exports \
 	test-publication-control test-credential-references test-catalogs test-inventory \
 	test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-invoice-recurrence test-networks test-network-stabilization \
 	test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all \
@@ -223,6 +223,17 @@ test-content-read:
 
 test-content-authoring:
 	docker compose run --rm migrate pytest apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_content_composition.py apps/core/tests/test_content_read.py apps/core/tests/test_content_authoring.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_api_contracts.py -q
+
+.PHONY: test-document-migration-inventory
+test-document-migration-inventory:
+	docker compose run --rm migrate pytest apps/core/tests/test_document_migration_inventory.py apps/core/tests/test_runtime_rls.py -q
+
+.PHONY: document-migration-upgrade-rehearsal
+document-migration-upgrade-rehearsal:
+	sh tests/rehearsals/rehearse-document-migration-upgrade.sh
+
+.PHONY: document-migration-release-gate
+document-migration-release-gate: check test-content-authoring test-document-migration-inventory document-migration-upgrade-rehearsal production-image-rehearsal
 
 file-export-release-gate: check test-file-export-stabilization test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
 

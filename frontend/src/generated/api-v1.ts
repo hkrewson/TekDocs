@@ -596,6 +596,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/documents/{document_entity_id}/migration-status": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_msp_migration_status"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents/{document_entity_id}/operations": {
         readonly parameters: {
             readonly query?: never;
@@ -5528,6 +5544,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/migration-status": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["documents_organization_migration_status"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/operations": {
         readonly parameters: {
             readonly query?: never;
@@ -10337,6 +10369,37 @@ export interface components {
             readonly results: readonly components["schemas"]["DocumentKey"][];
             readonly count: number;
             readonly unresolved_count: number;
+        };
+        readonly DocumentMigrationStatus: {
+            /** Format: uuid */
+            readonly document_id: string;
+            readonly legacy_authoritative: boolean;
+            readonly cutover_ready: boolean;
+            readonly handoff_blockers: readonly string[];
+            /**
+             * @description * `not_checked` - not_checked
+             *     * `matched` - matched
+             *     * `different` - different
+             *     * `unavailable` - unavailable
+             * @enum {string}
+             */
+            readonly read_projection_state: "not_checked" | "matched" | "different" | "unavailable";
+            /**
+             * @description * `legacy_only` - legacy_only
+             *     * `repository_missing` - repository_missing
+             *     * `index_pending` - index_pending
+             *     * `unsupported_legacy_shape` - unsupported_legacy_shape
+             *     * `partial_copy` - partial_copy
+             *     * `diverged` - diverged
+             *     * `in_sync` - in_sync
+             * @enum {string}
+             */
+            readonly content_copy_state: "legacy_only" | "repository_missing" | "index_pending" | "unsupported_legacy_shape" | "partial_copy" | "diverged" | "in_sync";
+            readonly accepted_commit: string | null;
+            readonly indexed_commit: string | null;
+            /** Format: uuid */
+            readonly legacy_revision_id: string | null;
+            readonly legacy_revision_ids: readonly string[];
         };
         readonly DocumentOperationsChoice: {
             /** Format: uuid */
@@ -17663,6 +17726,29 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["DocumentKeyReport"];
+                };
+            };
+        };
+    };
+    readonly documents_msp_migration_status: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentMigrationStatus"];
                 };
             };
         };
@@ -30957,6 +31043,30 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["DocumentKeyReport"];
+                };
+            };
+        };
+    };
+    readonly documents_organization_migration_status: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly document_entity_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentMigrationStatus"];
                 };
             };
         };

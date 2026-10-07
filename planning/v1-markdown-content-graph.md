@@ -284,6 +284,134 @@ content, widen scope or leave a partially accepted repository commit.
 
 ### `0.9.6` — migration and coexistence
 
+The first migration gate is a read-only, exact-workspace inventory. Run
+`docker compose run --rm migrate python manage.py inventory_document_migration --workspace <workspace-uuid>`
+against a controlled copy of the database. Its sorted JSON lists each legacy
+document ID, placement count, simple-shape candidates, and explicit deferral
+reasons; it does not export bodies, modify Git, or switch read/write authority.
+Repository-wide readiness is reported separately. Repeat the command and
+compare output before applying any import. A simple-shape candidate is **not**
+yet approved for cutover: metadata mapping, parity, and rollback remain below.
+
+For one `simple_candidate`, run
+`docker compose run --rm migrate python manage.py preview_document_migration --workspace <workspace-uuid> --document <document-uuid>`.
+This first-wave shape now includes one or more ordered, document-owned, live,
+shared sections, including bounded nested sections. Parent-child order is
+preserved as nested includes; cycles, missing parents and excessive depth are
+deferred. A live cross-document leaf may be referenced only when its source
+document and fragment are already indexed in the same workspace repository,
+the fragment is a leaf, and its Markdown matches the current legacy block
+revision exactly. A new pinned cross-document leaf uses the current accepted
+commit when its indexed fragment matches the selected legacy revision. Otherwise,
+the exporter searches at most 32 first-parent commits of that accepted head,
+newest first and with a 64 MiB aggregate history-read limit. It pins the first
+retained, verified same-repository snapshot whose leaf Markdown matches the
+selected revision and whose source document reaches that leaf through live
+includes. An already copied target retains its exact pin across later source
+edits, provided the snapshot remains available. Pinned owned sections, non-leaf
+references, pins with no match inside that bound, and cross-workspace reuse
+remain deferred. The target import writes no second copy of a referenced fragment.
+The preview deterministically builds `docs/<document-uuid>.md` and one
+`fragments/<block-uuid>.md` per section, retaining their IDs, order and portable
+category, collection, legacy tags and valid taxonomy selections. Taxonomy
+frontmatter uses stable vocabulary and term keys; selected global terms must be
+active in the current version, and client-local terms must be active, enabled
+and owned by the exact organization. Stale, retired, archived, ambiguous or
+out-of-scope selections remain deferred with `taxonomy_mapping_required`.
+An outgoing legacy `references` link from the document to an active entity in
+the exact same workspace becomes a neutral `entity_links` `mention` entry with
+the target's stable entity UUID when its entity type has a permission-filtered
+repository read projection. This includes assets, people, sites and network
+records, but never infers setup, enrollment or troubleshooting intent.
+Incoming links, other link types, unsupported entity types, archived targets
+and foreign-workspace targets remain deferred with
+`relationship_mapping_required`.
+It validates the combined repository candidate and requires the composed
+Markdown to equal the legacy resolved Markdown exactly. Schema-v1 structured
+topics are eligible when that composed Markdown contains each required topic
+section once; the root file preserves the topic type/version while included
+fragments carry the sections. Missing or duplicate sections block preview.
+The JSON contains copied paths, byte counts, SHA-256 digests, referenced-source
+digests, exact pinned commits when present, ordered source revisions and
+accepted base commit, not document bodies. It does **not** commit or change
+content authority. Unknown topic versions and complex/retained relationships
+stay deferred; topic copy does not imply publication parity or cutover.
+Ordinary document attachments remain in the managed file store, not Git. Their
+stable links are checked against active, clean records owned by the exact
+document; preview verifies stored bytes against size and checksum and binds
+attachment metadata into the import plan. Repository detail reads resolve the
+same authorized download links for copied documents. Missing, archived or
+corrupt references block the copy. Primary-file version chains remain deferred
+until file/publication parity is addressed in `0.9.7`.
+Field-key bindings are copied as a bounded `key_bindings` name-to-Entity-ID
+mapping in document frontmatter; resolved values and sensitive fields never go
+to Git. Preview requires active, exact-workspace bindings and addressable field
+paths, binds binding identities to its plan, and preserves the literal key
+expressions in Markdown. During coexistence, repository reads resolve a key
+only when the portable map still matches live legacy bindings, using the
+existing per-reader field authorization. Archived bindings become unresolved.
+Content-expanding keys remain deferred until their composition semantics can
+be made portable; inconsistent or foreign bindings are rejected, in addition
+to the existing database scope guard.
+
+An operator may copy one eligible, unchanged preview with
+`python manage.py import_document_migration --workspace <workspace-uuid> --document <document-uuid> --base-commit <preview-base> --plan-sha256 <preview-plan-sha256> --actor <tenant-operator-uuid> --apply`
+in the migration container. The plan fingerprint binds every proposed file
+digest, ordered source revisions, IDs and exact repository base. The Git commit uses
+compare-and-swap, is audited, and is followed by indexing and parity checks.
+An interrupted index can be retried with the same command without another Git
+commit. `index_pending`, `verification_pending` and `source_changed` are not
+cutover-ready states. Legacy data, editor, reads and publications remain
+authoritative throughout.
+
+To undo an unchanged copy, run
+`python manage.py rollback_document_migration --workspace <workspace-uuid> --document <document-uuid> --expected-commit <current-accepted-commit> --actor <tenant-operator-uuid> --apply`.
+Rollback refuses changed files, a stale repository base, or incoming links
+and inclusions from other content; it removes only files copied for that
+document in a **new**
+audited Git commit and reindexes. Historical Git commits and all legacy
+revisions remain intact. A rollback after external edits needs an explicit
+operator reconciliation rather than an automatic overwrite.
+
+During this bounded coexistence window, staff with document-view permission
+can inspect `GET /api/v1/documents/<entity-id>/migration-status` or the exact
+organization-workspace equivalent. The read-only response compares the current
+legacy revision with the indexed document/fragment copy and reports
+`legacy_only`, `index_pending`, `in_sync`, `diverged`, `partial_copy`, or an
+unsupported shape. It never routes reads or writes to Git: `legacy_authoritative`
+is true and `cutover_ready` is false in every state. This is deliberately a
+derived status, not a persisted authority marker. `in_sync` also requires the
+indexed title, Markdown, topic, taxonomies and portable properties to match
+the parsed repository source. Ordered include edges must retain their targets,
+audience, resolution mode and live source digest; stale metadata or edges are
+`diverged` until reindexing. Indexed wikilinks also preserve ordered target IDs,
+labels, fragments and resolved backlink pointers, leaving unknown targets
+unresolved. Composed operational-entity links must agree with indexed rows,
+while the document root is compared with the export's independently resolved
+link list so a jointly stale composition and row set cannot pass parity.
+`handoff_blockers` makes the
+copy-parity gate and the still-unimplemented repository read/write and
+publication gates explicit, including when the copy is `in_sync`; it is not a
+promotion command. Promotion must wait for
+write, review, key, template, attachment and publication parity.
+For an `in_sync` copy, `read_projection_state` separately exercises the
+permission-scoped repository detail route and compares its title and composed
+Markdown, rendered HTML (including reader-scoped key, attachment and entity
+resolution), and viewer-visible outgoing legacy `references` links with the
+legacy read. A mismatch is a handoff blocker; a match does
+not establish full document-detail, editor, key, or publication parity.
+
+Next, expand the exporter and parity checks to cross-workspace reuse and
+remaining legacy metadata and relationship types, then add an explicit per-document authority transition
+only after every relevant read and write path can use the Git graph. These
+deferred shapes do not prevent closing the bounded `0.9.6` copy release, but
+must remain visible in inventory and cannot be treated as migrated. Retain
+legacy revisions and all operational evidence for rollback; rollback must be
+a new Git commit or a controlled reversal of authority, never a history
+rewrite. Do not retire the legacy editor until key, taxonomy, relationship,
+template, attachment and publication paths pass on both fresh and upgraded
+fixtures.
+
 - Inventory existing production-shaped documents by composition complexity.
 - Export existing IDs, content, metadata, taxonomy selections, keys and
   relationships into repositories in a deterministic migration commit.
@@ -295,8 +423,13 @@ content, widen scope or leave a partially accepted repository commit.
 - Stop new legacy revisions only after the migrated route passes all write and
   publication paths.
 
-Exit condition: a fresh fixture and an upgraded 0.8.46 fixture converge on the
-same Git-backed content graph with no changed stable IDs or retained evidence.
+`0.9.6` exit condition: fresh and upgraded `0.8.46` fixtures demonstrate the
+same deterministic first-wave export for eligible documents, preserve stable
+IDs and retained legacy evidence, and reject unsupported records with explicit
+reasons. Preview, import, retry, parity status and guarded rollback pass with
+exact-workspace authorization; neither legacy read nor write authority moves.
+Full supported-document convergence and legacy-write retirement remain later
+gates after file, template, review, key, publication and recovery parity.
 
 ### `0.9.7` — publications, files, export and recovery
 

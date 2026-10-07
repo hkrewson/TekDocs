@@ -376,6 +376,23 @@ class _GitRepository:
         )
         return returncode == 0
 
+    def first_parent_history(self, object_id: str, *, limit: int) -> tuple[str, ...]:
+        _, output = self._run(
+            "read_accepted_history",
+            ("rev-list", "--first-parent", f"--max-count={limit}", object_id),
+            output_limit=limit * (64 + 1),
+        )
+        try:
+            identities = tuple(line for line in output.decode("ascii").splitlines() if line)
+        except UnicodeDecodeError as exc:
+            raise RepositoryCommandError("Managed repository returned invalid commit history") from exc
+        if not identities or identities[0] != object_id or len(identities) > limit:
+            raise RepositoryCommandError("Managed repository returned invalid commit history")
+        try:
+            return tuple(_validate_object_id(identity, self.object_format) for identity in identities)
+        except RepositoryInputError as exc:
+            raise RepositoryCommandError("Managed repository returned invalid commit history") from exc
+
     def verify_commit(self, object_id: str) -> None:
         self._run("verify_commit", ("cat-file", "-e", f"{object_id}^{{commit}}"), output_limit=0)
 
@@ -834,6 +851,25 @@ def read_accepted_repository_markdown_files(
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         return commit, tuple((path, git.read_file(accepted, path)) for path in git.markdown_paths(accepted))
+
+
+def list_accepted_repository_history(*, repository_id: uuid.UUID, limit: int = 32) -> tuple[str, ...]:
+    """Return a bounded first-parent chain from the exact accepted Git head."""
+
+    if limit < 1 or limit > 32:
+        raise RepositoryInputError("History limit is outside the migration safety bound")
+    repository, root, repository_path, object_format = _load_repository(repository_id)
+    with _repository_lock(root, repository.id, exclusive=False):
+        repository.refresh_from_db(fields=("accepted_commit",))
+        accepted = _accepted_object(repository, object_format)
+        if accepted is None:
+            raise RepositoryInputError("Repository has no accepted content")
+        git = _GitRepository(repository.id, repository_path, object_format)
+        reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
+        _record_reconciliation(repository, reconciliation)
+        if not accepted_usable:
+            raise RepositoryReconciliationError("Accepted repository content is unavailable")
+        return git.first_parent_history(accepted, limit=limit)
 
 
 def read_repository_markdown_files_at_commit(

@@ -1708,6 +1708,11 @@ retains composed Markdown and exact source proof in a separate signed,
 append-only, exact-Workspace evidence table. It can verify retained bytes
 without live Git, but has no distribution approval, artifact, portal, or
 export path. The legacy publisher and authority remain unchanged.
+The next internal gate refuses to sign an empty or structurally incomplete
+audience composition, or one containing dynamic attachment, key, entity-card,
+image, unsupported TekDocs-link, or Mermaid dependencies that repository
+publication cannot yet retain. It signs value-free preflight codes with the
+source proof; those dependencies move to the remaining `0.9.7` packaging work.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

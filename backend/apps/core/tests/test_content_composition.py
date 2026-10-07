@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -37,10 +38,14 @@ from apps.core.models import (
     WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
+from apps.core.publications import publication_signing_key
 from apps.core.repository_publication_evidence import (
+    RepositoryPublicationEvidenceError,
+    evidence_payload,
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
 )
+from apps.core.repository_publication_preflight import repository_publication_preflight
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
@@ -361,7 +366,20 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert evidence.manifest["source"]["accepted_commit"] == first.object_id
     assert len(evidence.manifest["source"]["sources"]) == 2
     assert "Included." in evidence.canonical_markdown
+    assert evidence.manifest["preflight"]["blockers"] == []
+    assert evidence.manifest["preflight"]["markdown_sha256"] == evidence.manifest["source"]["markdown_sha256"]
     assert verify_repository_publication_evidence(evidence)["valid"]
+    assert verify_repository_publication_evidence(evidence)["preflight_attested"]
+
+    prior_format = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    prior_format.manifest.pop("preflight")
+    prior_digest = hashlib.sha256(
+        evidence_payload(manifest=prior_format.manifest, markdown=prior_format.canonical_markdown)
+    ).digest()
+    prior_format.content_digest = prior_digest.hex()
+    prior_format.signature = base64.urlsafe_b64encode(publication_signing_key().sign(prior_digest)).decode("ascii")
+    assert verify_repository_publication_evidence(prior_format)["valid"]
+    assert not verify_repository_publication_evidence(prior_format)["preflight_attested"]
 
     foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
     with django_runtime_role(), transaction.atomic():
@@ -377,6 +395,9 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     evidence.refresh_from_db()
     evidence.manifest["source"]["sources"][1]["blob"] = "0" * 40
     assert not verify_repository_publication_evidence(evidence)["valid"]
+    evidence.refresh_from_db()
+    evidence.manifest["preflight"]["markdown_sha256"] = "0" * 64
+    assert not verify_repository_publication_evidence(evidence)["identity_valid"]
     evidence.refresh_from_db()
     with pytest.raises(ValidationError, match="append-only"):
         evidence.save()
@@ -404,6 +425,63 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
         message="Advance live fragment",
     )
     assert verify_repository_publication_evidence(evidence)["valid"]
+
+
+@pytest.mark.parametrize(
+    ("markdown", "code"),
+    [
+        ("   \n", "document.empty"),
+        (f"[File](tekdocs://attachment/{uuid.uuid4()})\n", "repository.attachment.unfrozen"),
+        ("Device <tekdocs://key/subject.serial_number>.\n", "repository.key.unfrozen"),
+        (f"[Device](tekdocs://entity/{uuid.uuid4()})\n", "repository.entity.unfrozen"),
+        ("[Secret](tekdocs://credential/example)\n", "repository.reference.unsupported"),
+        ("![Remote](https://example.invalid/image.png)\n", "repository.image.unfrozen"),
+        ("```mermaid\nflowchart LR\nA-->B\n```\n", "repository.diagram.unfrozen"),
+    ],
+)
+def test_repository_publication_preflight_classifies_unfrozen_dependencies(markdown, code):
+    result = repository_publication_preflight(markdown=markdown, audience="msp_internal", topic_type="")
+    assert result["blockers"] == [code]
+    assert result["markdown_sha256"] == hashlib.sha256(markdown.encode()).hexdigest()
+
+
+def test_repository_publication_preflight_ignores_literal_examples_and_blocks_topic_gaps():
+    literal = "`[Example](tekdocs://attachment/example)`\n\n```text\n![Example](https://example.invalid/a.png)\n```"
+    assert repository_publication_preflight(markdown=literal, audience="msp_internal", topic_type="")[
+        "blockers"
+    ] == []
+    topic = repository_publication_preflight(markdown="Body.\n", audience="msp_internal", topic_type="procedure")
+    assert "topic.section.missing" in topic["blockers"]
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        (f"[File](tekdocs://attachment/{uuid.uuid4()})\n", "repository.attachment.unfrozen"),
+        ("```mermaid\nflowchart LR\nA-->B\n```\n", "repository.diagram.unfrozen"),
+    ],
+)
+def test_repository_publication_evidence_refuses_unfrozen_dependencies(composition_repository, body, code):
+    installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body=body)},
+        message="Add unsupported publication candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    with pytest.raises(RepositoryPublicationEvidenceError, match=code):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document_id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+    assert RepositoryPublicationEvidence.objects.count() == 0
 
 
 def test_repository_publication_evidence_is_exact_client_workspace_scoped(composition_repository, django_runtime_role):

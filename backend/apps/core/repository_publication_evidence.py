@@ -32,6 +32,7 @@ from .publications import (
     publication_signing_key,
     publication_trusted_key_fingerprints,
 )
+from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
 
 EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v1"
 
@@ -91,6 +92,13 @@ def retain_repository_publication_evidence(
             or variant.get("digest") != source["composition_digest"]
         ):
             raise RepositoryPublicationEvidenceError("Indexed repository composition differs from its Git source")
+        preflight = repository_publication_preflight(
+            markdown=markdown, audience=audience, topic_type=node.topic_type
+        )
+        if preflight["blockers"]:
+            raise RepositoryPublicationEvidenceError(
+                "Repository publication preflight blocked: " + ", ".join(preflight["blockers"])
+            )
 
         evidence_id = uuid.uuid4()
         signed_at = timezone.now()
@@ -108,6 +116,7 @@ def retain_repository_publication_evidence(
             "signed_at": signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z"),
             "signed_by": str(actor.id),
             "source": source,
+            "preflight": preflight,
         }
         digest = hashlib.sha256(evidence_payload(manifest=manifest, markdown=markdown)).digest()
         key = publication_signing_key()
@@ -169,6 +178,18 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
             == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
         )
     )
+    preflight = manifest.get("preflight") if isinstance(manifest, dict) else None
+    preflight_attested = isinstance(preflight, dict) and all(
+        (
+            preflight.get("format") == PREFLIGHT_FORMAT,
+            preflight.get("audience") == evidence.audience,
+            preflight.get("markdown_sha256")
+            == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
+            preflight.get("blockers") == [],
+        )
+    )
+    if preflight is not None:
+        identity_valid = identity_valid and preflight_attested
     try:
         source_commit = evidence.source_commit
         identity_valid = identity_valid and isinstance(source, dict) and (
@@ -209,4 +230,5 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "signature_valid": signature_valid,
         "key_fingerprint_valid": key_fingerprint_valid,
         "trusted_key": evidence.key_fingerprint in trusted,
+        "preflight_attested": valid and preflight_attested,
     }

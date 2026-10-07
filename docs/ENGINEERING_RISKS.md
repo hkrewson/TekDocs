@@ -217,6 +217,11 @@ the composed Markdown and exact source proof under forced Workspace RLS.
 Verification needs the retained bytes and trusted key, not live Git. This is
 not yet a distributable STATIC publication: approval, artifacts, portal and
 export parity remain open, as does `TD-RISK-069` repository-inclusive restore.
+Until the repository publisher can freeze dynamic dependencies, its internal
+readiness gate refuses to sign compositions with live attachment, key,
+entity-card, image, unsupported TekDocs-link or Mermaid output references.
+This narrows signed evidence to content whose retained proof is complete; it
+does not close artifact custody or distribution risks.
 
 ## 0.9.2 Markdown/index disposition
 

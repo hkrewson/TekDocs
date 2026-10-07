@@ -459,6 +459,11 @@ and composed Markdown into a separate append-only, exact-Workspace record that
 verifies without live Git. It is not a distributable STATIC publication: the
 legacy publisher remains authoritative, and approval, artifacts, file/export/
 portal parity and repository-inclusive recovery remain in this milestone.
+An additional internal readiness gate blocks retention when the selected
+audience composition is empty, has required-topic gaps, or contains dynamic
+files, keys, entity cards, images, unsupported TekDocs links or Mermaid output
+that has not been frozen. The signed manifest records only versioned,
+value-free finding codes; this does not substitute for artifact packaging.
 
 ### `0.9.8` — version 1 acceptance
 

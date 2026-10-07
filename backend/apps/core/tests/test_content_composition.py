@@ -33,6 +33,7 @@ from apps.core.models import (
     ContentInclude,
     ContentNode,
     ContentTemplateSource,
+    EntityVisibility,
     InstallationState,
     RepositoryEvidenceAttachment,
     RepositoryPublicationEvidence,
@@ -475,8 +476,10 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         assert verify_repository_publication_evidence(evidence)["valid"]
         with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.integrity"):
             retain_repository_publication_evidence(
-                repository_id=repository.id, content_id=document.id,
-                audience="msp_internal", actor=installation.owner,
+                repository_id=repository.id,
+                content_id=document.id,
+                audience="msp_internal",
+                actor=installation.owner,
             )
         assert RepositoryPublicationEvidence.objects.count() == 1
         artifact.file.storage.delete(artifact.file.name)
@@ -517,45 +520,206 @@ def test_repository_evidence_rejects_attachment_without_exact_document(compositi
 def test_repository_evidence_rejects_sibling_client_attachment(composition_repository, tmp_path):
     installation, _workspace, _repository = composition_repository
     owner = create_organization(
-        tenant=installation.tenant, actor_id=installation.owner.id,
-        name="Attachment owner", legal_name="Attachment owner LLC",
-        website="", classifications=["client"],
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Attachment owner",
+        legal_name="Attachment owner LLC",
+        website="",
+        classifications=["client"],
     )
     sibling = create_organization(
-        tenant=installation.tenant, actor_id=installation.owner.id,
-        name="Attachment sibling", legal_name="Attachment sibling LLC",
-        website="", classifications=["client"],
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Attachment sibling",
+        legal_name="Attachment sibling LLC",
+        website="",
+        classifications=["client"],
     )
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         foreign_document = create_document(
-            tenant=installation.tenant, organization=owner, actor_id=installation.owner.id,
-            title="Owner guide", markdown="Private.\n",
+            tenant=installation.tenant,
+            organization=owner,
+            actor_id=installation.owner.id,
+            title="Owner guide",
+            markdown="Private.\n",
         )
         foreign_attachment = create_document_attachment(
-            document=foreign_document, actor_id=installation.owner.id,
+            document=foreign_document,
+            actor_id=installation.owner.id,
             upload=SimpleUploadedFile("guide.txt", b"Owner bytes"),
         )
         workspace = Workspace.objects.get(tenant=installation.tenant, organization=sibling)
         repository = repository_storage.ensure_workspace_repository(workspace).repository
         repository.refresh_from_db()
         repository_service.commit_repository_files(
-            repository_id=repository.id, expected_base=_accepted(repository),
-            changes={"documents/sibling.md": _content(
-                content_id=foreign_document.id, title="Sibling guide",
-                body=f"[File](tekdocs://attachment/{foreign_attachment.id})\n",
-            )}, message="Add sibling reference",
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={
+                "documents/sibling.md": _content(
+                    content_id=foreign_document.id,
+                    title="Sibling guide",
+                    body=f"[File](tekdocs://attachment/{foreign_attachment.id})\n",
+                )
+            },
+            message="Add sibling reference",
         )
         index_repository_content(repository_id=repository.id)
         Authenticator.objects.create(
-            user=installation.owner, type=Authenticator.Type.TOTP,
+            user=installation.owner,
+            type=Authenticator.Type.TOTP,
             data={"secret": generate_totp_secret()},
         )
         with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.unavailable"):
             retain_repository_publication_evidence(
-                repository_id=repository.id, content_id=foreign_document.id,
-                audience="client_visible", actor=installation.owner,
+                repository_id=repository.id,
+                content_id=foreign_document.id,
+                audience="client_visible",
+                actor=installation.owner,
             )
         assert RepositoryPublicationEvidence.objects.count() == 0
+
+
+def test_repository_evidence_freezes_exact_workspace_entity_cards(composition_repository):
+    installation, _workspace, repository = composition_repository
+    target = create_document(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        title="Original entity name",
+        markdown="Target.\n",
+    )
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/entity.md": _content(
+                content_id=content_id,
+                title="Entity guide",
+                body=f"[Target](tekdocs://entity/{target.entity_id})\n",
+            )
+        },
+        message="Add entity reference",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner,
+        type=Authenticator.Type.TOTP,
+        data={"secret": generate_totp_secret()},
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id,
+        content_id=content_id,
+        audience="msp_internal",
+        actor=installation.owner,
+    )
+    assert evidence.manifest["entity_cards"] == [
+        {
+            "id": str(target.entity_id),
+            "display_name": "Original entity name",
+            "entity_type": "document",
+            "workspace_label": installation.tenant.name,
+        }
+    ]
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    target.entity.display_name = "Renamed later"
+    target.entity.save(update_fields=("display_name", "updated_at"))
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    evidence.manifest["entity_cards"][0]["id"] = str(uuid.uuid4())
+    assert not verify_repository_publication_evidence(evidence)["entity_cards_valid"]
+
+
+def test_repository_evidence_entity_cards_require_client_visibility_and_exact_owner(composition_repository):
+    installation, _workspace, _repository = composition_repository
+    client = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Entity client",
+        legal_name="Entity client LLC",
+        website="",
+        classifications=["client"],
+    )
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Entity sibling",
+        legal_name="Entity sibling LLC",
+        website="",
+        classifications=["client"],
+    )
+    target = create_document(
+        tenant=installation.tenant,
+        organization=client,
+        actor_id=installation.owner.id,
+        title="Client-only target",
+        markdown="Target.\n",
+    )
+    foreign = create_document(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        title="Sibling target",
+        markdown="Target.\n",
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=client)
+    repository = repository_storage.ensure_workspace_repository(workspace).repository
+    repository.refresh_from_db()
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/entity.md": _content(
+                content_id=content_id,
+                title="Client guide",
+                body=f"[Target](tekdocs://entity/{target.entity_id})\n",
+            )
+        },
+        message="Add client entity reference",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner,
+        type=Authenticator.Type.TOTP,
+        data={"secret": generate_totp_secret()},
+    )
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.entity.unavailable"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=content_id,
+            audience="client_visible",
+            actor=installation.owner,
+        )
+    target.entity.visibility = EntityVisibility.CLIENT_VISIBLE
+    target.entity.save(update_fields=("visibility", "updated_at"))
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id,
+        content_id=content_id,
+        audience="client_visible",
+        actor=installation.owner,
+    )
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/entity.md": _content(
+                content_id=content_id,
+                title="Client guide",
+                body=f"[Target](tekdocs://entity/{foreign.entity_id})\n",
+            )
+        },
+        message="Reference sibling entity",
+    )
+    index_repository_content(repository_id=repository.id)
+    with pytest.raises(RepositoryPublicationEvidenceError, match="repository.entity.unavailable"):
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=content_id,
+            audience="client_visible",
+            actor=installation.owner,
+        )
+    assert verify_repository_publication_evidence(evidence)["valid"]
 
 
 @pytest.mark.parametrize(

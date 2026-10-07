@@ -22,15 +22,23 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
-from apps.accounts.policy import PermissionKey, require_permission
+from apps.accounts.policy import (
+    DataAudience,
+    InstallationMemberContext,
+    PermissionKey,
+    entity_visible_to_audience,
+    require_permission,
+)
 
 from .content_index_models import ContentNode, ContentNodeKind
 from .content_publication_sources import pinned_git_document_dependencies
 from .document_attachments import copy_attachment_content
+from .entity_mentions import resolve_entity_mentions
 from .models import (
     AuditEvent,
     Document,
     DocumentAttachment,
+    Entity,
     PublicationAudience,
     RepositoryEvidenceAttachment,
     RepositoryPublicationEvidence,
@@ -45,14 +53,73 @@ from .publications import (
     publication_signing_key,
     publication_trusted_key_fingerprints,
 )
-from .rendering import attachment_ids_in_markdown
+from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
+from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
 EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v1"
 
 
 class RepositoryPublicationEvidenceError(RuntimeError):
     """A repository source cannot be retained as signed evidence."""
+
+
+def _frozen_entity_cards(
+    *,
+    repository: WorkspaceRepository,
+    markdown: str,
+    audience: str,
+    actor: User,
+    member: InstallationMemberContext,
+) -> list[dict[str, str]]:
+    """Freeze only permission-visible, exact-Workspace entity display cards."""
+
+    requested = entity_ids_in_markdown(markdown)
+    if not requested:
+        return []
+    if len(requested) > 200:
+        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.entity.limit")
+    organization = repository.workspace.organization
+    workspace = (
+        resolve_organization_workspace(actor, entity_id=organization.entity_id)
+        if organization is not None
+        else resolve_msp_workspace(actor)
+    )
+    projections = resolve_entity_mentions(workspace=workspace, markdown=markdown, lock=True)
+    if set(projections) != {str(entity_id) for entity_id in requested}:
+        raise RepositoryPublicationEvidenceError(
+            "Repository publication preflight blocked: repository.entity.unavailable"
+        )
+    records = {
+        entity.id: entity
+        for entity in Entity.objects.filter(
+            id__in=requested,
+            tenant_id=repository.tenant_id,
+            workspace_id=repository.workspace_id,
+            organization=organization,
+            archived_at__isnull=True,
+        )
+    }
+    data_audience = (
+        DataAudience.CLIENT_PORTAL if audience == PublicationAudience.CLIENT_VISIBLE else DataAudience.MSP_STAFF
+    )
+    if len(records) != len(requested) or any(
+        not entity_visible_to_audience(member, records[entity_id], audience=data_audience, organization=organization)
+        for entity_id in requested
+        if entity_id in records
+    ):
+        raise RepositoryPublicationEvidenceError(
+            "Repository publication preflight blocked: repository.entity.unavailable"
+        )
+    return [
+        {
+            "id": projections[str(entity_id)]["id"],
+            "display_name": projections[str(entity_id)]["display_name"],
+            "entity_type": projections[str(entity_id)]["entity_type"],
+            "workspace_label": projections[str(entity_id)]["workspace_label"],
+        }
+        for entity_id in sorted(requested)
+    ]
 
 
 def evidence_payload(*, manifest: dict[str, Any], markdown: str) -> bytes:
@@ -87,6 +154,7 @@ def retain_repository_publication_evidence(
             content_id=content_id,
             audience=audience,
             actor=actor,
+            member=member,
             stored_files=stored_files,
         )
     except Exception:
@@ -101,6 +169,7 @@ def _retain_pinned_evidence(
     content_id: uuid.UUID,
     audience: str,
     actor: User,
+    member: InstallationMemberContext,
     stored_files: list[tuple[Any, str]],
 ) -> RepositoryPublicationEvidence:
     with pinned_git_document_dependencies(
@@ -134,26 +203,34 @@ def _retain_pinned_evidence(
             )
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
         if attachment_ids:
-            document = Document.objects.select_for_update().filter(
-                id=content_id,
-                tenant_id=repository.tenant_id,
-                organization=repository.workspace.organization,
-                entity__workspace_id=repository.workspace_id,
-                archived_at__isnull=True,
-            ).first()
+            document = (
+                Document.objects.select_for_update()
+                .filter(
+                    id=content_id,
+                    tenant_id=repository.tenant_id,
+                    organization=repository.workspace.organization,
+                    entity__workspace_id=repository.workspace_id,
+                    archived_at__isnull=True,
+                )
+                .first()
+            )
             if document is None:
                 raise RepositoryPublicationEvidenceError(
                     "Repository publication preflight blocked: repository.attachment.unavailable"
                 )
-            attachments = DocumentAttachment.objects.select_for_update().filter(
-                id__in=attachment_ids,
-                document=document,
-                tenant_id=repository.tenant_id,
-                organization=repository.workspace.organization,
-                archived_at__isnull=True,
-                purpose="attachment",
-                scan_status="clean",
-            ).order_by("id")
+            attachments = (
+                DocumentAttachment.objects.select_for_update()
+                .filter(
+                    id__in=attachment_ids,
+                    document=document,
+                    tenant_id=repository.tenant_id,
+                    organization=repository.workspace.organization,
+                    archived_at__isnull=True,
+                    purpose="attachment",
+                    scan_status="clean",
+                )
+                .order_by("id")
+            )
             if attachments.count() != len(attachment_ids):
                 raise RepositoryPublicationEvidenceError(
                     "Repository publication preflight blocked: repository.attachment.unavailable"
@@ -172,11 +249,15 @@ def _retain_pinned_evidence(
                         "Repository publication preflight blocked: repository.attachment.limit"
                     )
                 retained.append((attachment, content, uuid.uuid4()))
+        entity_cards = _frozen_entity_cards(
+            repository=repository, markdown=markdown, audience=audience, actor=actor, member=member
+        )
         preflight = repository_publication_preflight(
             markdown=markdown,
             audience=audience,
             topic_type=node.topic_type,
             frozen_attachment_ids={item.id for item, _content, _id in retained},
+            frozen_entity_ids={uuid.UUID(item["id"]) for item in entity_cards},
         )
         if preflight["blockers"]:
             raise RepositoryPublicationEvidenceError(
@@ -210,6 +291,7 @@ def _retain_pinned_evidence(
                 }
                 for attachment, content, artifact_id in retained
             ],
+            "entity_cards": entity_cards,
         }
         digest = hashlib.sha256(evidence_payload(manifest=manifest, markdown=markdown)).digest()
         key = publication_signing_key()
@@ -297,6 +379,23 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
     )
     if preflight is not None:
         identity_valid = identity_valid and preflight_attested
+    requested_entities = entity_ids_in_markdown(evidence.canonical_markdown)
+    cards = manifest.get("entity_cards") if isinstance(manifest, dict) else None
+    entity_cards_valid = (
+        not requested_entities
+        if cards is None
+        else (
+            isinstance(cards, list)
+            and len(cards) <= 200
+            and all(
+                isinstance(card, dict)
+                and set(card) == {"id", "display_name", "entity_type", "workspace_label"}
+                and all(isinstance(card[field], str) and card[field] for field in card)
+                for card in cards
+            )
+            and [card["id"] for card in cards] == [str(entity_id) for entity_id in sorted(requested_entities)]
+        )
+    )
     attachments_valid = True
     descriptors = manifest.get("attachments") if isinstance(manifest, dict) else None
     if descriptors is not None:
@@ -368,6 +467,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         and evidence.key_fingerprint in trusted
         and evidence.signature_algorithm == SIGNATURE_ALGORITHM
         and attachments_valid
+        and entity_cards_valid
     )
     return {
         "valid": valid,
@@ -378,4 +478,5 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "trusted_key": evidence.key_fingerprint in trusted,
         "preflight_attested": valid and preflight_attested,
         "attachments_valid": attachments_valid,
+        "entity_cards_valid": entity_cards_valid,
     }

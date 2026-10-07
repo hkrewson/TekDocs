@@ -20,7 +20,12 @@ _MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typograp
 
 
 def repository_publication_preflight(
-    *, markdown: str, audience: str, topic_type: str, frozen_attachment_ids: set[UUID] | None = None
+    *,
+    markdown: str,
+    audience: str,
+    topic_type: str,
+    frozen_attachment_ids: set[UUID] | None = None,
+    frozen_entity_ids: set[UUID] | None = None,
 ) -> dict[str, Any]:
     """Return deterministic, content-free blocker and warning codes."""
 
@@ -50,6 +55,14 @@ def repository_publication_preflight(
                     pass
                 else:
                     if target == f"tekdocs://attachment/{attachment_id}" and attachment_id in frozen_attachment_ids:
+                        continue
+            if kind == "entity" and frozen_entity_ids is not None:
+                try:
+                    entity_id = UUID(target[len("tekdocs://entity/") :])
+                except ValueError:
+                    pass
+                else:
+                    if target == f"tekdocs://entity/{entity_id}" and entity_id in frozen_entity_ids:
                         continue
             blockers.add(
                 {

@@ -1722,6 +1722,13 @@ without reading the mutable original. Missing, foreign, corrupt, primary-file,
 or over-limit references still fail closed. This remains internal evidence,
 not a distributable STATIC publication; repository-native attachment ownership,
 other dynamic dependencies, and file/export parity remain open.
+The next entity-card slice resolves narrative entity links through the existing
+permission-filtered relationship path, limits publication evidence to active
+targets owned by the exact Workspace, and requires client visibility for a
+client-audience snapshot. Its signed display-name/type/workspace-label cards
+remain verifiable after live entity names change. Foreign, unavailable, or
+private client-audience targets fail closed. No operational object is copied
+to Git, and this still does not create a distributable publication.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

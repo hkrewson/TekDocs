@@ -61,6 +61,8 @@ from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
 from .repository_publication_render import (
     MAX_RENDERED_PDF_BYTES,
+    pdf_snapshot_matches_current_renderer,
+    rendered_snapshot_matches_current_renderer,
     retained_pdf_snapshot,
     retained_rendered_snapshot,
     verify_retained_pdf_snapshot,
@@ -429,8 +431,10 @@ def _retain_pinned_evidence(
         return evidence
 
 
-def verify_repository_publication_evidence(evidence: RepositoryPublicationEvidence) -> dict[str, bool]:
-    """Verify retained bytes and signature without consulting live Git."""
+def verify_repository_publication_evidence(
+    evidence: RepositoryPublicationEvidence, *, compare_current_renderer: bool = False
+) -> dict[str, bool]:
+    """Verify signed retained bytes offline; compare today's renderer only when requested."""
 
     manifest = evidence.manifest
     source = manifest.get("source") if isinstance(manifest, dict) else None
@@ -450,6 +454,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
             source.get("repository_id") == str(evidence.repository_id),
             source.get("content_id") == str(evidence.content_id),
             source.get("audience") == evidence.audience,
+            source.get("root_title") is None or source.get("root_title") == manifest.get("title"),
             source.get("accepted_commit") == manifest.get("source_commit"),
             source.get("markdown_sha256") == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
         )
@@ -523,17 +528,28 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
     rendered_snapshot = manifest.get("rendered_snapshot") if isinstance(manifest, dict) else None
     rendered_snapshot_valid = (
         rendered_snapshot is None
-        or verify_retained_rendered_snapshot(markdown=evidence.canonical_markdown, manifest=manifest)
+        or verify_retained_rendered_snapshot(manifest=manifest)
+    )
+    rendered_snapshot_reproducible = (
+        compare_current_renderer
+        and rendered_snapshot_valid
+        and rendered_snapshot is not None
+        and rendered_snapshot_matches_current_renderer(markdown=evidence.canonical_markdown, manifest=manifest)
     )
     pdf_snapshot = manifest.get("pdf_snapshot") if isinstance(manifest, dict) else None
     pdf_snapshot_valid = pdf_snapshot is None and not evidence.pdf_file.name
+    pdf_snapshot_reproducible = False
     if pdf_snapshot is not None and evidence.pdf_file.name:
         try:
             with evidence.pdf_file.storage.open(evidence.pdf_file.name, "rb") as stream:
                 pdf_content = bytes(stream.read(MAX_RENDERED_PDF_BYTES + 1))
             pdf_snapshot_valid = verify_retained_pdf_snapshot(
-                markdown=evidence.canonical_markdown, manifest=manifest, content=pdf_content
+                manifest=manifest, content=pdf_content
             )
+            if compare_current_renderer and pdf_snapshot_valid:
+                pdf_snapshot_reproducible = pdf_snapshot_matches_current_renderer(
+                    markdown=evidence.canonical_markdown, manifest=manifest, content=pdf_content
+                )
         except (OSError, ValueError, TypeError):
             pdf_snapshot_valid = False
     attachments_valid = True
@@ -632,7 +648,10 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "attachments_valid": attachments_valid,
         "entity_cards_valid": entity_cards_valid,
         "key_snapshot_valid": key_snapshot_valid,
+        "renderer_comparison_performed": compare_current_renderer,
         "rendered_snapshot_attested": valid and rendered_snapshot is not None and rendered_snapshot_valid,
+        "rendered_snapshot_reproducible": valid and rendered_snapshot_reproducible,
         "pdf_snapshot_attested": valid and pdf_snapshot is not None and pdf_snapshot_valid,
+        "pdf_snapshot_reproducible": valid and pdf_snapshot_reproducible,
         "dependency_closure_attested": valid and dependency_closure_attested,
     }

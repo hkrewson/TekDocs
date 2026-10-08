@@ -5128,6 +5128,7 @@ class RepositoryPublicationEvidence(models.Model):
             or source.get("object_format") != self.source_commit.object_format
             or source.get("markdown_sha256")
             != hashlib.sha256(self.canonical_markdown.encode("utf-8")).hexdigest()
+            or (source.get("root_title") is not None and source.get("root_title") != self.manifest.get("title"))
             or bool(self.manifest.get("pdf_snapshot")) != bool(self.pdf_file.name)
         ):
             raise ValidationError("Publication evidence manifest does not match its retained source")

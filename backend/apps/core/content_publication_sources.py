@@ -197,6 +197,7 @@ def freeze_git_document_dependencies(
         "repository_id": str(repository.id),
         "workspace_id": str(repository.workspace_id),
         "content_id": str(content_id),
+        "root_title": root[2].title,
         "audience": audience,
         "object_format": accepted.object_format,
         "accepted_commit": accepted.object_id,

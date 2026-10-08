@@ -347,6 +347,7 @@ def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(compo
 def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(
     composition_repository,
     django_runtime_role,
+    monkeypatch,
 ):
     installation, _workspace, repository = composition_repository
     document_id = uuid.uuid4()
@@ -397,6 +398,28 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert evidence.manifest["pdf_snapshot"]["media_type"] == "application/pdf"
     assert evidence.manifest["pdf_snapshot"]["size"] == evidence.pdf_file.size
     assert verify_repository_publication_evidence(evidence)["pdf_snapshot_attested"]
+    assert evidence.manifest["source"]["root_title"] == "Candidate"
+    assert not verify_repository_publication_evidence(evidence)["renderer_comparison_performed"]
+    assert verify_repository_publication_evidence(evidence, compare_current_renderer=True)[
+        "rendered_snapshot_reproducible"
+    ]
+    assert verify_repository_publication_evidence(evidence, compare_current_renderer=True)["pdf_snapshot_reproducible"]
+
+    # Historical integrity must survive a later renderer change. Reproduction
+    # is an advisory diagnostic, not a validity gate for signed retained bytes.
+    with monkeypatch.context() as changed_renderer:
+        changed_renderer.setattr(
+            "apps.core.repository_publication_render.render_markdown", lambda *_a, **_k: "<p>New renderer.</p>"
+        )
+        changed_renderer.setattr(
+            "apps.core.repository_publication_render.render_pdf", lambda *_a, **_k: b"%PDF-new-renderer"
+        )
+        changed_result = verify_repository_publication_evidence(evidence, compare_current_renderer=True)
+        assert changed_result["valid"]
+        assert changed_result["rendered_snapshot_attested"]
+        assert changed_result["pdf_snapshot_attested"]
+        assert not changed_result["rendered_snapshot_reproducible"]
+        assert not changed_result["pdf_snapshot_reproducible"]
 
     inconsistent_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     inconsistent_pdf.manifest["title"] = "Forged title"
@@ -406,8 +429,24 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     inconsistent_pdf.content_digest = pdf_digest.hex()
     inconsistent_pdf.signature = base64.urlsafe_b64encode(publication_signing_key().sign(pdf_digest)).decode("ascii")
     assert verify_repository_publication_evidence(inconsistent_pdf)["signature_valid"]
+    assert not verify_repository_publication_evidence(inconsistent_pdf)["identity_valid"]
     assert not verify_repository_publication_evidence(inconsistent_pdf)["pdf_snapshot_attested"]
     assert not verify_repository_publication_evidence(inconsistent_pdf)["valid"]
+
+    inconsistent_pdf_checksum = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    inconsistent_pdf_checksum.manifest["pdf_snapshot"]["sha256"] = "0" * 64
+    checksum_digest = hashlib.sha256(
+        evidence_payload(
+            manifest=inconsistent_pdf_checksum.manifest,
+            markdown=inconsistent_pdf_checksum.canonical_markdown,
+        )
+    ).digest()
+    inconsistent_pdf_checksum.content_digest = checksum_digest.hex()
+    inconsistent_pdf_checksum.signature = base64.urlsafe_b64encode(
+        publication_signing_key().sign(checksum_digest)
+    ).decode("ascii")
+    assert verify_repository_publication_evidence(inconsistent_pdf_checksum)["signature_valid"]
+    assert not verify_repository_publication_evidence(inconsistent_pdf_checksum)["pdf_snapshot_attested"]
 
     missing_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     missing_pdf.pdf_file.name += ".missing"
@@ -461,6 +500,17 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     legacy_format.signature = base64.urlsafe_b64encode(publication_signing_key().sign(legacy_digest)).decode("ascii")
     assert verify_repository_publication_evidence(legacy_format)["valid"]
     assert not verify_repository_publication_evidence(legacy_format)["dependency_closure_attested"]
+
+    prior_title_proof = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    prior_title_proof.manifest["source"].pop("root_title")
+    prior_title_digest = hashlib.sha256(
+        evidence_payload(manifest=prior_title_proof.manifest, markdown=prior_title_proof.canonical_markdown)
+    ).digest()
+    prior_title_proof.content_digest = prior_title_digest.hex()
+    prior_title_proof.signature = base64.urlsafe_b64encode(
+        publication_signing_key().sign(prior_title_digest)
+    ).decode("ascii")
+    assert verify_repository_publication_evidence(prior_title_proof)["valid"]
 
     prior_render = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     prior_render.manifest.pop("rendered_snapshot")

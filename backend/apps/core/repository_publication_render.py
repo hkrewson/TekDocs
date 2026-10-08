@@ -45,7 +45,7 @@ def retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any]) -> tuple[d
     )
 
 
-def verify_retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any], content: bytes) -> bool:
+def verify_retained_pdf_snapshot(*, manifest: dict[str, Any], content: bytes) -> bool:
     snapshot = manifest.get("pdf_snapshot")
     if not isinstance(snapshot, dict) or set(snapshot) != {"format", "filename", "media_type", "size", "sha256"}:
         return False
@@ -56,14 +56,20 @@ def verify_retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any], con
         or type(snapshot.get("size")) is not int
         or snapshot["size"] != len(content)
         or len(content) > MAX_RENDERED_PDF_BYTES
+        or not content.startswith(b"%PDF-")
         or snapshot.get("sha256") != hashlib.sha256(content).hexdigest()
     ):
         return False
+    return True
+
+
+def pdf_snapshot_matches_current_renderer(*, markdown: str, manifest: dict[str, Any], content: bytes) -> bool:
+    """Advisory only: a renderer upgrade must not invalidate retained bytes."""
     try:
         expected, rendered = retained_pdf_snapshot(markdown=markdown, manifest=manifest)
-    except (ValueError, TypeError):
+    except Exception:  # A broken or changed current renderer cannot erase historical evidence.
         return False
-    return snapshot == expected and content == rendered
+    return manifest.get("pdf_snapshot") == expected and content == rendered
 
 
 def render_repository_evidence_html(*, markdown: str, manifest: dict[str, Any]) -> str:
@@ -129,14 +135,24 @@ def retained_rendered_snapshot(*, markdown: str, manifest: dict[str, Any]) -> di
     }
 
 
-def verify_retained_rendered_snapshot(*, markdown: str, manifest: dict[str, Any]) -> bool:
+def verify_retained_rendered_snapshot(*, manifest: dict[str, Any]) -> bool:
     snapshot = manifest.get("rendered_snapshot")
     if not isinstance(snapshot, dict) or set(snapshot) != {"format", "html", "sha256"}:
         return False
-    if snapshot.get("format") != RENDERED_SNAPSHOT_FORMAT or not isinstance(snapshot.get("html"), str):
+    html = snapshot.get("html")
+    if snapshot.get("format") != RENDERED_SNAPSHOT_FORMAT or not isinstance(html, str):
         return False
     try:
-        expected = retained_rendered_snapshot(markdown=markdown, manifest=manifest)
-    except (ValueError, TypeError):
+        encoded = html.encode("utf-8")
+    except UnicodeEncodeError:
         return False
-    return snapshot == expected
+    return len(encoded) <= MAX_RENDERED_HTML_BYTES and snapshot.get("sha256") == hashlib.sha256(encoded).hexdigest()
+
+
+def rendered_snapshot_matches_current_renderer(*, markdown: str, manifest: dict[str, Any]) -> bool:
+    """Advisory only: new rendering must not rewrite signed historical HTML."""
+    try:
+        expected = retained_rendered_snapshot(markdown=markdown, manifest=manifest)
+    except Exception:  # A broken or changed current renderer cannot erase historical evidence.
+        return False
+    return manifest.get("rendered_snapshot") == expected

@@ -467,7 +467,9 @@ value-free finding codes; this does not substitute for artifact packaging.
 Subsequent internal evidence now retains managed attachment bytes, entity
 display cards, frozen field-key values, sanitized HTML and a private PDF
 projection. These verify offline against signed inputs but are not yet
-approved or distributed as STATIC publications.
+approved or distributed as STATIC publications. Historical artifact integrity
+is based on signed retained bytes and checksums; current-renderer reproduction
+is a diagnostic rather than an upgrade-sensitive validity gate.
 
 ### `0.9.8` — version 1 acceptance
 

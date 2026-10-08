@@ -311,10 +311,11 @@ def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(
     assert events.first().metadata == {"accepted_commit": second.accepted_commit, "file_count": 2}
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         manifest = json.loads(archive.read("tekdocs-source.json"))
-        assert manifest["format"] == "tekdocs-repository-source-snapshot/v1"
+        assert manifest["format"] == "tekdocs-repository-source-snapshot/v2"
         assert manifest["workspace_id"] == str(repository.workspace_id)
         assert manifest["accepted_commit"] == second.accepted_commit
-        assert manifest["current_files_only"] is True
+        assert manifest["scope"] == "current-files-and-reachable-pinned-includes"
+        assert manifest["historical_files"] == []
         assert len(manifest["files"]) == 2
         assert {item["content_id"] for item in manifest["files"]} == {str(first.content_id), str(second.content_id)}
         for item in manifest["files"]:
@@ -369,3 +370,75 @@ def test_repository_source_snapshot_fails_closed_on_file_limit(authoring_context
     response = browser.get(reverse("msp-content-authoring-export"))
     assert response.status_code == 503
     assert response["Content-Type"].startswith("application/json")
+
+
+def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(authoring_context, monkeypatch):
+    installation, repository = authoring_context
+    parent_id, nested_id, unrelated_id, document_id = (uuid.uuid4() for _ in range(4))
+
+    def source(content_id, title, kind, body, includes=""):  # type: ignore[no-untyped-def]
+        return (
+            f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: {kind}\n"
+            f"title: {title}\n{includes}---\n{body}"
+        ).encode()
+
+    first_parent = source(
+        parent_id, "Parent", "fragment", "Original parent.\n",
+        f"includes:\n  - id: {nested_id}\n    mode: live\n    audience: shared\n",
+    )
+    first_nested = source(nested_id, "Nested", "fragment", "Original nested.\n")
+    repository.refresh_from_db()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+        changes={
+            "fragments/parent.md": first_parent,
+            "fragments/nested.md": first_nested,
+            "fragments/unrelated.md": source(unrelated_id, "Unrelated", "fragment", "Unrelated old text.\n"),
+        },
+        message="Add original fragments",
+    )
+    document = source(
+        document_id, "Guide", "document", "Guide body.\n",
+        f"includes:\n  - id: {parent_id}\n    mode: pinned\n    audience: shared\n    commit: {first.object_id}\n",
+    )
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={
+            "fragments/parent.md": source(parent_id, "Parent", "fragment", "Current parent.\n"),
+            "fragments/nested.md": source(nested_id, "Nested", "fragment", "Current nested.\n"),
+            "docs/guide.md": document,
+        },
+        message="Pin original parent",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("msp-content-authoring-export")
+    response = browser.get(url)
+    assert response.status_code == 200, response.content
+    assert browser.get(url).content == response.content
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        manifest = json.loads(archive.read("tekdocs-source.json"))
+        historical = manifest["historical_files"]
+        assert {item["content_id"] for item in historical} == {str(parent_id), str(nested_id)}
+        assert {item["commit"] for item in historical} == {first.object_id}
+        assert {item["source_path"] for item in historical} == {"fragments/parent.md", "fragments/nested.md"}
+        for item in historical:
+            actual = archive.read(item["path"])
+            assert hashlib.sha256(actual).hexdigest() == item["sha256"]
+        assert archive.read(f"pinned/{first.object_id}/fragments/parent.md") == first_parent
+        assert archive.read(f"pinned/{first.object_id}/fragments/nested.md") == first_nested
+        assert f"pinned/{first.object_id}/fragments/unrelated.md" not in archive.namelist()
+        assert archive.read("repository/fragments/parent.md").endswith(b"Current parent.\n")
+
+    def missing_commit(*, repository_id, object_id):  # type: ignore[no-untyped-def]
+        raise repository_service.RepositoryFileNotFoundError("Pinned commit is unavailable")
+
+    monkeypatch.setattr(
+        "apps.core.repository_source_exports.read_repository_markdown_files_at_commit", missing_commit
+    )
+    audits_before = AuditEvent.objects.filter(action="repository_source_export.downloaded").count()
+    assert browser.get(url).status_code == 503
+    assert AuditEvent.objects.filter(action="repository_source_export.downloaded").count() == audits_before

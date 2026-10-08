@@ -67,7 +67,7 @@ it('downloads a current Workspace snapshot and keeps a failed attempt recoverabl
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
   try {
     setup({ exportSources })
-    const download = await screen.findByRole('button', { name: 'Download current Markdown snapshot' })
+    const download = await screen.findByRole('button', { name: 'Download Markdown source snapshot' })
     await waitFor(() => expect(download).toBeEnabled())
     expect(screen.getByText(/not a backup/)).toBeInTheDocument()
     await user.click(download)

@@ -1773,6 +1773,10 @@ removed. It is not Git history, an editable export or a backup. Browser
 selection is now available with a repository-only path, snapshot/backup warning,
 saved-file count, and failed-selection retention. Remaining export formats
 remain open `0.9.7` work.
+The sanitized Git export POST now maps its public selection fields to the
+export service correctly. Live endpoint tests verify document and repository-
+only bundles plus cross-client refusal; this repairs the existing route and
+does not change the export format or complete broader parity.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

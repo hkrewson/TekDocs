@@ -445,6 +445,11 @@ gates after file, template, review, key, publication and recovery parity.
   The browser can now select that repository snapshot with or without legacy
   records and identifies saved repository bundles; remaining format parity
   stays open.
+- The existing sanitized-export POST now translates its public document and
+  publication ID fields to the export service instead of failing before bundle
+  creation. Endpoint tests verify document and repository-only selections and
+  reject cross-client document selection. ZIP semantics and remaining parity
+  work are unchanged.
 - The staff repository editor can download the exact loaded Markdown file,
   including portable frontmatter, for one document or fragment. It labels the
   accepted Git revision and excludes unsaved edits. This is a per-file editable

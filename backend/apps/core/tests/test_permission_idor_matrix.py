@@ -240,6 +240,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-integration-netbox-adopt": ("organization_entity_id", "conflict_id"),
         "organization-git-export-list-create": ("organization_entity_id",),
         "organization-git-export-download": ("organization_entity_id", "bundle_id"),
+        "organization-content-authoring-export": ("organization_entity_id",),
         "organization-import-list-create": ("organization_entity_id",),
         "organization-import-template": ("organization_entity_id", "record_type"),
         "organization-import-detail": ("organization_entity_id", "batch_id"),

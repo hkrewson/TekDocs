@@ -76,6 +76,21 @@ def installation(db):
     return result
 
 
+@pytest.fixture
+def repository_installation(db, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path / "media"
+    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name="Repository export MSP",
+        owner_email="repository-export@example.invalid",
+        owner_display_name="Repository Export Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    TOTP.activate(result.owner, generate_totp_secret())
+    return result
+
+
 TEST_PROVIDER_TOKEN = "-".join(("provider", "token", "value"))
 
 
@@ -1091,11 +1106,101 @@ def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_lin
     assert GitExportBundle.objects.count() == 2
 
 
+@pytest.mark.django_db
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_api_accepts_document_selection(installation, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    record = organization(installation, "API export client")
+    document = create_document(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        title="API export runbook",
+        markdown="Export this exact document.\n",
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-git-export-list-create",
+            kwargs={"organization_entity_id": record.entity_id},
+        ),
+        data=json.dumps({"document_ids": [str(document.entity_id)], "publication_ids": []}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    assert GitExportBundle.objects.count() == 1
+    bundle = GitExportBundle.objects.get()
+    with bundle.artifact.open("rb") as stored, zipfile.ZipFile(io.BytesIO(stored.read())) as archive:
+        assert archive.read(f"documents/api-export-runbook--{document.entity_id}.md") == (
+            b"Export this exact document.\n"
+        )
+    sibling = organization(installation, "Other API export client")
+    foreign_document = create_document(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        title="Foreign runbook",
+        markdown="Do not export this document.\n",
+    )
+    denied = browser.post(
+        reverse(
+            "organization-git-export-list-create",
+            kwargs={"organization_entity_id": record.entity_id},
+        ),
+        data=json.dumps({"document_ids": [str(foreign_document.entity_id)], "publication_ids": []}),
+        content_type="application/json",
+    )
+    assert denied.status_code == 404
+    assert GitExportBundle.objects.count() == 1
+
+
 @pytest.mark.django_db(transaction=True)
 @override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
-def test_git_export_includes_exact_sanitized_repository_snapshot(installation, tmp_path, settings):
-    settings.MEDIA_ROOT = tmp_path / "media"
-    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
+def test_git_export_api_accepts_repository_only_selection(repository_installation):
+    installation = repository_installation
+    record = organization(installation, "Repository-only API client")
+    workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
+    repository = repository_storage.ensure_workspace_repository(
+        Workspace.objects.get(pk=workspace.data_scope.workspace_id)
+    ).repository
+    repository.refresh_from_db()
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id,
+        changes={
+            "docs/api-runbook.md": (
+                f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: document\n"
+                "title: API runbook\n---\nRepository-only export.\n"
+            ).encode()
+        },
+        message="Add API export fixture",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse(
+            "organization-git-export-list-create",
+            kwargs={"organization_entity_id": record.entity_id},
+        ),
+        data=json.dumps({"document_ids": [], "publication_ids": [], "include_repository": True}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    bundle = GitExportBundle.objects.get()
+    with bundle.artifact.open("rb") as stored, zipfile.ZipFile(io.BytesIO(stored.read())) as archive:
+        assert b"Repository-only export." in archive.read("repository/docs/api-runbook.md")
+        assert json.loads(archive.read("tekdocs-export.json"))["repository"]["snapshot_only"] is True
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_includes_exact_sanitized_repository_snapshot(repository_installation):
+    installation = repository_installation
     record = organization(installation, "Repository export client")
     workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
     repository = repository_storage.ensure_workspace_repository(
@@ -1186,9 +1291,8 @@ def test_git_export_includes_exact_sanitized_repository_snapshot(installation, t
 
 @pytest.mark.django_db(transaction=True)
 @override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
-def test_git_export_repository_fails_closed_for_lagging_and_other_workspace(installation, tmp_path, settings):
-    settings.MEDIA_ROOT = tmp_path / "media"
-    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
+def test_git_export_repository_fails_closed_for_lagging_and_other_workspace(repository_installation):
+    installation = repository_installation
     first_org = organization(installation, "First export client")
     second_org = organization(installation, "Second export client")
     first_workspace = resolve_organization_workspace(installation.owner, entity_id=first_org.entity_id)

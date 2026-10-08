@@ -777,7 +777,14 @@ class GitExportListCreateView(APIView):
         require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
         serializer = GitExportWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        bundle = create_git_export(workspace=workspace, actor=request.user, **serializer.validated_data)
+        selection = serializer.validated_data
+        bundle = create_git_export(
+            workspace=workspace,
+            actor=request.user,
+            document_entity_ids=selection["document_ids"],
+            publication_entity_ids=selection["publication_ids"],
+            include_repository=selection["include_repository"],
+        )
         return _private(Response(GitExportSerializer(bundle).data, status=201))
 
 

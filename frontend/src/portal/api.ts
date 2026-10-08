@@ -30,6 +30,32 @@ export type PortalDocumentResult = {
   next_cursor: string | null
 }
 
+export type PortalRepositoryPublication = {
+  id: string
+  content_id: string
+  title: string
+  created_at: string
+}
+
+export type PortalRepositoryAttachment = {
+  id: string
+  filename: string
+  media_type: string
+  size: number
+}
+
+export type PortalRepositoryPublicationDetail = PortalRepositoryPublication & {
+  rendered_html: string
+  attachments: PortalRepositoryAttachment[]
+}
+
+export type PortalRepositoryPublicationResult = {
+  results: PortalRepositoryPublication[]
+  count: number
+  has_more: boolean
+  next_cursor: string | null
+}
+
 export type PortalInvoice = InvoiceDraft & { state: 'issued'; number: string; issued_at: string }
 export type PortalInvoiceResult = { results: PortalInvoice[]; count: number; has_more: boolean; next_cursor: string | null }
 
@@ -48,6 +74,19 @@ export const portalClient = {
   },
   artifactUrl(documentId: string, artifactId: string): string {
     return `/api/v1/portal/documents/${documentId}/artifacts/${artifactId}/download`
+  },
+  async listRepositoryPublications(cursor?: string): Promise<PortalRepositoryPublicationResult> {
+    const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+    return decode(await fetch(`/api/v1/portal/repository-publications${query}`, { credentials: 'same-origin' }))
+  },
+  async getRepositoryPublication(id: string): Promise<PortalRepositoryPublicationDetail> {
+    return decode(await fetch(`/api/v1/portal/repository-publications/${encodeURIComponent(id)}`, { credentials: 'same-origin' }))
+  },
+  repositoryPublicationPdfUrl(id: string): string {
+    return `/api/v1/portal/repository-publications/${encodeURIComponent(id)}/pdf`
+  },
+  repositoryPublicationAttachmentUrl(publicationId: string, artifactId: string): string {
+    return `/api/v1/portal/repository-publications/${encodeURIComponent(publicationId)}/attachments/${encodeURIComponent(artifactId)}`
   },
   async listInvoices(cursor?: string): Promise<PortalInvoiceResult> {
     const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''

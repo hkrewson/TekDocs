@@ -28,6 +28,7 @@ describe('ClientPortal', () => {
 
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#portal-main-content')
     expect(screen.getByRole('main')).toHaveAttribute('id', 'portal-main-content')
+    expect(screen.getByRole('link', { name: 'New publications' })).toHaveAttribute('href', '/portal?section=publications')
   })
 
   it('lists and opens a document without exposing publication internals', async () => {
@@ -164,5 +165,89 @@ describe('ClientPortal', () => {
     })).toBe(false)
     await userEvent.click(screen.getByRole('link', { name: 'Invoices' }))
     expect(await screen.findByText('No invoices have been issued to your organization.')).toBeInTheDocument()
+  })
+
+  it('opens a direct repository publication with sanitized content and retained downloads', async () => {
+    const publication = { id: 'repo-1', content_id: 'document-1', title: 'Laptop setup', created_at: '2026-10-08T12:00:00Z' }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/repository-publications/repo-1')) return Promise.resolve(new Response(JSON.stringify({
+        ...publication,
+        rendered_html: '<h3>Setup steps</h3><script>alert(1)</script>',
+        attachments: [{ id: 'artifact-1', filename: 'enrollment.txt', media_type: 'text/plain', size: 128 }],
+      }), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
+    })
+    const { container } = renderPortal('/portal?section=publications&publication=repo-1')
+
+    expect(await screen.findByRole('heading', { name: 'Setup steps' })).toBeInTheDocument()
+    expect(container.querySelector('script')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/pdf')
+    expect(screen.getByRole('link', { name: 'enrollment.txt' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/attachments/artifact-1')
+    expect(fetchMock.mock.calls.every(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      return url.includes('/portal/repository-publications')
+    })).toBe(true)
+  })
+
+  it('pages new publications independently of legacy documents', async () => {
+    const publication = (id: string, title: string) => ({ id, content_id: id, title, created_at: '2026-10-08T12:00:00Z' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('cursor=')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication('repo-2', 'Older setup')] }), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: true, next_cursor: 'repo-cursor', results: [publication('repo-1', 'Current setup')] }), { status: 200 }))
+    })
+    renderPortal('/portal?section=publications')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Load more publications' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/portal/repository-publications?cursor=repo-cursor', expect.anything())
+    expect(screen.getByRole('button', { name: /current setup/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /older setup/i })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      return url.includes('/portal/documents')
+    })).toBe(false)
+  })
+
+  it('keeps an unavailable repository publication out of the reader and offers list retry', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/repo-withdrawn')) return Promise.resolve(new Response('', { status: 404 }))
+      return Promise.reject(new Error('private repository detail'))
+    })
+    renderPortal('/portal?section=publications&publication=repo-withdrawn')
+    const section = screen.getByRole('heading', { name: 'New publications' }).closest('section')
+    if (!section) throw new Error('Publication section was not rendered.')
+    expect(await screen.findByText('This document is no longer available. Return to the document list and try again.')).toBeInTheDocument()
+    expect(await within(section).findByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.queryByText('private repository detail')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Download PDF' })).not.toBeInTheDocument()
+
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
+    await userEvent.click(within(section).getByRole('button', { name: 'Try again' }))
+    expect(await within(section).findByText('No new publications have been shared with your organization.')).toBeInTheDocument()
+  })
+
+  it('does not reuse a previously opened publication after access is revoked', async () => {
+    const publication = { id: 'repo-revoked', content_id: 'document-2', title: 'Enrollment guide', created_at: '2026-10-08T12:00:00Z' }
+    let available = true
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/repo-revoked')) return Promise.resolve(available
+        ? new Response(JSON.stringify({ ...publication, rendered_html: '<p>Retained instructions</p>', attachments: [] }), { status: 200 })
+        : new Response('', { status: 404 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
+    })
+    const user = userEvent.setup()
+    renderPortal('/portal?section=publications')
+
+    await user.click(await screen.findByRole('button', { name: /Enrollment guide/i }))
+    expect(await screen.findByText('Retained instructions')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'All new publications' }))
+    available = false
+    await user.click(await screen.findByRole('button', { name: /Enrollment guide/i }))
+    expect(await screen.findByText('This document is no longer available. Return to the document list and try again.')).toBeInTheDocument()
+    expect(screen.queryByText('Retained instructions')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Download PDF' })).not.toBeInTheDocument()
   })
 })

@@ -172,6 +172,33 @@ test('client portal uses plain language without exposing publication internals',
   expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
+test('client portal opens a repository publication and removes unavailable content on refresh', async ({ page }) => {
+  await mockClientPortal(page)
+  const publication = { id: 'repository-publication-1', content_id: 'source-1', title: 'Laptop enrollment', created_at: '2026-10-08T12:00:00Z' }
+  let available = true
+  await page.route('**/api/v1/portal/repository-publications**', (route) => {
+    const pathname = new URL(route.request().url()).pathname
+    if (!available) return route.fulfill({ status: 404, body: '' })
+    return route.fulfill({ json: pathname.endsWith(`/${publication.id}`)
+      ? { ...publication, rendered_html: '<h2>Enrollment steps</h2><script>alert(1)</script>', attachments: [{ id: 'attachment-1', filename: 'setup.txt', media_type: 'text/plain', size: 123 }] }
+      : { count: 1, has_more: false, next_cursor: null, results: [publication] } })
+  })
+  await page.goto('/portal?section=publications')
+  await page.getByRole('button', { name: /Laptop enrollment/ }).click()
+  await expect(page).toHaveURL(/section=publications&publication=repository-publication-1/)
+  await expect(page.getByRole('heading', { name: 'Enrollment steps' })).toBeVisible()
+  await expect(page.locator('main script')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repository-publication-1/pdf')
+  await expect(page.getByRole('link', { name: 'setup.txt' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repository-publication-1/attachments/attachment-1')
+  expect((await new AxeBuilder({ page }).include('main').withTags(wcag22Tags).analyze()).violations).toEqual([])
+
+  available = false
+  await page.reload()
+  await expect(page.getByText('This document is no longer available. Return to the document list and try again.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Enrollment steps' })).not.toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download PDF' })).not.toBeVisible()
+})
+
 test('document filters use one accessible disclosure menu', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/documentation')

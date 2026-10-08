@@ -495,6 +495,11 @@ bytes through a forced, private download after a second returned-byte check.
 Every request rechecks current delivery authorization, signed retained artifacts,
 and referenced entity visibility; it does not re-render live Git. The existing
 portal UI, notifications, exports, and authority handoff remain separate work.
+The client portal now has a separate New publications view for the authorized
+repository list, retained HTML, PDF and attachment links. It preserves direct
+URLs, paging, empty/retry states and server-side revocation. Legacy Documents
+stays on its existing path until the authority handoff is independently proven;
+notifications, exports and recovery remain open.
 
 ### `0.9.8` — version 1 acceptance
 

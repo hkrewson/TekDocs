@@ -1709,8 +1709,10 @@ client access; full repository portal projection and attachment downloads remain
 An exact-client portal API now projects only currently effective, separately
 authorized repository STATIC records and returns their signed sanitized HTML,
 an integrity-checked retained PDF, and individually rechecked retained
-attachment bytes. The existing portal Documentation UI,
-notifications, exports, migration authority
+attachment bytes. A separate client-portal New publications view now lists
+these records with direct detail, PDF and retained-file links, paging and
+safe unavailable states while legacy Documents remains separate.
+Notifications, exports, migration authority
 handoff, and recovery acceptance remain open `0.9.7` work.
 
 The first `0.9.7` foundation produces a deterministic internal dependency

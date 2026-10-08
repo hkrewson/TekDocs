@@ -154,6 +154,9 @@ def _write_archive(staging: Path, destination: Path, bundle_names: list[str]) ->
                     archive.addfile(_tar_info(source, name), stream)
         os.chmod(temporary, 0o600)
         os.replace(temporary, destination)
+    except OSError as exc:
+        temporary.unlink(missing_ok=True)
+        raise RepositoryRecoveryError("The repository recovery archive could not be written.") from exc
     except Exception:
         temporary.unlink(missing_ok=True)
         raise
@@ -223,10 +226,13 @@ def create_repository_recovery_archive(destination: Path) -> dict[str, Any]:
                 }
             )
         manifest: dict[str, Any] = {"format": FORMAT, "repositories": entries}
-        (staging / MANIFEST_NAME).write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        try:
+            (staging / MANIFEST_NAME).write_text(
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise RepositoryRecoveryError("The repository recovery manifest could not be written.") from exc
         _write_archive(staging, destination, bundle_names)
     return manifest
 

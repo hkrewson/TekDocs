@@ -478,6 +478,10 @@ gates after file, template, review, key, publication and recovery parity.
   custody through a one-off maintenance container, and requires a healthy
   backend and network-isolated restore. Storage-exhaustion recovery still needs
   a separate rehearsal.
+- Docker-backed fault injection now covers repository-bundle creation and final
+  archive writes running out of space. Both refuse publication, remove temporary
+  recovery references/files, preserve the accepted head, and permit a verified
+  retry. Full encrypted-backup/host-filesystem exhaustion remains unproven.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

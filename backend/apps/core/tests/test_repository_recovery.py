@@ -6,12 +6,13 @@ import json
 import os
 import subprocess
 import tarfile
+from errno import ENOSPC
 from pathlib import Path
 
 import pytest
 from django.test import override_settings
 
-from apps.core import repository_storage
+from apps.core import repository_recovery, repository_storage
 from apps.core.models import RepositoryCommit, RepositoryObjectFormat, Tenant, Workspace, WorkspaceKind
 from apps.core.repository_recovery import (
     RepositoryRecoveryError,
@@ -123,6 +124,51 @@ def test_repository_archive_refuses_mixed_verified_object_formats(recovery_repos
     )
     with pytest.raises(RepositoryRecoveryError, match="different format"):
         create_repository_recovery_archive(tmp_path / "mixed.tar")
+
+
+def test_repository_archive_recovers_after_bundle_storage_exhaustion(recovery_repository, tmp_path, monkeypatch):
+    repository, path, _ = recovery_repository
+    archive = tmp_path / "repositories.tar"
+    original_git = repository_recovery._git
+
+    def fail_bundle(*arguments, **kwargs):
+        if arguments[:2] == ("bundle", "create"):
+            raise RepositoryRecoveryError("A managed repository could not be archived or verified.") from OSError(
+                ENOSPC, "No space left on device"
+            )
+        return original_git(*arguments, **kwargs)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(repository_recovery, "_git", fail_bundle)
+        with pytest.raises(RepositoryRecoveryError, match="archived or verified"):
+            create_repository_recovery_archive(archive)
+    assert not archive.exists()
+    assert not _git(path, "for-each-ref", "--format=%(refname)", "refs/tekdocs/recovery")
+    assert repository.accepted_commit.object_id == _git(path, "rev-parse", CANONICAL_REF)
+    create_repository_recovery_archive(archive)
+    assert validate_repository_recovery_archive(archive)
+
+
+def test_repository_archive_recovers_after_output_storage_exhaustion(recovery_repository, tmp_path, monkeypatch):
+    repository, path, _ = recovery_repository
+    archive = tmp_path / "repositories.tar"
+    original_addfile = tarfile.TarFile.addfile
+
+    def fail_archive_member(self, tarinfo, fileobj=None):
+        if tarinfo.name.endswith(".bundle"):
+            raise OSError(ENOSPC, "No space left on device")
+        return original_addfile(self, tarinfo, fileobj)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(tarfile.TarFile, "addfile", fail_archive_member)
+        with pytest.raises(RepositoryRecoveryError, match="archive could not be written"):
+            create_repository_recovery_archive(archive)
+    assert not archive.exists()
+    assert not tuple(tmp_path.glob(".repositories.tar.*.tmp"))
+    assert not _git(path, "for-each-ref", "--format=%(refname)", "refs/tekdocs/recovery")
+    assert repository.accepted_commit.object_id == _git(path, "rev-parse", CANONICAL_REF)
+    create_repository_recovery_archive(archive)
+    assert validate_repository_recovery_archive(archive)
 
 
 def test_repository_verification_rejects_missing_retained_commit(recovery_repository, tmp_path):

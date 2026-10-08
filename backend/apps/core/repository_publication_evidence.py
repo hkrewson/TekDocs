@@ -1,8 +1,8 @@
 """Signed, retained Git-source evidence for a future repository STATIC publisher.
 
-This internal record is not a distributable publication: it has no approval,
-artifact, portal, or export route. Its signature binds the exact source proof
-and composed Markdown without relying on live Git during verification.
+This internal record is not a distributable publication: its staff-only review
+route does not approve, download, expose to portals, or export it. Its signature
+binds the exact source proof and composed Markdown without live Git verification.
 """
 
 from __future__ import annotations

@@ -4135,6 +4135,38 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/repository-publication-evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_msp_list"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_msp_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_msp_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/service-rates": {
         readonly parameters: {
             readonly query?: never;
@@ -8083,6 +8115,38 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["organization_reminder_calendar"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_list"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_organization_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -15128,6 +15192,42 @@ export interface components {
              * @enum {string|null}
              */
             readonly repair: "reconcile_to_accepted" | null;
+        };
+        readonly RepositoryEvidencePage: {
+            readonly results: readonly components["schemas"]["RepositoryEvidenceSummary"][];
+            readonly page: number;
+            readonly page_size: number;
+            readonly count: number;
+            readonly has_more: boolean;
+        };
+        readonly RepositoryEvidenceSummary: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly content_id: string;
+            /**
+             * @description * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_visible";
+            readonly title: string;
+            readonly source_commit: string;
+            /** Format: date-time */
+            readonly signed_at: string;
+            /** Format: uuid */
+            readonly signed_by_id: string;
+            readonly verified?: boolean;
+        };
+        readonly RepositoryEvidenceWrite: {
+            /** Format: uuid */
+            readonly content_id: string;
+            /**
+             * @description * `msp_internal` - MSP internal
+             *     * `client_visible` - Client visible
+             * @enum {string}
+             */
+            readonly audience: "msp_internal" | "client_visible";
         };
         readonly RepositoryStateCounts: {
             readonly never: number;
@@ -27358,6 +27458,80 @@ export interface operations {
             };
         };
     };
+    readonly repository_evidence_msp_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidencePage"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_msp_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RepositoryEvidenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RepositoryEvidenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["RepositoryEvidenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceSummary"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_msp_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceSummary"];
+                };
+            };
+        };
+    };
     readonly workspaces_msp_service_rates_list: {
         readonly parameters: {
             readonly query?: never;
@@ -38482,6 +38656,85 @@ export interface operations {
                 };
                 content: {
                     readonly "text/calendar": string;
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+                readonly page_size?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidencePage"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RepositoryEvidenceWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RepositoryEvidenceWrite"];
+                readonly "multipart/form-data": components["schemas"]["RepositoryEvidenceWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceSummary"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceSummary"];
                 };
             };
         };

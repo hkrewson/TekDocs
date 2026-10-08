@@ -438,6 +438,12 @@ from apps.core.reminder_views import (
     OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
+from apps.core.repository_publication_views import (
+    MSPRepositoryEvidenceCollectionView,
+    MSPRepositoryEvidenceDetailView,
+    OrganizationRepositoryEvidenceCollectionView,
+    OrganizationRepositoryEvidenceDetailView,
+)
 from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
 from apps.core.site_views import (
     MSPLocationDetailView,
@@ -493,6 +499,16 @@ urlpatterns = [
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/workspaces/msp/content-graph", MSPContentGraphView.as_view(), name="msp-content-graph"),
     path(
+        "api/v1/workspaces/msp/repository-publication-evidence",
+        MSPRepositoryEvidenceCollectionView.as_view(),
+        name="msp-repository-publication-evidence",
+    ),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>",
+        MSPRepositoryEvidenceDetailView.as_view(),
+        name="msp-repository-publication-evidence-detail",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring",
         MSPContentAuthoringView.as_view(),
         name="msp-content-authoring",
@@ -526,6 +542,16 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph",
         OrganizationContentGraphView.as_view(),
         name="organization-content-graph",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence",
+        OrganizationRepositoryEvidenceCollectionView.as_view(),
+        name="organization-repository-publication-evidence",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>",
+        OrganizationRepositoryEvidenceDetailView.as_view(),
+        name="organization-repository-publication-evidence-detail",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",

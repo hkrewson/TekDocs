@@ -469,7 +469,9 @@ display cards, frozen field-key values, sanitized HTML and a private PDF
 projection. These verify offline against signed inputs but are not yet
 approved or distributed as STATIC publications. Historical artifact integrity
 is based on signed retained bytes and checksums; current-renderer reproduction
-is a diagnostic rather than an upgrade-sensitive validity gate.
+is a diagnostic rather than an upgrade-sensitive validity gate. A staff-only,
+MFA-gated API now retains and lists scoped evidence summaries for review; it
+does not approve publications, return retained content or distribute artifacts.
 
 ### `0.9.8` — version 1 acceptance
 

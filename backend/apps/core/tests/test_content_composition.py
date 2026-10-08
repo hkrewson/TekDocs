@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
@@ -342,6 +343,110 @@ def test_publication_source_pin_rolls_back_retention_and_rejects_index_lag(compo
             repository_id=repository.id, content_id=document_id, audience="msp_internal"
         ):
             pytest.fail("An unindexed source must never enter publication retention")
+
+
+def test_repository_evidence_api_retains_safe_staff_summary_and_denies_portal(composition_repository):
+    installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/candidate.md": _content(content_id=document_id, title="Candidate", body="Private body.\n")},
+        message="Add API publication candidate",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("msp-repository-publication-evidence")
+    payload = json.dumps({"content_id": str(document_id), "audience": "msp_internal"})
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 403
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    response = browser.post(url, data=payload, content_type="application/json")
+    assert response.status_code == 201
+    summary = response.json()
+    assert summary["content_id"] == str(document_id)
+    assert summary["verified"] is True
+    assert summary["title"] == "Candidate"
+    assert "Private body" not in response.content.decode()
+    assert "manifest" not in summary and "pdf_file" not in summary
+    listed = browser.get(url)
+    assert listed.status_code == 200
+    assert listed.json()["count"] == 1
+    assert len(listed.json()["results"]) == 1
+    assert "verified" not in listed.json()["results"][0]
+    assert browser.get(url, {"page": 2, "page_size": 1}).json()["results"] == []
+    assert browser.get(url, {"page_size": 101}).status_code == 400
+    detail_url = reverse("msp-repository-publication-evidence-detail", args=[summary["id"]])
+    assert browser.get(detail_url).json()["verified"] is True
+
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Evidence Client",
+        legal_name="Evidence Client LLC",
+        website="",
+        classifications=["client"],
+    )
+    client_user = User.objects.create_user(email="evidence-client@example.invalid", display_name="Client Reader")
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=client_user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=organization,
+    )
+    browser.force_login(client_user)
+    assert browser.get(url).status_code == 403
+    assert browser.get(detail_url).status_code == 403
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 403
+
+
+def test_repository_evidence_api_enforces_exact_organization_scope(composition_repository):
+    installation, _workspace, _repository = composition_repository
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    first = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Evidence First", legal_name="Evidence First LLC", website="", classifications=["client"],
+    )
+    second = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Evidence Second", legal_name="Evidence Second LLC", website="", classifications=["client"],
+    )
+    first_workspace = Workspace.objects.get(organization=first)
+    second_workspace = Workspace.objects.get(organization=second)
+    first_repository = repository_storage.ensure_workspace_repository(first_workspace).repository
+    repository_storage.ensure_workspace_repository(second_workspace)
+    document_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=first_repository.id,
+        expected_base=_accepted(first_repository),
+        changes={
+            "documents/client-candidate.md": _content(
+                content_id=document_id, title="Client candidate", body="Scoped body.\n"
+            )
+        },
+        message="Add scoped publication candidate",
+    )
+    index_repository_content(repository_id=first_repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    first_url = reverse("organization-repository-publication-evidence", args=[first.entity_id])
+    second_url = reverse("organization-repository-publication-evidence", args=[second.entity_id])
+    response = browser.post(
+        first_url,
+        data=json.dumps({"content_id": str(document_id), "audience": "client_visible"}),
+        content_type="application/json",
+    )
+    assert response.status_code == 201
+    evidence_id = response.json()["id"]
+    assert browser.get(first_url).json()["count"] == 1
+    assert browser.get(second_url).json()["results"] == []
+    other_detail = reverse("organization-repository-publication-evidence-detail", args=[second.entity_id, evidence_id])
+    assert browser.get(other_detail).status_code == 404
+    assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
 
 
 def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(

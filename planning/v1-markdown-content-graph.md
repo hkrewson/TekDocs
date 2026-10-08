@@ -456,6 +456,10 @@ gates after file, template, review, key, publication and recovery parity.
   source bytes and a commit/path/hash/role manifest. It is unsanitized and omits
   attachments, database records and Git history; it is not a complete dependency
   bundle or backup. Index lag and unavailable source fail closed.
+- An offline verifier checks a downloaded source ZIP's v3 manifest, exact listed
+  Markdown identities and checksums, safe paths, bounded entries and unexpected
+  files. It proves internal consistency only: the manifest is not signed against
+  Git, and this neither imports content nor verifies attachments or backup state.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.
 - Produce complete repository bundles rather than relying on working-tree copies

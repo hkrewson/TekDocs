@@ -1764,6 +1764,10 @@ plus reachable historical include, template-source, and copy-provenance Markdown
 commit/path/hash/role manifest. It is unsanitized; attachments, database records
 and Git history are excluded. Complete editable bundles and
 recovery remain open gates.
+An offline source-snapshot command now rejects missing, altered, duplicate,
+unsafe or unlisted ZIP entries and checks exact Markdown identities against the
+v3 manifest. This is an internal-consistency check, not Git authenticity,
+import, attachment parity, or recovery verification.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

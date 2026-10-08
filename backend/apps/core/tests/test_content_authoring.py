@@ -24,6 +24,7 @@ from apps.core.content_authoring import (
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
 from apps.core.models import AuditEvent, ContentNode, InstallationState, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
+from apps.core.repository_source_validation import verify_repository_source_snapshot
 from apps.core.tasks import reconcile_content_indexes
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -305,6 +306,7 @@ def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(
     assert response["Cache-Control"] == "no-store"
     filename = f'tekdocs-repository-{second.accepted_commit[:12]}.zip'
     assert response["Content-Disposition"] == f'attachment; filename="{filename}"'
+    assert verify_repository_source_snapshot(response.content)["accepted_commit"] == second.accepted_commit
     assert browser.get(url).content == response.content
     events = AuditEvent.objects.filter(action="repository_source_export.downloaded", entity_id=repository.id)
     assert events.count() == 2

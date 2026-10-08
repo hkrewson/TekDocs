@@ -12,7 +12,7 @@ import pytest
 from django.test import override_settings
 
 from apps.core import repository_storage
-from apps.core.models import RepositoryCommit, Tenant, Workspace, WorkspaceKind
+from apps.core.models import RepositoryCommit, RepositoryObjectFormat, Tenant, Workspace, WorkspaceKind
 from apps.core.repository_recovery import (
     RepositoryRecoveryError,
     create_repository_recovery_archive,
@@ -101,6 +101,38 @@ def test_repository_archive_refuses_advanced_repository(recovery_repository, tmp
 
     with pytest.raises(RepositoryRecoveryError, match="match its accepted head"):
         create_repository_recovery_archive(tmp_path / "advanced.tar")
+
+
+def test_repository_archive_refuses_mixed_verified_object_formats(recovery_repository, tmp_path):
+    repository, _, _ = recovery_repository
+    RepositoryCommit.objects.create(
+        tenant=repository.tenant,
+        repository=repository,
+        object_format=RepositoryObjectFormat.SHA256,
+        object_id="a" * 64,
+    )
+    with pytest.raises(RepositoryRecoveryError, match="different format"):
+        create_repository_recovery_archive(tmp_path / "mixed.tar")
+
+
+def test_repository_verification_rejects_missing_retained_commit(recovery_repository, tmp_path):
+    repository, path, _ = recovery_repository
+    tree = _git(path, "rev-parse", f"{CANONICAL_REF}^{{tree}}")
+    retained = _git(path, "commit-tree", tree, "-m", "Retained but unreachable")
+    RepositoryCommit.objects.create(
+        tenant=repository.tenant,
+        repository=repository,
+        object_format=repository.accepted_commit.object_format,
+        object_id=retained,
+    )
+    archive = tmp_path / "repositories.tar"
+    create_repository_recovery_archive(archive)
+    assert verify_repository_recovery_database(archive)
+    retained_object = path / "objects" / retained[:2] / retained[2:]
+    assert retained_object.is_file()
+    retained_object.unlink()
+    with pytest.raises(RepositoryRecoveryError, match="verified Git commit is unavailable"):
+        verify_repository_recovery_database(archive)
 
 
 def test_repository_archive_rejects_truncation_and_swapped_bundle(recovery_repository, tmp_path):

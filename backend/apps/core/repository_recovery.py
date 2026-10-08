@@ -15,7 +15,7 @@ from typing import Any
 
 from .models import RepositoryCommit, RepositoryObjectFormat, WorkspaceRepository
 from .repository_service import CANONICAL_REF, _repository_lock
-from .repository_storage import GIT_EXECUTABLE, resolve_managed_repository_path
+from .repository_storage import GIT_EXECUTABLE, RepositoryStorageError, resolve_managed_repository_path
 
 FORMAT = "tekdocs-repositories-v1"
 MANIFEST_NAME = "manifest.json"
@@ -177,11 +177,14 @@ def create_repository_recovery_archive(destination: Path) -> dict[str, Any]:
                 raise RepositoryRecoveryError("Every managed repository must have an accepted commit before backup.")
             root, path = resolve_managed_repository_path(repository)
             object_format = repository.accepted_commit.object_format
-            commits = tuple(
-                RepositoryCommit.objects.filter(repository=repository, object_format=object_format)
+            verified_objects = tuple(
+                RepositoryCommit.objects.filter(repository=repository)
                 .order_by("object_id")
-                .values_list("object_id", flat=True)
+                .values_list("object_format", "object_id")
             )
+            if any(commit_format != object_format for commit_format, _ in verified_objects):
+                raise RepositoryRecoveryError("A managed repository has verified objects with a different format.")
+            commits = tuple(object_id for _, object_id in verified_objects)
             accepted = repository.accepted_commit.object_id
             bundle_name = f"repositories/{repository.id}.bundle"
             bundle_path = staging / bundle_name
@@ -348,9 +351,21 @@ def verify_repository_recovery_database(archive_path: Path) -> dict[str, Any]:
             != entry["indexed_commit"]
         ):
             raise RepositoryRecoveryError("The restored database and repository authority do not match.")
-        commits = set(
-            RepositoryCommit.objects.filter(repository=repository).values_list("object_id", flat=True)
-        )
-        if commits != set(entry["verified_commits"]):
+        commits = set(RepositoryCommit.objects.filter(repository=repository).values_list("object_format", "object_id"))
+        if commits != {(entry["object_format"], object_id) for object_id in entry["verified_commits"]}:
             raise RepositoryRecoveryError("The restored verified repository objects do not match.")
+        try:
+            root, path = resolve_managed_repository_path(repository)
+        except RepositoryStorageError as exc:
+            raise RepositoryRecoveryError("A restored repository is unavailable.") from exc
+        with _repository_lock(root, repository.id, exclusive=False):
+            if _git("rev-parse", "--show-object-format", git_dir=path).decode().strip() != entry["object_format"]:
+                raise RepositoryRecoveryError("A restored repository has the wrong Git object format.")
+            if _git("rev-parse", "--verify", CANONICAL_REF, git_dir=path).decode().strip() != entry["accepted_commit"]:
+                raise RepositoryRecoveryError("A restored repository does not match its accepted head.")
+            for _, object_id in commits:
+                try:
+                    _git("cat-file", "-e", f"{object_id}^{{commit}}", git_dir=path)
+                except RepositoryRecoveryError as exc:
+                    raise RepositoryRecoveryError("A restored verified Git commit is unavailable.") from exc
     return manifest

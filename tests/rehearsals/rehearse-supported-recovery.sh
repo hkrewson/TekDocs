@@ -73,6 +73,9 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py initialize_workspace_repositories
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 
 echo "Checking bounded encrypted-backup write failure before a normal retry"
 limited_backup="$work_directory/limited-backup"
@@ -177,7 +180,10 @@ echo "Restoring without external network access into independent database, media
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=verify backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

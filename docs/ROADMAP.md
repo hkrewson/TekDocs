@@ -1726,6 +1726,10 @@ The supported-backup rehearsal also forces a file-size-limited write during
 encrypted PostgreSQL capture, verifies no final or partial set and backend
 health, then retries with a successful backup and network-isolated restore.
 Actual host-disk exhaustion and production recovery acceptance remain open.
+The network-isolated restore now also verifies an authored Markdown document,
+a revised reusable fragment, the document's pinned historical fragment source,
+and its indexed composition. This is local exact-content recovery evidence,
+not an authority transition or a deployed restore acceptance.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

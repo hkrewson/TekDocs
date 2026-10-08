@@ -486,6 +486,12 @@ gates after file, template, review, key, publication and recovery parity.
   limit during encrypted PostgreSQL capture; it leaves no final or partial set,
   resumes to a healthy backend, and permits the normal verified retry. This
   simulates a bounded write failure, not whole-host filesystem exhaustion.
+- The network-isolated restore rehearsal now retains an authored document and
+  reusable fragment with a pinned historical include before backup. The
+  restored stack must recover the current fragment, original pinned source,
+  indexed composition, and both Git revisions; repository manifests alone
+  no longer satisfy this evidence. This is local recovery evidence, not an
+  authority handoff or production restore acceptance.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

@@ -661,8 +661,11 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     assert browser.get(review_pdf_url).status_code == 409
 
 
-def test_repository_evidence_decision_is_separate_from_distribution(composition_repository):
+def test_repository_evidence_decision_is_separate_from_distribution(
+    composition_repository, tmp_path, settings, monkeypatch
+):
     installation, _workspace, _repository = composition_repository
+    settings.MEDIA_ROOT = str(tmp_path / "media")
     organization = create_organization(
         tenant=installation.tenant,
         actor_id=installation.owner.id,
@@ -673,11 +676,26 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     )
     workspace = Workspace.objects.get(organization=organization)
     repository = repository_storage.ensure_workspace_repository(workspace).repository
-    content_id = uuid.uuid4()
+    document = create_document(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        title="Decision",
+        markdown="Legacy source.\n",
+    )
+    attachment = create_document_attachment(
+        document=document,
+        actor_id=installation.owner.id,
+        upload=SimpleUploadedFile("decision-guide.txt", b"Client setup instructions"),
+    )
+    content_id = document.id
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=_accepted(repository),
-        changes={"documents/decision.md": _content(content_id=content_id, title="Decision", body="Review me.\n")},
+        changes={"documents/decision.md": _content(
+            content_id=content_id, title="Decision",
+            body=f"Review me.\n\n[Guide](tekdocs://attachment/{attachment.id})\n",
+        )},
         message="Add review decision source",
     )
     index_repository_content(repository_id=repository.id)
@@ -839,10 +857,15 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     portal_list_url = reverse("client-portal-repository-publication-list")
     portal_detail_url = reverse("client-portal-repository-publication-detail", args=[publication.id])
     portal_pdf_url = reverse("client-portal-repository-publication-pdf", args=[publication.id])
+    artifact = RepositoryEvidenceAttachment.objects.get(evidence_id=evidence_id)
+    portal_attachment_url = reverse(
+        "client-portal-repository-publication-attachment", args=[publication.id, artifact.id]
+    )
     browser.force_login(portal_user)
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
+    assert browser.get(portal_attachment_url).status_code == 404
     browser.force_login(authorizer)
     release_event = RepositoryStaticPublicationControlEvent.objects.get(action="released")
     with pytest.raises(DatabaseError):
@@ -886,25 +909,59 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     portal_detail = browser.get(portal_detail_url)
     assert portal_detail.status_code == 200
     assert "Review me." in portal_detail.json()["rendered_html"]
+    assert portal_detail.json()["attachments"] == [{
+        "id": str(artifact.id), "filename": "decision-guide.txt",
+        "media_type": artifact.media_type, "size": len(b"Client setup instructions"),
+    }]
     portal_pdf = browser.get(portal_pdf_url)
     assert portal_pdf.status_code == 200
     assert portal_pdf.content.startswith(b"%PDF-")
     assert portal_pdf["Content-Disposition"].startswith("attachment;")
+    portal_attachment = browser.get(portal_attachment_url)
+    assert portal_attachment.status_code == 200
+    assert portal_attachment.content == b"Client setup instructions"
+    assert portal_attachment["Content-Type"] == "application/octet-stream"
+    assert portal_attachment["Content-Disposition"].startswith("attachment;")
+    assert portal_attachment["Cache-Control"] == "private, no-store"
+    assert portal_attachment["X-Content-Type-Options"] == "nosniff"
+    assert browser.get(reverse(
+        "client-portal-repository-publication-attachment", args=[publication.id, uuid.uuid4()]
+    )).status_code == 404
+    stored = artifact.file.storage
+    original_open = stored.open
+    reads = 0
+
+    def changed_between_checks(name, mode="rb"):
+        nonlocal reads
+        if name != artifact.file.name:
+            return original_open(name, mode)
+        reads += 1
+        return BytesIO(b"Client setup instructions" if reads == 1 else b"Changed attachment bytes")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(stored, "open", changed_between_checks)
+        changed = browser.get(portal_attachment_url)
+    assert reads >= 2
+    assert changed.status_code == 404
+    assert changed.content != b"Changed attachment bytes"
     retained_pdf.storage.delete(retained_pdf.name)
     try:
         assert browser.get(portal_list_url).json()["results"] == []
         assert browser.get(portal_detail_url).status_code == 404
         assert browser.get(portal_pdf_url).status_code == 404
+        assert browser.get(portal_attachment_url).status_code == 404
     finally:
         assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
     browser.force_login(sibling_user)
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
+    assert browser.get(portal_attachment_url).status_code == 404
     browser.force_login(reviewer)
     assert browser.get(portal_list_url).status_code == 403
     assert browser.get(portal_detail_url).status_code == 403
     assert browser.get(portal_pdf_url).status_code == 403
+    assert browser.get(portal_attachment_url).status_code == 403
     with pytest.raises(DatabaseError):
         RepositoryStaticDeliveryAuthorization.objects.filter(pk=delivery.json()["id"]).update(reason="Changed")
     with pytest.raises(DatabaseError):
@@ -987,6 +1044,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
+    assert browser.get(portal_attachment_url).status_code == 404
     browser.force_login(authorizer)
     replacement_delivery = browser.post(
         candidate_delivery_url, data=delivery_payload, content_type="application/json"

@@ -76,6 +76,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "client-portal-document-artifact-download": ("publication_entity_id", "artifact_entity_id"),
         "client-portal-repository-publication-detail": ("publication_id",),
         "client-portal-repository-publication-pdf": ("publication_id",),
+        "client-portal-repository-publication-attachment": ("publication_id", "artifact_id"),
         "client-portal-notification-read": ("notification_id",),
         "notification-read": ("notification_id",),
         "organization-detail": ("entity_id",),

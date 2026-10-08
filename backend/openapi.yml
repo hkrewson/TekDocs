@@ -6027,6 +6027,53 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/portal/repository-publications/{publication_id}/attachments/{artifact_id}:
+    get:
+      operationId: client_portal_repository_publications_attachment_download
+      parameters:
+      - in: path
+        name: artifact_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: publication_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          description: Unavailable attachment
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/portal/repository-publications/{publication_id}/pdf:
     get:
       operationId: client_portal_repository_publications_pdf_download
@@ -48140,6 +48187,23 @@ components:
       - has_more
       - next_cursor
       - results
+    PortalRepositoryAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+      required:
+      - filename
+      - id
+      - media_type
+      - size
     PortalRepositoryPublication:
       type: object
       properties:
@@ -48175,7 +48239,12 @@ components:
           format: date-time
         rendered_html:
           type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalRepositoryAttachment'
       required:
+      - attachments
       - content_id
       - created_at
       - id

@@ -1707,9 +1707,10 @@ references. It becomes ineffective on withdrawal, supersession, corruption, or
 reference-visibility loss. This is approval for a future delivery path, not
 client access; full repository portal projection and attachment downloads remain open gates.
 An exact-client portal API now projects only currently effective, separately
-authorized repository STATIC records and returns their signed sanitized HTML
-or an integrity-checked retained PDF. The existing portal Documentation UI,
-retained attachment downloads, notifications, exports, migration authority
+authorized repository STATIC records and returns their signed sanitized HTML,
+an integrity-checked retained PDF, and individually rechecked retained
+attachment bytes. The existing portal Documentation UI,
+notifications, exports, migration authority
 handoff, and recovery acceptance remain open `0.9.7` work.
 
 The first `0.9.7` foundation produces a deterministic internal dependency

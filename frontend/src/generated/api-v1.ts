@@ -1748,6 +1748,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/portal/repository-publications/{publication_id}/attachments/{artifact_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_repository_publications_attachment_download"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/portal/repository-publications/{publication_id}/pdf": {
         readonly parameters: {
             readonly query?: never;
@@ -14835,6 +14851,13 @@ export interface components {
             readonly has_more: boolean;
             readonly next_cursor: string | null;
         };
+        readonly PortalRepositoryAttachment: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly filename: string;
+            readonly media_type: string;
+            readonly size: number;
+        };
         readonly PortalRepositoryPublication: {
             /** Format: uuid */
             readonly id: string;
@@ -14853,6 +14876,7 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
             readonly rendered_html: string;
+            readonly attachments: readonly components["schemas"]["PortalRepositoryAttachment"][];
         };
         readonly PortalRepositoryPublicationResult: {
             readonly results: readonly components["schemas"]["PortalRepositoryPublication"][];
@@ -21430,6 +21454,41 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["PortalRepositoryPublicationDetail"];
+                };
+            };
+        };
+    };
+    readonly client_portal_repository_publications_attachment_download: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly artifact_id: string;
+                readonly publication_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/octet-stream": string;
+                };
+            };
+            /** @description Unavailable attachment */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

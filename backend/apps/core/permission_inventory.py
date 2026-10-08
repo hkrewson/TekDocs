@@ -388,6 +388,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("client-portal-repository-publication-list", ("GET",)),
     route("client-portal-repository-publication-detail", ("GET",)),
     route("client-portal-repository-publication-pdf", ("GET",)),
+    route("client-portal-repository-publication-attachment", ("GET",)),
     route("client-portal-invoice-list", ("GET",)),
     route("client-portal-invoice-detail", ("GET",)),
     route("client-portal-invoice-pdf", ("GET",)),

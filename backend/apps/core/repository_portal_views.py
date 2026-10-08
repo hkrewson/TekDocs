@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from uuid import UUID
 
@@ -18,7 +19,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import require_client_portal_member
 
-from .models import RepositoryStaticPublication, RepositoryStaticPublicationControlEvent
+from .models import RepositoryEvidenceAttachment, RepositoryStaticPublication, RepositoryStaticPublicationControlEvent
+from .publications import MAX_RETAINED_ATTACHMENT_BYTES
 from .repository_publication_render import MAX_RENDERED_PDF_BYTES, verify_retained_pdf_snapshot
 from .repository_static_delivery import repository_static_delivery_ready
 from .rls import OrganizationRLSMode, bind_local_rls_scope
@@ -36,8 +38,16 @@ class PortalRepositoryPublicationSerializer(serializers.Serializer):
     created_at = serializers.DateTimeField()
 
 
+class PortalRepositoryAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    filename = serializers.CharField()
+    media_type = serializers.CharField()
+    size = serializers.IntegerField()
+
+
 class PortalRepositoryPublicationDetailSerializer(PortalRepositoryPublicationSerializer):
     rendered_html = serializers.CharField()
+    attachments = PortalRepositoryAttachmentSerializer(many=True)
 
 
 class PortalRepositoryPublicationResultSerializer(serializers.Serializer):
@@ -182,7 +192,14 @@ class ClientPortalRepositoryPublicationDetailView(APIView):
         evidence = publication.authorization.package.decision.evidence
         response = Response(
             PortalRepositoryPublicationDetailSerializer(
-                {**_data(publication), "rendered_html": evidence.manifest["rendered_snapshot"]["html"]}
+                {
+                    **_data(publication),
+                    "rendered_html": evidence.manifest["rendered_snapshot"]["html"],
+                    "attachments": [
+                        {key: item[key] for key in ("id", "filename", "media_type", "size")}
+                        for item in evidence.manifest.get("attachments", [])
+                    ],
+                }
             ).data
         )
         response["Cache-Control"] = "private, no-store"
@@ -206,6 +223,55 @@ class ClientPortalRepositoryPublicationPDFView(APIView):
             raise Http404
         response = HttpResponse(content, content_type="application/pdf")
         response["Content-Disposition"] = 'attachment; filename="repository-publication.pdf"'
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class ClientPortalRepositoryPublicationAttachmentView(APIView):
+    @extend_schema(
+        operation_id="client_portal_repository_publications_attachment_download",
+        responses={
+            (200, "application/octet-stream"): bytes,
+            404: OpenApiResponse(description="Unavailable attachment"),
+        },
+    )
+    def get(self, request, publication_id, artifact_id):  # type: ignore[no-untyped-def]
+        publication = _publication(request, publication_id)
+        evidence = publication.authorization.package.decision.evidence
+        artifact = get_object_or_404(
+            RepositoryEvidenceAttachment,
+            pk=artifact_id,
+            evidence=evidence,
+            tenant_id=publication.tenant_id,
+            organization_id=publication.organization_id,
+            workspace_id=publication.workspace_id,
+        )
+        descriptor = next(
+            (
+                item for item in evidence.manifest.get("attachments", [])
+                if isinstance(item, dict) and item.get("id") == str(artifact.id)
+            ),
+            None,
+        )
+        if descriptor is None or artifact.size > MAX_RETAINED_ATTACHMENT_BYTES:
+            raise Http404
+        try:
+            with artifact.file.storage.open(artifact.file.name, "rb") as stream:
+                content = bytes(stream.read(MAX_RETAINED_ATTACHMENT_BYTES + 1))
+        except (OSError, ValueError, TypeError):
+            raise Http404 from None
+        if (
+            len(content) != artifact.size
+            or len(content) > MAX_RETAINED_ATTACHMENT_BYTES
+            or hashlib.sha256(content).hexdigest() != artifact.checksum
+            or descriptor.get("checksum") != artifact.checksum
+            or descriptor.get("size") != artifact.size
+            or descriptor.get("source_id") != str(artifact.source_attachment_id)
+        ):
+            raise Http404
+        response = HttpResponse(content, content_type="application/octet-stream")
+        response["Content-Disposition"] = 'attachment; filename="repository-publication-attachment"'
         response["Cache-Control"] = "private, no-store"
         response["X-Content-Type-Options"] = "nosniff"
         return response

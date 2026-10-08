@@ -439,6 +439,7 @@ from apps.core.reminder_views import (
 )
 from apps.core.rendering_views import MarkdownRenderView
 from apps.core.repository_portal_views import (
+    ClientPortalRepositoryPublicationAttachmentView,
     ClientPortalRepositoryPublicationDetailView,
     ClientPortalRepositoryPublicationListView,
     ClientPortalRepositoryPublicationPDFView,
@@ -706,6 +707,11 @@ urlpatterns = [
         "api/v1/portal/repository-publications/<uuid:publication_id>/pdf",
         ClientPortalRepositoryPublicationPDFView.as_view(),
         name="client-portal-repository-publication-pdf",
+    ),
+    path(
+        "api/v1/portal/repository-publications/<uuid:publication_id>/attachments/<uuid:artifact_id>",
+        ClientPortalRepositoryPublicationAttachmentView.as_view(),
+        name="client-portal-repository-publication-attachment",
     ),
     path(
         "api/v1/portal/documents/<uuid:publication_entity_id>",

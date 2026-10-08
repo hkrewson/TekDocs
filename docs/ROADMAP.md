@@ -1777,6 +1777,11 @@ The sanitized Git export POST now maps its public selection fields to the
 export service correctly. Live endpoint tests verify document and repository-
 only bundles plus cross-client refusal; this repairs the existing route and
 does not change the export format or complete broader parity.
+Selected STATIC publications with frozen field-key values are now rejected
+before sanitized export creation, because the signed manifest and canonical
+Markdown both retain the resolved values. Ordinary publication selection and
+cross-client refusal are covered by live endpoint tests; broader format parity
+remains open.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

@@ -450,6 +450,10 @@ gates after file, template, review, key, publication and recovery parity.
   creation. Endpoint tests verify document and repository-only selections and
   reject cross-client document selection. ZIP semantics and remaining parity
   work are unchanged.
+- A sanitized Git export refuses selected STATIC publications that froze field-
+  key values; those values occur in both signed metadata and canonical Markdown
+  and cannot be safely removed without falsifying the publication evidence.
+  Endpoint tests retain ordinary publication selection and exact-client denial.
 - The staff repository editor can download the exact loaded Markdown file,
   including portable frontmatter, for one document or fragment. It labels the
   accepted Git revision and excludes unsaved edits. This is a per-file editable

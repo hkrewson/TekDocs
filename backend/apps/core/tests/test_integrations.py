@@ -19,7 +19,7 @@ from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
 from apps.core.content_profile import parse_content
 from apps.core.documents import create_document
-from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
+from apps.core.git_exports import _manifest_has_credential_reference, _manifest_has_frozen_key_values, create_git_export
 from apps.core.integration_providers import (
     PROVIDERS,
     NetBoxProvider,
@@ -34,6 +34,7 @@ from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
     ClientAsset,
     CredentialReference,
+    DocumentKeyBinding,
     Entity,
     GitExportBundle,
     InstallationState,
@@ -57,6 +58,7 @@ from apps.core.network_addressing import create_subnet, create_vlan, create_vrf
 from apps.core.network_endpoints import create_interface, create_ip_address, create_mac_address
 from apps.core.network_inventory import create_device, create_rack
 from apps.core.organizations import create_organization
+from apps.core.publications import publish_document
 from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -99,6 +101,12 @@ def test_static_manifest_credential_metadata_is_not_exportable():
         {"entities": [{"id": str(uuid.uuid4()), "entity_type": "credential_reference"}]}
     )
     assert not _manifest_has_credential_reference({"entities": [{"id": str(uuid.uuid4()), "entity_type": "network"}]})
+
+
+def test_static_manifest_frozen_key_values_are_not_exportable():
+    assert _manifest_has_frozen_key_values({"key_resolutions": [{"value": "synthetic-value"}]})
+    assert _manifest_has_frozen_key_values({"key_resolutions": {}})
+    assert not _manifest_has_frozen_key_values({"key_resolutions": []})
 
 
 @pytest.mark.parametrize(
@@ -1154,6 +1162,116 @@ def test_git_export_api_accepts_document_selection(installation, tmp_path, setti
     )
     assert denied.status_code == 404
     assert GitExportBundle.objects.count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_api_accepts_publication_selection(installation, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    record = organization(installation, "Publication API export client")
+    workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
+    document = create_document(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        title="Publication API runbook",
+        markdown="Retained publication content.\n",
+    )
+    publication = publish_document(
+        workspace=workspace,
+        document=document,
+        actor_id=installation.owner.id,
+        reason="Export selection test",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("organization-git-export-list-create", kwargs={"organization_entity_id": record.entity_id})
+    response = browser.post(
+        url,
+        data=json.dumps({"document_ids": [], "publication_ids": [str(publication.entity_id)]}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 201
+    bundle = GitExportBundle.objects.get()
+    with bundle.artifact.open("rb") as stored, zipfile.ZipFile(io.BytesIO(stored.read())) as archive:
+        assert archive.read(f"publications/{publication.entity_id}/publication.md") == (
+            b"Retained publication content.\n"
+        )
+        assert json.loads(archive.read(f"publications/{publication.entity_id}/manifest.json")) == publication.manifest
+    sibling = organization(installation, "Other publication API export client")
+    sibling_document = create_document(
+        tenant=installation.tenant,
+        organization=sibling,
+        actor_id=installation.owner.id,
+        title="Foreign publication runbook",
+        markdown="Do not export this publication.\n",
+    )
+    foreign_publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=sibling.entity_id),
+        document=sibling_document,
+        actor_id=installation.owner.id,
+        reason="Foreign export selection test",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+    denied = browser.post(
+        url,
+        data=json.dumps({"document_ids": [], "publication_ids": [str(foreign_publication.entity_id)]}),
+        content_type="application/json",
+    )
+    assert denied.status_code == 404
+    assert GitExportBundle.objects.count() == 1
+
+
+@pytest.mark.django_db
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_api_refuses_publication_with_frozen_field_values(installation, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
+    record = organization(installation, "Keyed publication API export client")
+    asset = create_network_hardware_asset(installation=installation, organization=record, name="Keyed export fixture")
+    asset.hardware.serial_number = "SYNTHETIC-FROZEN-VALUE"
+    asset.hardware.save(update_fields=["serial_number"])
+    document = create_document(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        title="Keyed publication runbook",
+        markdown="Serial <tekdocs://key/subject.serial_number>.\n",
+    )
+    DocumentKeyBinding.objects.create(
+        tenant=installation.tenant,
+        workspace=workspace_for_owner(tenant=installation.tenant, organization=record),
+        organization=record,
+        document=document,
+        name="subject",
+        target_entity=asset.entity,
+        created_by=installation.owner,
+    )
+    publication = publish_document(
+        workspace=resolve_organization_workspace(installation.owner, entity_id=record.entity_id),
+        document=document,
+        actor_id=installation.owner.id,
+        reason="Freeze field value for export safety test",
+        audience="msp_internal",
+        retention="permanent",
+        retention_review_on=None,
+    )
+    assert publication.manifest["key_resolutions"][0]["value"] == "SYNTHETIC-FROZEN-VALUE"
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse("organization-git-export-list-create", kwargs={"organization_entity_id": record.entity_id}),
+        data=json.dumps({"document_ids": [], "publication_ids": [str(publication.entity_id)]}),
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert GitExportBundle.objects.count() == 0
 
 
 @pytest.mark.django_db(transaction=True)

@@ -88,6 +88,13 @@ def _manifest_has_credential_reference(manifest: object) -> bool:
     )
 
 
+def _manifest_has_frozen_key_values(manifest: object) -> bool:
+    if not isinstance(manifest, dict):
+        return True
+    resolutions = manifest.get("key_resolutions", [])
+    return not isinstance(resolutions, list) or bool(resolutions)
+
+
 def _zip_bytes(files: dict[str, bytes]) -> bytes:
     target = io.BytesIO()
     with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
@@ -131,6 +138,10 @@ def create_git_export(
     if any(_manifest_has_credential_reference(publication.manifest) for publication in publications):
         raise ValidationError(
             {"publication_ids": "A selected STATIC publication contains credential-reference metadata."}
+        )
+    if any(_manifest_has_frozen_key_values(publication.manifest) for publication in publications):
+        raise ValidationError(
+            {"publication_ids": "A selected STATIC publication contains frozen field values that cannot be sanitized."}
         )
 
     files: dict[str, bytes] = {}

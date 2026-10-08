@@ -213,6 +213,11 @@ def test_publication_source_freeze_rejects_stale_or_tampered_projection(composit
         freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
 
     index_repository_content(repository_id=repository.id, force=True)
+    ContentNode.objects.filter(repository=repository, content_id=document_id).update(title="Forged title")
+    with pytest.raises(ContentPublicationSourceError, match="metadata differs"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+    index_repository_content(repository_id=repository.id, force=True)
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=first.object_id,
@@ -389,6 +394,24 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
     assert "Root." in evidence.manifest["rendered_snapshot"]["html"]
     assert verify_repository_publication_evidence(evidence)["rendered_snapshot_attested"]
+    assert evidence.manifest["pdf_snapshot"]["media_type"] == "application/pdf"
+    assert evidence.manifest["pdf_snapshot"]["size"] == evidence.pdf_file.size
+    assert verify_repository_publication_evidence(evidence)["pdf_snapshot_attested"]
+
+    inconsistent_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    inconsistent_pdf.manifest["title"] = "Forged title"
+    pdf_digest = hashlib.sha256(
+        evidence_payload(manifest=inconsistent_pdf.manifest, markdown=inconsistent_pdf.canonical_markdown)
+    ).digest()
+    inconsistent_pdf.content_digest = pdf_digest.hex()
+    inconsistent_pdf.signature = base64.urlsafe_b64encode(publication_signing_key().sign(pdf_digest)).decode("ascii")
+    assert verify_repository_publication_evidence(inconsistent_pdf)["signature_valid"]
+    assert not verify_repository_publication_evidence(inconsistent_pdf)["pdf_snapshot_attested"]
+    assert not verify_repository_publication_evidence(inconsistent_pdf)["valid"]
+
+    missing_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    missing_pdf.pdf_file.name += ".missing"
+    assert not verify_repository_publication_evidence(missing_pdf)["pdf_snapshot_attested"]
 
     inconsistent_render = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     inconsistent_render.manifest["rendered_snapshot"]["html"] = "<p>Forged.</p>"
@@ -451,6 +474,17 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert verify_repository_publication_evidence(prior_render)["valid"]
     assert not verify_repository_publication_evidence(prior_render)["rendered_snapshot_attested"]
 
+    prior_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    prior_pdf.manifest.pop("pdf_snapshot")
+    prior_pdf.pdf_file.name = ""
+    prior_pdf_digest = hashlib.sha256(
+        evidence_payload(manifest=prior_pdf.manifest, markdown=prior_pdf.canonical_markdown)
+    ).digest()
+    prior_pdf.content_digest = prior_pdf_digest.hex()
+    prior_pdf.signature = base64.urlsafe_b64encode(publication_signing_key().sign(prior_pdf_digest)).decode("ascii")
+    assert verify_repository_publication_evidence(prior_pdf)["valid"]
+    assert not verify_repository_publication_evidence(prior_pdf)["pdf_snapshot_attested"]
+
     foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
     with django_runtime_role(), transaction.atomic():
         bind_local_rls_scope(DataScope.tenant(installation.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY)
@@ -475,6 +509,14 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
         RepositoryPublicationEvidence.objects.filter(pk=evidence.id).update(canonical_markdown="Tampered")
     with pytest.raises(DatabaseError), transaction.atomic():
         RepositoryPublicationEvidence.objects.filter(pk=evidence.id).delete()
+    with pytest.raises(DatabaseError), transaction.atomic():
+        RepositoryPublicationEvidence.objects.filter(pk=evidence.id).update(pdf_file="forged.pdf")
+    wrong_path = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    wrong_path.pk = uuid.uuid4()
+    wrong_path.manifest["evidence_id"] = str(wrong_path.pk)
+    wrong_path.pdf_file.name = "forged.pdf"
+    with pytest.raises(DatabaseError), transaction.atomic():
+        RepositoryPublicationEvidence.objects.bulk_create([wrong_path])
     forged = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     forged.pk = uuid.uuid4()
     forged.manifest["evidence_id"] = str(forged.pk)
@@ -493,6 +535,9 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
         message="Advance live fragment",
     )
     assert verify_repository_publication_evidence(evidence)["valid"]
+    evidence.pdf_file.storage.delete(evidence.pdf_file.name)
+    assert not verify_repository_publication_evidence(evidence)["pdf_snapshot_attested"]
+    assert not verify_repository_publication_evidence(evidence)["valid"]
 
 
 def test_repository_evidence_freezes_portable_field_keys_without_changing_git(composition_repository):
@@ -1070,6 +1115,33 @@ def test_repository_evidence_attachment_upgrade_installs_forced_rls_and_append_o
                 "'core_repositoryevidenceattachment_immutable')"
             )
             assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
+def test_repository_evidence_pdf_upgrade_preserves_forced_rls_and_checks_path():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0169_repositoryevidenceattachment")])
+        with connection.cursor() as cursor:
+            assert "pdf_file" not in [column.name for column in connection.introspection.get_table_description(
+                cursor, "core_repositorypublicationevidence"
+            )]
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorypublicationevidence'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_constraint WHERE conrelid = "
+                "'core_repositorypublicationevidence'::regclass "
+                "AND conname = 'repository_evidence_pdf_manifest_match'"
+            )
+            assert cursor.fetchone() == (1,)
     finally:
         MigrationExecutor(connection).migrate(head)
 

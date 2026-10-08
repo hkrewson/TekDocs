@@ -5010,6 +5010,10 @@ class DocumentPublication(models.Model):
         )
 
 
+def repository_evidence_pdf_upload_to(instance: "RepositoryPublicationEvidence", _filename: str) -> str:
+    return str(PurePosixPath("repository-evidence-pdfs") / str(instance.tenant_id) / str(instance.id) / "snapshot.pdf")
+
+
 class RepositoryPublicationEvidence(models.Model):
     """Append-only signed source snapshot; not yet a distributable STATIC publication."""
 
@@ -5032,6 +5036,7 @@ class RepositoryPublicationEvidence(models.Model):
     content_id = models.UUIDField()
     audience = models.CharField(max_length=24, choices=PublicationAudience.choices)
     canonical_markdown = models.TextField()
+    pdf_file = models.FileField(upload_to=repository_evidence_pdf_upload_to, max_length=500, blank=True)
     manifest = models.JSONField()
     content_digest = models.CharField(max_length=64)
     signature = models.TextField()
@@ -5123,6 +5128,7 @@ class RepositoryPublicationEvidence(models.Model):
             or source.get("object_format") != self.source_commit.object_format
             or source.get("markdown_sha256")
             != hashlib.sha256(self.canonical_markdown.encode("utf-8")).hexdigest()
+            or bool(self.manifest.get("pdf_snapshot")) != bool(self.pdf_file.name)
         ):
             raise ValidationError("Publication evidence manifest does not match its retained source")
 

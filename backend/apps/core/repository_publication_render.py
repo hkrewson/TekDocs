@@ -6,22 +6,70 @@ import hashlib
 from typing import Any
 
 from .document_key_freeze import verify_frozen_field_keys
-from .rendering import RenderedAttachment, RenderedEntityMention, render_markdown
+from .rendering import RenderedAttachment, RenderedEntityMention, render_markdown, render_pdf
 
 RENDERED_SNAPSHOT_FORMAT = "tekdocs-repository-rendered-snapshot/v1"
 MAX_RENDERED_HTML_BYTES = 4 * 1024 * 1024
+PDF_SNAPSHOT_FORMAT = "tekdocs-repository-pdf-snapshot/v1"
+MAX_RENDERED_PDF_BYTES = 8 * 1024 * 1024
+
+
+def frozen_repository_markdown(*, markdown: str, manifest: dict[str, Any]) -> str:
+    key_snapshot = manifest.get("key_snapshot")
+    if key_snapshot is None:
+        return markdown
+    if not verify_frozen_field_keys(markdown, key_snapshot):
+        raise ValueError("Field-key snapshot is unavailable")
+    frozen = key_snapshot["markdown"]
+    if not isinstance(frozen, str):
+        raise ValueError("Field-key snapshot Markdown is unavailable")
+    return frozen
+
+
+def retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any]) -> tuple[dict[str, Any], bytes]:
+    title = manifest.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("Repository document title is unavailable")
+    content = render_pdf(frozen_repository_markdown(markdown=markdown, manifest=manifest), title=title)
+    if not content.startswith(b"%PDF-") or len(content) > MAX_RENDERED_PDF_BYTES:
+        raise ValueError("Rendered publication PDF is unavailable or exceeds its size limit")
+    return (
+        {
+            "format": PDF_SNAPSHOT_FORMAT,
+            "filename": "snapshot.pdf",
+            "media_type": "application/pdf",
+            "size": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        },
+        content,
+    )
+
+
+def verify_retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any], content: bytes) -> bool:
+    snapshot = manifest.get("pdf_snapshot")
+    if not isinstance(snapshot, dict) or set(snapshot) != {"format", "filename", "media_type", "size", "sha256"}:
+        return False
+    if (
+        snapshot.get("format") != PDF_SNAPSHOT_FORMAT
+        or snapshot.get("filename") != "snapshot.pdf"
+        or snapshot.get("media_type") != "application/pdf"
+        or type(snapshot.get("size")) is not int
+        or snapshot["size"] != len(content)
+        or len(content) > MAX_RENDERED_PDF_BYTES
+        or snapshot.get("sha256") != hashlib.sha256(content).hexdigest()
+    ):
+        return False
+    try:
+        expected, rendered = retained_pdf_snapshot(markdown=markdown, manifest=manifest)
+    except (ValueError, TypeError):
+        return False
+    return snapshot == expected and content == rendered
 
 
 def render_repository_evidence_html(*, markdown: str, manifest: dict[str, Any]) -> str:
     """Render frozen dependencies without consulting Git, assets, or source files."""
 
-    key_snapshot = manifest.get("key_snapshot")
-    if key_snapshot is not None:
-        if not verify_frozen_field_keys(markdown, key_snapshot):
-            raise ValueError("Field-key snapshot is unavailable")
-        frozen_markdown = key_snapshot["markdown"]
-    else:
-        frozen_markdown = markdown
+    frozen_markdown = frozen_repository_markdown(markdown=markdown, manifest=manifest)
 
     cards = manifest.get("entity_cards")
     attachments = manifest.get("attachments")

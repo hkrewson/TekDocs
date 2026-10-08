@@ -59,7 +59,13 @@ from .publications import (
 )
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
-from .repository_publication_render import retained_rendered_snapshot, verify_retained_rendered_snapshot
+from .repository_publication_render import (
+    MAX_RENDERED_PDF_BYTES,
+    retained_pdf_snapshot,
+    retained_rendered_snapshot,
+    verify_retained_pdf_snapshot,
+    verify_retained_rendered_snapshot,
+)
 from .topic_schemas import SCHEMAS
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
@@ -344,6 +350,7 @@ def _retain_pinned_evidence(
             "content_id": str(content_id),
             "audience": audience,
             "topic_type": node.topic_type,
+            "title": node.title,
             "signed_at": signed_at_text,
             "signed_by": str(actor.id),
             "source": source,
@@ -365,6 +372,7 @@ def _retain_pinned_evidence(
             manifest["key_snapshot"] = key_snapshot
         try:
             manifest["rendered_snapshot"] = retained_rendered_snapshot(markdown=markdown, manifest=manifest)
+            manifest["pdf_snapshot"], pdf_content = retained_pdf_snapshot(markdown=markdown, manifest=manifest)
         except (ValueError, TypeError) as exc:
             raise RepositoryPublicationEvidenceError(
                 "Repository publication preflight blocked: repository.render.unavailable"
@@ -391,6 +399,8 @@ def _retain_pinned_evidence(
             signed_by=actor,
             signed_at=signed_at,
         )
+        evidence.pdf_file.save("snapshot.pdf", ContentFile(pdf_content), save=False)
+        stored_files.append((evidence.pdf_file.storage, evidence.pdf_file.name))
         evidence.full_clean()
         evidence.save()  # type: ignore[no-untyped-call]
         for attachment, content, artifact_id in retained:
@@ -515,6 +525,17 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         rendered_snapshot is None
         or verify_retained_rendered_snapshot(markdown=evidence.canonical_markdown, manifest=manifest)
     )
+    pdf_snapshot = manifest.get("pdf_snapshot") if isinstance(manifest, dict) else None
+    pdf_snapshot_valid = pdf_snapshot is None and not evidence.pdf_file.name
+    if pdf_snapshot is not None and evidence.pdf_file.name:
+        try:
+            with evidence.pdf_file.storage.open(evidence.pdf_file.name, "rb") as stream:
+                pdf_content = bytes(stream.read(MAX_RENDERED_PDF_BYTES + 1))
+            pdf_snapshot_valid = verify_retained_pdf_snapshot(
+                markdown=evidence.canonical_markdown, manifest=manifest, content=pdf_content
+            )
+        except (OSError, ValueError, TypeError):
+            pdf_snapshot_valid = False
     attachments_valid = True
     descriptors = manifest.get("attachments") if isinstance(manifest, dict) else None
     if descriptors is not None:
@@ -597,6 +618,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         and entity_cards_valid
         and key_snapshot_valid
         and rendered_snapshot_valid
+        and pdf_snapshot_valid
         and (topic_type is None or preflight is None or dependency_closure_attested)
     )
     return {
@@ -611,5 +633,6 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "entity_cards_valid": entity_cards_valid,
         "key_snapshot_valid": key_snapshot_valid,
         "rendered_snapshot_attested": valid and rendered_snapshot is not None and rendered_snapshot_valid,
+        "pdf_snapshot_attested": valid and pdf_snapshot is not None and pdf_snapshot_valid,
         "dependency_closure_attested": valid and dependency_closure_attested,
     }

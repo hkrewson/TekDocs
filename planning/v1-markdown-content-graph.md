@@ -457,13 +457,17 @@ accepted Git head and database row stable through evidence retention, including
 inside request transactions. A third foundation signs the exact source proof
 and composed Markdown into a separate append-only, exact-Workspace record that
 verifies without live Git. It is not a distributable STATIC publication: the
-legacy publisher remains authoritative, and approval, artifacts, file/export/
+legacy publisher remains authoritative, and approval, final artifacts, file/export/
 portal parity and repository-inclusive recovery remain in this milestone.
 An additional internal readiness gate blocks retention when the selected
 audience composition is empty, has required-topic gaps, or contains dynamic
 files, keys, entity cards, images, unsupported TekDocs links or Mermaid output
 that has not been frozen. The signed manifest records only versioned,
 value-free finding codes; this does not substitute for artifact packaging.
+Subsequent internal evidence now retains managed attachment bytes, entity
+display cards, frozen field-key values, sanitized HTML and a private PDF
+projection. These verify offline against signed inputs but are not yet
+approved or distributed as STATIC publications.
 
 ### `0.9.8` — version 1 acceptance
 

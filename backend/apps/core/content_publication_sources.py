@@ -129,7 +129,11 @@ def freeze_git_document_dependencies(
             raise ContentPublicationSourceError("Accepted repository document is unavailable")
         if (node.source_path, node.content_digest) != (root[0], root[2].content_digest):
             raise ContentPublicationSourceError("Indexed repository document differs from its accepted source")
-        if node.topic_type != root[2].topic_type or node.frontmatter != root[2].frontmatter:
+        if (
+            node.title != root[2].title
+            or node.topic_type != root[2].topic_type
+            or node.frontmatter != root[2].frontmatter
+        ):
             raise ContentPublicationSourceError("Indexed repository metadata differs from its accepted source")
         variant = variants[content_id][audience]
         if node.composition_variants.get(audience) != variant:

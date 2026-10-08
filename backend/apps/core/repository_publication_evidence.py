@@ -59,6 +59,7 @@ from .publications import (
 )
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
+from .repository_publication_render import retained_rendered_snapshot, verify_retained_rendered_snapshot
 from .topic_schemas import SCHEMAS
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
@@ -354,6 +355,7 @@ def _retain_pinned_evidence(
                     "checksum": attachment.checksum,
                     "size": len(content),
                     "media_type": attachment.media_type,
+                    "filename": attachment.original_filename,
                 }
                 for attachment, content, artifact_id in retained
             ],
@@ -361,6 +363,12 @@ def _retain_pinned_evidence(
         }
         if key_snapshot is not None:
             manifest["key_snapshot"] = key_snapshot
+        try:
+            manifest["rendered_snapshot"] = retained_rendered_snapshot(markdown=markdown, manifest=manifest)
+        except (ValueError, TypeError) as exc:
+            raise RepositoryPublicationEvidenceError(
+                "Repository publication preflight blocked: repository.render.unavailable"
+            ) from exc
         digest = hashlib.sha256(evidence_payload(manifest=manifest, markdown=markdown)).digest()
         key = publication_signing_key()
         raw_public_key = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
@@ -502,6 +510,11 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         not key_targets_in_markdown(evidence.canonical_markdown)
         if key_snapshot is None else verify_frozen_field_keys(evidence.canonical_markdown, key_snapshot)
     )
+    rendered_snapshot = manifest.get("rendered_snapshot") if isinstance(manifest, dict) else None
+    rendered_snapshot_valid = (
+        rendered_snapshot is None
+        or verify_retained_rendered_snapshot(markdown=evidence.canonical_markdown, manifest=manifest)
+    )
     attachments_valid = True
     descriptors = manifest.get("attachments") if isinstance(manifest, dict) else None
     if descriptors is not None:
@@ -583,6 +596,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         and attachments_valid
         and entity_cards_valid
         and key_snapshot_valid
+        and rendered_snapshot_valid
         and (topic_type is None or preflight is None or dependency_closure_attested)
     )
     return {
@@ -596,5 +610,6 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "attachments_valid": attachments_valid,
         "entity_cards_valid": entity_cards_valid,
         "key_snapshot_valid": key_snapshot_valid,
+        "rendered_snapshot_attested": valid and rendered_snapshot is not None and rendered_snapshot_valid,
         "dependency_closure_attested": valid and dependency_closure_attested,
     }

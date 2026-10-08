@@ -1742,6 +1742,11 @@ exactly cover referenced attachments. Earlier evidence remains verifiable
 without claiming the newer closure attestation. Source pinning additionally
 checks indexed topic and frontmatter parity with the accepted Git root. This
 is not distribution or authority handoff.
+The next packaging foundation signs a bounded sanitized HTML projection from
+the retained Markdown and frozen key, entity and attachment inputs. Offline
+verification recomputes it; attachment cards carry no distribution URL. Older
+evidence remains valid without an HTML attestation. Approval, retained PDF and
+file downloads, portal delivery, and authority handoff are still open.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

@@ -387,6 +387,21 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert verify_repository_publication_evidence(evidence)["valid"]
     assert verify_repository_publication_evidence(evidence)["preflight_attested"]
     assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
+    assert "Root." in evidence.manifest["rendered_snapshot"]["html"]
+    assert verify_repository_publication_evidence(evidence)["rendered_snapshot_attested"]
+
+    inconsistent_render = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    inconsistent_render.manifest["rendered_snapshot"]["html"] = "<p>Forged.</p>"
+    render_digest = hashlib.sha256(
+        evidence_payload(manifest=inconsistent_render.manifest, markdown=inconsistent_render.canonical_markdown)
+    ).digest()
+    inconsistent_render.content_digest = render_digest.hex()
+    inconsistent_render.signature = base64.urlsafe_b64encode(
+        publication_signing_key().sign(render_digest)
+    ).decode("ascii")
+    assert verify_repository_publication_evidence(inconsistent_render)["signature_valid"]
+    assert not verify_repository_publication_evidence(inconsistent_render)["rendered_snapshot_attested"]
+    assert not verify_repository_publication_evidence(inconsistent_render)["valid"]
 
     inconsistent = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     inconsistent.manifest["topic_type"] = "procedure"
@@ -423,6 +438,18 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     legacy_format.signature = base64.urlsafe_b64encode(publication_signing_key().sign(legacy_digest)).decode("ascii")
     assert verify_repository_publication_evidence(legacy_format)["valid"]
     assert not verify_repository_publication_evidence(legacy_format)["dependency_closure_attested"]
+
+    prior_render = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    prior_render.manifest.pop("rendered_snapshot")
+    prior_render_digest = hashlib.sha256(
+        evidence_payload(manifest=prior_render.manifest, markdown=prior_render.canonical_markdown)
+    ).digest()
+    prior_render.content_digest = prior_render_digest.hex()
+    prior_render.signature = base64.urlsafe_b64encode(
+        publication_signing_key().sign(prior_render_digest)
+    ).decode("ascii")
+    assert verify_repository_publication_evidence(prior_render)["valid"]
+    assert not verify_repository_publication_evidence(prior_render)["rendered_snapshot_attested"]
 
     foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
     with django_runtime_role(), transaction.atomic():
@@ -527,6 +554,8 @@ def test_repository_evidence_freezes_portable_field_keys_without_changing_git(co
     assert snapshot["records"][0]["value"] == "First laptop"
     assert verify_repository_publication_evidence(evidence)["key_snapshot_valid"]
     assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
+    assert "First laptop" in evidence.manifest["rendered_snapshot"]["html"]
+    assert "tekdocs://key/" not in evidence.manifest["rendered_snapshot"]["html"]
 
     asset.entity.display_name = "Renamed laptop"
     asset.entity.save(update_fields=("display_name", "updated_at"))
@@ -609,6 +638,8 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         )
         assert verify_repository_publication_evidence(evidence)["valid"]
         assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
+        assert "guide.txt" in evidence.manifest["rendered_snapshot"]["html"]
+        assert "href=" not in evidence.manifest["rendered_snapshot"]["html"]
         incomplete = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
         incomplete.manifest["attachments"][0]["source_id"] = str(uuid.uuid4())
         incomplete_digest = hashlib.sha256(
@@ -771,6 +802,7 @@ def test_repository_evidence_freezes_exact_workspace_entity_cards(composition_re
         }
     ]
     assert verify_repository_publication_evidence(evidence)["valid"]
+    assert "Original entity name" in evidence.manifest["rendered_snapshot"]["html"]
     target.entity.display_name = "Renamed later"
     target.entity.save(update_fields=("display_name", "updated_at"))
     assert verify_repository_publication_evidence(evidence)["valid"]

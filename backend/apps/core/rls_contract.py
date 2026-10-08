@@ -18,6 +18,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_repositorypublicationevidence",
     "core_repositoryevidencereviewdecision",
     "core_repositorypublicationpackage",
+    "core_repositorypackageauthorization",
     "core_repositoryevidenceattachment",
     "core_documentpublicationartifact",
     "core_documentpublicationcontrolevent",

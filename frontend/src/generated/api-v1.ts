@@ -8251,6 +8251,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/authorization": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_package_authorization_retrieve"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_organization_package_authorization_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review": {
         readonly parameters: {
             readonly query?: never;
@@ -15459,6 +15475,33 @@ export interface components {
             readonly created_at: string;
             readonly verified: boolean;
             readonly permits_distribution: boolean;
+        };
+        readonly RepositoryPackageAuthorization: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly package_id: string;
+            /**
+             * @description * `authorized_for_publication` - Authorized for publication
+             *     * `rejected` - Rejected
+             * @enum {string}
+             */
+            readonly outcome: "authorized_for_publication" | "rejected";
+            readonly reason: string;
+            /** Format: uuid */
+            readonly actor_id: string;
+            /** Format: date-time */
+            readonly occurred_at: string;
+            readonly permits_distribution: boolean;
+        };
+        readonly RepositoryPackageAuthorizationWrite: {
+            /**
+             * @description * `authorized_for_publication` - Authorized for publication
+             *     * `rejected` - Rejected
+             * @enum {string}
+             */
+            readonly outcome: "authorized_for_publication" | "rejected";
+            readonly reason: string;
         };
         readonly RepositoryStateCounts: {
             readonly never: number;
@@ -39194,6 +39237,60 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RepositoryPackage"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_package_authorization_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryPackageAuthorization"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_package_authorization_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RepositoryPackageAuthorizationWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RepositoryPackageAuthorizationWrite"];
+                readonly "multipart/form-data": components["schemas"]["RepositoryPackageAuthorizationWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryPackageAuthorization"];
                 };
             };
         };

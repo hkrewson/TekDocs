@@ -1766,6 +1766,12 @@ hashes, the signed evidence digest, decision, and source commit under the exact
 organization Workspace. The staff-only package is not a distributable STATIC
 record; final publication approval, portal/file delivery, and authority handoff
 remain separate `0.9.7` work.
+An independent, MFA-gated final package decision now records either
+`authorized_for_publication` or `rejected` after retained-artifact verification.
+It is append-only, exact-Workspace scoped, requires a reason, and prevents the
+package creator from authorizing their own work. This is the permission to build
+a repository publication record, not client distribution: artifact publication,
+portal delivery, and authority handoff remain open.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

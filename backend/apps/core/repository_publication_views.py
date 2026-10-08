@@ -23,12 +23,17 @@ from .models import (
     PublicationAudience,
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
+    RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
     WorkspaceRepository,
     workspace_for_owner,
 )
 from .publications import MAX_RETAINED_ATTACHMENT_BYTES
+from .repository_package_authorization import (
+    RepositoryPackageAuthorizationError,
+    decide_repository_package,
+)
 from .repository_publication_evidence import (
     RepositoryPublicationEvidenceError,
     retain_repository_publication_evidence,
@@ -121,6 +126,21 @@ class RepositoryPackageSerializer(serializers.Serializer):
     created_by_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()
     verified = serializers.BooleanField()
+    permits_distribution = serializers.BooleanField()
+
+
+class RepositoryPackageAuthorizationWriteSerializer(serializers.Serializer):
+    outcome = serializers.ChoiceField(choices=RepositoryPackageAuthorization.Outcome.choices)
+    reason = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
+
+
+class RepositoryPackageAuthorizationSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    package_id = serializers.UUIDField()
+    outcome = serializers.ChoiceField(choices=RepositoryPackageAuthorization.Outcome.choices)
+    reason = serializers.CharField()
+    actor_id = serializers.UUIDField()
+    occurred_at = serializers.DateTimeField()
     permits_distribution = serializers.BooleanField()
 
 
@@ -403,6 +423,48 @@ def _package(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respon
     return Response(_package_data(package), status=status.HTTP_201_CREATED)
 
 
+def _authorization_data(authorization: RepositoryPackageAuthorization) -> dict[str, object]:
+    return cast(
+        dict[str, object],
+        RepositoryPackageAuthorizationSerializer(
+            {
+                "id": authorization.id,
+                "package_id": authorization.package_id,
+                "outcome": authorization.outcome,
+                "reason": authorization.reason,
+                "actor_id": authorization.actor_id,
+                "occurred_at": authorization.occurred_at,
+                "permits_distribution": False,
+            }
+        ).data,
+    )
+
+
+def _authorization(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    package = RepositoryPublicationPackage.objects.filter(decision__evidence=evidence).first()
+    if package is None:
+        return Response({"detail": "Verified package is required"}, status=status.HTTP_409_CONFLICT)
+    if request.method == "GET":
+        authorization = RepositoryPackageAuthorization.objects.filter(package=package).first()
+        if authorization is None:
+            return Response({"detail": "No authorization decision exists"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_authorization_data(authorization))
+    serializer = RepositoryPackageAuthorizationWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        authorization = decide_repository_package(
+            package_id=package.id,
+            outcome=serializer.validated_data["outcome"],
+            reason=serializer.validated_data["reason"],
+            actor=request.user,
+        )
+    except (RepositoryPackageAuthorizationError, IntegrityError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(_authorization_data(authorization), status=status.HTTP_201_CREATED)
+
+
 class MSPRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_list",
@@ -595,5 +657,30 @@ class OrganizationRepositoryEvidencePackageView(APIView):
         return _package(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryPackageAuthorizationView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_package_authorization_retrieve",
+        responses={200: RepositoryPackageAuthorizationSerializer},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _authorization(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+    @extend_schema(
+        operation_id="repository_evidence_organization_package_authorization_create",
+        request=RepositoryPackageAuthorizationWriteSerializer,
+        responses={201: RepositoryPackageAuthorizationSerializer},
+    )
+    def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _authorization(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,
         )

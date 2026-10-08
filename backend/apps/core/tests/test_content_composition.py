@@ -40,6 +40,7 @@ from apps.core.models import (
     InstallationState,
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
+    RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
     Tenant,
@@ -725,6 +726,46 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert package.manifest["html_sha256"]
     assert browser.get(package_url).json()["manifest_digest"] == package.manifest_digest
     assert browser.post(package_url).status_code == 409
+    authorization_url = reverse(
+        "organization-repository-publication-evidence-package-authorization",
+        args=[organization.entity_id, evidence_id],
+    )
+    authorization_payload = json.dumps(
+        {"outcome": "authorized_for_publication", "reason": "Exact package approved for publication creation"}
+    )
+    assert browser.get(authorization_url).status_code == 404
+    assert (
+        browser.post(authorization_url, data=authorization_payload, content_type="application/json").status_code
+        == 409
+    )
+    authorizer = User.objects.create_user(email="package-authorizer@example.invalid", display_name="Authorizer")
+    authorizer_membership = TenantMembership.objects.create(
+        tenant=installation.tenant, user=authorizer, role=BuiltInRole.ADMINISTRATOR
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        membership=authorizer_membership,
+        created_by=installation.owner,
+    )
+    browser.force_login(authorizer)
+    assert (
+        browser.post(authorization_url, data=authorization_payload, content_type="application/json").status_code
+        == 403
+    )
+    Authenticator.objects.create(user=authorizer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()})
+    authorized = browser.post(authorization_url, data=authorization_payload, content_type="application/json")
+    assert authorized.status_code == 201, authorized.content
+    assert authorized.json()["permits_distribution"] is False
+    assert authorized.json()["package_id"] == str(package.id)
+    assert browser.get(authorization_url).json()["outcome"] == "authorized_for_publication"
+    assert (
+        browser.post(authorization_url, data=authorization_payload, content_type="application/json").status_code
+        == 409
+    )
+    with pytest.raises(DatabaseError):
+        RepositoryPackageAuthorization.objects.filter(pk=authorized.json()["id"]).update(reason="Changed")
+    browser.force_login(reviewer)
     sibling = create_organization(
         tenant=installation.tenant,
         actor_id=installation.owner.id,
@@ -738,6 +779,14 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     )
     assert browser.get(sibling_url).status_code == 404
     assert browser.post(sibling_url).status_code == 404
+    sibling_authorization_url = reverse(
+        "organization-repository-publication-evidence-package-authorization",
+        args=[sibling.entity_id, evidence_id],
+    )
+    assert browser.get(sibling_authorization_url).status_code == 404
+    assert browser.post(
+        sibling_authorization_url, data=authorization_payload, content_type="application/json"
+    ).status_code == 404
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
     foreign_tenant = Tenant.objects.create(name="Foreign package MSP", slug="foreign-package-msp")
     foreign_user = User.objects.create_user(email="foreign-package@example.invalid", display_name="Foreign")
@@ -748,6 +797,10 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     browser.force_login(foreign_user)
     assert browser.get(package_url).status_code in {403, 404}
     assert browser.post(package_url).status_code in {403, 404}
+    assert browser.get(authorization_url).status_code in {403, 404}
+    assert browser.post(
+        authorization_url, data=authorization_payload, content_type="application/json"
+    ).status_code in {403, 404}
     read_only_user = User.objects.create_user(email="read-only-package@example.invalid", display_name="Read-only")
     read_only_membership = TenantMembership.objects.create(
         tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY
@@ -764,6 +817,10 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     browser.force_login(read_only_user)
     assert browser.get(package_url).status_code == 403
     assert browser.post(package_url).status_code == 403
+    assert browser.get(authorization_url).status_code == 403
+    assert browser.post(
+        authorization_url, data=authorization_payload, content_type="application/json"
+    ).status_code == 403
     browser.force_login(reviewer)
     with pytest.raises(DatabaseError):
         RepositoryPublicationPackage.objects.filter(pk=package.id).update(manifest_digest="0" * 64)
@@ -798,6 +855,10 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(url, data=payload, content_type="application/json").status_code == 403
     assert browser.get(package_url).status_code == 403
     assert browser.post(package_url).status_code == 403
+    assert browser.get(authorization_url).status_code == 403
+    assert browser.post(
+        authorization_url, data=authorization_payload, content_type="application/json"
+    ).status_code == 403
 
     browser.force_login(installation.owner)
     second = browser.post(
@@ -827,6 +888,14 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(reverse(
         "organization-repository-publication-evidence-package", args=[organization.entity_id, corrupt.id]
     )).status_code == 409
+    assert browser.post(
+        reverse(
+            "organization-repository-publication-evidence-package-authorization",
+            args=[organization.entity_id, corrupt.id],
+        ),
+        data=authorization_payload,
+        content_type="application/json",
+    ).status_code == 409
     retained = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
     retained.pdf_file.storage.delete(retained.pdf_file.name)
     assert not verify_repository_publication_package(package)
@@ -851,6 +920,31 @@ def test_repository_publication_package_upgrade_installs_forced_rls_and_guards()
                 "WHERE tgrelid = 'core_repositorypublicationpackage'::regclass "
                 "AND tgname IN ('core_repositorypublicationpackage_validate', "
                 "'core_repositorypublicationpackage_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
+def test_repository_package_authorization_upgrade_installs_forced_rls_and_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0172_repository_publication_package")])
+        assert "core_repositorypackageauthorization" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorypackageauthorization'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger "
+                "WHERE tgrelid = 'core_repositorypackageauthorization'::regclass "
+                "AND tgname IN ('core_repositorypackageauthorization_validate', "
+                "'core_repositorypackageauthorization_immutable')"
             )
             assert cursor.fetchone() == (2,)
     finally:

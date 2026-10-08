@@ -5217,6 +5217,52 @@ class RepositoryPublicationPackage(models.Model):
         raise ValidationError("Repository publication packages are append-only")
 
 
+class RepositoryPackageAuthorization(models.Model):
+    """Final staff decision on one package; no client-delivery authority yet."""
+
+    class Outcome(models.TextChoices):
+        AUTHORIZED_FOR_PUBLICATION = "authorized_for_publication", "Authorized for publication"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    package = models.OneToOneField(
+        RepositoryPublicationPackage, on_delete=models.PROTECT, related_name="authorization"
+    )
+    outcome = models.CharField(max_length=28, choices=Outcome.choices)
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(outcome__in=["authorized_for_publication", "rejected"]),
+                name="repository_package_authorization_outcome_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(reason=""), name="repository_package_authorization_reason_required"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository package authorizations are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository package authorizations are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

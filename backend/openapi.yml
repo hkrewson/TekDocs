@@ -32334,6 +32334,85 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/authorization
+  : get:
+      operationId: repository_evidence_organization_package_authorization_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryPackageAuthorization'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: repository_evidence_organization_package_authorization_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryPackageAuthorizationWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryPackageAuthorizationWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryPackageAuthorizationWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryPackageAuthorization'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_organization_review
@@ -49479,6 +49558,60 @@ components:
       - permits_distribution
       - source_commit
       - verified
+    RepositoryPackageAuthorization:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        package_id:
+          type: string
+          format: uuid
+        outcome:
+          enum:
+          - authorized_for_publication
+          - rejected
+          type: string
+          description: |-
+            * `authorized_for_publication` - Authorized for publication
+            * `rejected` - Rejected
+          x-spec-enum-id: 4dedbb902220f80e
+        reason:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        permits_distribution:
+          type: boolean
+      required:
+      - actor_id
+      - id
+      - occurred_at
+      - outcome
+      - package_id
+      - permits_distribution
+      - reason
+    RepositoryPackageAuthorizationWrite:
+      type: object
+      properties:
+        outcome:
+          enum:
+          - authorized_for_publication
+          - rejected
+          type: string
+          description: |-
+            * `authorized_for_publication` - Authorized for publication
+            * `rejected` - Rejected
+          x-spec-enum-id: 4dedbb902220f80e
+        reason:
+          type: string
+          maxLength: 500
+      required:
+      - outcome
+      - reason
     RepositoryStateCounts:
       type: object
       properties:

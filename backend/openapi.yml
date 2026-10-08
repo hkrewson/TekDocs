@@ -32480,6 +32480,85 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/control
+  : get:
+      operationId: repository_evidence_organization_static_control_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticControl'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: repository_evidence_organization_static_control_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticControl'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_organization_review
@@ -49711,6 +49790,84 @@ components:
       - missing
       - never
       - unavailable
+    RepositoryStaticControl:
+      type: object
+      properties:
+        publication_id:
+          type: string
+          format: uuid
+        state:
+          enum:
+          - recorded
+          - released
+          - withdrawn
+          type: string
+          description: |-
+            * `recorded` - recorded
+            * `released` - released
+            * `withdrawn` - withdrawn
+          x-spec-enum-id: 6bb54b29bc07888e
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryStaticControlEvent'
+        verified:
+          type: boolean
+        permits_distribution:
+          type: boolean
+      required:
+      - events
+      - permits_distribution
+      - publication_id
+      - state
+      - verified
+    RepositoryStaticControlEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          enum:
+          - released
+          - withdrawn
+          type: string
+          description: |-
+            * `released` - Released for future delivery
+            * `withdrawn` - Withdrawn
+          x-spec-enum-id: 82d05710138611cd
+        reason:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+      required:
+      - action
+      - actor_id
+      - id
+      - occurred_at
+      - reason
+    RepositoryStaticControlWrite:
+      type: object
+      properties:
+        action:
+          enum:
+          - released
+          - withdrawn
+          type: string
+          description: |-
+            * `released` - Released for future delivery
+            * `withdrawn` - Withdrawn
+          x-spec-enum-id: 82d05710138611cd
+        reason:
+          type: string
+          maxLength: 500
+      required:
+      - action
+      - reason
     RepositoryStaticPublication:
       type: object
       properties:

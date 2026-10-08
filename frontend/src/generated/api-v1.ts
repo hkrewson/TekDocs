@@ -8283,6 +8283,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/control": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_static_control_retrieve"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_organization_static_control_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review": {
         readonly parameters: {
             readonly query?: never;
@@ -15527,6 +15543,44 @@ export interface components {
             readonly mismatched: number;
             readonly corrupt: number;
             readonly unavailable: number;
+        };
+        readonly RepositoryStaticControl: {
+            /** Format: uuid */
+            readonly publication_id: string;
+            /**
+             * @description * `recorded` - recorded
+             *     * `released` - released
+             *     * `withdrawn` - withdrawn
+             * @enum {string}
+             */
+            readonly state: "recorded" | "released" | "withdrawn";
+            readonly events: readonly components["schemas"]["RepositoryStaticControlEvent"][];
+            readonly verified: boolean;
+            readonly permits_distribution: boolean;
+        };
+        readonly RepositoryStaticControlEvent: {
+            /** Format: uuid */
+            readonly id: string;
+            /**
+             * @description * `released` - Released for future delivery
+             *     * `withdrawn` - Withdrawn
+             * @enum {string}
+             */
+            readonly action: "released" | "withdrawn";
+            readonly reason: string;
+            /** Format: uuid */
+            readonly actor_id: string;
+            /** Format: date-time */
+            readonly occurred_at: string;
+        };
+        readonly RepositoryStaticControlWrite: {
+            /**
+             * @description * `released` - Released for future delivery
+             *     * `withdrawn` - Withdrawn
+             * @enum {string}
+             */
+            readonly action: "released" | "withdrawn";
+            readonly reason: string;
         };
         readonly RepositoryStaticPublication: {
             /** Format: uuid */
@@ -39371,6 +39425,60 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RepositoryStaticPublication"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_static_control_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryStaticControl"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_static_control_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RepositoryStaticControlWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RepositoryStaticControlWrite"];
+                readonly "multipart/form-data": components["schemas"]["RepositoryStaticControlWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryStaticControl"];
                 };
             };
         };

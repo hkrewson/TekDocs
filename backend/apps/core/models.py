@@ -5300,6 +5300,55 @@ class RepositoryStaticPublication(models.Model):
         raise ValidationError("Repository STATIC publications are append-only")
 
 
+class RepositoryStaticPublicationControlEvent(models.Model):
+    """Append-only internal release/withdrawal decision; no client delivery."""
+
+    class Action(models.TextChoices):
+        RELEASED = "released", "Released for future delivery"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    publication = models.ForeignKey(
+        RepositoryStaticPublication, on_delete=models.PROTECT, related_name="control_events"
+    )
+    action = models.CharField(max_length=16, choices=Action.choices)
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(action__in=["released", "withdrawn"]),
+                name="repository_static_control_action_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(reason=""), name="repository_static_control_reason_required"
+            ),
+            models.UniqueConstraint(
+                fields=("publication", "action"), name="repository_static_control_one_action"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.publication_id}: {self.action}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository STATIC control events are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository STATIC control events are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

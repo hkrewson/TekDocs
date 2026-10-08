@@ -27,6 +27,7 @@ from .models import (
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
     RepositoryStaticPublication,
+    RepositoryStaticPublicationControlEvent,
     WorkspaceRepository,
     workspace_for_owner,
 )
@@ -51,6 +52,11 @@ from .repository_publication_render import (
     verify_retained_rendered_snapshot,
 )
 from .repository_service import RepositoryServiceError
+from .repository_static_controls import (
+    RepositoryStaticControlError,
+    record_repository_static_control,
+    repository_static_state,
+)
 from .repository_static_publications import (
     RepositoryStaticPublicationError,
     create_repository_static_publication,
@@ -158,6 +164,27 @@ class RepositoryStaticPublicationSerializer(serializers.Serializer):
     content_digest = serializers.CharField()
     created_by_id = serializers.UUIDField()
     created_at = serializers.DateTimeField()
+    verified = serializers.BooleanField()
+    permits_distribution = serializers.BooleanField()
+
+
+class RepositoryStaticControlWriteSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=RepositoryStaticPublicationControlEvent.Action.choices)
+    reason = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
+
+
+class RepositoryStaticControlEventSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    action = serializers.ChoiceField(choices=RepositoryStaticPublicationControlEvent.Action.choices)
+    reason = serializers.CharField()
+    actor_id = serializers.UUIDField()
+    occurred_at = serializers.DateTimeField()
+
+
+class RepositoryStaticControlSerializer(serializers.Serializer):
+    publication_id = serializers.UUIDField()
+    state = serializers.ChoiceField(choices=["recorded", "released", "withdrawn"])
+    events = RepositoryStaticControlEventSerializer(many=True)
     verified = serializers.BooleanField()
     permits_distribution = serializers.BooleanField()
 
@@ -520,6 +547,54 @@ def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID
     return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
 
 
+def _static_control_data(publication: RepositoryStaticPublication) -> dict[str, object]:
+    return cast(
+        dict[str, object],
+        RepositoryStaticControlSerializer(
+            {
+                "publication_id": publication.id,
+                "state": repository_static_state(publication),
+                "events": [
+                    {
+                        "id": event.id,
+                        "action": event.action,
+                        "reason": event.reason,
+                        "actor_id": event.actor_id,
+                        "occurred_at": event.occurred_at,
+                    }
+                    for event in publication.control_events.all()
+                ],
+                "verified": verify_repository_static_publication(publication),
+                "permits_distribution": False,
+            }
+        ).data,
+    )
+
+
+def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    publication = RepositoryStaticPublication.objects.filter(
+        authorization__package__decision__evidence=evidence
+    ).first()
+    if publication is None:
+        return Response({"detail": "No STATIC record exists"}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == "GET":
+        return Response(_static_control_data(publication))
+    serializer = RepositoryStaticControlWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        record_repository_static_control(
+            publication_id=publication.id,
+            action=serializer.validated_data["action"],
+            reason=serializer.validated_data["reason"],
+            actor=request.user,
+        )
+    except (RepositoryStaticControlError, IntegrityError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(_static_control_data(publication), status=status.HTTP_201_CREATED)
+
+
 class MSPRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_list",
@@ -762,5 +837,30 @@ class OrganizationRepositoryStaticPublicationView(APIView):
         return _static_publication(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryStaticControlView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_control_retrieve",
+        responses={200: RepositoryStaticControlSerializer},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_control(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_control_create",
+        request=RepositoryStaticControlWriteSerializer,
+        responses={201: RepositoryStaticControlSerializer},
+    )
+    def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_control(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,
         )

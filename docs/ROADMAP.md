@@ -1695,7 +1695,10 @@ Evidence: `docs/releases/0.8.46.md`.
 The repository publication path now includes an internal signed, append-only
 STATIC record for an independently authorized package. It binds the exact Git
 commit and retained artifact hashes, but has no client delivery authority.
-Release, withdrawal/supersession, and portal parity remain `0.9.7` exit gates.
+Release, withdrawal/supersession, and portal parity are distinct `0.9.7` exit gates.
+Internal release and withdrawal decisions are now append-only and exact-Workspace
+scoped. Supersession, client delivery, and portal parity remain open; an internal
+release is not a client-visible publication.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

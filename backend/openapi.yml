@@ -15151,6 +15151,34 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/review:
+    get:
+      operationId: repository_evidence_msp_review
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryEvidenceReview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/service-rates:
     get:
       operationId: workspaces_msp_service_rates_list
@@ -32031,6 +32059,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
+    get:
+      operationId: repository_evidence_organization_review
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryEvidenceReview'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/search:
     get:
       operationId: workspace_search_organization
@@ -48785,6 +48847,44 @@ components:
       - page
       - page_size
       - results
+    RepositoryEvidenceReview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content_id:
+          type: string
+          format: uuid
+        audience:
+          enum:
+          - msp_internal
+          - client_visible
+          type: string
+          description: |-
+            * `msp_internal` - MSP internal
+            * `client_visible` - Client visible
+          x-spec-enum-id: 489f26fd4031dd3a
+        title:
+          type: string
+        source_commit:
+          type: string
+        signed_at:
+          type: string
+          format: date-time
+        canonical_markdown:
+          type: string
+        verified:
+          type: boolean
+      required:
+      - audience
+      - canonical_markdown
+      - content_id
+      - id
+      - signed_at
+      - source_commit
+      - title
+      - verified
     RepositoryEvidenceSummary:
       type: object
       properties:

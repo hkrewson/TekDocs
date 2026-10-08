@@ -441,8 +441,10 @@ from apps.core.rendering_views import MarkdownRenderView
 from apps.core.repository_publication_views import (
     MSPRepositoryEvidenceCollectionView,
     MSPRepositoryEvidenceDetailView,
+    MSPRepositoryEvidenceReviewView,
     OrganizationRepositoryEvidenceCollectionView,
     OrganizationRepositoryEvidenceDetailView,
+    OrganizationRepositoryEvidenceReviewView,
 )
 from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
 from apps.core.site_views import (
@@ -509,6 +511,11 @@ urlpatterns = [
         name="msp-repository-publication-evidence-detail",
     ),
     path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/review",
+        MSPRepositoryEvidenceReviewView.as_view(),
+        name="msp-repository-publication-evidence-review",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring",
         MSPContentAuthoringView.as_view(),
         name="msp-content-authoring",
@@ -552,6 +559,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>",
         OrganizationRepositoryEvidenceDetailView.as_view(),
         name="organization-repository-publication-evidence-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/review",
+        OrganizationRepositoryEvidenceReviewView.as_view(),
+        name="organization-repository-publication-evidence-review",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",

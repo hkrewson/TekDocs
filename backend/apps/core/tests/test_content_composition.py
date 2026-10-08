@@ -380,6 +380,11 @@ def test_repository_evidence_api_retains_safe_staff_summary_and_denies_portal(co
     assert browser.get(url, {"page_size": 101}).status_code == 400
     detail_url = reverse("msp-repository-publication-evidence-detail", args=[summary["id"]])
     assert browser.get(detail_url).json()["verified"] is True
+    review_url = reverse("msp-repository-publication-evidence-review", args=[summary["id"]])
+    reviewed = browser.get(review_url)
+    assert reviewed.status_code == 200
+    assert "Private body." in reviewed.json()["canonical_markdown"]
+    assert "manifest" not in reviewed.json() and "pdf_file" not in reviewed.json()
 
     organization = create_organization(
         tenant=installation.tenant,
@@ -399,6 +404,7 @@ def test_repository_evidence_api_retains_safe_staff_summary_and_denies_portal(co
     browser.force_login(client_user)
     assert browser.get(url).status_code == 403
     assert browser.get(detail_url).status_code == 403
+    assert browser.get(review_url).status_code == 403
     assert browser.post(url, data=payload, content_type="application/json").status_code == 403
 
 
@@ -447,6 +453,60 @@ def test_repository_evidence_api_enforces_exact_organization_scope(composition_r
     other_detail = reverse("organization-repository-publication-evidence-detail", args=[second.entity_id, evidence_id])
     assert browser.get(other_detail).status_code == 404
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
+    own_review = reverse("organization-repository-publication-evidence-review", args=[first.entity_id, evidence_id])
+    other_review = reverse("organization-repository-publication-evidence-review", args=[second.entity_id, evidence_id])
+    assert browser.get(own_review).status_code == 200
+    assert browser.get(other_review).status_code == 404
+
+
+def test_repository_evidence_review_uses_retained_source_and_fails_closed(composition_repository):
+    installation, _workspace, repository = composition_repository
+    document_id = uuid.uuid4()
+    initial = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/review.md": _content(content_id=document_id, title="Review", body="Retained text.\n")},
+        message="Add review source",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    created = browser.post(
+        reverse("msp-repository-publication-evidence"),
+        data=json.dumps({"content_id": str(document_id), "audience": "msp_internal"}),
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    evidence_id = created.json()["id"]
+    review_url = reverse("msp-repository-publication-evidence-review", args=[evidence_id])
+    updated = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=initial.object_id,
+        changes={"documents/review.md": _content(content_id=document_id, title="Review", body="New text.\n")},
+        message="Advance review source",
+    )
+    index_repository_content(repository_id=repository.id)
+    assert updated.object_id != initial.object_id
+    reviewed = browser.get(review_url)
+    assert reviewed.status_code == 200
+    assert reviewed.json()["source_commit"] == initial.object_id
+    assert "Retained text." in reviewed.json()["canonical_markdown"]
+    assert "New text." not in reviewed.content.decode()
+
+    read_only_user = User.objects.create_user(email="review-reader@example.invalid", display_name="Reader")
+    TenantMembership.objects.create(tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY)
+    browser.force_login(read_only_user)
+    assert browser.get(review_url).status_code == 403
+
+    evidence = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
+    evidence.pdf_file.storage.delete(evidence.pdf_file.name)
+    browser.force_login(installation.owner)
+    rejected = browser.get(review_url)
+    assert rejected.status_code == 409
+    assert "Retained text." not in rejected.content.decode()
 
 
 def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(

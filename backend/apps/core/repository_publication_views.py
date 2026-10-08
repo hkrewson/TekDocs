@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey
+from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError
 from .document_views import _msp_workspace, _organization_workspace
@@ -53,6 +53,17 @@ class RepositoryEvidencePageSerializer(serializers.Serializer):
     page_size = serializers.IntegerField()
     count = serializers.IntegerField()
     has_more = serializers.BooleanField()
+
+
+class RepositoryEvidenceReviewSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    content_id = serializers.UUIDField()
+    audience = serializers.ChoiceField(choices=PublicationAudience.choices)
+    title = serializers.CharField()
+    source_commit = serializers.CharField()
+    signed_at = serializers.DateTimeField()
+    canonical_markdown = serializers.CharField()
+    verified = serializers.BooleanField()
 
 
 def _repository(workspace: ResolvedWorkspace) -> WorkspaceRepository:
@@ -114,15 +125,41 @@ def _collection(request, workspace: ResolvedWorkspace) -> Response:  # type: ign
     return Response(_summary(evidence, verify=True), status=status.HTTP_201_CREATED)
 
 
-def _detail(workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:
+def _evidence(workspace: ResolvedWorkspace, evidence_id: UUID) -> RepositoryPublicationEvidence:
     repository = _repository(workspace)
-    evidence = get_object_or_404(
+    return get_object_or_404(
         RepositoryPublicationEvidence.objects.select_related("source_commit"),
         pk=evidence_id,
         repository=repository,
         workspace=repository.workspace,
     )
-    return Response(_summary(evidence, verify=True))
+
+
+def _detail(workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:
+    return Response(_summary(_evidence(workspace, evidence_id), verify=True))
+
+
+def _review(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    if not verify_repository_publication_evidence(evidence)["valid"]:
+        return Response(
+            {"detail": "Retained publication evidence failed verification"}, status=status.HTTP_409_CONFLICT
+        )
+    return Response(
+        RepositoryEvidenceReviewSerializer(
+            {
+                "id": evidence.id,
+                "content_id": evidence.content_id,
+                "audience": evidence.audience,
+                "title": evidence.manifest["title"],
+                "source_commit": evidence.source_commit.object_id,
+                "signed_at": evidence.signed_at,
+                "canonical_markdown": evidence.canonical_markdown,
+                "verified": True,
+            }
+        ).data
+    )
 
 
 class MSPRepositoryEvidenceCollectionView(APIView):
@@ -149,6 +186,12 @@ class MSPRepositoryEvidenceDetailView(APIView):
     )
     def get(self, request, evidence_id):  # type: ignore[no-untyped-def]
         return _detail(_msp_workspace(request, PermissionKey.DOCUMENTS_PUBLISH), evidence_id)
+
+
+class MSPRepositoryEvidenceReviewView(APIView):
+    @extend_schema(operation_id="repository_evidence_msp_review", responses={200: RepositoryEvidenceReviewSerializer})
+    def get(self, request, evidence_id):  # type: ignore[no-untyped-def]
+        return _review(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
 
 
 class OrganizationRepositoryEvidenceCollectionView(APIView):
@@ -181,4 +224,16 @@ class OrganizationRepositoryEvidenceDetailView(APIView):
     def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
         return _detail(
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH), evidence_id
+        )
+
+
+class OrganizationRepositoryEvidenceReviewView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_review", responses={200: RepositoryEvidenceReviewSerializer}
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _review(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
         )

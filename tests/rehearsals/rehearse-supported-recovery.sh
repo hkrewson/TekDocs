@@ -76,6 +76,29 @@ compose_for "$source_environment" "$source_secrets" exec -T \
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
+echo "Checking database/Git accepted-head mismatch refusal and operational recovery"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_FAULT_MODE=break backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-recovery-mismatch-fixture.py"
+mismatch_backup="$work_directory/mismatch-backup"
+if "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
+  --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$mismatch_backup" \
+  > "$work_directory/mismatch.log" 2>&1; then
+  echo "Backup accepted a repository head that differed from PostgreSQL authority." >&2
+  exit 1
+fi
+grep -q 'match its accepted head before backup' "$work_directory/mismatch.log"
+[ ! -e "$mismatch_backup" ]
+[ -z "$(find "$work_directory" -maxdepth 1 -name 'mismatch-backup.partial.*' -print -quit)" ]
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T \
+  -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false -e TEKDOCS_RECOVERY_FAULT_MODE=repair \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-recovery-mismatch-fixture.py"
+compose_for "$source_environment" "$source_secrets" up -d --wait backend
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_FAULT_MODE=verify backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-recovery-mismatch-fixture.py"
+compose_for "$source_environment" "$source_secrets" ps --status running --services | grep -qx backend
 echo "Checking encrypted artifacts for plaintext deployment values"
 for secret_file in "$source_secrets"/*; do
   secret_value=$(sed -n '1p' "$secret_file")
@@ -135,4 +158,4 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

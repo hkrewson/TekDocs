@@ -1712,8 +1712,13 @@ an integrity-checked retained PDF, and individually rechecked retained
 attachment bytes. A separate client-portal New publications view now lists
 these records with direct detail, PDF and retained-file links, paging and
 safe unavailable states while legacy Documents remains separate.
-Notifications, exports, migration authority
-handoff, and recovery acceptance remain open `0.9.7` work.
+Repository delivery and access-change notifications now reach the exact-client
+inbox and email boundary. Exports, migration authority handoff, and recovery
+acceptance remain open `0.9.7` work.
+Recovery fault evidence now includes a production-shaped refusal of a
+database/Git accepted-head mismatch without a partial backup, followed by
+maintenance repair and a healthy network-isolated restore. Storage-exhaustion
+and full authority-handoff recovery acceptance remain open.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

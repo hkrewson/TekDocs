@@ -472,7 +472,12 @@ gates after file, template, review, key, publication and recovery parity.
   object check, and final database/repository verification repeats it. Missing
   file objects fail the backup or final verification even when the retained
   commit itself still exists. Focused Docker tests cover both damaged states;
-  the production fault-rehearsal matrix above remains open.
+  the production fault-rehearsal matrix above remains open. A production-shaped
+  rehearsal now also advances one isolated Git head away from PostgreSQL's
+  accepted commit, proves backup refusal without a partial recovery set, repairs
+  custody through a one-off maintenance container, and requires a healthy
+  backend and network-isolated restore. Storage-exhaustion recovery still needs
+  a separate rehearsal.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

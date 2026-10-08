@@ -32413,6 +32413,73 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication
+  : get:
+      operationId: repository_evidence_organization_static_publication_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticPublication'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: repository_evidence_organization_static_publication_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticPublication'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_organization_review
@@ -49644,6 +49711,42 @@ components:
       - missing
       - never
       - unavailable
+    RepositoryStaticPublication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        authorization_id:
+          type: string
+          format: uuid
+        package_id:
+          type: string
+          format: uuid
+        source_commit:
+          type: string
+        content_digest:
+          type: string
+        created_by_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        verified:
+          type: boolean
+        permits_distribution:
+          type: boolean
+      required:
+      - authorization_id
+      - content_digest
+      - created_at
+      - created_by_id
+      - id
+      - package_id
+      - permits_distribution
+      - source_commit
+      - verified
     ReuseAudience:
       type: object
       properties:

@@ -12,6 +12,7 @@ import pytest
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection, transaction
 from django.test import Client, override_settings
@@ -43,6 +44,7 @@ from apps.core.models import (
     RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
+    RepositoryStaticPublication,
     Tenant,
     Workspace,
     WorkspaceKind,
@@ -59,6 +61,7 @@ from apps.core.repository_publication_evidence import (
 from apps.core.repository_publication_packages import verify_repository_publication_package
 from apps.core.repository_publication_preflight import repository_publication_preflight
 from apps.core.repository_service import RepositoryFileNotFoundError
+from apps.core.repository_static_publications import verify_repository_static_publication
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -730,6 +733,12 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
         "organization-repository-publication-evidence-package-authorization",
         args=[organization.entity_id, evidence_id],
     )
+    static_url = reverse(
+        "organization-repository-publication-evidence-static-publication",
+        args=[organization.entity_id, evidence_id],
+    )
+    assert browser.get(static_url).status_code == 409
+    assert browser.post(static_url).status_code == 409
     authorization_payload = json.dumps(
         {"outcome": "authorized_for_publication", "reason": "Exact package approved for publication creation"}
     )
@@ -759,6 +768,31 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert authorized.json()["permits_distribution"] is False
     assert authorized.json()["package_id"] == str(package.id)
     assert browser.get(authorization_url).json()["outcome"] == "authorized_for_publication"
+    browser.force_login(reviewer)
+    assert browser.get(static_url).status_code == 404
+    retained_pdf = RepositoryPublicationEvidence.objects.get(pk=evidence_id).pdf_file
+    with retained_pdf.open("rb") as source:
+        pdf_bytes = source.read()
+    try:
+        retained_pdf.storage.delete(retained_pdf.name)
+        assert browser.post(static_url).status_code == 409
+        assert not RepositoryStaticPublication.objects.exists()
+    finally:
+        assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
+    recorded = browser.post(static_url)
+    assert recorded.status_code == 201, recorded.content
+    assert recorded.json()["verified"] is True
+    assert recorded.json()["permits_distribution"] is False
+    publication = RepositoryStaticPublication.objects.get(pk=recorded.json()["id"])
+    assert publication.manifest["package_digest"] == package.manifest_digest
+    assert browser.get(static_url).json()["content_digest"] == publication.content_digest
+    assert browser.post(static_url).status_code == 409
+    with pytest.raises(DatabaseError):
+        RepositoryStaticPublication.objects.filter(pk=publication.id).update(content_digest="0" * 64)
+    assert verify_repository_static_publication(publication)
+    publication.manifest["source_commit"] = "tampered"
+    assert not verify_repository_static_publication(publication)
+    publication.refresh_from_db()
     assert (
         browser.post(authorization_url, data=authorization_payload, content_type="application/json").status_code
         == 409
@@ -787,6 +821,11 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(
         sibling_authorization_url, data=authorization_payload, content_type="application/json"
     ).status_code == 404
+    sibling_static_url = reverse(
+        "organization-repository-publication-evidence-static-publication", args=[sibling.entity_id, evidence_id]
+    )
+    assert browser.get(sibling_static_url).status_code == 404
+    assert browser.post(sibling_static_url).status_code == 404
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
     foreign_tenant = Tenant.objects.create(name="Foreign package MSP", slug="foreign-package-msp")
     foreign_user = User.objects.create_user(email="foreign-package@example.invalid", display_name="Foreign")
@@ -801,6 +840,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(
         authorization_url, data=authorization_payload, content_type="application/json"
     ).status_code in {403, 404}
+    assert browser.get(static_url).status_code in {403, 404}
+    assert browser.post(static_url).status_code in {403, 404}
     read_only_user = User.objects.create_user(email="read-only-package@example.invalid", display_name="Read-only")
     read_only_membership = TenantMembership.objects.create(
         tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY
@@ -821,10 +862,13 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(
         authorization_url, data=authorization_payload, content_type="application/json"
     ).status_code == 403
+    assert browser.get(static_url).status_code == 403
+    assert browser.post(static_url).status_code == 403
     browser.force_login(reviewer)
     with pytest.raises(DatabaseError):
         RepositoryPublicationPackage.objects.filter(pk=package.id).update(manifest_digest="0" * 64)
     assert verify_repository_publication_package(package)
+    assert verify_repository_static_publication(publication)
     package.manifest["source_commit"] = "tampered"
     assert not verify_repository_publication_package(package)
     package.refresh_from_db()
@@ -835,6 +879,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
         message="Advance accepted head after packaging",
     )
     assert verify_repository_publication_package(package)
+    assert verify_repository_static_publication(publication)
     index_repository_content(repository_id=repository.id)
     assert browser.get(url).json()["outcome"] == "accepted_for_packaging"
     assert browser.post(url, data=payload, content_type="application/json").status_code == 409
@@ -859,6 +904,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(
         authorization_url, data=authorization_payload, content_type="application/json"
     ).status_code == 403
+    assert browser.get(static_url).status_code == 403
+    assert browser.post(static_url).status_code == 403
 
     browser.force_login(installation.owner)
     second = browser.post(
@@ -899,6 +946,32 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     retained = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
     retained.pdf_file.storage.delete(retained.pdf_file.name)
     assert not verify_repository_publication_package(package)
+    assert not verify_repository_static_publication(publication)
+
+
+def test_repository_static_publication_upgrade_installs_forced_rls_and_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0173_repository_package_authorization")])
+        assert "core_repositorystaticpublication" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorystaticpublication'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger "
+                "WHERE tgrelid = 'core_repositorystaticpublication'::regclass "
+                "AND tgname IN ('core_repositorystaticpublication_validate', "
+                "'core_repositorystaticpublication_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
 
 
 def test_repository_publication_package_upgrade_installs_forced_rls_and_guards():

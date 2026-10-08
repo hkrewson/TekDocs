@@ -8267,6 +8267,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_static_publication_retrieve"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_organization_static_publication_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review": {
         readonly parameters: {
             readonly query?: never;
@@ -15511,6 +15527,22 @@ export interface components {
             readonly mismatched: number;
             readonly corrupt: number;
             readonly unavailable: number;
+        };
+        readonly RepositoryStaticPublication: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly authorization_id: string;
+            /** Format: uuid */
+            readonly package_id: string;
+            readonly source_commit: string;
+            readonly content_digest: string;
+            /** Format: uuid */
+            readonly created_by_id: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly verified: boolean;
+            readonly permits_distribution: boolean;
         };
         readonly ReuseAudience: {
             /** Format: uuid */
@@ -39291,6 +39323,54 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RepositoryPackageAuthorization"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_static_publication_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryStaticPublication"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_static_publication_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryStaticPublication"];
                 };
             };
         };

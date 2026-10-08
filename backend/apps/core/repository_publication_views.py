@@ -26,6 +26,7 @@ from .models import (
     RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
+    RepositoryStaticPublication,
     WorkspaceRepository,
     workspace_for_owner,
 )
@@ -50,6 +51,11 @@ from .repository_publication_render import (
     verify_retained_rendered_snapshot,
 )
 from .repository_service import RepositoryServiceError
+from .repository_static_publications import (
+    RepositoryStaticPublicationError,
+    create_repository_static_publication,
+    verify_repository_static_publication,
+)
 from .workspaces import ResolvedWorkspace
 
 
@@ -141,6 +147,18 @@ class RepositoryPackageAuthorizationSerializer(serializers.Serializer):
     reason = serializers.CharField()
     actor_id = serializers.UUIDField()
     occurred_at = serializers.DateTimeField()
+    permits_distribution = serializers.BooleanField()
+
+
+class RepositoryStaticPublicationSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    authorization_id = serializers.UUIDField()
+    package_id = serializers.UUIDField()
+    source_commit = serializers.CharField()
+    content_digest = serializers.CharField()
+    created_by_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    verified = serializers.BooleanField()
     permits_distribution = serializers.BooleanField()
 
 
@@ -465,6 +483,43 @@ def _authorization(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> 
     return Response(_authorization_data(authorization), status=status.HTTP_201_CREATED)
 
 
+def _static_publication_data(publication: RepositoryStaticPublication) -> dict[str, object]:
+    return cast(
+        dict[str, object],
+        RepositoryStaticPublicationSerializer(
+            {
+                "id": publication.id,
+                "authorization_id": publication.authorization_id,
+                "package_id": publication.authorization.package_id,
+                "source_commit": publication.manifest.get("source_commit", ""),
+                "content_digest": publication.content_digest,
+                "created_by_id": publication.created_by_id,
+                "created_at": publication.created_at,
+                "verified": verify_repository_static_publication(publication),
+                "permits_distribution": False,
+            }
+        ).data,
+    )
+
+
+def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    authorization = RepositoryPackageAuthorization.objects.filter(package__decision__evidence=evidence).first()
+    if authorization is None:
+        return Response({"detail": "Authorized package is required"}, status=status.HTTP_409_CONFLICT)
+    if request.method == "GET":
+        publication = RepositoryStaticPublication.objects.filter(authorization=authorization).first()
+        if publication is None:
+            return Response({"detail": "No STATIC record exists"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_static_publication_data(publication))
+    try:
+        publication = create_repository_static_publication(authorization_id=authorization.id, actor=request.user)
+    except (RepositoryStaticPublicationError, IntegrityError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
+
+
 class MSPRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_list",
@@ -682,5 +737,30 @@ class OrganizationRepositoryPackageAuthorizationView(APIView):
         return _authorization(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryStaticPublicationView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_publication_retrieve",
+        responses={200: RepositoryStaticPublicationSerializer},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_publication(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            evidence_id,
+        )
+
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_publication_create",
+        request=None,
+        responses={201: RepositoryStaticPublicationSerializer},
+    )
+    def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_publication(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
             evidence_id,
         )

@@ -5263,6 +5263,43 @@ class RepositoryPackageAuthorization(models.Model):
         raise ValidationError("Repository package authorizations are append-only")
 
 
+class RepositoryStaticPublication(models.Model):
+    """Signed internal STATIC record; delivery requires a separate release boundary."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    authorization = models.OneToOneField(
+        RepositoryPackageAuthorization, on_delete=models.PROTECT, related_name="static_publication"
+    )
+    manifest = models.JSONField()
+    content_digest = models.CharField(max_length=64)
+    signature = models.TextField()
+    signature_algorithm = models.CharField(max_length=20, default="Ed25519")
+    public_key = models.TextField()
+    key_fingerprint = models.CharField(max_length=64)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository STATIC publications are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository STATIC publications are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

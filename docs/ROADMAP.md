@@ -1722,6 +1722,10 @@ and full authority-handoff recovery acceptance remain open.
 Repository-artifact fault tests additionally cover exhausted space while Git
 creates a bundle and while the archive is written; they prove cleanup and a
 successful retry, not whole-host encrypted-backup exhaustion.
+The supported-backup rehearsal also forces a file-size-limited write during
+encrypted PostgreSQL capture, verifies no final or partial set and backend
+health, then retries with a successful backup and network-isolated restore.
+Actual host-disk exhaustion and production recovery acceptance remain open.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

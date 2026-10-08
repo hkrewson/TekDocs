@@ -74,6 +74,28 @@ compose_for "$source_environment" "$source_secrets" exec -T \
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py initialize_workspace_repositories
 
+echo "Checking bounded encrypted-backup write failure before a normal retry"
+limited_backup="$work_directory/limited-backup"
+if (
+  ulimit -f 8
+  "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
+    --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$limited_backup"
+) > "$work_directory/limited-backup.log" 2>&1; then
+  echo "Backup accepted an encrypted artifact write beyond its file-size limit." >&2
+  exit 1
+fi
+if ! grep -q 'Capturing PostgreSQL into an authenticated encrypted artifact' \
+  "$work_directory/limited-backup.log" || \
+  ! grep -Eiqa 'file too large|file size limit exceeded' \
+  "$work_directory/limited-backup.log"; then
+  echo "The bounded backup failed for an unexpected reason." >&2
+  sed -n '1,25p' "$work_directory/limited-backup.log" >&2
+  exit 1
+fi
+[ ! -e "$limited_backup" ]
+[ -z "$(find "$work_directory" -maxdepth 1 -name 'limited-backup.partial.*' -print -quit)" ]
+compose_for "$source_environment" "$source_secrets" up -d --wait backend
+
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
 echo "Checking database/Git accepted-head mismatch refusal and operational recovery"
@@ -158,4 +180,4 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

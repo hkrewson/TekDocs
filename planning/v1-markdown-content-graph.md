@@ -476,12 +476,16 @@ gates after file, template, review, key, publication and recovery parity.
   rehearsal now also advances one isolated Git head away from PostgreSQL's
   accepted commit, proves backup refusal without a partial recovery set, repairs
   custody through a one-off maintenance container, and requires a healthy
-  backend and network-isolated restore. Storage-exhaustion recovery still needs
-  a separate rehearsal.
+  backend and network-isolated restore. A bounded encrypted-artifact write
+  rehearsal now also checks failure cleanup, backend health, and a successful
+  backup retry before that restore; actual host-disk exhaustion remains open.
 - Docker-backed fault injection now covers repository-bundle creation and final
   archive writes running out of space. Both refuse publication, remove temporary
   recovery references/files, preserve the accepted head, and permit a verified
-  retry. Full encrypted-backup/host-filesystem exhaustion remains unproven.
+  retry. The supported backup is separately rehearsed with a process file-size
+  limit during encrypted PostgreSQL capture; it leaves no final or partial set,
+  resumes to a healthy backend, and permits the normal verified retry. This
+  simulates a bounded write failure, not whole-host filesystem exhaustion.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

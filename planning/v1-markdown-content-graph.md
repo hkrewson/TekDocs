@@ -468,6 +468,11 @@ gates after file, template, review, key, publication and recovery parity.
   or optional remotes, and prove a network-isolated restore.
 - Rehearse interrupted commits, corrupt repositories, missing objects, storage
   exhaustion and database/repository mismatch recovery.
+- Repository backup and offline bundle validation now run a full strict Git
+  object check, and final database/repository verification repeats it. Missing
+  file objects fail the backup or final verification even when the retained
+  commit itself still exists. Focused Docker tests cover both damaged states;
+  the production fault-rehearsal matrix above remains open.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

@@ -103,6 +103,16 @@ def test_repository_archive_refuses_advanced_repository(recovery_repository, tmp
         create_repository_recovery_archive(tmp_path / "advanced.tar")
 
 
+def test_repository_archive_refuses_missing_file_object(recovery_repository, tmp_path):
+    _, path, _ = recovery_repository
+    blob = _git(path, "rev-parse", f"{CANONICAL_REF}:docs/recovery.md")
+    (path / "objects" / blob[:2] / blob[2:]).unlink()
+
+    with pytest.raises(RepositoryRecoveryError, match="archived or verified"):
+        create_repository_recovery_archive(tmp_path / "missing-blob.tar")
+    assert not (tmp_path / "missing-blob.tar").exists()
+
+
 def test_repository_archive_refuses_mixed_verified_object_formats(recovery_repository, tmp_path):
     repository, _, _ = recovery_repository
     RepositoryCommit.objects.create(
@@ -132,6 +142,17 @@ def test_repository_verification_rejects_missing_retained_commit(recovery_reposi
     assert retained_object.is_file()
     retained_object.unlink()
     with pytest.raises(RepositoryRecoveryError, match="verified Git commit is unavailable"):
+        verify_repository_recovery_database(archive)
+
+
+def test_repository_verification_rejects_missing_file_object(recovery_repository, tmp_path):
+    _, path, _ = recovery_repository
+    archive = tmp_path / "repositories.tar"
+    create_repository_recovery_archive(archive)
+    blob = _git(path, "rev-parse", f"{CANONICAL_REF}:docs/recovery.md")
+    (path / "objects" / blob[:2] / blob[2:]).unlink()
+
+    with pytest.raises(RepositoryRecoveryError, match="missing or invalid Git objects"):
         verify_repository_recovery_database(archive)
 
 

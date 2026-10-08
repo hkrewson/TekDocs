@@ -201,6 +201,7 @@ def create_repository_recovery_archive(destination: Path) -> dict[str, Any]:
                         reference = f"{RECOVERY_REF_PREFIX}{object_id}"
                         _git("update-ref", reference, object_id, git_dir=path)
                         recovery_refs.append(reference)
+                    _git("fsck", "--full", "--strict", "--no-reflogs", git_dir=path)
                     _git("bundle", "create", str(bundle_path), "--all", git_dir=path)
                 finally:
                     for reference in recovery_refs:
@@ -283,6 +284,7 @@ def _validated_archive(archive_path: Path) -> Iterator[tuple[dict[str, Any], Pat
             _git("fetch", str(bundle_path), "+refs/*:refs/*", git_dir=verification_repository)
             for object_id in entry["verified_commits"]:
                 _git("cat-file", "-e", f"{object_id}^{{commit}}", git_dir=verification_repository)
+            _git("fsck", "--full", "--strict", "--no-reflogs", git_dir=verification_repository)
         yield manifest, staging
 
 
@@ -368,4 +370,8 @@ def verify_repository_recovery_database(archive_path: Path) -> dict[str, Any]:
                     _git("cat-file", "-e", f"{object_id}^{{commit}}", git_dir=path)
                 except RepositoryRecoveryError as exc:
                     raise RepositoryRecoveryError("A restored verified Git commit is unavailable.") from exc
+            try:
+                _git("fsck", "--full", "--strict", "--no-reflogs", git_dir=path)
+            except RepositoryRecoveryError as exc:
+                raise RepositoryRecoveryError("A restored repository has missing or invalid Git objects.") from exc
     return manifest

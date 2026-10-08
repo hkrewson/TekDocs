@@ -14,9 +14,9 @@ from apps.accounts.throttles import InboundWebhookEndpointThrottle, InboundWebho
 
 from .collection_pagination import BoundedCollectionQuerySerializer, OffsetPageSerializer, paginate
 from .models import WebhookDeliveryState, WebhookDirection, WebhookEndpoint
-from .outbox import OutboxTopic
 from .webhook_egress import MAX_WEBHOOK_BODY_BYTES
 from .webhooks import (
+    OUTBOUND_WEBHOOK_TOPICS,
     accept_inbound_webhook,
     authorize_webhook_management,
     create_webhook_endpoint,
@@ -82,7 +82,7 @@ class WebhookDeliveryResultSerializer(OffsetPageSerializer):
 class WebhookDeliveryQuerySerializer(BoundedCollectionQuerySerializer):
     state = serializers.ChoiceField(choices=WebhookDeliveryState.choices, required=False)
     endpoint_id = serializers.UUIDField(required=False)
-    topic = serializers.ChoiceField(choices=[topic.value for topic in OutboxTopic], required=False)
+    topic = serializers.ChoiceField(choices=OUTBOUND_WEBHOOK_TOPICS, required=False)
 
 
 class WebhookRetrySerializer(serializers.Serializer):

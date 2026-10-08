@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { AuthenticatedContext } from '../auth/api'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
+import type { NotificationsClient } from '../notifications/api'
 import { ClientPortal } from './ClientPortal'
 
 const context: AuthenticatedContext = {
@@ -17,11 +18,38 @@ const context: AuthenticatedContext = {
 
 afterEach(() => vi.restoreAllMocks())
 
-function renderPortal(path = '/portal') {
-  return render(<ApplicationRouter initialPath={path}><ClientPortal context={context} onSignOut={vi.fn()} signingOut={false} signOutError={null} /></ApplicationRouter>)
+function renderPortal(path = '/portal', notificationsClient?: NotificationsClient) {
+  return render(<ApplicationRouter initialPath={path}><ClientPortal context={context} onSignOut={vi.fn()} signingOut={false} signOutError={null} notificationsClient={notificationsClient} /></ApplicationRouter>)
 }
 
 describe('ClientPortal', () => {
+  it('opens a repository publication from its notification', async () => {
+    const publication = { id: 'repo-1', content_id: 'document-1', title: 'Laptop setup', created_at: '2026-10-08T12:00:00Z' }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/repository-publications/repo-1')) return Promise.resolve(new Response(JSON.stringify({ ...publication, rendered_html: '<h3>Setup steps</h3>', attachments: [] }), { status: 200 }))
+      return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
+    })
+    const notice = {
+      id: 'notice-1', topic: 'repository_publication.available', title: 'Documentation published',
+      message: 'Laptop setup is now available.', read: true, created_at: '2026-10-08T12:00:00Z',
+      target: { kind: 'portal_repository_publication' as const, organization_id: null, publication_id: 'repo-1' },
+    }
+    const notificationsClient: NotificationsClient = {
+      list: vi.fn().mockResolvedValue({ results: [notice], unread_count: 0, has_more: false, next_cursor: null }),
+      setRead: vi.fn().mockResolvedValue(notice),
+      getPreferences: vi.fn(), updatePreferences: vi.fn(),
+    }
+    renderPortal('/portal', notificationsClient)
+    await userEvent.click(screen.getByRole('button', { name: 'Notifications' }))
+    await userEvent.click(await screen.findByRole('button', { name: /Laptop setup is now available/i }))
+    expect(await screen.findByRole('heading', { name: 'Setup steps' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      return url.endsWith('/api/v1/portal/repository-publications/repo-1')
+    })).toBe(true)
+  })
+
   it('provides direct keyboard access to the portal content', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
     renderPortal()

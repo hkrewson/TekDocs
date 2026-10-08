@@ -13677,9 +13677,10 @@ export interface components {
              *     * `organization_documentation` - organization_documentation
              *     * `portal_documents` - portal_documents
              *     * `portal_document` - portal_document
+             *     * `portal_repository_publication` - portal_repository_publication
              * @enum {string}
              */
-            readonly kind: "organization_overview" | "organization_documentation" | "portal_documents" | "portal_document";
+            readonly kind: "organization_overview" | "organization_documentation" | "portal_documents" | "portal_document" | "portal_repository_publication";
             /** Format: uuid */
             readonly organization_id: string | null;
             /** Format: uuid */

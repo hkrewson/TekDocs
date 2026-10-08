@@ -1,7 +1,7 @@
 import { browserCsrfToken } from '../auth/api'
 
 export type NotificationTarget = {
-  kind: 'organization_overview' | 'organization_documentation' | 'portal_documents' | 'portal_document'
+  kind: 'organization_overview' | 'organization_documentation' | 'portal_documents' | 'portal_document' | 'portal_repository_publication'
   organization_id: string | null
   publication_id: string | null
 }

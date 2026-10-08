@@ -9,7 +9,14 @@ from django.db import connection, transaction
 from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
-from .models import AuditEvent, RepositoryStaticPublication, RepositoryStaticPublicationControlEvent
+from .models import (
+    AuditEvent,
+    PublicationAudience,
+    RepositoryStaticDeliveryAuthorization,
+    RepositoryStaticPublication,
+    RepositoryStaticPublicationControlEvent,
+)
+from .outbox import OutboxTopic, enqueue_outbox_event
 from .repository_static_publications import verify_repository_static_publication
 
 
@@ -103,4 +110,21 @@ def record_repository_static_control(
         entity_id=publication.id,
         metadata={"control_event_id": str(event.id), "supersedes_id": str(supersedes_id) if supersedes_id else None},
     )
+    unavailable_id = (
+        supersedes_id if action == RepositoryStaticPublicationControlEvent.Action.RELEASED else publication.id
+    )
+    if unavailable_id is not None and RepositoryStaticDeliveryAuthorization.objects.filter(
+        publication_id=unavailable_id,
+        tenant_id=publication.tenant_id,
+        organization_id=publication.organization_id,
+        workspace_id=publication.workspace_id,
+    ).exists():
+        enqueue_outbox_event(
+            tenant=publication.tenant,
+            organization=publication.organization,
+            topic=OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+            subject_id=unavailable_id,
+            idempotency_key=f"repository-publication-access-changed:{unavailable_id}",
+            payload={"audience": PublicationAudience.CLIENT_VISIBLE},
+        )
     return event

@@ -51,6 +51,7 @@ from apps.core.models import (
     Location,
     Organization,
     OrganizationClassification,
+    OutboxEvent,
     Person,
     Site,
     TaxRate,
@@ -60,6 +61,7 @@ from apps.core.models import (
     WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
+from apps.core.outbox import OutboxTopic, enqueue_outbox_event
 from apps.core.people import create_person
 from apps.core.publications import publish_document, verify_publication
 from apps.core.repository_recovery import (
@@ -335,6 +337,64 @@ def migration_head_restored(transactional_db):
                     cursor.execute("CHECKPOINT")
             except DatabaseError:  # pragma: no cover - requires a non-superuser test role
                 pass
+
+
+@pytest.mark.django_db(transaction=True)
+def test_repository_notification_outbox_topics_upgrade_and_reverse_without_losing_events(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("Outbox validator migration requires PostgreSQL")
+
+    tenant = Tenant.objects.create(name="Notification upgrade", slug=f"notification-upgrade-{uuid.uuid4()}")
+    entity = Entity.objects.create_owned(tenant=tenant, entity_type="organization", display_name="Upgrade client")
+    organization = Organization.objects.create(tenant=tenant, entity=entity)
+    subject_id = uuid.uuid4()
+
+    call_command("migrate", "core", "0177_repository_static_delivery_authorization", verbosity=0, interactive=False)
+    with transaction.atomic():
+        legacy = enqueue_outbox_event(
+            tenant=tenant,
+            organization=organization,
+            topic=OutboxTopic.PUBLICATION_AVAILABLE,
+            subject_id=subject_id,
+            idempotency_key=f"legacy-upgrade:{subject_id}",
+            payload={"audience": "client_visible"},
+        )
+    with pytest.raises(DatabaseError), transaction.atomic():
+        enqueue_outbox_event(
+            tenant=tenant,
+            organization=organization,
+            topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+            subject_id=subject_id,
+            idempotency_key=f"before-upgrade:{subject_id}",
+            payload={"audience": "client_visible"},
+        )
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    assert OutboxEvent.objects.filter(pk=legacy.pk, topic=OutboxTopic.PUBLICATION_AVAILABLE).exists()
+    with transaction.atomic():
+        repository_event = enqueue_outbox_event(
+            tenant=tenant,
+            organization=organization,
+            topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+            subject_id=subject_id,
+            idempotency_key=f"after-upgrade:{subject_id}",
+            payload={"audience": "client_visible"},
+        )
+    assert OutboxEvent.objects.filter(pk=repository_event.pk).exists()
+
+    call_command("migrate", "core", "0177_repository_static_delivery_authorization", verbosity=0, interactive=False)
+    assert OutboxEvent.objects.filter(pk__in=(legacy.pk, repository_event.pk)).count() == 2
+    with pytest.raises(DatabaseError), transaction.atomic():
+        enqueue_outbox_event(
+            tenant=tenant,
+            organization=organization,
+            topic=OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+            subject_id=subject_id,
+            idempotency_key=f"after-reverse:{subject_id}",
+            payload={"audience": "client_visible"},
+        )
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    assert OutboxEvent.objects.filter(pk__in=(legacy.pk, repository_event.pk)).count() == 2
 
 
 @pytest.mark.django_db(transaction=True)

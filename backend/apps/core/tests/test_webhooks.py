@@ -11,6 +11,7 @@ from django.db import DatabaseError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.settings import api_settings
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -30,11 +31,19 @@ from apps.core.outbox import OutboxTopic, enqueue_outbox_event
 from apps.core.webhook_egress import WebhookEgressError, post_webhook, resolve_webhook_target, validate_webhook_url
 from apps.core.webhook_secrets import encrypt_webhook_secret
 from apps.core.webhooks import (
+    _normalized_topics,
     accept_inbound_webhook,
     dispatch_due_webhooks,
     project_webhook_deliveries,
     signature,
 )
+
+
+def test_repository_notification_topics_are_not_outbound_webhook_subscriptions():
+    with pytest.raises(DRFValidationError):
+        _normalized_topics(WebhookDirection.OUTBOUND, [OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE])
+    with pytest.raises(DRFValidationError):
+        _normalized_topics(WebhookDirection.OUTBOUND, [OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED])
 
 
 @pytest.fixture

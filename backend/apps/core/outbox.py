@@ -23,6 +23,8 @@ class OutboxTopic(StrEnum):
     INVITATION_ACCEPTED = "client_invitation.accepted"
     PUBLICATION_AVAILABLE = "document_publication.available"
     PUBLICATION_WITHDRAWN = "document_publication.withdrawn"
+    REPOSITORY_PUBLICATION_AVAILABLE = "repository_publication.available"
+    REPOSITORY_PUBLICATION_ACCESS_CHANGED = "repository_publication.access_changed"
 
 
 _ALLOWED_PAYLOADS: dict[OutboxTopic, dict[str, frozenset[str]]] = {
@@ -30,6 +32,8 @@ _ALLOWED_PAYLOADS: dict[OutboxTopic, dict[str, frozenset[str]]] = {
     OutboxTopic.INVITATION_ACCEPTED: {"role": frozenset({"client_administrator", "client_user"})},
     OutboxTopic.PUBLICATION_AVAILABLE: {"audience": frozenset({"client_visible"})},
     OutboxTopic.PUBLICATION_WITHDRAWN: {"audience": frozenset({"client_visible"})},
+    OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE: {"audience": frozenset({"client_visible"})},
+    OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED: {"audience": frozenset({"client_visible"})},
 }
 
 

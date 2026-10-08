@@ -210,6 +210,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
   function openNotificationTarget(target: NotificationTarget) {
     if (target.kind === 'portal_document' && target.publication_id) showDocuments(target.publication_id)
     else if (target.kind === 'portal_documents') showDocuments()
+    else if (target.kind === 'portal_repository_publication' && target.publication_id) showPublications(target.publication_id)
   }
 
   const activePhase = section === 'documents' ? phase : section === 'publications' ? publicationPhase : invoicePhase

@@ -45,7 +45,13 @@ from .notifications import (
 
 class NotificationTargetSerializer(serializers.Serializer):
     kind = serializers.ChoiceField(
-        choices=("organization_overview", "organization_documentation", "portal_documents", "portal_document")
+        choices=(
+            "organization_overview",
+            "organization_documentation",
+            "portal_documents",
+            "portal_document",
+            "portal_repository_publication",
+        )
     )
     organization_id = serializers.UUIDField(allow_null=True)
     publication_id = serializers.UUIDField(allow_null=True)

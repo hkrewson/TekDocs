@@ -39,6 +39,12 @@ from .webhook_secrets import decrypt_webhook_secret, encrypt_webhook_secret
 
 SIGNATURE_VERSION = "v1"
 INBOUND_EVENT_TYPES = frozenset({"integration.ping"})
+OUTBOUND_WEBHOOK_TOPICS = (
+    OutboxTopic.INVITATION_ISSUED.value,
+    OutboxTopic.INVITATION_ACCEPTED.value,
+    OutboxTopic.PUBLICATION_AVAILABLE.value,
+    OutboxTopic.PUBLICATION_WITHDRAWN.value,
+)
 MAX_ENDPOINTS_PER_ORGANIZATION = 50
 MAX_WEBHOOK_ATTEMPTS = 8
 PROCESSING_LEASE = timedelta(minutes=5)
@@ -123,11 +129,7 @@ def authorize_webhook_management(*, request: Any, organization_entity_id: UUID) 
 
 
 def _normalized_topics(direction: WebhookDirection, topics: list[str]) -> list[str]:
-    allowed = (
-        frozenset(topic.value for topic in OutboxTopic)
-        if direction == WebhookDirection.OUTBOUND
-        else INBOUND_EVENT_TYPES
-    )
+    allowed = OUTBOUND_WEBHOOK_TOPICS if direction == WebhookDirection.OUTBOUND else INBOUND_EVENT_TYPES
     normalized = sorted(set(topics))
     if not normalized or len(normalized) > 20 or any(topic not in allowed for topic in normalized):
         raise ValidationError({"topics": "Select one or more supported webhook event types."})

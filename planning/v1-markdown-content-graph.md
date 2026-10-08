@@ -499,7 +499,15 @@ The client portal now has a separate New publications view for the authorized
 repository list, retained HTML, PDF and attachment links. It preserves direct
 URLs, paging, empty/retry states and server-side revocation. Legacy Documents
 stays on its existing path until the authority handoff is independently proven;
-notifications, exports and recovery remain open.
+notification, export and recovery parity were separate work at this point.
+Repository delivery authorization now queues a value-minimized publication notice
+for the exact organization. Supersession and withdrawal queue a generic
+access-change notice only when the predecessor had client-delivery authorization.
+The portal inbox opens an available repository publication directly; inbox and
+email delivery recheck current authorization and suppress stale availability
+after access is revoked. These internal notification topics are not outbound
+webhook subscriptions. Export parity, repository-inclusive recovery and the
+legacy authority handoff remain open.
 
 ### `0.9.8` — version 1 acceptance
 

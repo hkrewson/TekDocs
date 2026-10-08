@@ -40,6 +40,9 @@ from apps.core.models import (
     ContentTemplateSource,
     EntityVisibility,
     InstallationState,
+    NotificationEmailDelivery,
+    NotificationEmailState,
+    OutboxEvent,
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
     RepositoryPackageAuthorization,
@@ -53,7 +56,9 @@ from apps.core.models import (
     WorkspaceKind,
     WorkspaceRepository,
 )
+from apps.core.notification_email import dispatch_due_notification_emails
 from apps.core.organizations import create_organization
+from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events
 from apps.core.publications import publication_signing_key
 from apps.core.repository_publication_evidence import (
     RepositoryPublicationEvidenceError,
@@ -820,6 +825,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert browser.get(control_url).json()["state"] == "recorded"
     assert browser.get(delivery_url).status_code == 404
     assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    assert not OutboxEvent.objects.filter(topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE).exists()
     with pytest.raises(DatabaseError):
         RepositoryStaticDeliveryAuthorization.objects.create(
             tenant=installation.tenant, organization=organization, workspace=workspace,
@@ -862,6 +868,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         "client-portal-repository-publication-attachment", args=[publication.id, artifact.id]
     )
     browser.force_login(portal_user)
+    inbox_url = reverse("client-portal-notification-list")
+    assert browser.get(inbox_url).json()["results"] == []
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
@@ -889,6 +897,12 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert delivery.json()["permits_distribution"] is True
     assert browser.get(delivery_url).json()["id"] == delivery.json()["id"]
     assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    assert list(
+        OutboxEvent.objects.filter(topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE).values_list(
+            "subject_id", flat=True
+        )
+    ) == [publication.id]
+    assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
     sibling = create_organization(
         tenant=installation.tenant,
         actor_id=installation.owner.id,
@@ -902,6 +916,11 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         tenant=installation.tenant, user=sibling_user, role=BuiltInRole.CLIENT_USER, organization=sibling
     )
     browser.force_login(portal_user)
+    available_notices = browser.get(inbox_url).json()["results"]
+    assert len(available_notices) == 1
+    assert available_notices[0]["target"] == {
+        "kind": "portal_repository_publication", "organization_id": None, "publication_id": str(publication.id),
+    }
     portal_list = browser.get(portal_list_url)
     assert portal_list.status_code == 200
     assert portal_list["Cache-Control"] == "private, no-store"
@@ -953,6 +972,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     finally:
         assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
     browser.force_login(sibling_user)
+    assert browser.get(inbox_url).json()["results"] == []
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
@@ -1040,7 +1060,20 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert superseded.json()["events"][0]["supersedes_id"] == str(publication.id)
     assert browser.get(control_url).json()["state"] == "superseded"
     assert browser.get(delivery_url).json()["currently_effective"] is False
+    assert OutboxEvent.objects.filter(
+        topic=OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED, subject_id=publication.id
+    ).count() == 1
+    assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
+    dispatch_due_notification_emails(tenant=installation.tenant)
+    assert NotificationEmailDelivery.objects.get(
+        recipient=portal_user,
+        notification__event__topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+        notification__event__subject_id=publication.id,
+    ).state == NotificationEmailState.SUPPRESSED
     browser.force_login(portal_user)
+    notices = browser.get(inbox_url).json()["results"]
+    assert [item["topic"] for item in notices] == [OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED]
+    assert notices[0]["target"] is None
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(portal_detail_url).status_code == 404
     assert browser.get(portal_pdf_url).status_code == 404
@@ -1052,10 +1085,16 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert replacement_delivery.status_code == 201, replacement_delivery.content
     assert replacement_delivery.json()["currently_effective"] is True
     assert replacement_delivery.json()["permits_distribution"] is True
+    assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
     candidate_portal_detail_url = reverse(
         "client-portal-repository-publication-detail", args=[candidate_publication.id]
     )
     browser.force_login(portal_user)
+    assert [
+        item["target"]["publication_id"]
+        for item in browser.get(inbox_url).json()["results"]
+        if item["target"]
+    ] == [str(candidate_publication.id)]
     assert [item["id"] for item in browser.get(portal_list_url).json()["results"]] == [
         str(candidate_publication.id)
     ]
@@ -1092,9 +1131,16 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert withdrawn.status_code == 201, withdrawn.content
     assert withdrawn.json()["state"] == "withdrawn"
     assert withdrawn.json()["permits_distribution"] is False
+    assert dispatch_due_outbox_events(tenant=installation.tenant) == 1
     assert browser.get(candidate_delivery_url).json()["currently_effective"] is False
     assert browser.get(candidate_delivery_url).json()["permits_distribution"] is False
     browser.force_login(portal_user)
+    final_notices = browser.get(inbox_url).json()["results"]
+    assert [item["topic"] for item in final_notices] == [
+        OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+        OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+    ]
+    assert all(item["target"] is None for item in final_notices)
     assert browser.get(portal_list_url).json()["results"] == []
     assert browser.get(candidate_portal_detail_url).status_code == 404
     browser.force_login(authorizer)

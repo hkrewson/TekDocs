@@ -17,6 +17,7 @@ from .models import (
     RepositoryStaticDeliveryAuthorization,
     RepositoryStaticPublication,
 )
+from .outbox import OutboxTopic, enqueue_outbox_event
 from .repository_static_controls import _lock_content, repository_static_state
 from .repository_static_publications import verify_repository_static_publication
 
@@ -103,5 +104,13 @@ def authorize_repository_static_delivery(
         action="repository.static_publication.delivery_authorized",
         entity_id=publication.id,
         metadata={"delivery_authorization_id": str(authorization.id)},
+    )
+    enqueue_outbox_event(
+        tenant=publication.tenant,
+        organization=publication.organization,
+        topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+        subject_id=publication.id,
+        idempotency_key=f"repository-publication-available:{publication.id}",
+        payload={"audience": PublicationAudience.CLIENT_VISIBLE},
     )
     return authorization

@@ -23,9 +23,12 @@ from .models import (
     NotificationSurface,
     OutboxEvent,
     PublicationControlAction,
+    RepositoryStaticDeliveryAuthorization,
+    RepositoryStaticPublication,
 )
 from .outbox import OutboxDeliveryFailure, OutboxTopic
 from .portal_views import _reference_projection_safe, _safe_portal_publications
+from .repository_static_delivery import repository_static_delivery_ready
 from .rls import OrganizationRLSMode, bind_local_rls_scope
 from .scoping import DataScope
 
@@ -106,11 +109,20 @@ def project_inbox_notifications(event: OutboxEvent) -> None:
             raise OutboxDeliveryFailure("delivery_failed")
         msp_permission = PermissionKey.INVITATIONS_VIEW
     else:
-        if not DocumentPublication.objects.filter(
-            id=event.subject_id,
-            tenant=event.tenant,
-            organization=event.organization,
-        ).exists():
+        is_repository = topic in {
+            OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+            OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+        }
+        subject_exists = (
+            RepositoryStaticPublication.objects.filter(
+                id=event.subject_id, tenant=event.tenant, organization=event.organization
+            ).exists()
+            if is_repository
+            else DocumentPublication.objects.filter(
+                id=event.subject_id, tenant=event.tenant, organization=event.organization
+            ).exists()
+        )
+        if not subject_exists:
             raise OutboxDeliveryFailure("delivery_failed")
         msp_permission = PermissionKey.DOCUMENTS_VIEW
 
@@ -124,7 +136,12 @@ def project_inbox_notifications(event: OutboxEvent) -> None:
         )
         for user in _msp_users_for_event(event, msp_permission)
     ]
-    if topic in {OutboxTopic.PUBLICATION_AVAILABLE, OutboxTopic.PUBLICATION_WITHDRAWN}:
+    if topic in {
+        OutboxTopic.PUBLICATION_AVAILABLE,
+        OutboxTopic.PUBLICATION_WITHDRAWN,
+        OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE,
+        OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED,
+    }:
         rows.extend(
             InboxNotification(
                 tenant=event.tenant,
@@ -204,6 +221,55 @@ def _client_publication_available(publication: DocumentPublication) -> bool:
     return _reference_projection_safe(publication)
 
 
+def _repository_notification_projection(
+    notification: InboxNotification,
+    context: InstallationMemberContext,
+    publication: RepositoryStaticPublication,
+) -> NotificationProjection | None:
+    if publication.tenant_id != context.tenant.id or publication.organization_id != notification.organization_id:
+        return None
+    topic = OutboxTopic(notification.event.topic)
+    if not RepositoryStaticDeliveryAuthorization.objects.filter(publication=publication).exists():
+        return None
+    if context.surface == NotificationSurface.CLIENT_PORTAL:
+        if context.organization is None or context.organization.id != publication.organization_id:
+            return None
+        if topic == OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED:
+            return NotificationProjection(
+                notification,
+                "Documentation access changed",
+                "A previously available publication is no longer available.",
+                None,
+            )
+        if not repository_static_delivery_ready(publication):
+            return None
+        title = publication.authorization.package.decision.evidence.manifest["title"]
+        return NotificationProjection(
+            notification,
+            "Documentation published",
+            f"{title} is now available.",
+            NotificationTarget(kind="portal_repository_publication", publication_id=publication.id),
+        )
+    if not context_has_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=publication.organization):
+        return None
+    if topic == OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED:
+        return NotificationProjection(
+            notification,
+            "Documentation access changed",
+            f"Repository publication access changed for {notification.organization.entity.display_name}.",
+            NotificationTarget(kind="organization_documentation", organization_id=notification.organization.entity_id),
+        )
+    if not repository_static_delivery_ready(publication):
+        return None
+    title = publication.authorization.package.decision.evidence.manifest["title"]
+    return NotificationProjection(
+        notification,
+        "Documentation published",
+        f"{title} was published for {notification.organization.entity.display_name}.",
+        NotificationTarget(kind="organization_documentation", organization_id=notification.organization.entity_id),
+    )
+
+
 def authorize_notification(
     notification: InboxNotification,
     context: InstallationMemberContext,
@@ -247,6 +313,17 @@ def authorize_notification(
             f"Client invitation {action}",
             f"A {role} invitation for {organization.entity.display_name} was {action}.",
             organization_target,
+        )
+
+    if topic in {OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE, OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED}:
+        repository_publication = RepositoryStaticPublication.objects.filter(
+            id=notification.event.subject_id,
+            tenant=context.tenant,
+            organization=organization,
+        ).select_related("authorization__package__decision__evidence", "organization__entity").first()
+        return (
+            _repository_notification_projection(notification, context, repository_publication)
+            if repository_publication else None
         )
 
     publication = _publication_for_notification(notification, context)
@@ -313,8 +390,13 @@ def authorize_notifications(
         publication_notifications = [
             item
             for item in organization_notifications
+            if OutboxTopic(item.event.topic) in {OutboxTopic.PUBLICATION_AVAILABLE, OutboxTopic.PUBLICATION_WITHDRAWN}
+        ]
+        repository_notifications = [
+            item
+            for item in organization_notifications
             if OutboxTopic(item.event.topic)
-            not in {OutboxTopic.INVITATION_ISSUED, OutboxTopic.INVITATION_ACCEPTED}
+            in {OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE, OutboxTopic.REPOSITORY_PUBLICATION_ACCESS_CHANGED}
         ]
 
         invitation_ids = {item.event.subject_id for item in invitation_notifications}
@@ -429,6 +511,23 @@ def authorize_notifications(
                         organization_id=organization.entity_id,
                     ),
                 )
+        if repository_notifications:
+            repository_ids = {item.event.subject_id for item in repository_notifications}
+            repository_records = {
+                record.id: record
+                for record in RepositoryStaticPublication.objects.filter(
+                    tenant=context.tenant,
+                    organization=organization,
+                    id__in=repository_ids,
+                ).select_related("authorization__package__decision__evidence", "organization__entity")
+            }
+            for notification in repository_notifications:
+                repository_publication = repository_records.get(notification.event.subject_id)
+                if repository_publication is None:
+                    continue
+                projection = _repository_notification_projection(notification, context, repository_publication)
+                if projection is not None:
+                    projections[notification.id] = projection
     return [projections[item.id] for item in eligible if item.id in projections]
 
 

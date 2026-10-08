@@ -45703,13 +45703,15 @@ components:
           - organization_documentation
           - portal_documents
           - portal_document
+          - portal_repository_publication
           type: string
           description: |-
             * `organization_overview` - organization_overview
             * `organization_documentation` - organization_documentation
             * `portal_documents` - portal_documents
             * `portal_document` - portal_document
-          x-spec-enum-id: d28622d6d06de297
+            * `portal_repository_publication` - portal_repository_publication
+          x-spec-enum-id: 5c8a86a273ef5989
         organization_id:
           type: string
           format: uuid

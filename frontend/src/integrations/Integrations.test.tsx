@@ -97,8 +97,79 @@ describe('Integrations', () => {
     await user.click(await screen.findByRole('checkbox', { name: /Switch replacement runbook/i }))
     await user.click(screen.getByRole('button', { name: 'Create bundle' }))
 
-    await waitFor(() => expect(provider.createGitExport).toHaveBeenCalledWith(workspace, ['document-1'], []))
+    await waitFor(() => expect(provider.createGitExport).toHaveBeenCalledWith(workspace, ['document-1'], [], false))
     expect(await screen.findByText('1 KiB')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /Switch replacement runbook/i }))
+    await user.click(screen.getByRole('checkbox', { name: 'Include all accepted repository Markdown' }))
+    await user.click(screen.getByRole('button', { name: 'Create bundle' }))
+    await waitFor(() => expect(provider.createGitExport).toHaveBeenCalledWith(workspace, ['document-1'], [], true))
+  })
+
+  it('creates a repository-only snapshot and preserves the choice after a failed attempt', async () => {
+    const provider = providerClient()
+    const documents = { list: vi.fn().mockResolvedValue({ results: [], count: 0 }) } as unknown as DocumentsClient
+    const user = userEvent.setup()
+    vi.mocked(provider.createGitExport)
+      .mockRejectedValueOnce(new IntegrationRequestError('Repository is not indexed.', 400))
+      .mockResolvedValueOnce({
+        id: 'repository-bundle',
+        selection_manifest: {
+          documents: [], publications: [],
+          repository: {
+            accepted_commit: 'abcdef1234567890', snapshot_only: true,
+            files: [
+              { path: 'repository/documents/one.md', content_id: 'one', kind: 'document', sha256: 'a'.repeat(64) },
+              { path: 'repository/fragments/two.md', content_id: 'two', kind: 'fragment', sha256: 'b'.repeat(64) },
+            ],
+          },
+        },
+        content_digest: 'c'.repeat(64), byte_size: 1024, created_at: '2026-10-08T00:00:00Z',
+      })
+    setup(provider, documents)
+
+    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    const checkbox = await screen.findByRole('checkbox', { name: 'Include all accepted repository Markdown' })
+    expect(screen.getByText(/not a backup/i)).toBeInTheDocument()
+    expect(screen.getByText(/No legacy documents are available/i)).toBeInTheDocument()
+    const create = screen.getByRole('button', { name: 'Create bundle' })
+    expect(create).toBeDisabled()
+    checkbox.focus()
+    await user.keyboard(' ')
+    expect(create).toBeEnabled()
+    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+    expect(checkbox).toBeChecked()
+
+    await user.click(create)
+    expect(await screen.findByRole('alert')).toHaveTextContent('The export could not be created')
+    expect(checkbox).toBeChecked()
+    expect(provider.createGitExport).toHaveBeenCalledWith(workspace, [], [], true)
+
+    await user.click(create)
+    expect(await screen.findByText('2 Markdown files')).toBeInTheDocument()
+    expect(screen.getByText('Git version abcdef123456')).toBeInTheDocument()
+    expect(checkbox).not.toBeChecked()
+    expect(create).toBeDisabled()
+  })
+
+  it('keeps repository export available when legacy document choices fail to load', async () => {
+    const provider = providerClient()
+    const documents = { list: vi.fn().mockRejectedValue(new Error('Legacy documents unavailable')) } as unknown as DocumentsClient
+    const user = userEvent.setup()
+    vi.mocked(provider.createGitExport).mockResolvedValue({
+      id: 'repository-bundle',
+      selection_manifest: { documents: [], publications: [], repository: { accepted_commit: 'abcdef1234567890', snapshot_only: true, files: [] } },
+      content_digest: 'c'.repeat(64), byte_size: 1024, created_at: '2026-10-08T00:00:00Z',
+    })
+    setup(provider, documents)
+
+    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    expect(await screen.findByRole('status')).toHaveTextContent('Legacy document choices could not be loaded')
+    const checkbox = screen.getByRole('checkbox', { name: 'Include all accepted repository Markdown' })
+    await user.click(checkbox)
+    await user.click(screen.getByRole('button', { name: 'Create bundle' }))
+
+    await waitFor(() => expect(provider.createGitExport).toHaveBeenCalledWith(workspace, [], [], true))
   })
 
   it('protects a connection draft during section navigation and retries a failed collection', async () => {

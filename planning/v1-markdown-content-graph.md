@@ -442,7 +442,9 @@ gates after file, template, review, key, publication and recovery parity.
   credential references, key bindings and managed attachment links, bounds
   source and ZIP size, and labels the output snapshot-only. This is export
   parity groundwork, not an editable export, Git-history transfer or backup;
-  UI selection and remaining format parity stay open.
+  The browser can now select that repository snapshot with or without legacy
+  records and identifies saved repository bundles; remaining format parity
+  stays open.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.
 - Produce complete repository bundles rather than relying on working-tree copies

@@ -60,8 +60,10 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [conflictPage, setConflictPage] = useState({ page: 1, page_size: 25, count: 0, has_more: false })
   const [exports, setExports] = useState<GitExportBundle[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
+  const [exportDocumentsUnavailable, setExportDocumentsUnavailable] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
   const [selectedPublications, setSelectedPublications] = useState<string[]>([])
+  const [includeRepository, setIncludeRepository] = useState(false)
   const [draft, setDraft] = useState(EMPTY_CONNECTION)
   const [showForm, setShowForm] = useState(false)
   const [loadState, setLoadState] = useState<{ section: string; value: 'loading' | 'ready' | 'error' }>({ section: 'connections', value: 'loading' })
@@ -89,7 +91,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const connectionDirty = showForm && JSON.stringify(draft) !== JSON.stringify(EMPTY_CONNECTION)
   const rotationDirty = Boolean(rotating && Object.values(rotating.credentials).some(Boolean)) || Boolean(writeCredential?.apiToken)
   const editingDirty = Boolean(editing && (editing.name !== editing.connection.name || editing.base_url !== editing.connection.base_url || editing.sync_interval_minutes !== editing.connection.sync_interval_minutes))
-  const exportDirty = selected.length > 0 || selectedPublications.length > 0
+  const exportDirty = selected.length > 0 || selectedPublications.length > 0 || includeRepository
   useUnsavedChanges(connectionDirty || rotationDirty || editingDirty || exportDirty, saving, () => {
     setShowForm(false)
     setDraft(EMPTY_CONNECTION)
@@ -101,6 +103,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     setPassword('')
     setSelected([])
     setSelectedPublications([])
+    setIncludeRepository(false)
     setError(null)
   })
 
@@ -142,13 +145,15 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
         })
         : Promise.all([
           providerClient.listGitExports(workspace, controller.signal),
-          documentsClient.list({ organizationId: workspace.kind === 'organization' ? workspace.id : undefined }, controller.signal),
+          documentsClient.list({ organizationId: workspace.kind === 'organization' ? workspace.id : undefined }, controller.signal).catch(() => null),
         ]).then(([nextExports, nextDocuments]) => {
+          if (controller.signal.aborted) return
           setExports(nextExports)
-          setDocuments(nextDocuments.results.filter((item) => !item.is_template))
+          setExportDocumentsUnavailable(nextDocuments === null)
+          setDocuments(nextDocuments?.results.filter((item) => !item.is_template) ?? [])
         })
     request.then(() => {
-      setLoadState({ section, value: 'ready' })
+      if (!controller.signal.aborted) setLoadState({ section, value: 'ready' })
     }).catch(() => { if (!controller.signal.aborted) setLoadState({ section, value: 'error' }) })
     return () => controller.abort()
   }, [documentsClient, providerClient, reload, reviewPage, reviewSearch, reviewType, section, sourcePage, sourceSearch, sourceType, workspace])
@@ -322,11 +327,11 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   }
 
   async function createExport() {
-    if (selected.length === 0 && selectedPublications.length === 0) return
+    if (selected.length === 0 && selectedPublications.length === 0 && !includeRepository) return
     setSaving(true); setError(null)
     try {
-      const bundle = await providerClient.createGitExport(workspace, selected, selectedPublications)
-      setExports((current) => [bundle, ...current]); setSelected([]); setSelectedPublications([])
+      const bundle = await providerClient.createGitExport(workspace, selected, selectedPublications, includeRepository)
+      setExports((current) => [bundle, ...current]); setSelected([]); setSelectedPublications([]); setIncludeRepository(false)
     } catch { setError(translate('integrations.exportFailed')) }
     finally { setSaving(false) }
   }
@@ -374,7 +379,37 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
         {(reviewSearch || reviewType) && <button className="row-action" type="button" onClick={() => { setReviewSearchDraft(''); updateReviewCollection({ page: 1, search: '', type: '' }) }}>{translate('collections.clearFilters')}</button>}
       </form>
       {conflicts.length === 0 ? <p className="empty-state">{reviewSearch || reviewType ? translate('integrations.noFilteredDifferences') : translate('integrations.noDifferences')}</p> : <><div className="table-scroll" role="group" aria-label={translate('integrations.reconciliationTable')} tabIndex={0}><table><thead><tr><th>Source record</th><th>Connection</th><th>Source details</th><th>Change</th><th>TekDocs record</th><th>Other actions</th></tr></thead><tbody>{conflicts.map((conflict) => { const canAdopt = conflict.difference === 'unmatched' && conflict.connection_provider === 'netbox' && (conflict.remote_type === 'ipam.prefix' || conflict.remote_type === 'dcim.device'); return <tr key={conflict.id}><td><code>{conflict.remote_type}:{conflict.remote_id}</code></td><td>{conflict.connection_name}</td><td>{Object.entries(conflict.provider_values ?? {}).filter(([, value]) => value !== null && value !== '').slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' · ') || 'No saved details'}</td><td>{conflict.difference}</td><td>{canAdopt ? <button className="primary-button" type="button" disabled={saving} onClick={() => setAdopting(conflict)}>{translate('integrations.linkToTekDocs')}</button> : conflict.local_entity_name || conflict.local_entity_id || 'Not matched'}</td><td><div className="table-actions">{!canAdopt && <><button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'keep_local') }}>{translate('integrations.keepFlagged')}</button>{conflict.local_entity_id && <button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'accept_remote') }}>{translate('integrations.acknowledgeChange')}</button>}</>}<button className="secondary-button" type="button" disabled={saving} onClick={() => { void reconcile(conflict, 'ignored') }}>{translate('integrations.dismissDifference')}</button></div></td></tr> })}</tbody></table></div><CollectionPagination label={translate('integrations.reviewDifferences')} page={conflictPage.page} pageSize={conflictPage.page_size} count={conflictPage.count} hasMore={conflictPage.has_more} onPageChange={(page) => updateReviewCollection({ page })} /></>}</section>}
-    {phase === 'ready' && section === 'exports' && <><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div><button className="primary-button" type="button" disabled={saving || (selected.length === 0 && selectedPublications.length === 0)} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button></div>{documents.length === 0 ? <p className="empty-state">No documents are available in this workspace.</p> : <><h3>Editable documents</h3><div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>{documents.some((document) => document.publications.length > 0) && <><h3>Published copies</h3><div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div></>}</>}</section><section className="content-section"><div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>{exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}><table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table></div>}</section></>}
+    {phase === 'ready' && section === 'exports' && <>
+      <section className="content-section">
+        <div className="section-heading">
+          <div><h2>{translate('integrations.createExport')}</h2><p>{translate('integrations.createExportHelp')}</p></div>
+          <button className="primary-button" type="button" disabled={saving || !exportDirty} onClick={() => { void createExport() }}>{translate('integrations.createBundle')}</button>
+        </div>
+        <h3>{translate('integrations.repositorySnapshotHeading')}</h3>
+        <div className="integration-export-choices">
+          <label>
+            <input type="checkbox" checked={includeRepository} aria-describedby="repository-export-help" onChange={(event) => setIncludeRepository(event.target.checked)} />
+            <span>{translate('integrations.repositorySnapshotOption')}</span>
+          </label>
+        </div>
+        <p id="repository-export-help" className="integration-export-help">{translate('integrations.repositorySnapshotHelp')}</p>
+        {exportDocumentsUnavailable && <p className="form-message" role="status">{translate('integrations.legacyExportDocumentsUnavailable')}</p>}
+        {documents.length === 0 ? !exportDocumentsUnavailable && <p className="empty-state">{translate('integrations.noLegacyExportDocuments')}</p> : <>
+          <h3>{translate('integrations.legacyExportDocuments')}</h3>
+          <div className="integration-export-choices">{documents.map((document) => <label key={document.id}><input type="checkbox" checked={selected.includes(document.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} /><span>{document.title}</span><small>{document.category}</small></label>)}</div>
+          {documents.some((document) => document.publications.length > 0) && <>
+            <h3>{translate('integrations.publishedExportCopies')}</h3>
+            <div className="integration-export-choices">{documents.flatMap((document) => document.publications.map((publication) => <label key={publication.id}><input type="checkbox" checked={selectedPublications.includes(publication.id)} onChange={(event) => setSelectedPublications((current) => event.target.checked ? [...current, publication.id] : current.filter((id) => id !== publication.id))} /><span>{document.title}</span><small>{publication.lifecycle_state.replace('_', ' ')}</small></label>))}</div>
+          </>}
+        </>}
+      </section>
+      <section className="content-section">
+        <div className="section-heading"><div><h2>{translate('integrations.savedExports')}</h2><p>{translate('integrations.savedExportsHelp')}</p></div></div>
+        {exports.length === 0 ? <p className="empty-state">No exports have been created.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.bundleTable')} tabIndex={0}>
+          <table><thead><tr><th>Created</th><th>Documents</th><th>Published copies</th><th>{translate('integrations.repositorySnapshotHeading')}</th><th>Size</th><th>File ID</th><th>Download</th></tr></thead><tbody>{exports.map((bundle) => <tr key={bundle.id}><td>{new Date(bundle.created_at).toLocaleString()}</td><td>{bundle.selection_manifest.documents.length}</td><td>{bundle.selection_manifest.publications.length}</td><td>{bundle.selection_manifest.repository ? <>{translate(bundle.selection_manifest.repository.files.length === 1 ? 'integrations.repositoryFileCountOne' : 'integrations.repositoryFileCountOther', { count: bundle.selection_manifest.repository.files.length })}<br /><small>{translate('integrations.repositoryCommit', { commit: bundle.selection_manifest.repository.accepted_commit.slice(0, 12) })}</small></> : '—'}</td><td>{Math.ceil(bundle.byte_size / 1024)} KiB</td><td><code>{bundle.content_digest.slice(0, 16)}…</code></td><td>{client.gitExportDownloadUrl && <a className="secondary-button" href={client.gitExportDownloadUrl(workspace, bundle)}><Download size={14} />ZIP</a>}</td></tr>)}</tbody></table>
+        </div>}
+      </section>
+    </>}
     {section === 'webhooks' && <Webhooks workspace={workspace} client={client} embedded />}
     {publication && <div className="archive-confirmation" role="alertdialog" aria-labelledby="netbox-publication-heading"><div><strong id="netbox-publication-heading">{translate('integrations.reviewNetBoxPublication')}</strong><p>{publication.proposal.action === 'create' ? translate('integrations.netboxProposalCreate') : translate('integrations.netboxProposalUpdate')} <code>{publication.proposal.endpoint}</code></p><dl className="record-facts">{Object.entries(publication.proposal.fields).map(([key, value]) => <div key={key}><dt>{key.replaceAll('_', ' ')}</dt><dd>{String(value)}</dd></div>)}</dl><p><small>{translate('integrations.netboxProposalRecheck')}</small></p></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving} onClick={() => { void publishProposal() }}>{translate('integrations.publishToNetBox')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setPublication(null)}>{translate('common.cancel')}</button></div></div>}
     {adopting && <NetBoxAdoptionDrawer workspace={workspace} conflict={adopting} providerClient={providerClient} networksClient={networksClient} onClose={() => setAdopting(null)} onSaved={(updated) => { setConflicts((current) => current.filter((item) => item.id !== updated.id)); setConflictPage((current) => ({ ...current, count: Math.max(0, current.count - 1) })); setAdopting(null); if (section === 'connections') setReload((value) => value + 1) }} />}

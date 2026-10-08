@@ -1750,7 +1750,9 @@ optional complete accepted-and-indexed repository Markdown snapshot for the
 exact Workspace. The manifest pins its commit and sanitized file hashes;
 known credential references, key bindings and live attachment links are
 removed. It is not Git history, an editable export or a backup. Browser
-selection and remaining export formats remain open `0.9.7` work.
+selection is now available with a repository-only path, snapshot/backup warning,
+saved-file count, and failed-selection retention. Remaining export formats
+remain open `0.9.7` work.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

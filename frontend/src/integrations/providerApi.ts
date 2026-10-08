@@ -14,7 +14,7 @@ export type ConflictQuery = { page: number; page_size: number; q?: string; remot
 export type HaloTicketSummary = { id: string; number: string; title: string; status: string; priority: string; assigned_team: string; assigned_agent: string; respond_by: string | null; fix_by: string | null; opened_at: string | null; closed_at: string | null; source_updated_at: string; source_last_synced_at: string | null; stale: boolean; external_url: string }
 export type IntegrationPage<T> = { results: T[]; page: number; page_size: number; count: number; has_more: boolean }
 export type NetBoxPublicationProposal = { source_observation_id: string; source_type: string; connection_id: string; action: 'create' | 'update'; endpoint: string; fields: Record<string, string | number | boolean | null>; target_fingerprint: string; proposal_digest: string }
-export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[] }; content_digest: string; byte_size: number; created_at: string }
+export type GitExportBundle = { id: string; selection_manifest: { documents: { entity_id: string; path: string }[]; publications: { entity_id: string }[]; repository?: { accepted_commit: string; snapshot_only: true; files: { path: string; content_id: string; kind: string; sha256: string }[] } }; content_digest: string; byte_size: number; created_at: string }
 
 export interface IntegrationsClient {
   listProviders(workspace: WorkspaceContext, signal?: AbortSignal): Promise<IntegrationProvider[]>
@@ -34,7 +34,7 @@ export interface IntegrationsClient {
   resolveConflict(workspace: WorkspaceContext, conflict: IntegrationConflict, resolution: 'keep_local' | 'accept_remote' | 'ignored'): Promise<IntegrationConflict>
   adoptNetBoxConflict(workspace: WorkspaceContext, conflict: IntegrationConflict, adoption: NetBoxAdoption): Promise<IntegrationConflict>
   listGitExports(workspace: WorkspaceContext, signal?: AbortSignal): Promise<GitExportBundle[]>
-  createGitExport(workspace: WorkspaceContext, documentIds: string[], publicationIds: string[]): Promise<GitExportBundle>
+  createGitExport(workspace: WorkspaceContext, documentIds: string[], publicationIds: string[], includeRepository?: boolean): Promise<GitExportBundle>
   gitExportDownloadUrl(workspace: WorkspaceContext, bundle: GitExportBundle): string
   listHaloTickets(workspace: WorkspaceContext, signal?: AbortSignal): Promise<HaloTicketSummary[]>
 }
@@ -90,7 +90,7 @@ export const browserIntegrationsClient: IntegrationsClient = {
   resolveConflict: (workspace, conflict, resolution) => mutate(`${base(workspace)}/conflicts/${encodeURIComponent(conflict.id)}/resolve`, 'POST', { resolution }),
   adoptNetBoxConflict: (workspace, conflict, adoption) => mutate(`${base(workspace)}/conflicts/${encodeURIComponent(conflict.id)}/netbox-adopt`, 'POST', adoption),
   listGitExports: async (workspace, signal) => parse(await fetch(`${base(workspace)}/git-exports`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
-  createGitExport: (workspace, document_ids, publication_ids) => mutate(`${base(workspace)}/git-exports`, 'POST', { document_ids, publication_ids }),
+  createGitExport: (workspace, document_ids, publication_ids, include_repository = false) => mutate(`${base(workspace)}/git-exports`, 'POST', { document_ids, publication_ids, include_repository }),
   gitExportDownloadUrl: (workspace, bundle) => `${base(workspace)}/git-exports/${encodeURIComponent(bundle.id)}/download`,
   listHaloTickets: async (workspace, signal) => parse(await fetch(`${base(workspace)}/halo/tickets`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal })),
 }

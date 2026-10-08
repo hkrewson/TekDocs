@@ -81,6 +81,24 @@ describe('provider integrations API', () => {
     expect(requestPath(mutations[5][0])).toContain('/conflicts/conflict%2Fone/resolve')
     expect(requestPath(mutations[6][0])).toContain('/conflicts/conflict%2Fone/netbox-adopt')
     expect(JSON.stringify(mutations[0]?.[1]?.body)).toContain('one-time-token')
+    expect(JSON.parse(mutations[7]?.[1]?.body as string)).toEqual({
+      document_ids: ['document-1'], publication_ids: [], include_repository: false,
+    })
+  })
+
+  it('requests the accepted repository snapshot without legacy document selections', async () => {
+    document.cookie = 'csrftoken=integration-csrf; path=/'
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => Promise.resolve(
+      new Response(JSON.stringify({ id: requestPath(input) }), { status: 200 }),
+    ))
+
+    await browserIntegrationsClient.createGitExport(workspace, [], [], true)
+
+    const request = fetchMock.mock.calls.find(([path]) => requestPath(path).endsWith('/git-exports'))?.[1]
+    expect(new Headers(request?.headers).get('X-CSRFToken')).toBe('integration-csrf')
+    expect(JSON.parse(request?.body as string)).toEqual({
+      document_ids: [], publication_ids: [], include_repository: true,
+    })
   })
 
   it('loads operational collections and surfaces safe errors', async () => {

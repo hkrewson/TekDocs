@@ -1569,6 +1569,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .integration-export-choices { display: grid; border-top: 1px solid var(--border); }
 .integration-export-choices label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--border); cursor: pointer; }
 .integration-export-choices label small { color: var(--muted); text-transform: capitalize; }
+.integration-export-help { max-width: 72ch; margin: 8px 0 20px; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .import-start .section-heading p, .import-history .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
 .import-notice { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; padding: 10px 12px; background: var(--surface-subtle); border-left: 3px solid var(--accent); font-size: 12px; }
 .import-notice span { color: var(--muted); }

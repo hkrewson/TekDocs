@@ -88,7 +88,7 @@ it('updates kind separately and confirms consequential status changes', async ()
 it('keeps a failed disconnected status draft and does not retry it automatically', async () => {
   const { user, write } = setup({ fail: true, initial: '&circuits=circuit-1' })
   const drawer = await screen.findByRole('dialog', { name: 'Primary circuit' })
-  await user.click(within(drawer).getByRole('button', { name: 'Change circuit status' }))
+  await user.click(await within(drawer).findByRole('button', { name: 'Change circuit status' }))
   await user.selectOptions(within(drawer).getByRole('combobox', { name: 'Status' }), 'disconnected')
   await user.click(within(drawer).getByRole('button', { name: 'Review status change' }))
   await user.click(within(drawer).getByRole('button', { name: 'Change status' }))

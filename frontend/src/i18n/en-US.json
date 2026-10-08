@@ -1875,6 +1875,8 @@
   "repository.reviewRebase": "Your draft is retained with the latest version as its base. Review it before saving.",
   "repository.saving": "Saving…",
   "repository.save": "Save to Git",
+  "repository.downloadLoaded": "Download loaded Markdown file",
+  "repository.loadedRevision": "Loaded Git revision {commit}. Download includes the saved source and portable metadata, not unsaved edits or other files.",
   "documentation.importFile": "Markdown file to import",
   "documentation.loadingDocuments": "Loading documents…",
   "documentation.documentsUnavailable": "Documents could not be loaded. Refresh the page to try again.",

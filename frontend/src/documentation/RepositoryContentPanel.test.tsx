@@ -96,3 +96,42 @@ it('refreshes a new-file base after an unrelated repository advance without disc
   await user.click(screen.getByRole('button', { name: 'Save to Git' }))
   await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ base_commit: advanced }), undefined))
 })
+
+it('downloads only the loaded saved source, including frontmatter, while a draft is dirty', async () => {
+  const user = userEvent.setup()
+  const createObjectURL = vi.fn().mockReturnValue('blob:loaded-source')
+  const revokeObjectURL = vi.fn()
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('guide.md')
+    expect(this.href).toBe('blob:loaded-source')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+  try {
+    setup()
+    expect(screen.queryByRole('button', { name: 'Download loaded Markdown file' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    expect(screen.getByText(`Loaded Git revision ${commit.slice(0, 12)}. Download includes the saved source and portable metadata, not unsaved edits or other files.`)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    await user.click(screen.getByRole('button', { name: 'Download loaded Markdown file' }))
+    expect(click).toHaveBeenCalledOnce()
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    const exported = createObjectURL.mock.calls[0][0] as Blob
+    expect(exported.type).toBe('text/markdown;charset=utf-8')
+    expect(exported.size).toBe(new TextEncoder().encode(initial.source).length)
+    const reader = new FileReader()
+    const loaded = new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string) })
+    reader.readAsText(exported)
+    expect(await loaded).toBe(initial.source)
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:loaded-source'))
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+    click.mockRestore()
+  }
+})

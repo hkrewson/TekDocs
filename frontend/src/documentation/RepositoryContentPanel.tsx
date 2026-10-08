@@ -119,6 +119,17 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     finally { setBusy(false) }
   }
 
+  function downloadLoadedSource() {
+    if (!source?.accepted_commit) return
+    const name = source.path.split('/').at(-1) || `${source.content_id}.md`
+    const url = URL.createObjectURL(new Blob([source.source], { type: 'text/markdown;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   return <section className="repository-authoring">
     <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
     {error && <p role="alert" className="form-message error">{error}</p>}
@@ -142,7 +153,8 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
           <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
         </div>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
-        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button><button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
+        {source?.accepted_commit && <p className="form-message">{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</p>}
+        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>{source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}<button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
       </section>
     </div>
   </section>

@@ -445,6 +445,10 @@ gates after file, template, review, key, publication and recovery parity.
   The browser can now select that repository snapshot with or without legacy
   records and identifies saved repository bundles; remaining format parity
   stays open.
+- The staff repository editor can download the exact loaded Markdown file,
+  including portable frontmatter, for one document or fragment. It labels the
+  accepted Git revision and excludes unsaved edits. This is a per-file editable
+  source export, not a complete dependency bundle, Git-history transfer or backup.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.
 - Produce complete repository bundles rather than relying on working-tree copies

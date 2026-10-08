@@ -11697,6 +11697,8 @@ export interface components {
         readonly GitExportWrite: {
             readonly document_ids?: readonly string[];
             readonly publication_ids?: readonly string[];
+            /** @default false */
+            readonly include_repository: boolean;
         };
         readonly HaloTicketSummary: {
             /** Format: uuid */

@@ -832,7 +832,7 @@ def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> byt
 
 
 def read_accepted_repository_markdown_files(
-    *, repository_id: uuid.UUID
+    *, repository_id: uuid.UUID, max_files: int | None = None, max_bytes: int | None = None
 ) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
     """Read a bounded, stable Markdown snapshot from exactly one accepted commit."""
 
@@ -850,7 +850,18 @@ def read_accepted_repository_markdown_files(
         _record_reconciliation(repository, reconciliation)
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
-        return commit, tuple((path, git.read_file(accepted, path)) for path in git.markdown_paths(accepted))
+        paths = git.markdown_paths(accepted)
+        if max_files is not None and len(paths) > max_files:
+            raise RepositoryResourceLimitError("Accepted repository exceeds the file limit")
+        files: list[tuple[str, bytes]] = []
+        total_bytes = 0
+        for path in paths:
+            source = git.read_file(accepted, path)
+            total_bytes += len(source)
+            if max_bytes is not None and total_bytes > max_bytes:
+                raise RepositoryResourceLimitError("Accepted repository exceeds the byte limit")
+            files.append((path, source))
+        return commit, tuple(files)
 
 
 def list_accepted_repository_history(*, repository_id: uuid.UUID, limit: int = 32) -> tuple[str, ...]:

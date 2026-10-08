@@ -41130,6 +41130,9 @@ components:
             type: string
             format: uuid
           maxItems: 250
+        include_repository:
+          type: boolean
+          default: false
     HaloTicketSummary:
       type: object
       properties:

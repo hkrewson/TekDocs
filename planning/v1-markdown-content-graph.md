@@ -437,6 +437,12 @@ gates after file, template, review, key, publication and recovery parity.
 - Retain attachment custody outside Git while resolving Markdown references.
 - Update editable exports, sanitized Git exports, templates, monitored sources,
   client listings and portal reads for the content graph.
+- Sanitized Git export now accepts an optional complete, exact accepted and
+  indexed repository Markdown snapshot for one Workspace. It removes known
+  credential references, key bindings and managed attachment links, bounds
+  source and ZIP size, and labels the output snapshot-only. This is export
+  parity groundwork, not an editable export, Git-history transfer or backup;
+  UI selection and remaining format parity stay open.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.
 - Produce complete repository bundles rather than relying on working-tree copies

@@ -419,6 +419,7 @@ class ConflictCollectionQuerySerializer(BoundedCollectionQuerySerializer):
 class GitExportWriteSerializer(StrictSerializer):
     document_ids = serializers.ListField(child=serializers.UUIDField(), max_length=250, default=list)
     publication_ids = serializers.ListField(child=serializers.UUIDField(), max_length=250, default=list)
+    include_repository = serializers.BooleanField(default=False)
 
 
 class GitExportSerializer(serializers.Serializer):

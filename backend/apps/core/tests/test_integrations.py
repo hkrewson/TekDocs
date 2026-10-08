@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import secrets
@@ -14,6 +15,9 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core import repository_service, repository_storage
+from apps.core.content_index import index_repository_content
+from apps.core.content_profile import parse_content
 from apps.core.documents import create_document
 from apps.core.git_exports import _manifest_has_credential_reference, create_git_export
 from apps.core.integration_providers import (
@@ -29,6 +33,8 @@ from apps.core.integration_secrets import decrypt_integration_secret, encrypt_in
 from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
     ClientAsset,
+    CredentialReference,
+    Entity,
     GitExportBundle,
     InstallationState,
     IntegrationConflict,
@@ -43,6 +49,7 @@ from apps.core.models import (
     NetworkMACAddress,
     NetworkSubnet,
     OrganizationKind,
+    Workspace,
     workspace_for_owner,
 )
 from apps.core.netbox_publication import preview_netbox_publication, publish_netbox_proposal
@@ -1082,3 +1089,160 @@ def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_lin
     assert b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in exported_markdown
     assert "attachment_content" in export_manifest["exclusions"]
     assert GitExportBundle.objects.count() == 2
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_includes_exact_sanitized_repository_snapshot(installation, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path / "media"
+    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
+    record = organization(installation, "Repository export client")
+    workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
+    repository = repository_storage.ensure_workspace_repository(
+        Workspace.objects.get(pk=workspace.data_scope.workspace_id)
+    ).repository
+    repository.refresh_from_db()
+    credential_entity = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=record,
+        entity_type="credential_reference",
+        display_name="Export credential",
+    )
+    CredentialReference.objects.create(
+        tenant=installation.tenant,
+        organization=record,
+        entity=credential_entity,
+        provider="onepassword",
+        reference_url=(
+            "https://start.1password.com/open/i?"
+            "a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&"
+            "i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com"
+        ),
+    )
+    content_id = uuid.uuid4()
+    source = (
+        f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: document\ntitle: Export runbook\n"
+        f"key_bindings:\n  admin: {credential_entity.id}\n"
+        f"entity_links:\n  - id: {credential_entity.id}\n    relationship: maintenance\n"
+        "---\n# Export runbook\n\n"
+        f"[Credential](tekdocs://entity/{credential_entity.id})\n\n"
+        "[File](tekdocs://attachment/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)\n"
+    ).encode()
+    committed = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+        changes={"documents/export-runbook.md": source},
+        message="Add export runbook",
+    )
+    index_repository_content(repository_id=repository.id)
+    first = create_git_export(
+        workspace=workspace,
+        actor=installation.owner,
+        document_entity_ids=[],
+        publication_entity_ids=[],
+        include_repository=True,
+    )
+    second = create_git_export(
+        workspace=workspace,
+        actor=installation.owner,
+        document_entity_ids=[],
+        publication_entity_ids=[],
+        include_repository=True,
+    )
+    assert first.content_digest == second.content_digest
+    with first.artifact.open("rb") as stored, zipfile.ZipFile(io.BytesIO(stored.read())) as archive:
+        exported = archive.read("repository/documents/export-runbook.md")
+        manifest = json.loads(archive.read("tekdocs-export.json"))
+        readme = archive.read("README.md")
+    parsed = parse_content(exported)
+    assert parsed.content_id == content_id
+    assert "key_bindings" not in parsed.frontmatter
+    assert parsed.entity_links == ()
+    assert str(credential_entity.id).encode() not in exported
+    assert b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in exported
+    assert manifest["repository"]["accepted_commit"] == committed.object_id
+    assert manifest["repository"]["snapshot_only"] is True
+    assert manifest["repository"]["files"][0]["sha256"] == hashlib.sha256(exported).hexdigest()
+    assert b"not a complete backup" in readme
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=committed.object_id,
+        changes={
+            "documents/export-runbook.md": None,
+            f"documents/{credential_entity.id}.md": source,
+        },
+        message="Move runbook to credential-named path",
+    )
+    index_repository_content(repository_id=repository.id)
+    with pytest.raises(ValidationError, match="path contains credential-reference"):
+        create_git_export(
+            workspace=workspace,
+            actor=installation.owner,
+            document_entity_ids=[],
+            publication_entity_ids=[],
+            include_repository=True,
+        )
+
+
+@pytest.mark.django_db(transaction=True)
+@override_settings(DEFAULT_FILE_STORAGE="django.core.files.storage.FileSystemStorage")
+def test_git_export_repository_fails_closed_for_lagging_and_other_workspace(installation, tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path / "media"
+    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
+    first_org = organization(installation, "First export client")
+    second_org = organization(installation, "Second export client")
+    first_workspace = resolve_organization_workspace(installation.owner, entity_id=first_org.entity_id)
+    second_workspace = resolve_organization_workspace(installation.owner, entity_id=second_org.entity_id)
+    repository = repository_storage.ensure_workspace_repository(
+        Workspace.objects.get(pk=first_workspace.data_scope.workspace_id)
+    ).repository
+    repository.refresh_from_db()
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+        changes={
+            "documents/private.md": (
+                f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: document\n"
+                "title: Private\n---\nPrivate content.\n"
+            ).encode()
+        },
+        message="Add private content",
+    )
+    with pytest.raises(ValidationError, match="not fully indexed"):
+        create_git_export(
+            workspace=first_workspace,
+            actor=installation.owner,
+            document_entity_ids=[],
+            publication_entity_ids=[],
+            include_repository=True,
+        )
+    index_repository_content(repository_id=repository.id)
+    second_repository = repository_storage.ensure_workspace_repository(
+        Workspace.objects.get(pk=second_workspace.data_scope.workspace_id)
+    ).repository
+    second_repository.refresh_from_db()
+    public_content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=second_repository.id,
+        expected_base=second_repository.accepted_commit.object_id if second_repository.accepted_commit_id else None,
+        changes={
+            "documents/other.md": (
+                f"---\nschema: tekdocs.content/v1\nid: {public_content_id}\nkind: document\n"
+                "title: Other\n---\nOther client content.\n"
+            ).encode()
+        },
+        message="Add other client content",
+    )
+    index_repository_content(repository_id=second_repository.id)
+    other = create_git_export(
+        workspace=second_workspace,
+        actor=installation.owner,
+        document_entity_ids=[],
+        publication_entity_ids=[],
+        include_repository=True,
+    )
+    with other.artifact.open("rb") as stored, zipfile.ZipFile(io.BytesIO(stored.read())) as archive:
+        assert "repository/documents/private.md" not in archive.namelist()
+        assert b"Private content" not in b"".join(archive.read(path) for path in archive.namelist())
+    assert GitExportBundle.objects.count() == 1

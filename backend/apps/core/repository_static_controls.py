@@ -31,6 +31,10 @@ def repository_static_state(publication: RepositoryStaticPublication) -> str:
     actions = set(publication.control_events.values_list("action", flat=True))
     if RepositoryStaticPublicationControlEvent.Action.WITHDRAWN in actions:
         return "withdrawn"
+    if RepositoryStaticPublicationControlEvent.objects.filter(
+        supersedes=publication, action=RepositoryStaticPublicationControlEvent.Action.RELEASED
+    ).exists():
+        return "superseded"
     if RepositoryStaticPublicationControlEvent.Action.RELEASED in actions:
         return "released"
     return "recorded"
@@ -38,7 +42,7 @@ def repository_static_state(publication: RepositoryStaticPublication) -> str:
 
 @transaction.atomic
 def record_repository_static_control(
-    *, publication_id: UUID, action: str, reason: str, actor: User,
+    *, publication_id: UUID, action: str, reason: str, actor: User, supersedes_id: UUID | None = None,
 ) -> RepositoryStaticPublicationControlEvent:
     publication = (
         RepositoryStaticPublication.objects.select_related(
@@ -51,6 +55,7 @@ def record_repository_static_control(
     if action not in RepositoryStaticPublicationControlEvent.Action.values or not reason.strip():
         raise RepositoryStaticControlError("Action and reason are required")
     content_id = publication.authorization.package.decision.evidence.content_id
+    audience = publication.authorization.package.decision.evidence.audience
     _lock_content(workspace_id=publication.workspace_id, content_id=content_id)
     state = repository_static_state(publication)
     if action == RepositoryStaticPublicationControlEvent.Action.RELEASED:
@@ -65,15 +70,28 @@ def record_repository_static_control(
             publication__workspace_id=publication.workspace_id,
             publication__authorization__package__decision__evidence__content_id=content_id,
         ).exclude(publication__control_events__action=RepositoryStaticPublicationControlEvent.Action.WITHDRAWN)
-        if active.exists():
-            raise RepositoryStaticControlError("An active release already exists for this document")
-    elif state != "released":
-        raise RepositoryStaticControlError("Only a released publication can be withdrawn")
+        active_publications = [
+            event.publication for event in active if repository_static_state(event.publication) == "released"
+        ]
+        if [current.id for current in active_publications] != ([supersedes_id] if supersedes_id else []):
+            raise RepositoryStaticControlError("Supersession must name the current active release")
+        if active_publications and (
+            active_publications[0].authorization.package.decision.evidence.audience != audience
+        ):
+            raise RepositoryStaticControlError("Supersession audience must match the active release")
+        if supersedes_id == publication.id:
+            raise RepositoryStaticControlError("A publication cannot supersede itself")
+    else:
+        if supersedes_id is not None:
+            raise RepositoryStaticControlError("Withdrawal cannot supersede a publication")
+        if state != "released":
+            raise RepositoryStaticControlError("Only a released publication can be withdrawn")
     event = RepositoryStaticPublicationControlEvent.objects.create(
         tenant_id=publication.tenant_id,
         organization_id=publication.organization_id,
         workspace_id=publication.workspace_id,
         publication=publication,
+        supersedes_id=supersedes_id,
         action=action,
         reason=reason.strip(),
         actor=actor,
@@ -83,6 +101,6 @@ def record_repository_static_control(
         actor=actor,
         action=f"repository.static_publication.{action}",
         entity_id=publication.id,
-        metadata={"control_event_id": str(event.id)},
+        metadata={"control_event_id": str(event.id), "supersedes_id": str(supersedes_id) if supersedes_id else None},
     )
     return event

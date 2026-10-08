@@ -474,6 +474,15 @@ MFA-gated API now retains and lists scoped evidence summaries for review; it
 does not approve publications or distribute artifacts. A separate approver-only
 read verifies the retained evidence before returning exact canonical Markdown;
 it does not expose frozen key values or downloadable files.
+The internal path now requires independent evidence review, package creation,
+authorization, and a signed repository STATIC record before an MFA-enabled
+approver can release it. Release and withdrawal are append-only exact-Workspace
+decisions. A replacement must be independently signed and authorized and name
+the one active predecessor for the same document and audience; PostgreSQL
+serializes the decision and the predecessor remains verifiable as superseded
+history even if the replacement is withdrawn. This is not client delivery:
+repository portal routes, notifications, and legacy authority handoff remain
+separate exit gates.
 
 ### `0.9.8` — version 1 acceptance
 

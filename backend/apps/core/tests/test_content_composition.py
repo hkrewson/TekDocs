@@ -862,21 +862,71 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(
         candidate_control_url, data=release_payload, content_type="application/json"
     ).status_code == 409
-    retained_pdf.storage.delete(retained_pdf.name)
+    candidate_publication = RepositoryStaticPublication.objects.get(
+        authorization__package__decision__evidence_id=candidate_evidence_id
+    )
+    with pytest.raises(DatabaseError):
+        RepositoryStaticPublicationControlEvent.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            workspace=workspace,
+            publication=candidate_publication,
+            action="released",
+            reason="Missing explicit predecessor",
+            actor=authorizer,
+        )
+    supersession_payload = json.dumps({
+        "action": "released", "reason": "Replace the reviewed prior record",
+        "supersedes_id": str(publication.id),
+    })
+    assert browser.post(
+        candidate_control_url,
+        data=json.dumps({"action": "released", "reason": "Wrong predecessor", "supersedes_id": str(uuid.uuid4())}),
+        content_type="application/json",
+    ).status_code == 409
+    superseded = browser.post(candidate_control_url, data=supersession_payload, content_type="application/json")
+    assert superseded.status_code == 201, superseded.content
+    assert superseded.json()["state"] == "released"
+    assert superseded.json()["events"][0]["supersedes_id"] == str(publication.id)
+    assert browser.get(control_url).json()["state"] == "superseded"
+    assert browser.post(control_url, data=withdrawal_payload, content_type="application/json").status_code == 409
+    with pytest.raises(DatabaseError):
+        RepositoryStaticPublicationControlEvent.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            workspace=workspace,
+            publication=publication,
+            action="withdrawn",
+            reason="Cannot withdraw superseded record",
+            actor=authorizer,
+        )
+    assert browser.post(
+        candidate_control_url,
+        data=json.dumps({"action": "withdrawn", "reason": "Invalid predecessor", "supersedes_id": str(publication.id)}),
+        content_type="application/json",
+    ).status_code == 409
+    assert browser.post(
+        candidate_control_url, data=supersession_payload, content_type="application/json"
+    ).status_code == 409
+    candidate_pdf = RepositoryPublicationEvidence.objects.get(pk=candidate_evidence_id).pdf_file
+    with candidate_pdf.open("rb") as source:
+        candidate_pdf_bytes = source.read()
+    candidate_pdf.storage.delete(candidate_pdf.name)
     try:
-        withdrawn = browser.post(control_url, data=withdrawal_payload, content_type="application/json")
+        withdrawn = browser.post(candidate_control_url, data=withdrawal_payload, content_type="application/json")
         assert withdrawn.json()["verified"] is False
     finally:
-        assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
+        assert candidate_pdf.storage.save(candidate_pdf.name, ContentFile(candidate_pdf_bytes)) == candidate_pdf.name
     assert withdrawn.status_code == 201, withdrawn.content
     assert withdrawn.json()["state"] == "withdrawn"
     assert withdrawn.json()["permits_distribution"] is False
     assert len(withdrawn.json()["events"]) == 2
-    assert browser.post(control_url, data=withdrawal_payload, content_type="application/json").status_code == 409
-    assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
+    assert browser.get(control_url).json()["state"] == "superseded"
     assert browser.post(
-        candidate_control_url, data=release_payload, content_type="application/json"
-    ).status_code == 201
+        candidate_control_url, data=withdrawal_payload, content_type="application/json"
+    ).status_code == 409
+    assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
+    assert browser.post(candidate_control_url, data=release_payload, content_type="application/json").status_code == 409
     browser.force_login(reviewer)
     assert publication.manifest["package_digest"] == package.manifest_digest
     assert browser.get(static_url).json()["content_digest"] == publication.content_digest
@@ -1063,8 +1113,20 @@ def test_repository_static_control_upgrade_installs_forced_rls_and_guards():
     try:
         MigrationExecutor(connection).migrate([("core", "0174_repository_static_publication")])
         assert "core_repositorystaticpublicationcontrolevent" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate([("core", "0175_repository_static_controls")])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name='core_repositorystaticpublicationcontrolevent' AND column_name='supersedes_id'"
+            )
+            assert cursor.fetchone() == (0,)
         MigrationExecutor(connection).migrate(head)
         with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM information_schema.columns "
+                "WHERE table_name='core_repositorystaticpublicationcontrolevent' AND column_name='supersedes_id'"
+            )
+            assert cursor.fetchone() == (1,)
             cursor.execute(
                 "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
                 "WHERE relname = 'core_repositorystaticpublicationcontrolevent'"

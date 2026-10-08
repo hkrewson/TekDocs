@@ -15550,10 +15550,11 @@ export interface components {
             /**
              * @description * `recorded` - recorded
              *     * `released` - released
+             *     * `superseded` - superseded
              *     * `withdrawn` - withdrawn
              * @enum {string}
              */
-            readonly state: "recorded" | "released" | "withdrawn";
+            readonly state: "recorded" | "released" | "superseded" | "withdrawn";
             readonly events: readonly components["schemas"]["RepositoryStaticControlEvent"][];
             readonly verified: boolean;
             readonly permits_distribution: boolean;
@@ -15567,6 +15568,8 @@ export interface components {
              * @enum {string}
              */
             readonly action: "released" | "withdrawn";
+            /** Format: uuid */
+            readonly supersedes_id: string | null;
             readonly reason: string;
             /** Format: uuid */
             readonly actor_id: string;
@@ -15581,6 +15584,8 @@ export interface components {
              */
             readonly action: "released" | "withdrawn";
             readonly reason: string;
+            /** Format: uuid */
+            readonly supersedes_id?: string | null;
         };
         readonly RepositoryStaticPublication: {
             /** Format: uuid */

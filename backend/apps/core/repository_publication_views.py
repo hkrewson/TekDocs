@@ -171,11 +171,13 @@ class RepositoryStaticPublicationSerializer(serializers.Serializer):
 class RepositoryStaticControlWriteSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=RepositoryStaticPublicationControlEvent.Action.choices)
     reason = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
+    supersedes_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class RepositoryStaticControlEventSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     action = serializers.ChoiceField(choices=RepositoryStaticPublicationControlEvent.Action.choices)
+    supersedes_id = serializers.UUIDField(allow_null=True)
     reason = serializers.CharField()
     actor_id = serializers.UUIDField()
     occurred_at = serializers.DateTimeField()
@@ -183,7 +185,7 @@ class RepositoryStaticControlEventSerializer(serializers.Serializer):
 
 class RepositoryStaticControlSerializer(serializers.Serializer):
     publication_id = serializers.UUIDField()
-    state = serializers.ChoiceField(choices=["recorded", "released", "withdrawn"])
+    state = serializers.ChoiceField(choices=["recorded", "released", "superseded", "withdrawn"])
     events = RepositoryStaticControlEventSerializer(many=True)
     verified = serializers.BooleanField()
     permits_distribution = serializers.BooleanField()
@@ -558,6 +560,7 @@ def _static_control_data(publication: RepositoryStaticPublication) -> dict[str, 
                     {
                         "id": event.id,
                         "action": event.action,
+                        "supersedes_id": event.supersedes_id,
                         "reason": event.reason,
                         "actor_id": event.actor_id,
                         "occurred_at": event.occurred_at,
@@ -589,6 +592,7 @@ def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) ->
             action=serializer.validated_data["action"],
             reason=serializer.validated_data["reason"],
             actor=request.user,
+            supersedes_id=serializer.validated_data.get("supersedes_id"),
         )
     except (RepositoryStaticControlError, IntegrityError) as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)

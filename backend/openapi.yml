@@ -49800,13 +49800,15 @@ components:
           enum:
           - recorded
           - released
+          - superseded
           - withdrawn
           type: string
           description: |-
             * `recorded` - recorded
             * `released` - released
+            * `superseded` - superseded
             * `withdrawn` - withdrawn
-          x-spec-enum-id: 6bb54b29bc07888e
+          x-spec-enum-id: 7fdc2d648eb23992
         events:
           type: array
           items:
@@ -49836,6 +49838,10 @@ components:
             * `released` - Released for future delivery
             * `withdrawn` - Withdrawn
           x-spec-enum-id: 82d05710138611cd
+        supersedes_id:
+          type: string
+          format: uuid
+          nullable: true
         reason:
           type: string
         actor_id:
@@ -49850,6 +49856,7 @@ components:
       - id
       - occurred_at
       - reason
+      - supersedes_id
     RepositoryStaticControlWrite:
       type: object
       properties:
@@ -49865,6 +49872,10 @@ components:
         reason:
           type: string
           maxLength: 500
+        supersedes_id:
+          type: string
+          format: uuid
+          nullable: true
       required:
       - action
       - reason

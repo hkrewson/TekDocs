@@ -5314,6 +5314,10 @@ class RepositoryStaticPublicationControlEvent(models.Model):
     publication = models.ForeignKey(
         RepositoryStaticPublication, on_delete=models.PROTECT, related_name="control_events"
     )
+    supersedes = models.OneToOneField(
+        RepositoryStaticPublication, null=True, blank=True, on_delete=models.PROTECT,
+        related_name="supersession_event",
+    )
     action = models.CharField(max_length=16, choices=Action.choices)
     reason = models.CharField(max_length=500)
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
@@ -5334,6 +5338,10 @@ class RepositoryStaticPublicationControlEvent(models.Model):
             ),
             models.UniqueConstraint(
                 fields=("publication", "action"), name="repository_static_control_one_action"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(action="released") | models.Q(supersedes__isnull=True),
+                name="repository_static_control_supersedes_on_release",
             ),
         ]
 

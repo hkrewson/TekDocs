@@ -70,6 +70,15 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route(
+        "msp-repository-publication-evidence", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_PUBLISH, (PermissionKey.DOCUMENTS_PUBLISH,),
+    ),
+    route("msp-repository-publication-evidence-detail", ("GET",), PermissionKey.DOCUMENTS_PUBLISH),
+    route("msp-repository-publication-evidence-review", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
+    route("msp-repository-publication-evidence-review-html", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
+    route("msp-repository-publication-evidence-review-pdf", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
+    route("msp-repository-publication-evidence-review-attachment", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
     route("msp-content-authoring", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1356,6 +1365,54 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_VIEW,
         (PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_PUBLISH, (PermissionKey.DOCUMENTS_PUBLISH,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-detail", ("GET",),
+        PermissionKey.DOCUMENTS_PUBLISH, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-review", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-review-html", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-review-pdf", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-review-attachment", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-decision", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_APPROVE, (PermissionKey.DOCUMENTS_APPROVE,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-package", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_PUBLISH, (PermissionKey.DOCUMENTS_PUBLISH,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-package-authorization", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_APPROVE, (PermissionKey.DOCUMENTS_APPROVE,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-static-publication", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_PUBLISH, (PermissionKey.DOCUMENTS_PUBLISH,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-static-control", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_APPROVE, (PermissionKey.DOCUMENTS_APPROVE,), organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-static-delivery", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_APPROVE, (PermissionKey.DOCUMENTS_APPROVE,), organization_scoped=True,
     ),
     route(
         "organization-content-authoring",

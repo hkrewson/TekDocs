@@ -26,6 +26,7 @@ from .models import (
     RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
+    RepositoryStaticDeliveryAuthorization,
     RepositoryStaticPublication,
     RepositoryStaticPublicationControlEvent,
     WorkspaceRepository,
@@ -56,6 +57,11 @@ from .repository_static_controls import (
     RepositoryStaticControlError,
     record_repository_static_control,
     repository_static_state,
+)
+from .repository_static_delivery import (
+    RepositoryStaticDeliveryError,
+    authorize_repository_static_delivery,
+    repository_static_delivery_ready,
 )
 from .repository_static_publications import (
     RepositoryStaticPublicationError,
@@ -188,6 +194,20 @@ class RepositoryStaticControlSerializer(serializers.Serializer):
     state = serializers.ChoiceField(choices=["recorded", "released", "superseded", "withdrawn"])
     events = RepositoryStaticControlEventSerializer(many=True)
     verified = serializers.BooleanField()
+    permits_distribution = serializers.BooleanField()
+
+
+class RepositoryStaticDeliveryWriteSerializer(serializers.Serializer):
+    reason = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
+
+
+class RepositoryStaticDeliverySerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    publication_id = serializers.UUIDField()
+    reason = serializers.CharField()
+    actor_id = serializers.UUIDField()
+    occurred_at = serializers.DateTimeField()
+    currently_effective = serializers.BooleanField()
     permits_distribution = serializers.BooleanField()
 
 
@@ -599,6 +619,47 @@ def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) ->
     return Response(_static_control_data(publication), status=status.HTTP_201_CREATED)
 
 
+def _static_delivery_data(authorization: RepositoryStaticDeliveryAuthorization) -> dict[str, object]:
+    return cast(
+        dict[str, object],
+        RepositoryStaticDeliverySerializer(
+            {
+                "id": authorization.id,
+                "publication_id": authorization.publication_id,
+                "reason": authorization.reason,
+                "actor_id": authorization.actor_id,
+                "occurred_at": authorization.occurred_at,
+                "currently_effective": repository_static_delivery_ready(authorization.publication),
+                "permits_distribution": False,
+            }
+        ).data,
+    )
+
+
+def _static_delivery(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_APPROVE, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    publication = RepositoryStaticPublication.objects.filter(
+        authorization__package__decision__evidence=evidence
+    ).first()
+    if publication is None:
+        return Response({"detail": "No STATIC record exists"}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == "GET":
+        authorization = RepositoryStaticDeliveryAuthorization.objects.filter(publication=publication).first()
+        if authorization is None:
+            return Response({"detail": "Delivery authorization does not exist"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_static_delivery_data(authorization))
+    serializer = RepositoryStaticDeliveryWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        authorization = authorize_repository_static_delivery(
+            publication_id=publication.id, reason=serializer.validated_data["reason"], actor=request.user
+        )
+    except (RepositoryStaticDeliveryError, IntegrityError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(_static_delivery_data(authorization), status=status.HTTP_201_CREATED)
+
+
 class MSPRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_list",
@@ -864,6 +925,31 @@ class OrganizationRepositoryStaticControlView(APIView):
     )
     def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
         return _static_control(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryStaticDeliveryView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_delivery_retrieve",
+        responses={200: RepositoryStaticDeliverySerializer},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_delivery(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_delivery_authorize",
+        request=RepositoryStaticDeliveryWriteSerializer,
+        responses={201: RepositoryStaticDeliverySerializer},
+    )
+    def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_delivery(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,

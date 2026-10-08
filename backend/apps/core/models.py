@@ -5357,6 +5357,43 @@ class RepositoryStaticPublicationControlEvent(models.Model):
         raise ValidationError("Repository STATIC control events are append-only")
 
 
+class RepositoryStaticDeliveryAuthorization(models.Model):
+    """Append-only approval for a future client delivery path, not delivery itself."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    publication = models.OneToOneField(
+        RepositoryStaticPublication, on_delete=models.PROTECT, related_name="delivery_authorization"
+    )
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(reason=""), name="repository_static_delivery_reason_required"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository STATIC delivery authorizations are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository STATIC delivery authorizations are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

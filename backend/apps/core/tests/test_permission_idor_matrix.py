@@ -616,6 +616,13 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         if route_name.startswith("organization-"):
             kwargs["organization_entity_id"] = value
         return kwargs
+    if "repository-publication-evidence" in route_name:
+        kwargs = {"organization_entity_id": value} if route_name.startswith("organization-") else {}
+        if not route_name.endswith("repository-publication-evidence"):
+            kwargs["evidence_id"] = value
+        if route_name.endswith("review-attachment"):
+            kwargs["artifact_id"] = value
+        return kwargs
     return {
         name: ("json" if name == "export_format" else 1 if name == "revision_number" else value)
         for name in route_kwargs.get(route_name, ())

@@ -7,6 +7,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from threading import Event
+from types import SimpleNamespace
 
 import pytest
 from allauth.mfa.models import Authenticator
@@ -44,6 +45,7 @@ from apps.core.models import (
     RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
+    RepositoryStaticDeliveryAuthorization,
     RepositoryStaticPublication,
     RepositoryStaticPublicationControlEvent,
     Tenant,
@@ -62,6 +64,7 @@ from apps.core.repository_publication_evidence import (
 from apps.core.repository_publication_packages import verify_repository_publication_package
 from apps.core.repository_publication_preflight import repository_publication_preflight
 from apps.core.repository_service import RepositoryFileNotFoundError
+from apps.core.repository_static_delivery import _client_reference_projection_safe
 from apps.core.repository_static_publications import verify_repository_static_publication
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
@@ -789,9 +792,21 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
         "organization-repository-publication-evidence-static-control",
         args=[organization.entity_id, evidence_id],
     )
+    delivery_url = reverse(
+        "organization-repository-publication-evidence-static-delivery",
+        args=[organization.entity_id, evidence_id],
+    )
+    delivery_payload = json.dumps({"reason": "Approve exact retained record for a future client path"})
     release_payload = json.dumps({"action": "released", "reason": "Exact package cleared for future delivery"})
     withdrawal_payload = json.dumps({"action": "withdrawn", "reason": "Withdraw before client delivery"})
     assert browser.get(control_url).json()["state"] == "recorded"
+    assert browser.get(delivery_url).status_code == 404
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    with pytest.raises(DatabaseError):
+        RepositoryStaticDeliveryAuthorization.objects.create(
+            tenant=installation.tenant, organization=organization, workspace=workspace,
+            publication=publication, reason="No active release", actor=authorizer,
+        )
     assert browser.post(control_url, data=withdrawal_payload, content_type="application/json").status_code == 409
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
     with pytest.raises(DatabaseError):
@@ -818,6 +833,29 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert released.json()["permits_distribution"] is False
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
     release_event = RepositoryStaticPublicationControlEvent.objects.get(action="released")
+    with pytest.raises(DatabaseError):
+        RepositoryStaticDeliveryAuthorization.objects.create(
+            tenant=installation.tenant, organization=organization, workspace=_workspace,
+            publication=publication, reason="Wrong Workspace", actor=authorizer,
+        )
+    with pytest.raises(DatabaseError):
+        RepositoryStaticDeliveryAuthorization.objects.create(
+            tenant=installation.tenant, organization=organization, workspace=workspace,
+            publication=publication, reason="Creator cannot self-authorize delivery", actor=reviewer,
+        )
+    retained_pdf.storage.delete(retained_pdf.name)
+    try:
+        assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    finally:
+        assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
+    delivery = browser.post(delivery_url, data=delivery_payload, content_type="application/json")
+    assert delivery.status_code == 201, delivery.content
+    assert delivery.json()["currently_effective"] is True
+    assert delivery.json()["permits_distribution"] is False
+    assert browser.get(delivery_url).json()["id"] == delivery.json()["id"]
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    with pytest.raises(DatabaseError):
+        RepositoryStaticDeliveryAuthorization.objects.filter(pk=delivery.json()["id"]).update(reason="Changed")
     with pytest.raises(DatabaseError):
         RepositoryStaticPublicationControlEvent.objects.filter(pk=release_event.id).update(reason="Changed")
     browser.force_login(installation.owner)
@@ -858,6 +896,10 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
         "organization-repository-publication-evidence-static-control",
         args=[organization.entity_id, candidate_evidence_id],
     )
+    candidate_delivery_url = reverse(
+        "organization-repository-publication-evidence-static-delivery",
+        args=[organization.entity_id, candidate_evidence_id],
+    )
     browser.force_login(authorizer)
     assert browser.post(
         candidate_control_url, data=release_payload, content_type="application/json"
@@ -889,6 +931,12 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert superseded.json()["state"] == "released"
     assert superseded.json()["events"][0]["supersedes_id"] == str(publication.id)
     assert browser.get(control_url).json()["state"] == "superseded"
+    assert browser.get(delivery_url).json()["currently_effective"] is False
+    replacement_delivery = browser.post(
+        candidate_delivery_url, data=delivery_payload, content_type="application/json"
+    )
+    assert replacement_delivery.status_code == 201, replacement_delivery.content
+    assert replacement_delivery.json()["currently_effective"] is True
     assert browser.post(control_url, data=withdrawal_payload, content_type="application/json").status_code == 409
     with pytest.raises(DatabaseError):
         RepositoryStaticPublicationControlEvent.objects.create(
@@ -920,6 +968,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert withdrawn.status_code == 201, withdrawn.content
     assert withdrawn.json()["state"] == "withdrawn"
     assert withdrawn.json()["permits_distribution"] is False
+    assert browser.get(candidate_delivery_url).json()["currently_effective"] is False
     assert len(withdrawn.json()["events"]) == 2
     assert browser.get(control_url).json()["state"] == "superseded"
     assert browser.post(
@@ -973,10 +1022,15 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     sibling_control_url = reverse(
         "organization-repository-publication-evidence-static-control", args=[sibling.entity_id, evidence_id]
     )
+    sibling_delivery_url = reverse(
+        "organization-repository-publication-evidence-static-delivery", args=[sibling.entity_id, evidence_id]
+    )
     assert browser.get(sibling_control_url).status_code == 404
     assert browser.post(
         sibling_control_url, data=release_payload, content_type="application/json"
     ).status_code == 404
+    assert browser.get(sibling_delivery_url).status_code == 404
+    assert browser.post(sibling_delivery_url, data=delivery_payload, content_type="application/json").status_code == 404
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
     foreign_tenant = Tenant.objects.create(name="Foreign package MSP", slug="foreign-package-msp")
     foreign_user = User.objects.create_user(email="foreign-package@example.invalid", display_name="Foreign")
@@ -995,6 +1049,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(static_url).status_code in {403, 404}
     assert browser.get(control_url).status_code in {403, 404}
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code in {403, 404}
+    assert browser.get(delivery_url).status_code in {403, 404}
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code in {403, 404}
     read_only_user = User.objects.create_user(email="read-only-package@example.invalid", display_name="Read-only")
     read_only_membership = TenantMembership.objects.create(
         tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY
@@ -1019,6 +1075,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(static_url).status_code == 403
     assert browser.get(control_url).status_code == 403
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 403
+    assert browser.get(delivery_url).status_code == 403
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 403
     browser.force_login(reviewer)
     with pytest.raises(DatabaseError):
         RepositoryPublicationPackage.objects.filter(pk=package.id).update(manifest_digest="0" * 64)
@@ -1063,6 +1121,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert browser.post(static_url).status_code == 403
     assert browser.get(control_url).status_code == 403
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 403
+    assert browser.get(delivery_url).status_code == 403
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 403
 
     browser.force_login(installation.owner)
     second = browser.post(
@@ -1104,6 +1164,31 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     retained.pdf_file.storage.delete(retained.pdf_file.name)
     assert not verify_repository_publication_package(package)
     assert not verify_repository_static_publication(publication)
+
+
+def test_repository_static_delivery_upgrade_installs_forced_rls_and_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0176_repository_static_supersession")])
+        assert "core_repositorystaticdeliveryauthorization" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorystaticdeliveryauthorization'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger "
+                "WHERE tgrelid = 'core_repositorystaticdeliveryauthorization'::regclass "
+                "AND tgname IN ('core_repositorystaticdeliveryauthorization_validate', "
+                "'core_repositorystaticdeliveryauthorization_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
 
 
 def test_repository_static_control_upgrade_installs_forced_rls_and_guards():
@@ -1921,6 +2006,20 @@ def test_repository_evidence_entity_cards_require_client_visibility_and_exact_ow
         actor=installation.owner,
     )
     assert verify_repository_publication_evidence(evidence)["valid"]
+    projection = SimpleNamespace(
+        tenant_id=installation.tenant.id,
+        organization_id=client.id,
+        workspace_id=workspace.id,
+        authorization=SimpleNamespace(
+            package=SimpleNamespace(decision=SimpleNamespace(evidence=evidence))
+        ),
+    )
+    assert _client_reference_projection_safe(projection)
+    target.entity.visibility = EntityVisibility.MSP_PRIVATE
+    target.entity.save(update_fields=("visibility", "updated_at"))
+    assert not _client_reference_projection_safe(projection)
+    target.entity.visibility = EntityVisibility.CLIENT_VISIBLE
+    target.entity.save(update_fields=("visibility", "updated_at"))
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=_accepted(repository),

@@ -1701,6 +1701,11 @@ decisions are append-only and exact-Workspace scoped. A replacement must have
 its own signed, authorized STATIC record, and only the current active record
 can be superseded. Client delivery and portal parity remain open; an internal
 release is not a client-visible publication.
+A separate append-only, MFA-gated client-delivery authorization now requires
+the active release, intact retained chain, and currently client-visible entity
+references. It becomes ineffective on withdrawal, supersession, corruption, or
+reference-visibility loss. This is approval for a future delivery path, not
+client access; repository portal projection and downloads remain open gates.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

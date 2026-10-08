@@ -40,6 +40,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_repositorystaticpublication"
         else "Append-only internal repository release/withdrawal; exact-workspace RLS and lineage guard."
         if table == "core_repositorystaticpublicationcontrolevent"
+        else "Append-only future client-delivery approval; exact-workspace RLS and active-release guard."
+        if table == "core_repositorystaticdeliveryauthorization"
         else "Append-only retained repository evidence bytes; exact-workspace RLS and source-attachment guard."
         if table == "core_repositoryevidenceattachment"
         else "Exact-client recurring enrollment, approved terms, and permanent period claims."

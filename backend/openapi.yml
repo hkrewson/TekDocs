@@ -32559,6 +32559,85 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/delivery-authorization
+  : get:
+      operationId: repository_evidence_organization_static_delivery_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticDelivery'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: repository_evidence_organization_static_delivery_authorize
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticDeliveryWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticDeliveryWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticDeliveryWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryStaticDelivery'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_organization_review
@@ -49878,6 +49957,43 @@ components:
           nullable: true
       required:
       - action
+      - reason
+    RepositoryStaticDelivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        publication_id:
+          type: string
+          format: uuid
+        reason:
+          type: string
+        actor_id:
+          type: string
+          format: uuid
+        occurred_at:
+          type: string
+          format: date-time
+        currently_effective:
+          type: boolean
+        permits_distribution:
+          type: boolean
+      required:
+      - actor_id
+      - currently_effective
+      - id
+      - occurred_at
+      - permits_distribution
+      - publication_id
+      - reason
+    RepositoryStaticDeliveryWrite:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+      required:
       - reason
     RepositoryStaticPublication:
       type: object

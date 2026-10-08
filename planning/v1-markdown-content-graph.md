@@ -483,6 +483,11 @@ serializes the decision and the predecessor remains verifiable as superseded
 history even if the replacement is withdrawn. This is not client delivery:
 repository portal routes, notifications, and legacy authority handoff remain
 separate exit gates.
+A separate append-only client-delivery authorization is the next gate after an
+active internal release. It rechecks the signed retained chain and current
+client-visible entity references; it is ineffective after withdrawal,
+supersession, artifact corruption, or a reference-visibility change. It does
+not itself add a portal read or download path.
 
 ### `0.9.8` — version 1 acceptance
 

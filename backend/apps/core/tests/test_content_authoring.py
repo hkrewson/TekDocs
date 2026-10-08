@@ -420,6 +420,7 @@ def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(auth
     url = reverse("msp-content-authoring-export")
     response = browser.get(url)
     assert response.status_code == 200, response.content
+    assert len(verify_repository_source_snapshot(response.content)["historical_files"]) == 2
     assert browser.get(url).content == response.content
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         manifest = json.loads(archive.read("tekdocs-source.json"))
@@ -507,6 +508,7 @@ def test_repository_source_snapshot_follows_template_and_copy_provenance(authori
     browser.force_login(installation.owner)
     response = browser.get(reverse("msp-content-authoring-export"))
     assert response.status_code == 200, response.content
+    assert len(verify_repository_source_snapshot(response.content)["historical_files"]) == 3
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         manifest = json.loads(archive.read("tekdocs-source.json"))
         historical = {item["content_id"]: item for item in manifest["historical_files"]}

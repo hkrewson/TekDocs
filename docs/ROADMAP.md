@@ -1766,7 +1766,9 @@ and Git history are excluded. Complete editable bundles and
 recovery remain open gates.
 An offline source-snapshot command now rejects missing, altered, duplicate,
 unsafe or unlisted ZIP entries and checks exact Markdown identities against the
-v3 manifest. This is an internal-consistency check, not Git authenticity,
+v3 manifest. It also reconstructs the transitive Markdown dependency graph,
+rejecting omitted, unreferenced or incorrectly labelled historical sources.
+This is an internal-consistency check, not Git authenticity,
 import, attachment parity, or recovery verification.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active

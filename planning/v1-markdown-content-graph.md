@@ -458,7 +458,9 @@ gates after file, template, review, key, publication and recovery parity.
   bundle or backup. Index lag and unavailable source fail closed.
 - An offline verifier checks a downloaded source ZIP's v3 manifest, exact listed
   Markdown identities and checksums, safe paths, bounded entries and unexpected
-  files. It proves internal consistency only: the manifest is not signed against
+  files. It also recomputes transitive include/template/copy dependencies and
+  refuses omitted, unreferenced or mislabelled historical sources. It proves
+  internal consistency only: the manifest is not signed against
   Git, and this neither imports content nor verifies attachments or backup state.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.

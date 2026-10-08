@@ -8,10 +8,13 @@ import json
 import re
 import stat
 import zipfile
+from collections import deque
 from pathlib import PurePosixPath
 from uuid import UUID
 
-from .content_profile import ContentProfileError, parse_content
+from .content_composition import ContentCompositionError, ContentCompositionResolver
+from .content_index import MAX_PINNED_SNAPSHOTS
+from .content_profile import ContentProfileError, ParsedContent, parse_content
 from .repository_source_exports import MAX_SOURCE_FILES, MAX_SOURCE_INPUT_BYTES, MAX_SOURCE_ZIP_BYTES
 
 MAX_MANIFEST_BYTES = 256 * 1024
@@ -82,6 +85,71 @@ def _descriptor(value: object, *, historical: bool, object_format: str) -> tuple
     return expected_path, content_id, kind, digest
 
 
+def _verify_dependency_closure(
+    *,
+    accepted_commit: str,
+    snapshots: dict[str, dict[UUID, ParsedContent]],
+    historical_roles: dict[tuple[str, UUID], set[str]],
+) -> None:
+    discovered: dict[tuple[str, UUID], set[str]] = {}
+    pending: deque[tuple[str, UUID]] = deque()
+
+    def load_snapshot(object_id: str) -> dict[UUID, ParsedContent]:
+        snapshot = snapshots.get(object_id)
+        if snapshot is None:
+            raise RepositorySourceValidationError("The source snapshot omits a referenced Git revision.")
+        return snapshot
+
+    def add_reference(object_id: str, content_id: UUID, role: str, *, fragment_only: bool = False) -> None:
+        target = load_snapshot(object_id).get(content_id)
+        if target is None or (fragment_only and target.kind != "fragment"):
+            raise RepositorySourceValidationError("The source snapshot omits a referenced Markdown file.")
+        if object_id == accepted_commit:
+            return
+        key = (object_id, content_id)
+        if key not in discovered:
+            discovered[key] = set()
+            pending.append(key)
+        discovered[key].add(role)
+
+    def add_provenance(parsed: ParsedContent) -> None:
+        if parsed.derived_from is not None:
+            if parsed.derived_from.content_id == parsed.content_id:
+                raise RepositorySourceValidationError("The source snapshot has invalid copy provenance.")
+            add_reference(
+                parsed.derived_from.object_id,
+                parsed.derived_from.content_id,
+                "derived_from",
+                fragment_only=True,
+            )
+        for source in parsed.template_sources:
+            add_reference(source.object_id, source.content_id, "template_source")
+
+    current = snapshots[accepted_commit]
+    resolver = ContentCompositionResolver(
+        accepted_object_id=accepted_commit,
+        accepted=current,
+        loader=load_snapshot,
+    )
+    for content_id in sorted(current, key=str):
+        for dependency in resolver.resolve(content_id=content_id, audience=None).manifest:
+            add_reference(str(dependency["commit"]), UUID(str(dependency["id"])), "include", fragment_only=True)
+        add_provenance(current[content_id])
+    while pending:
+        object_id, content_id = pending.popleft()
+        snapshot = load_snapshot(object_id)
+        resolver = ContentCompositionResolver(
+            accepted_object_id=object_id,
+            accepted=snapshot,
+            loader=load_snapshot,
+        )
+        for dependency in resolver.resolve(content_id=content_id, audience=None).manifest:
+            add_reference(str(dependency["commit"]), UUID(str(dependency["id"])), "include", fragment_only=True)
+        add_provenance(snapshot[content_id])
+    if discovered != historical_roles:
+        raise RepositorySourceValidationError("The source snapshot historical dependency inventory differs.")
+
+
 def verify_repository_source_snapshot(content: bytes) -> dict[str, object]:
     """Check ZIP structure, manifest identities, and exact Markdown bytes.
 
@@ -142,6 +210,8 @@ def verify_repository_source_snapshot(content: bytes) -> dict[str, object]:
                 raise RepositorySourceValidationError("The source snapshot file inventory is invalid.")
             expected = {"README.md", "tekdocs-source.json"}
             identities: set[tuple[str, UUID]] = set()
+            snapshots: dict[str, dict[UUID, ParsedContent]] = {manifest["accepted_commit"]: {}}
+            historical_roles: dict[tuple[str, UUID], set[str]] = {}
             source_bytes = 0
             for item in current + historical:
                 is_historical = item in historical
@@ -162,11 +232,30 @@ def verify_repository_source_snapshot(content: bytes) -> dict[str, object]:
                 parsed = parse_content(source)
                 if parsed.content_id != content_id or parsed.kind != kind:
                     raise RepositorySourceValidationError("The source snapshot Markdown identity differs.")
+                snapshots.setdefault(identity[0], {})[content_id] = parsed
+                if is_historical:
+                    if identity[0] == manifest["accepted_commit"]:
+                        raise RepositorySourceValidationError("A historical source uses the current Git revision.")
+                    historical_roles[identity] = set(item["roles"])
+            if len(snapshots) - 1 > MAX_PINNED_SNAPSHOTS:
+                raise RepositorySourceValidationError("The source snapshot has too many historical revisions.")
             if set(names) != expected:
                 raise RepositorySourceValidationError("The source snapshot contains an unlisted entry.")
             archive.read("README.md")
+            _verify_dependency_closure(
+                accepted_commit=manifest["accepted_commit"], snapshots=snapshots, historical_roles=historical_roles
+            )
             return manifest
     except RepositorySourceValidationError:
         raise
-    except (OSError, zipfile.BadZipFile, RuntimeError, KeyError, ValueError, TypeError, ContentProfileError) as exc:
+    except (
+        OSError,
+        zipfile.BadZipFile,
+        RuntimeError,
+        KeyError,
+        ValueError,
+        TypeError,
+        ContentProfileError,
+        ContentCompositionError,
+    ) as exc:
         raise RepositorySourceValidationError("The source snapshot is invalid or unreadable.") from exc

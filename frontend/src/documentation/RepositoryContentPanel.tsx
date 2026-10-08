@@ -32,6 +32,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
@@ -130,8 +131,25 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     window.setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 
+  async function downloadSnapshot() {
+    if (exporting) return
+    setExporting(true); setError('')
+    try {
+      const result = await client.exportSources(organizationId)
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setError(translate('repository.snapshotFailed'))
+    } finally { setExporting(false) }
+  }
+
   return <section className="repository-authoring">
-    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
+    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="secondary-button" onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
+    <p className="form-message">{translate('repository.snapshotNotice')}</p>
     {error && <p role="alert" className="form-message error">{error}</p>}
     {message && <p role="status" className="form-message success">{message}</p>}
     {listing && listing.accepted_commit !== listing.indexed_commit && <p role="status" className="form-message">{translate('repository.indexPending')}</p>}

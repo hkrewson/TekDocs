@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from drf_spectacular.utils import extend_schema
+from django.http import HttpResponse
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -22,12 +23,15 @@ from .content_authoring import (
 from .content_index import ContentIndexValidationError
 from .content_read import repository_for_reader
 from .document_views import _msp_workspace, _organization_workspace
+from .models import AuditEvent, WorkspaceRepository
 from .repository_service import (
     RepositoryFileNotFoundError,
     RepositoryInputError,
     RepositoryReconciliationError,
     RepositoryServiceError,
 )
+from .repository_source_exports import RepositorySourceExportError, export_repository_sources
+from .repository_storage import RepositoryStorageError
 
 
 class ContentAuthoringMutationSerializer(serializers.Serializer):
@@ -163,6 +167,60 @@ class OrganizationContentAuthoringSourceView(APIView):
     )
     def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _read(request, content_id, organization_entity_id)
+
+
+def _source_snapshot(request, organization_entity_id: UUID | None = None) -> HttpResponse | Response:  # type: ignore[no-untyped-def]
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+    try:
+        repository = repository_for_reader(workspace)
+        result = export_repository_sources(repository)
+    except WorkspaceRepository.DoesNotExist:
+        return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+    except RepositorySourceExportError as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    except (RepositoryServiceError, RepositoryStorageError):
+        return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="repository_source_export.downloaded",
+        entity_id=repository.id,
+        request_id=getattr(request, "request_id", None),
+        metadata={"accepted_commit": result.accepted_commit, "file_count": result.file_count},
+    )
+    response = HttpResponse(result.content, content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="tekdocs-repository-{result.accepted_commit[:12]}.zip"'
+    response["Cache-Control"] = "no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+class MSPContentAuthoringExportView(APIView):
+    @extend_schema(
+        operation_id="content_authoring_msp_export",
+        responses={
+            (200, "application/zip"): bytes,
+            404: OpenApiResponse(description="Workspace repository is unavailable"),
+            409: OpenApiResponse(description="Accepted and indexed heads do not match"),
+            503: OpenApiResponse(description="Repository source is unavailable or exceeds limits"),
+        },
+    )
+    def get(self, request):  # type: ignore[no-untyped-def]
+        return _source_snapshot(request)
+
+
+class OrganizationContentAuthoringExportView(APIView):
+    @extend_schema(
+        operation_id="content_authoring_organization_export",
+        responses={
+            (200, "application/zip"): bytes,
+            404: OpenApiResponse(description="Workspace repository is unavailable"),
+            409: OpenApiResponse(description="Accepted and indexed heads do not match"),
+            503: OpenApiResponse(description="Repository source is unavailable or exceeds limits"),
+        },
+    )
+    def get(self, request, organization_entity_id):  # type: ignore[no-untyped-def]
+        return _source_snapshot(request, organization_entity_id)
 
 
 class MSPContentPathResolveView(APIView):

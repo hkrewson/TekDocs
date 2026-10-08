@@ -95,6 +95,20 @@ export const browserRepositoryClient = {
     })
     return parse<RepositorySource>(response)
   },
+  async exportSources(organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/authoring/export`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) {
+      let detail: unknown
+      try { detail = (await response.json() as { detail?: unknown }).detail } catch { /* Upstream errors may be HTML. */ }
+      throw new Error(typeof detail === 'string' && detail.length < 300 ? detail : translate('repository.requestFailed', { status: response.status }))
+    }
+    if (!response.headers.get('Content-Type')?.startsWith('application/zip')) throw new Error(translate('repository.snapshotFailed'))
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const name = disposition.match(/filename="(tekdocs-repository-[a-f0-9]{12}\.zip)"/)?.[1] || 'tekdocs-repository-source.zip'
+    return { content: await response.blob(), name }
+  },
   async save(mutation: RepositoryMutation, organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring`, {
       method: 'POST', credentials: 'same-origin',

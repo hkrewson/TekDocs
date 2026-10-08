@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import hashlib
+import io
+import json
 import uuid
+import zipfile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
@@ -18,7 +22,7 @@ from apps.core.content_authoring import (
     resolve_authored_path,
 )
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
-from apps.core.models import ContentNode, InstallationState, Workspace, WorkspaceKind
+from apps.core.models import AuditEvent, ContentNode, InstallationState, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
 from apps.core.tasks import reconcile_content_indexes
 
@@ -286,3 +290,82 @@ def test_accepted_index_marker_retries_without_rewriting_git(authoring_context):
     repository.refresh_from_db()
     assert repository.accepted_commit.object_id == authored.accepted_commit
     assert repository.indexed_commit.object_id == authored.accepted_commit
+
+
+def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(authoring_context):
+    installation, repository = authoring_context
+    first = _create(installation, repository)
+    second = _create(installation, repository, title="Second guide")
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("msp-content-authoring-export")
+    response = browser.get(url)
+    assert response.status_code == 200
+    assert response["Content-Type"] == "application/zip"
+    assert response["Cache-Control"] == "no-store"
+    filename = f'tekdocs-repository-{second.accepted_commit[:12]}.zip'
+    assert response["Content-Disposition"] == f'attachment; filename="{filename}"'
+    assert browser.get(url).content == response.content
+    events = AuditEvent.objects.filter(action="repository_source_export.downloaded", entity_id=repository.id)
+    assert events.count() == 2
+    assert events.first().metadata == {"accepted_commit": second.accepted_commit, "file_count": 2}
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        manifest = json.loads(archive.read("tekdocs-source.json"))
+        assert manifest["format"] == "tekdocs-repository-source-snapshot/v1"
+        assert manifest["workspace_id"] == str(repository.workspace_id)
+        assert manifest["accepted_commit"] == second.accepted_commit
+        assert manifest["current_files_only"] is True
+        assert len(manifest["files"]) == 2
+        assert {item["content_id"] for item in manifest["files"]} == {str(first.content_id), str(second.content_id)}
+        for item in manifest["files"]:
+            source = archive.read(item["path"])
+            assert hashlib.sha256(source).hexdigest() == item["sha256"]
+            authored = read_authored_content(repository=repository, content_id=uuid.UUID(item["content_id"]))
+            assert source == authored.source.encode()
+        assert "not a complete dependency bundle or backup" in archive.read("README.md").decode()
+    assert Client().get(url).status_code in {401, 403}
+
+    repository.indexed_commit = None
+    repository.save(update_fields=["indexed_commit", "updated_at"])
+    assert browser.get(url).status_code == 409
+    assert events.count() == 2
+
+
+def test_repository_source_snapshot_does_not_cross_workspace(authoring_context):
+    installation, repository = authoring_context
+    authored = _create(installation, repository)
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Separate source client",
+        legal_name="Separate source client",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    workspace = Workspace.objects.get(
+        tenant=installation.tenant, kind=WorkspaceKind.ORGANIZATION, organization=organization
+    )
+    organization_repository = repository_storage.ensure_workspace_repository(workspace).repository
+    own = _create(installation, organization_repository, title="Client guide")
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(
+        reverse("organization-content-authoring-export", kwargs={"organization_entity_id": organization.entity_id})
+    )
+    assert response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        manifest = json.loads(archive.read("tekdocs-source.json"))
+        assert manifest["workspace_id"] == str(workspace.id)
+        assert {item["content_id"] for item in manifest["files"]} == {str(own.content_id)}
+        assert authored.source.encode() not in [archive.read(item["path"]) for item in manifest["files"]]
+
+
+def test_repository_source_snapshot_fails_closed_on_file_limit(authoring_context, monkeypatch):
+    installation, repository = authoring_context
+    _create(installation, repository)
+    monkeypatch.setattr("apps.core.repository_source_exports.MAX_SOURCE_FILES", 0)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(reverse("msp-content-authoring-export"))
+    assert response.status_code == 503
+    assert response["Content-Type"].startswith("application/json")

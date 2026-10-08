@@ -82,9 +82,11 @@ from apps.core.compliance_risk_views import (
     OrganizationComplianceRiskReviewView,
 )
 from apps.core.content_authoring_views import (
+    MSPContentAuthoringExportView,
     MSPContentAuthoringSourceView,
     MSPContentAuthoringView,
     MSPContentPathResolveView,
+    OrganizationContentAuthoringExportView,
     OrganizationContentAuthoringSourceView,
     OrganizationContentAuthoringView,
     OrganizationContentPathResolveView,
@@ -554,6 +556,11 @@ urlpatterns = [
         name="msp-content-authoring",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/export",
+        MSPContentAuthoringExportView.as_view(),
+        name="msp-content-authoring-export",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>",
         MSPContentAuthoringSourceView.as_view(),
         name="msp-content-authoring-source",
@@ -647,6 +654,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",
         OrganizationContentAuthoringView.as_view(),
         name="organization-content-authoring",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/export",
+        OrganizationContentAuthoringExportView.as_view(),
+        name="organization-content-authoring-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>",

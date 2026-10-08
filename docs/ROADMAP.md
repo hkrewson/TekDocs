@@ -1757,6 +1757,11 @@ The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,
 not a dependency-complete bundle, Git-history transfer or backup.
+The staff repository editor can now request an exact-current-source ZIP for
+one Workspace. It contains every Markdown file from one accepted-and-indexed
+commit, byte-for-byte, with a deterministic hash manifest. It is unsanitized;
+historical pinned objects, attachments, database records and Git history are
+excluded, so complete editable bundles and recovery remain open gates.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

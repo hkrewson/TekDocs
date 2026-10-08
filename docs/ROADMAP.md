@@ -1757,6 +1757,9 @@ Retained attachment bytes can now be reviewed under that same exact-evidence
 staff boundary. The returned file is independently checked against its signed
 descriptor and sent as a non-cacheable, generic binary download. This remains
 private candidate review, not client file distribution or publication.
+The signed sanitized HTML projection is also available as a forced-download,
+non-cacheable staff review artifact after exact-evidence verification. It does
+not rerender current source, expose a client page, or grant publication authority.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

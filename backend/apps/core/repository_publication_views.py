@@ -33,7 +33,11 @@ from .repository_publication_evidence import (
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
 )
-from .repository_publication_render import MAX_RENDERED_PDF_BYTES, verify_retained_pdf_snapshot
+from .repository_publication_render import (
+    MAX_RENDERED_PDF_BYTES,
+    verify_retained_pdf_snapshot,
+    verify_retained_rendered_snapshot,
+)
 from .repository_service import RepositoryServiceError
 from .workspaces import ResolvedWorkspace
 
@@ -229,6 +233,23 @@ def _review_pdf(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Htt
     return response
 
 
+def _review_html(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> HttpResponse:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    if not verify_repository_publication_evidence(evidence)["rendered_snapshot_attested"]:
+        response = HttpResponse("Retained publication evidence failed verification", status=409)
+    elif not verify_retained_rendered_snapshot(manifest=evidence.manifest):
+        response = HttpResponse("Retained publication HTML failed verification", status=409)
+    else:
+        content = evidence.manifest["rendered_snapshot"]["html"].encode("utf-8")
+        response = HttpResponse(content, content_type="text/html; charset=utf-8")
+        response["Content-Disposition"] = 'attachment; filename="repository-evidence-snapshot.html"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Content-Security-Policy"] = "sandbox; default-src 'none'"
+    return response
+
+
 def _review_attachment(  # type: ignore[no-untyped-def]
     request, workspace: ResolvedWorkspace, evidence_id: UUID, artifact_id: UUID
 ) -> HttpResponse:
@@ -368,6 +389,15 @@ class MSPRepositoryEvidenceReviewPDFView(APIView):
         return _review_pdf(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
 
 
+class MSPRepositoryEvidenceReviewHTMLView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_msp_review_html",
+        responses={(200, "text/html"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, evidence_id):  # type: ignore[no-untyped-def]
+        return _review_html(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
+
+
 class MSPRepositoryEvidenceReviewAttachmentView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_review_attachment",
@@ -431,6 +461,19 @@ class OrganizationRepositoryEvidenceReviewPDFView(APIView):
     )
     def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
         return _review_pdf(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryEvidenceReviewHTMLView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_review_html",
+        responses={(200, "text/html"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _review_html(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,

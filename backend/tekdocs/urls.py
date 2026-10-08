@@ -442,12 +442,14 @@ from apps.core.repository_publication_views import (
     MSPRepositoryEvidenceCollectionView,
     MSPRepositoryEvidenceDetailView,
     MSPRepositoryEvidenceReviewAttachmentView,
+    MSPRepositoryEvidenceReviewHTMLView,
     MSPRepositoryEvidenceReviewPDFView,
     MSPRepositoryEvidenceReviewView,
     OrganizationRepositoryEvidenceCollectionView,
     OrganizationRepositoryEvidenceDecisionView,
     OrganizationRepositoryEvidenceDetailView,
     OrganizationRepositoryEvidenceReviewAttachmentView,
+    OrganizationRepositoryEvidenceReviewHTMLView,
     OrganizationRepositoryEvidenceReviewPDFView,
     OrganizationRepositoryEvidenceReviewView,
 )
@@ -521,6 +523,11 @@ urlpatterns = [
         name="msp-repository-publication-evidence-review",
     ),
     path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/review/html",
+        MSPRepositoryEvidenceReviewHTMLView.as_view(),
+        name="msp-repository-publication-evidence-review-html",
+    ),
+    path(
         "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/review/pdf",
         MSPRepositoryEvidenceReviewPDFView.as_view(),
         name="msp-repository-publication-evidence-review-pdf",
@@ -579,6 +586,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/review",
         OrganizationRepositoryEvidenceReviewView.as_view(),
         name="organization-repository-publication-evidence-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/review/html",
+        OrganizationRepositoryEvidenceReviewHTMLView.as_view(),
+        name="organization-repository-publication-evidence-review-html",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/review/pdf",

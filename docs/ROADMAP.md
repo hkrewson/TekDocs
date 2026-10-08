@@ -1760,6 +1760,12 @@ private candidate review, not client file distribution or publication.
 The signed sanitized HTML projection is also available as a forced-download,
 non-cacheable staff review artifact after exact-evidence verification. It does
 not rerender current source, expose a client page, or grant publication authority.
+One immutable package candidate can now be created from a separate accepted
+client-visible review. It re-verifies all retained artifacts and binds their
+hashes, the signed evidence digest, decision, and source commit under the exact
+organization Workspace. The staff-only package is not a distributable STATIC
+record; final publication approval, portal/file delivery, and authority handoff
+remain separate `0.9.7` work.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

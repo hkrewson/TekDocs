@@ -5178,6 +5178,45 @@ class RepositoryEvidenceReviewDecision(models.Model):
         raise ValidationError("Repository evidence review decisions are append-only")
 
 
+class RepositoryPublicationPackage(models.Model):
+    """Immutable, non-distributable handoff from accepted repository evidence."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    decision = models.OneToOneField(
+        RepositoryEvidenceReviewDecision, on_delete=models.PROTECT, related_name="package"
+    )
+    manifest = models.JSONField()
+    manifest_digest = models.CharField(max_length=64)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-created_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(manifest_digest__regex=r"^[0-9a-f]{64}$"),
+                name="repository_package_digest_valid",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository publication packages are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository publication packages are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

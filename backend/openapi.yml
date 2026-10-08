@@ -32267,6 +32267,73 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package:
+    get:
+      operationId: repository_evidence_organization_package_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryPackage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: repository_evidence_organization_package_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryPackage'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_organization_review
@@ -49376,6 +49443,42 @@ components:
       required:
       - audience
       - content_id
+    RepositoryPackage:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        evidence_id:
+          type: string
+          format: uuid
+        decision_id:
+          type: string
+          format: uuid
+        source_commit:
+          type: string
+        manifest_digest:
+          type: string
+        created_by_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        verified:
+          type: boolean
+        permits_distribution:
+          type: boolean
+      required:
+      - created_at
+      - created_by_id
+      - decision_id
+      - evidence_id
+      - id
+      - manifest_digest
+      - permits_distribution
+      - source_commit
+      - verified
     RepositoryStateCounts:
       type: object
       properties:

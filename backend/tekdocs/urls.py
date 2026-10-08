@@ -448,6 +448,7 @@ from apps.core.repository_publication_views import (
     OrganizationRepositoryEvidenceCollectionView,
     OrganizationRepositoryEvidenceDecisionView,
     OrganizationRepositoryEvidenceDetailView,
+    OrganizationRepositoryEvidencePackageView,
     OrganizationRepositoryEvidenceReviewAttachmentView,
     OrganizationRepositoryEvidenceReviewHTMLView,
     OrganizationRepositoryEvidenceReviewPDFView,
@@ -606,6 +607,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/decision",
         OrganizationRepositoryEvidenceDecisionView.as_view(),
         name="organization-repository-publication-evidence-decision",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/package",
+        OrganizationRepositoryEvidencePackageView.as_view(),
+        name="organization-repository-publication-evidence-package",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",

@@ -24,6 +24,7 @@ from .models import (
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
     RepositoryPublicationEvidence,
+    RepositoryPublicationPackage,
     WorkspaceRepository,
     workspace_for_owner,
 )
@@ -32,6 +33,11 @@ from .repository_publication_evidence import (
     RepositoryPublicationEvidenceError,
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
+)
+from .repository_publication_packages import (
+    RepositoryPublicationPackageError,
+    create_repository_publication_package,
+    verify_repository_publication_package,
 )
 from .repository_publication_render import (
     MAX_RENDERED_PDF_BYTES,
@@ -103,6 +109,18 @@ class RepositoryEvidenceDecisionSerializer(serializers.Serializer):
     reason = serializers.CharField()
     actor_id = serializers.UUIDField()
     occurred_at = serializers.DateTimeField()
+    permits_distribution = serializers.BooleanField()
+
+
+class RepositoryPackageSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    evidence_id = serializers.UUIDField()
+    decision_id = serializers.UUIDField()
+    source_commit = serializers.CharField()
+    manifest_digest = serializers.CharField()
+    created_by_id = serializers.UUIDField()
+    created_at = serializers.DateTimeField()
+    verified = serializers.BooleanField()
     permits_distribution = serializers.BooleanField()
 
 
@@ -348,6 +366,43 @@ def _decision_data(decision: RepositoryEvidenceReviewDecision) -> dict[str, obje
     )
 
 
+def _package_data(package: RepositoryPublicationPackage) -> dict[str, object]:
+    return cast(
+        dict[str, object],
+        RepositoryPackageSerializer(
+            {
+                "id": package.id,
+                "evidence_id": package.decision.evidence_id,
+                "decision_id": package.decision_id,
+                "source_commit": package.manifest.get("source_commit", ""),
+                "manifest_digest": package.manifest_digest,
+                "created_by_id": package.created_by_id,
+                "created_at": package.created_at,
+                "verified": verify_repository_publication_package(package),
+                "permits_distribution": False,
+            }
+        ).data,
+    )
+
+
+def _package(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    decision = RepositoryEvidenceReviewDecision.objects.filter(evidence=evidence).first()
+    if decision is None:
+        return Response({"detail": "Accepted review decision is required"}, status=status.HTTP_409_CONFLICT)
+    if request.method == "GET":
+        package = RepositoryPublicationPackage.objects.filter(decision=decision).first()
+        if package is None:
+            return Response({"detail": "No package exists"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_package_data(package))
+    try:
+        package = create_repository_publication_package(decision_id=decision.id, actor=request.user)
+    except (RepositoryPublicationPackageError, IntegrityError) as exc:
+        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    return Response(_package_data(package), status=status.HTTP_201_CREATED)
+
+
 class MSPRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_msp_list",
@@ -515,5 +570,30 @@ class OrganizationRepositoryEvidenceDecisionView(APIView):
         return _decision(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryEvidencePackageView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_package_retrieve",
+        responses={200: RepositoryPackageSerializer},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _package(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            evidence_id,
+        )
+
+    @extend_schema(
+        operation_id="repository_evidence_organization_package_create",
+        request=None,
+        responses={201: RepositoryPackageSerializer},
+    )
+    def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _package(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
             evidence_id,
         )

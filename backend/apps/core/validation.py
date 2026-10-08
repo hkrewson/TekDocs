@@ -32,6 +32,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_repositorypublicationevidence"
         else "Append-only exact-evidence internal review decision; exact-workspace RLS and scope guard."
         if table == "core_repositoryevidencereviewdecision"
+        else "Append-only accepted-evidence handoff; exact-workspace RLS and decision-scope guard."
+        if table == "core_repositorypublicationpackage"
         else "Append-only retained repository evidence bytes; exact-workspace RLS and source-attachment guard."
         if table == "core_repositoryevidenceattachment"
         else "Exact-client recurring enrollment, approved terms, and permanent period claims."

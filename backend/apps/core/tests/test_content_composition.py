@@ -483,6 +483,76 @@ def test_repository_evidence_api_enforces_exact_organization_scope(composition_r
     assert browser.get(own_review_pdf).status_code in {403, 404}
 
 
+def test_repository_evidence_attachment_review_enforces_organization_boundary(composition_repository, tmp_path):
+    installation, _workspace, _repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        first = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Attachment First", legal_name="Attachment First LLC", website="", classifications=["client"],
+        )
+        second = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Attachment Second", legal_name="Attachment Second LLC", website="", classifications=["client"],
+        )
+        repository = repository_storage.ensure_workspace_repository(
+            Workspace.objects.get(organization=first)
+        ).repository
+        document = create_document(
+            tenant=installation.tenant, organization=first, actor_id=installation.owner.id,
+            title="Client attachment", markdown="Legacy source.\n",
+        )
+        attachment = create_document_attachment(
+            document=document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("private.txt", b"First client only"),
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=_accepted(repository),
+            changes={"documents/client-attachment.md": _content(
+                content_id=document.id, title="Client attachment",
+                body=f"[Private](tekdocs://attachment/{attachment.id})\n",
+            )},
+            message="Add scoped attachment source",
+        )
+        index_repository_content(repository_id=repository.id)
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.id,
+            audience="client_visible", actor=installation.owner,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(evidence=evidence)
+        own_url = reverse(
+            "organization-repository-publication-evidence-review-attachment",
+            args=[first.entity_id, evidence.id, artifact.id],
+        )
+        other_url = reverse(
+            "organization-repository-publication-evidence-review-attachment",
+            args=[second.entity_id, evidence.id, artifact.id],
+        )
+        msp_url = reverse("msp-repository-publication-evidence-review-attachment", args=[evidence.id, artifact.id])
+        browser = Client()
+        browser.force_login(installation.owner)
+        assert browser.get(own_url).content == b"First client only"
+        assert browser.get(other_url).status_code == 404
+        assert browser.get(msp_url).status_code == 404
+        Authenticator.objects.filter(user=installation.owner).delete()
+        assert browser.get(own_url).status_code == 403
+
+        client_user = User.objects.create_user(email="attachment-client@example.invalid", display_name="Client")
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=client_user, role=BuiltInRole.CLIENT_USER, organization=first,
+        )
+        browser.force_login(client_user)
+        assert browser.get(own_url).status_code == 403
+
+        foreign_tenant = Tenant.objects.create(name="Foreign attachment MSP", slug="foreign-attachment-msp")
+        foreign_reviewer = User.objects.create_user(email="foreign-attachment@example.invalid", display_name="Foreign")
+        TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_reviewer, role=BuiltInRole.ADMINISTRATOR)
+        browser.force_login(foreign_reviewer)
+        assert browser.get(own_url).status_code in {403, 404}
+
+
 def test_repository_evidence_review_uses_retained_source_and_fails_closed(composition_repository, monkeypatch):
     installation, _workspace, repository = composition_repository
     document_id = uuid.uuid4()
@@ -1027,7 +1097,7 @@ def test_repository_evidence_freezes_portable_field_keys_without_changing_git(co
         )
 
 
-def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_repository, tmp_path):
+def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_repository, tmp_path, monkeypatch):
     installation, workspace, repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         document = create_document(
@@ -1073,6 +1143,51 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
         assert "guide.txt" in evidence.manifest["rendered_snapshot"]["html"]
         assert "href=" not in evidence.manifest["rendered_snapshot"]["html"]
+        review_url = reverse("msp-repository-publication-evidence-review-attachment", args=[evidence.id, artifact.id])
+        browser = Client()
+        browser.force_login(installation.owner)
+        review = browser.get(reverse("msp-repository-publication-evidence-review", args=[evidence.id]))
+        assert review.status_code == 200
+        assert review.json()["attachments"] == [{
+            "id": str(artifact.id),
+            "source_id": str(attachment.id),
+            "filename": "guide.txt",
+            "media_type": artifact.media_type,
+            "size": len(b"Original attachment bytes"),
+        }]
+        reviewed = browser.get(review_url)
+        assert reviewed.status_code == 200
+        assert reviewed.content == b"Original attachment bytes"
+        assert reviewed["Content-Type"] == "application/octet-stream"
+        assert reviewed["Content-Disposition"].startswith("attachment;")
+        assert reviewed["Cache-Control"] == "private, no-store"
+        assert reviewed["X-Content-Type-Options"] == "nosniff"
+        assert browser.get(
+            reverse("msp-repository-publication-evidence-review-attachment", args=[evidence.id, uuid.uuid4()])
+        ).status_code == 404
+        stored = artifact.file.storage
+        original_open = stored.open
+        reads = 0
+
+        def changed_between_checks(name, mode="rb"):
+            nonlocal reads
+            if name != artifact.file.name:
+                return original_open(name, mode)
+            reads += 1
+            return BytesIO(b"Original attachment bytes" if reads == 1 else b"Changed attachment bytes")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(stored, "open", changed_between_checks)
+            changed = browser.get(review_url)
+        assert reads == 2
+        assert changed.status_code == 409
+        assert changed.content != b"Changed attachment bytes"
+
+        read_only_user = User.objects.create_user(email="attachment-reader@example.invalid", display_name="Reader")
+        TenantMembership.objects.create(tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY)
+        browser.force_login(read_only_user)
+        assert browser.get(review_url).status_code == 403
+        browser.force_login(installation.owner)
         incomplete = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
         incomplete.manifest["attachments"][0]["source_id"] = str(uuid.uuid4())
         incomplete_digest = hashlib.sha256(
@@ -1087,6 +1202,7 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         assert not verify_repository_publication_evidence(incomplete)["attachments_valid"]
         attachment.file.storage.delete(attachment.file.name)
         assert verify_repository_publication_evidence(evidence)["valid"]
+        assert browser.get(review_url).content == b"Original attachment bytes"
         with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.integrity"):
             retain_repository_publication_evidence(
                 repository_id=repository.id,
@@ -1097,6 +1213,7 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         assert RepositoryPublicationEvidence.objects.count() == 1
         artifact.file.storage.delete(artifact.file.name)
         assert not verify_repository_publication_evidence(evidence)["attachments_valid"]
+        assert browser.get(review_url).status_code == 409
         with pytest.raises(DatabaseError), transaction.atomic():
             RepositoryEvidenceAttachment.objects.filter(pk=artifact.pk).update(checksum="0" * 64)
 

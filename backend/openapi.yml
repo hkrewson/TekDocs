@@ -15179,6 +15179,53 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/review/attachments/{artifact_id}:
+    get:
+      operationId: repository_evidence_msp_review_attachment
+      parameters:
+      - in: path
+        name: artifact_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/review/pdf:
     get:
       operationId: repository_evidence_msp_review_pdf
@@ -32213,6 +32260,59 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review/attachments/{artifact_id}
+  : get:
+      operationId: repository_evidence_organization_review_attachment
+      parameters:
+      - in: path
+        name: artifact_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review/pdf:
     get:
       operationId: repository_evidence_organization_review_pdf
@@ -49095,9 +49195,14 @@ components:
           format: date-time
         canonical_markdown:
           type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryEvidenceReviewAttachment'
         verified:
           type: boolean
       required:
+      - attachments
       - audience
       - canonical_markdown
       - content_id
@@ -49106,6 +49211,27 @@ components:
       - source_commit
       - title
       - verified
+    RepositoryEvidenceReviewAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+      required:
+      - filename
+      - id
+      - media_type
+      - size
+      - source_id
     RepositoryEvidenceSummary:
       type: object
       properties:

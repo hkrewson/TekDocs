@@ -1,8 +1,9 @@
 """Signed, retained Git-source evidence for a future repository STATIC publisher.
 
-This internal record is not a distributable publication: its staff-only review
-route does not approve, download, expose to portals, or export it. Its signature
-binds the exact source proof and composed Markdown without live Git verification.
+This internal record is not a distributable publication: staff may review its
+retained PDF and files, but no route approves or exposes them to portals. Its
+signature binds the exact source proof and composed Markdown without live Git
+verification.
 """
 
 from __future__ import annotations
@@ -587,12 +588,15 @@ def verify_repository_publication_evidence(
                 ):
                     attachments_valid = False
                     continue
+                if artifact.size > MAX_RETAINED_ATTACHMENT_BYTES:
+                    attachments_valid = False
+                    continue
                 try:
                     with artifact.file.storage.open(artifact.file.name, "rb") as stream:
                         content = bytes(stream.read(artifact.size + 1))
                     if len(content) != artifact.size or hashlib.sha256(content).hexdigest() != artifact.checksum:
                         attachments_valid = False
-                except OSError:
+                except (OSError, ValueError, TypeError):
                     attachments_valid = False
     try:
         source_commit = evidence.source_commit

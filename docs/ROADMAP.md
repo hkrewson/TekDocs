@@ -1753,6 +1753,10 @@ does not approve a STATIC publication or authorize any client distribution.
 The retained PDF can be downloaded for authorized staff review only after
 signed-evidence and exact returned-byte checks. It has no client route or
 distribution authority.
+Retained attachment bytes can now be reviewed under that same exact-evidence
+staff boundary. The returned file is independently checked against its signed
+descriptor and sent as a non-cacheable, generic binary download. This remains
+private candidate review, not client file distribution or publication.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

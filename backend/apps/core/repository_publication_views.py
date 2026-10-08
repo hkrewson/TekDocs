@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import cast
 from uuid import UUID
 
@@ -20,11 +21,13 @@ from .content_publication_sources import ContentPublicationSourceError
 from .document_views import _msp_workspace, _organization_workspace
 from .models import (
     PublicationAudience,
+    RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
     RepositoryPublicationEvidence,
     WorkspaceRepository,
     workspace_for_owner,
 )
+from .publications import MAX_RETAINED_ATTACHMENT_BYTES
 from .repository_publication_evidence import (
     RepositoryPublicationEvidenceError,
     retain_repository_publication_evidence,
@@ -64,6 +67,14 @@ class RepositoryEvidencePageSerializer(serializers.Serializer):
     has_more = serializers.BooleanField()
 
 
+class RepositoryEvidenceReviewAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    source_id = serializers.UUIDField()
+    filename = serializers.CharField()
+    media_type = serializers.CharField()
+    size = serializers.IntegerField()
+
+
 class RepositoryEvidenceReviewSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     content_id = serializers.UUIDField()
@@ -72,6 +83,7 @@ class RepositoryEvidenceReviewSerializer(serializers.Serializer):
     source_commit = serializers.CharField()
     signed_at = serializers.DateTimeField()
     canonical_markdown = serializers.CharField()
+    attachments = RepositoryEvidenceReviewAttachmentSerializer(many=True)
     verified = serializers.BooleanField()
 
 
@@ -180,6 +192,16 @@ def _review(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respons
                 "source_commit": evidence.source_commit.object_id,
                 "signed_at": evidence.signed_at,
                 "canonical_markdown": evidence.canonical_markdown,
+                "attachments": [
+                    {
+                        "id": item["id"],
+                        "source_id": item["source_id"],
+                        "filename": item["filename"],
+                        "media_type": item["media_type"],
+                        "size": item["size"],
+                    }
+                    for item in evidence.manifest.get("attachments", [])
+                ],
                 "verified": True,
             }
         ).data
@@ -202,6 +224,46 @@ def _review_pdf(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Htt
         else:
             response = HttpResponse(content, content_type="application/pdf")
             response["Content-Disposition"] = 'attachment; filename="repository-evidence-snapshot.pdf"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _review_attachment(  # type: ignore[no-untyped-def]
+    request, workspace: ResolvedWorkspace, evidence_id: UUID, artifact_id: UUID
+) -> HttpResponse:
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    artifact = get_object_or_404(
+        RepositoryEvidenceAttachment, pk=artifact_id, evidence=evidence,
+        workspace=evidence.workspace, tenant=evidence.tenant, organization=evidence.organization,
+    )
+    if not verify_repository_publication_evidence(evidence)["valid"]:
+        response = HttpResponse("Retained publication evidence failed verification", status=409)
+    else:
+        descriptors = evidence.manifest.get("attachments", [])
+        descriptor = next(
+            (item for item in descriptors if isinstance(item, dict) and item.get("id") == str(artifact.id)), None
+        )
+        content = b""
+        if descriptor is not None and 0 <= artifact.size <= MAX_RETAINED_ATTACHMENT_BYTES:
+            try:
+                with artifact.file.storage.open(artifact.file.name, "rb") as stream:
+                    content = bytes(stream.read(MAX_RETAINED_ATTACHMENT_BYTES + 1))
+            except (OSError, ValueError, TypeError):
+                pass
+        if (
+            descriptor is None
+            or len(content) != artifact.size
+            or len(content) > MAX_RETAINED_ATTACHMENT_BYTES
+            or hashlib.sha256(content).hexdigest() != descriptor.get("checksum")
+            or descriptor.get("size") != artifact.size
+            or descriptor.get("source_id") != str(artifact.source_attachment_id)
+        ):
+            response = HttpResponse("Retained publication attachment failed verification", status=409)
+        else:
+            response = HttpResponse(content, content_type="application/octet-stream")
+            response["Content-Disposition"] = 'attachment; filename="repository-evidence-attachment"'
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
@@ -306,6 +368,17 @@ class MSPRepositoryEvidenceReviewPDFView(APIView):
         return _review_pdf(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
 
 
+class MSPRepositoryEvidenceReviewAttachmentView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_msp_review_attachment",
+        responses={(200, "application/octet-stream"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, evidence_id, artifact_id):  # type: ignore[no-untyped-def]
+        return _review_attachment(
+            request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id, artifact_id
+        )
+
+
 class OrganizationRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_organization_list",
@@ -361,6 +434,20 @@ class OrganizationRepositoryEvidenceReviewPDFView(APIView):
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,
+        )
+
+
+class OrganizationRepositoryEvidenceReviewAttachmentView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_review_attachment",
+        responses={(200, "application/octet-stream"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id, artifact_id):  # type: ignore[no-untyped-def]
+        return _review_attachment(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+            artifact_id,
         )
 
 

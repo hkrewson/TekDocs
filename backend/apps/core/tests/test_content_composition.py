@@ -18,7 +18,7 @@ from django.urls import reverse
 from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, TenantMembership, User
+from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core import content_composition, content_publication_sources, repository_service, repository_storage
 from apps.core.content_composition import ContentCompositionError, ContentCompositionResolver
 from apps.core.content_index import ContentIndexValidationError, content_graph_projection, index_repository_content
@@ -38,6 +38,7 @@ from apps.core.models import (
     EntityVisibility,
     InstallationState,
     RepositoryEvidenceAttachment,
+    RepositoryEvidenceReviewDecision,
     RepositoryPublicationEvidence,
     Tenant,
     Workspace,
@@ -507,6 +508,127 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     rejected = browser.get(review_url)
     assert rejected.status_code == 409
     assert "Retained text." not in rejected.content.decode()
+
+
+def test_repository_evidence_decision_is_separate_from_distribution(composition_repository):
+    installation, _workspace, _repository = composition_repository
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Decision Client",
+        legal_name="Decision Client LLC",
+        website="",
+        classifications=["client"],
+    )
+    workspace = Workspace.objects.get(organization=organization)
+    repository = repository_storage.ensure_workspace_repository(workspace).repository
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={"documents/decision.md": _content(content_id=content_id, title="Decision", body="Review me.\n")},
+        message="Add review decision source",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    created = browser.post(
+        reverse("organization-repository-publication-evidence", args=[organization.entity_id]),
+        data=json.dumps({"content_id": str(content_id), "audience": "client_visible"}),
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    evidence_id = created.json()["id"]
+    url = reverse("organization-repository-publication-evidence-decision", args=[organization.entity_id, evidence_id])
+    payload = json.dumps({"outcome": "accepted_for_packaging", "reason": "Exact source reviewed"})
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 409
+    reviewer = User.objects.create_user(email="evidence-reviewer@example.invalid", display_name="Reviewer")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant, user=reviewer, role=BuiltInRole.ADMINISTRATOR
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=organization,
+        membership=membership,
+        created_by=installation.owner,
+    )
+    browser.force_login(reviewer)
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 403
+    Authenticator.objects.create(user=reviewer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()})
+    accepted = browser.post(url, data=payload, content_type="application/json")
+    assert accepted.status_code == 201
+    assert accepted.json()["permits_distribution"] is False
+    assert browser.get(url).json()["outcome"] == "accepted_for_packaging"
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 409
+    assert RepositoryEvidenceReviewDecision.objects.count() == 1
+    assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
+    with pytest.raises(DatabaseError):
+        RepositoryEvidenceReviewDecision.objects.filter(evidence_id=evidence_id).update(reason="Changed")
+
+    portal_user = User.objects.create_user(email="decision-client@example.invalid", display_name="Client")
+    TenantMembership.objects.create(
+        tenant=installation.tenant,
+        user=portal_user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=organization,
+    )
+    browser.force_login(portal_user)
+    assert browser.get(url).status_code == 403
+    assert browser.post(url, data=payload, content_type="application/json").status_code == 403
+
+    browser.force_login(installation.owner)
+    second = browser.post(
+        reverse("organization-repository-publication-evidence", args=[organization.entity_id]),
+        data=json.dumps({"content_id": str(content_id), "audience": "client_visible"}),
+        content_type="application/json",
+    )
+    assert second.status_code == 201
+    corrupt = RepositoryPublicationEvidence.objects.get(pk=second.json()["id"])
+    with pytest.raises(DatabaseError):
+        RepositoryEvidenceReviewDecision.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            workspace=_workspace,
+            evidence=corrupt,
+            outcome=RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING,
+            reason="Wrong workspace",
+            actor=reviewer,
+        )
+    corrupt.pdf_file.storage.delete(corrupt.pdf_file.name)
+    browser.force_login(reviewer)
+    corrupt_url = reverse(
+        "organization-repository-publication-evidence-decision", args=[organization.entity_id, corrupt.id]
+    )
+    assert browser.post(corrupt_url, data=payload, content_type="application/json").status_code == 409
+    assert RepositoryEvidenceReviewDecision.objects.count() == 1
+
+
+def test_repository_evidence_review_decision_upgrade_installs_forced_rls_and_guards():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0170_repository_evidence_pdf")])
+        assert "core_repositoryevidencereviewdecision" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositoryevidencereviewdecision'"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger "
+                "WHERE tgrelid = 'core_repositoryevidencereviewdecision'::regclass "
+                "AND tgname IN ('core_repositoryevidencereviewdecision_validate', "
+                "'core_repositoryevidencereviewdecision_immutable')"
+            )
+            assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
 
 
 def test_repository_publication_evidence_is_signed_append_only_and_independent_of_live_head(

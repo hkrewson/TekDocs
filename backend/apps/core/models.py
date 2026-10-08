@@ -5134,6 +5134,50 @@ class RepositoryPublicationEvidence(models.Model):
             raise ValidationError("Publication evidence manifest does not match its retained source")
 
 
+class RepositoryEvidenceReviewDecision(models.Model):
+    """Final internal review of exact evidence, not distribution approval."""
+
+    class Outcome(models.TextChoices):
+        ACCEPTED_FOR_PACKAGING = "accepted_for_packaging", "Accepted for packaging"
+        REJECTED = "rejected", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, on_delete=models.PROTECT, null=True, blank=True)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    evidence = models.OneToOneField(
+        RepositoryPublicationEvidence, on_delete=models.PROTECT, related_name="review_decision"
+    )
+    outcome = models.CharField(max_length=24, choices=Outcome.choices)
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("-occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(outcome__in=["accepted_for_packaging", "rejected"]),
+                name="repository_review_outcome_valid",
+            ),
+            models.CheckConstraint(condition=~models.Q(reason=""), name="repository_review_reason_required"),
+        ]
+
+    def __str__(self) -> str:
+        return str(self.id)
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Repository evidence review decisions are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Repository evidence review decisions are append-only")
+
+
 def repository_evidence_attachment_upload_to(instance: "RepositoryEvidenceAttachment", _filename: str) -> str:
     return str(
         PurePosixPath("repository-evidence-attachments")

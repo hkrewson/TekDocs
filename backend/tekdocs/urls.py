@@ -443,6 +443,7 @@ from apps.core.repository_publication_views import (
     MSPRepositoryEvidenceDetailView,
     MSPRepositoryEvidenceReviewView,
     OrganizationRepositoryEvidenceCollectionView,
+    OrganizationRepositoryEvidenceDecisionView,
     OrganizationRepositoryEvidenceDetailView,
     OrganizationRepositoryEvidenceReviewView,
 )
@@ -564,6 +565,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/review",
         OrganizationRepositoryEvidenceReviewView.as_view(),
         name="organization-repository-publication-evidence-review",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/decision",
+        OrganizationRepositoryEvidenceDecisionView.as_view(),
+        name="organization-repository-publication-evidence-decision",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring",

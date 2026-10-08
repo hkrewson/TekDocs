@@ -8171,6 +8171,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/decision": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_decision_retrieve"];
+        readonly put?: never;
+        readonly post: operations["repository_evidence_organization_decision_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/review": {
         readonly parameters: {
             readonly query?: never;
@@ -15224,6 +15240,33 @@ export interface components {
              * @enum {string|null}
              */
             readonly repair: "reconcile_to_accepted" | null;
+        };
+        readonly RepositoryEvidenceDecision: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly evidence_id: string;
+            /**
+             * @description * `accepted_for_packaging` - Accepted for packaging
+             *     * `rejected` - Rejected
+             * @enum {string}
+             */
+            readonly outcome: "accepted_for_packaging" | "rejected";
+            readonly reason: string;
+            /** Format: uuid */
+            readonly actor_id: string;
+            /** Format: date-time */
+            readonly occurred_at: string;
+            readonly permits_distribution: boolean;
+        };
+        readonly RepositoryEvidenceDecisionWrite: {
+            /**
+             * @description * `accepted_for_packaging` - Accepted for packaging
+             *     * `rejected` - Rejected
+             * @enum {string}
+             */
+            readonly outcome: "accepted_for_packaging" | "rejected";
+            readonly reason: string;
         };
         readonly RepositoryEvidencePage: {
             readonly results: readonly components["schemas"]["RepositoryEvidenceSummary"][];
@@ -38808,6 +38851,60 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RepositoryEvidenceSummary"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_decision_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceDecision"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_decision_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RepositoryEvidenceDecisionWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RepositoryEvidenceDecisionWrite"];
+                readonly "multipart/form-data": components["schemas"]["RepositoryEvidenceDecisionWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryEvidenceDecision"];
                 };
             };
         };

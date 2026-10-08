@@ -1747,6 +1747,9 @@ the retained Markdown and frozen key, entity and attachment inputs. Offline
 verification recomputes it; attachment cards carry no distribution URL. Older
 evidence remains valid without an HTML attestation. Approval, retained PDF and
 file downloads, portal delivery, and authority handoff are still open.
+The internal review-decision foundation records one immutable, exact-evidence
+client-visible outcome after MFA and integrity checks. Acceptance for packaging
+does not approve a STATIC publication or authorize any client distribution.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

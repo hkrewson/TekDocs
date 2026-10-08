@@ -1879,7 +1879,7 @@
   "repository.loadedRevision": "Loaded Git revision {commit}. Download includes the saved source and portable metadata, not unsaved edits or other files.",
   "repository.snapshotDownload": "Download Markdown source snapshot",
   "repository.snapshotPreparing": "Preparing Markdown source snapshot…",
-  "repository.snapshotNotice": "This ZIP contains unfiltered saved Markdown, including reachable pinned fragments, and may include sensitive text. Unsaved edits, template-source and copy-provenance history, attachments, database records, and Git history are excluded. It is not a backup.",
+  "repository.snapshotNotice": "This ZIP contains unfiltered saved Markdown, including reachable historical include, template-source, and copy-provenance files, and may include sensitive text. Unsaved edits, attachments, database records, and Git history are excluded. It is not a backup.",
   "repository.snapshotFailed": "The Markdown snapshot could not be downloaded. Refresh the repository state and try again.",
   "documentation.importFile": "Markdown file to import",
   "documentation.loadingDocuments": "Loading documents…",

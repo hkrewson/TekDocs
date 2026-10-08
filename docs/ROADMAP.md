@@ -1759,10 +1759,10 @@ clear that unsaved drafts are excluded. This is editable source for one file,
 not a dependency-complete bundle, Git-history transfer or backup.
 The staff repository editor can now request a source ZIP for one Workspace.
 It contains every current Markdown file from one accepted-and-indexed commit,
-plus reachable pinned include fragments (including nested historical live
-includes), byte-for-byte, with a deterministic commit/path/hash manifest.
-It is unsanitized; template-source and copy-provenance history, attachments,
-database records and Git history are excluded. Complete editable bundles and
+plus reachable historical include, template-source, and copy-provenance Markdown
+(including transitive dependencies), byte-for-byte, with a deterministic
+commit/path/hash/role manifest. It is unsanitized; attachments, database records
+and Git history are excluded. Complete editable bundles and
 recovery remain open gates.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active

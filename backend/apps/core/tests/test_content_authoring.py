@@ -311,10 +311,10 @@ def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(
     assert events.first().metadata == {"accepted_commit": second.accepted_commit, "file_count": 2}
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         manifest = json.loads(archive.read("tekdocs-source.json"))
-        assert manifest["format"] == "tekdocs-repository-source-snapshot/v2"
+        assert manifest["format"] == "tekdocs-repository-source-snapshot/v3"
         assert manifest["workspace_id"] == str(repository.workspace_id)
         assert manifest["accepted_commit"] == second.accepted_commit
-        assert manifest["scope"] == "current-files-and-reachable-pinned-includes"
+        assert manifest["scope"] == "current-files-and-reachable-markdown-dependencies"
         assert manifest["historical_files"] == []
         assert len(manifest["files"]) == 2
         assert {item["content_id"] for item in manifest["files"]} == {str(first.content_id), str(second.content_id)}
@@ -425,6 +425,7 @@ def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(auth
         assert {item["content_id"] for item in historical} == {str(parent_id), str(nested_id)}
         assert {item["commit"] for item in historical} == {first.object_id}
         assert {item["source_path"] for item in historical} == {"fragments/parent.md", "fragments/nested.md"}
+        assert all(item["roles"] == ["include"] for item in historical)
         for item in historical:
             actual = archive.read(item["path"])
             assert hashlib.sha256(actual).hexdigest() == item["sha256"]
@@ -442,3 +443,77 @@ def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(auth
     audits_before = AuditEvent.objects.filter(action="repository_source_export.downloaded").count()
     assert browser.get(url).status_code == 503
     assert AuditEvent.objects.filter(action="repository_source_export.downloaded").count() == audits_before
+
+
+def test_repository_source_snapshot_follows_template_and_copy_provenance(authoring_context):
+    installation, repository = authoring_context
+    origin_id, nested_id, unrelated_id, template_id, copy_id, document_id = (uuid.uuid4() for _ in range(6))
+
+    def source(content_id, title, kind, body, metadata=""):  # type: ignore[no-untyped-def]
+        return (
+            f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: {kind}\ntitle: {title}\n{metadata}---\n{body}"
+        ).encode()
+
+    original_fragment = source(origin_id, "Origin", "fragment", "Original origin.\n")
+    original_nested = source(nested_id, "Nested", "fragment", "Original nested.\n")
+    original_template = source(
+        template_id,
+        "Template",
+        "document",
+        "Original template.\n",
+        f"includes:\n  - id: {nested_id}\n    mode: live\n    audience: shared\n",
+    )
+    repository.refresh_from_db()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+        changes={
+            "fragments/origin.md": original_fragment,
+            "fragments/nested.md": original_nested,
+            "fragments/unrelated.md": source(unrelated_id, "Unrelated", "fragment", "Unrelated old text.\n"),
+            "docs/template.md": original_template,
+        },
+        message="Add original template and fragments",
+    )
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=first.object_id,
+        changes={
+            "fragments/origin.md": source(origin_id, "Origin", "fragment", "Current origin.\n"),
+            "fragments/nested.md": source(nested_id, "Nested", "fragment", "Current nested.\n"),
+            "docs/template.md": source(template_id, "Template", "document", "Current template.\n"),
+            "fragments/copy.md": source(
+                copy_id,
+                "Copy",
+                "fragment",
+                "Copied content.\n",
+                f"derived_from:\n  id: {origin_id}\n  commit: {first.object_id}\n",
+            ),
+            "docs/guide.md": source(
+                document_id,
+                "Guide",
+                "document",
+                "Guide body.\n",
+                f"template_sources:\n  - id: {template_id}\n    commit: {first.object_id}\n"
+                f"  - id: {origin_id}\n    commit: {first.object_id}\n",
+            ),
+        },
+        message="Add copied fragment and template-derived document",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(reverse("msp-content-authoring-export"))
+    assert response.status_code == 200, response.content
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        manifest = json.loads(archive.read("tekdocs-source.json"))
+        historical = {item["content_id"]: item for item in manifest["historical_files"]}
+        assert set(historical) == {str(origin_id), str(nested_id), str(template_id)}
+        assert {item["commit"] for item in historical.values()} == {first.object_id}
+        assert historical[str(origin_id)]["roles"] == ["derived_from", "template_source"]
+        assert historical[str(template_id)]["roles"] == ["template_source"]
+        assert historical[str(nested_id)]["roles"] == ["include"]
+        assert archive.read(historical[str(origin_id)]["path"]) == original_fragment
+        assert archive.read(historical[str(template_id)]["path"]) == original_template
+        assert archive.read(historical[str(nested_id)]["path"]) == original_nested
+        assert f"pinned/{first.object_id}/fragments/unrelated.md" not in archive.namelist()

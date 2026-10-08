@@ -450,10 +450,10 @@ gates after file, template, review, key, publication and recovery parity.
   accepted Git revision and excludes unsaved edits. This is a per-file editable
   source export, not a complete dependency bundle, Git-history transfer or backup.
 - Staff can also download a bounded, deterministic ZIP of every current Markdown
-  file in one accepted-and-indexed Workspace commit plus reachable pinned
-  include fragments, including nested live includes resolved in their historical
-  commit context. It retains exact source bytes and a commit/path/hash manifest.
-  It is unsanitized and omits template-source and copy-provenance history,
+  file in one accepted-and-indexed Workspace commit plus reachable historical
+  include, template-source, and copy-provenance Markdown. Dependencies are
+  traversed transitively in their historical commit context. It retains exact
+  source bytes and a commit/path/hash/role manifest. It is unsanitized and omits
   attachments, database records and Git history; it is not a complete dependency
   bundle or backup. Index lag and unavailable source fail closed.
 - Extend encrypted backup/restore to repositories and add an accepted-head

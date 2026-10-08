@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import zipfile
+from collections import deque
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -74,7 +75,7 @@ class _HistoricalSources:
 
 
 def export_repository_sources(repository: WorkspaceRepository) -> RepositorySourceExport:
-    """Package current files and reachable pinned include sources, never a backup."""
+    """Package current files and reachable Markdown source dependencies, never a backup."""
 
     repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
     if repository.accepted_commit_id is None or repository.indexed_commit_id != repository.accepted_commit_id:
@@ -87,22 +88,65 @@ def export_repository_sources(repository: WorkspaceRepository) -> RepositorySour
         raise RepositorySourceExportError("The accepted repository content changed during export.")
     files: dict[str, bytes] = {}
     manifest_files: list[dict[str, str]] = []
-    historical_files: list[dict[str, str]] = []
+    historical_files: list[dict[str, str | list[str]]] = []
     try:
         accepted = _parsed_sources(sources)
         history = _HistoricalSources(repository)
+        accepted_parsed = {content_id: item[2] for content_id, item in accepted.items()}
+
+        def load_snapshot(object_id: str) -> dict[UUID, ParsedContent]:
+            return accepted_parsed if object_id == commit.object_id else history.load(object_id)
+
         resolver = ContentCompositionResolver(
             accepted_object_id=commit.object_id,
-            accepted={content_id: item[2] for content_id, item in accepted.items()},
-            loader=history.load,
+            accepted=accepted_parsed,
+            loader=load_snapshot,
         )
-        historical_targets: set[tuple[str, UUID]] = set()
+        historical_roles: dict[tuple[str, UUID], set[str]] = {}
+        pending: deque[tuple[str, UUID]] = deque()
+
+        def add_reference(object_id: str, content_id: UUID, role: str, *, fragment_only: bool = False) -> None:
+            target = load_snapshot(object_id).get(content_id)
+            if target is None or (fragment_only and target.kind != "fragment"):
+                raise RepositorySourceExportError("A referenced Markdown source is unavailable or invalid.")
+            if object_id == commit.object_id:
+                return
+            key = (object_id, content_id)
+            if key not in historical_roles:
+                if len(sources) + len(historical_roles) >= MAX_SOURCE_FILES:
+                    raise RepositorySourceExportError("The repository source snapshot exceeds the file limit.")
+                historical_roles[key] = set()
+                pending.append(key)
+            historical_roles[key].add(role)
+
+        def add_provenance(parsed: ParsedContent) -> None:
+            if parsed.derived_from is not None:
+                if parsed.derived_from.content_id == parsed.content_id:
+                    raise RepositorySourceExportError("Copy provenance cannot refer to the same content identity.")
+                add_reference(
+                    parsed.derived_from.object_id,
+                    parsed.derived_from.content_id,
+                    "derived_from",
+                    fragment_only=True,
+                )
+            for source in parsed.template_sources:
+                add_reference(source.object_id, source.content_id, "template_source")
+
         for content_id in sorted(accepted, key=str):
             for dependency in resolver.resolve(content_id=content_id, audience=None).manifest:
-                if dependency["commit"] != commit.object_id:
-                    historical_targets.add((str(dependency["commit"]), UUID(str(dependency["id"]))))
-        if len(sources) + len(historical_targets) > MAX_SOURCE_FILES:
-            raise RepositorySourceExportError("The repository source snapshot exceeds the file limit.")
+                add_reference(str(dependency["commit"]), UUID(str(dependency["id"])), "include", fragment_only=True)
+            add_provenance(accepted[content_id][2])
+        while pending:
+            object_id, content_id = pending.popleft()
+            parsed = load_snapshot(object_id)[content_id]
+            historical_resolver = ContentCompositionResolver(
+                accepted_object_id=object_id,
+                accepted=load_snapshot(object_id),
+                loader=load_snapshot,
+            )
+            for dependency in historical_resolver.resolve(content_id=content_id, audience=None).manifest:
+                add_reference(str(dependency["commit"]), UUID(str(dependency["id"])), "include", fragment_only=True)
+            add_provenance(parsed)
         total_bytes = sum(len(source) for _path, source in sources)
         for content_id in sorted(accepted, key=str):
             path, source, parsed = accepted[content_id]
@@ -116,7 +160,7 @@ def export_repository_sources(repository: WorkspaceRepository) -> RepositorySour
                     "sha256": hashlib.sha256(source).hexdigest(),
                 }
             )
-        for object_id, content_id in sorted(historical_targets, key=lambda item: (item[0], str(item[1]))):
+        for object_id, content_id in sorted(historical_roles, key=lambda item: (item[0], str(item[1]))):
             path, source, parsed = history.snapshots[object_id][content_id]
             total_bytes += len(source)
             if total_bytes > MAX_SOURCE_INPUT_BYTES:
@@ -131,6 +175,7 @@ def export_repository_sources(repository: WorkspaceRepository) -> RepositorySour
                     "content_id": str(parsed.content_id),
                     "kind": parsed.kind,
                     "sha256": hashlib.sha256(source).hexdigest(),
+                    "roles": sorted(historical_roles[(object_id, content_id)]),
                 }
             )
     except RepositorySourceExportError:
@@ -141,27 +186,21 @@ def export_repository_sources(repository: WorkspaceRepository) -> RepositorySour
     if repository.accepted_commit_id != commit.id or repository.indexed_commit_id != commit.id:
         raise RepositorySourceExportError("The accepted repository content changed during export.")
     manifest = {
-        "format": "tekdocs-repository-source-snapshot/v2",
+        "format": "tekdocs-repository-source-snapshot/v3",
         "workspace_id": str(repository.workspace_id),
         "accepted_commit": commit.object_id,
         "object_format": commit.object_format,
-        "scope": "current-files-and-reachable-pinned-includes",
-        "exclusions": [
-            "template_source_history",
-            "copy_provenance_history",
-            "attachment_bytes",
-            "database_records",
-            "git_history",
-        ],
+        "scope": "current-files-and-reachable-markdown-dependencies",
+        "exclusions": ["attachment_bytes", "database_records", "git_history"],
         "files": manifest_files,
         "historical_files": historical_files,
     }
     files["tekdocs-source.json"] = _json(manifest)
     files["README.md"] = (
         b"# TekDocs repository source snapshot\n\n"
-        b"This contains exact current Markdown files and reachable pinned include fragments. "
-        b"It is not sanitized; review source before sharing. Template-source and copy-provenance history, "
-        b"attachments, database records and Git history are excluded. "
+        b"This contains exact current Markdown files and reachable include, template-source, "
+        b"and copy-provenance history. It is not sanitized; review source before sharing. "
+        b"Attachments, database records and Git history are excluded. "
         b"This is not a complete dependency bundle or backup.\n"
     )
     target = io.BytesIO()

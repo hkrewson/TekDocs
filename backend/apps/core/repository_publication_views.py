@@ -620,6 +620,7 @@ def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) ->
 
 
 def _static_delivery_data(authorization: RepositoryStaticDeliveryAuthorization) -> dict[str, object]:
+    effective = repository_static_delivery_ready(authorization.publication)
     return cast(
         dict[str, object],
         RepositoryStaticDeliverySerializer(
@@ -629,8 +630,8 @@ def _static_delivery_data(authorization: RepositoryStaticDeliveryAuthorization) 
                 "reason": authorization.reason,
                 "actor_id": authorization.actor_id,
                 "occurred_at": authorization.occurred_at,
-                "currently_effective": repository_static_delivery_ready(authorization.publication),
-                "permits_distribution": False,
+                "currently_effective": effective,
+                "permits_distribution": effective,
             }
         ).data,
     )

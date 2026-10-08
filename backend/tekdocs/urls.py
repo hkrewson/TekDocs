@@ -438,6 +438,11 @@ from apps.core.reminder_views import (
     OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
+from apps.core.repository_portal_views import (
+    ClientPortalRepositoryPublicationDetailView,
+    ClientPortalRepositoryPublicationListView,
+    ClientPortalRepositoryPublicationPDFView,
+)
 from apps.core.repository_publication_views import (
     MSPRepositoryEvidenceCollectionView,
     MSPRepositoryEvidenceDetailView,
@@ -687,6 +692,21 @@ urlpatterns = [
         name="client-portal-notification-preferences",
     ),
     path("api/v1/portal/documents", ClientPortalDocumentListView.as_view(), name="client-portal-document-list"),
+    path(
+        "api/v1/portal/repository-publications",
+        ClientPortalRepositoryPublicationListView.as_view(),
+        name="client-portal-repository-publication-list",
+    ),
+    path(
+        "api/v1/portal/repository-publications/<uuid:publication_id>",
+        ClientPortalRepositoryPublicationDetailView.as_view(),
+        name="client-portal-repository-publication-detail",
+    ),
+    path(
+        "api/v1/portal/repository-publications/<uuid:publication_id>/pdf",
+        ClientPortalRepositoryPublicationPDFView.as_view(),
+        name="client-portal-repository-publication-pdf",
+    ),
     path(
         "api/v1/portal/documents/<uuid:publication_entity_id>",
         ClientPortalDocumentDetailView.as_view(),

@@ -5973,6 +5973,101 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/portal/repository-publications:
+    get:
+      operationId: client_portal_repository_publications_list
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalRepositoryPublicationResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/portal/repository-publications/{publication_id}:
+    get:
+      operationId: client_portal_repository_publications_retrieve
+      parameters:
+      - in: path
+        name: publication_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalRepositoryPublicationDetail'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/portal/repository-publications/{publication_id}/pdf:
+    get:
+      operationId: client_portal_repository_publications_pdf_download
+      parameters:
+      - in: path
+        name: publication_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - portal
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '404':
+          description: Unavailable publication
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/recycle-bin:
     get:
       operationId: recycle_bin_msp_list
@@ -48033,6 +48128,66 @@ components:
           items:
             $ref: '#/components/schemas/Invoice'
           readOnly: true
+        count:
+          type: integer
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - count
+      - has_more
+      - next_cursor
+      - results
+    PortalRepositoryPublication:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required:
+      - content_id
+      - created_at
+      - id
+      - title
+    PortalRepositoryPublicationDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        content_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        rendered_html:
+          type: string
+      required:
+      - content_id
+      - created_at
+      - id
+      - rendered_html
+      - title
+    PortalRepositoryPublicationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalRepositoryPublication'
         count:
           type: integer
         has_more:

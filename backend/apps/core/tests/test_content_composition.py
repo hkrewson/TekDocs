@@ -832,6 +832,18 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert released.json()["verified"] is True
     assert released.json()["permits_distribution"] is False
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
+    portal_user = User.objects.create_user(email="decision-client@example.invalid", display_name="Client")
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization
+    )
+    portal_list_url = reverse("client-portal-repository-publication-list")
+    portal_detail_url = reverse("client-portal-repository-publication-detail", args=[publication.id])
+    portal_pdf_url = reverse("client-portal-repository-publication-pdf", args=[publication.id])
+    browser.force_login(portal_user)
+    assert browser.get(portal_list_url).json()["results"] == []
+    assert browser.get(portal_detail_url).status_code == 404
+    assert browser.get(portal_pdf_url).status_code == 404
+    browser.force_login(authorizer)
     release_event = RepositoryStaticPublicationControlEvent.objects.get(action="released")
     with pytest.raises(DatabaseError):
         RepositoryStaticDeliveryAuthorization.objects.create(
@@ -851,9 +863,48 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     delivery = browser.post(delivery_url, data=delivery_payload, content_type="application/json")
     assert delivery.status_code == 201, delivery.content
     assert delivery.json()["currently_effective"] is True
-    assert delivery.json()["permits_distribution"] is False
+    assert delivery.json()["permits_distribution"] is True
     assert browser.get(delivery_url).json()["id"] == delivery.json()["id"]
     assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Package Sibling",
+        legal_name="Package Sibling LLC",
+        website="",
+        classifications=["client"],
+    )
+    sibling_user = User.objects.create_user(email="package-sibling@example.invalid", display_name="Sibling")
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=sibling_user, role=BuiltInRole.CLIENT_USER, organization=sibling
+    )
+    browser.force_login(portal_user)
+    portal_list = browser.get(portal_list_url)
+    assert portal_list.status_code == 200
+    assert portal_list["Cache-Control"] == "private, no-store"
+    assert [item["id"] for item in portal_list.json()["results"]] == [str(publication.id)]
+    portal_detail = browser.get(portal_detail_url)
+    assert portal_detail.status_code == 200
+    assert "Review me." in portal_detail.json()["rendered_html"]
+    portal_pdf = browser.get(portal_pdf_url)
+    assert portal_pdf.status_code == 200
+    assert portal_pdf.content.startswith(b"%PDF-")
+    assert portal_pdf["Content-Disposition"].startswith("attachment;")
+    retained_pdf.storage.delete(retained_pdf.name)
+    try:
+        assert browser.get(portal_list_url).json()["results"] == []
+        assert browser.get(portal_detail_url).status_code == 404
+        assert browser.get(portal_pdf_url).status_code == 404
+    finally:
+        assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
+    browser.force_login(sibling_user)
+    assert browser.get(portal_list_url).json()["results"] == []
+    assert browser.get(portal_detail_url).status_code == 404
+    assert browser.get(portal_pdf_url).status_code == 404
+    browser.force_login(reviewer)
+    assert browser.get(portal_list_url).status_code == 403
+    assert browser.get(portal_detail_url).status_code == 403
+    assert browser.get(portal_pdf_url).status_code == 403
     with pytest.raises(DatabaseError):
         RepositoryStaticDeliveryAuthorization.objects.filter(pk=delivery.json()["id"]).update(reason="Changed")
     with pytest.raises(DatabaseError):
@@ -932,11 +983,26 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert superseded.json()["events"][0]["supersedes_id"] == str(publication.id)
     assert browser.get(control_url).json()["state"] == "superseded"
     assert browser.get(delivery_url).json()["currently_effective"] is False
+    browser.force_login(portal_user)
+    assert browser.get(portal_list_url).json()["results"] == []
+    assert browser.get(portal_detail_url).status_code == 404
+    assert browser.get(portal_pdf_url).status_code == 404
+    browser.force_login(authorizer)
     replacement_delivery = browser.post(
         candidate_delivery_url, data=delivery_payload, content_type="application/json"
     )
     assert replacement_delivery.status_code == 201, replacement_delivery.content
     assert replacement_delivery.json()["currently_effective"] is True
+    assert replacement_delivery.json()["permits_distribution"] is True
+    candidate_portal_detail_url = reverse(
+        "client-portal-repository-publication-detail", args=[candidate_publication.id]
+    )
+    browser.force_login(portal_user)
+    assert [item["id"] for item in browser.get(portal_list_url).json()["results"]] == [
+        str(candidate_publication.id)
+    ]
+    assert browser.get(candidate_portal_detail_url).status_code == 200
+    browser.force_login(authorizer)
     assert browser.post(control_url, data=withdrawal_payload, content_type="application/json").status_code == 409
     with pytest.raises(DatabaseError):
         RepositoryStaticPublicationControlEvent.objects.create(
@@ -969,6 +1035,11 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     assert withdrawn.json()["state"] == "withdrawn"
     assert withdrawn.json()["permits_distribution"] is False
     assert browser.get(candidate_delivery_url).json()["currently_effective"] is False
+    assert browser.get(candidate_delivery_url).json()["permits_distribution"] is False
+    browser.force_login(portal_user)
+    assert browser.get(portal_list_url).json()["results"] == []
+    assert browser.get(candidate_portal_detail_url).status_code == 404
+    browser.force_login(authorizer)
     assert len(withdrawn.json()["events"]) == 2
     assert browser.get(control_url).json()["state"] == "superseded"
     assert browser.post(
@@ -993,14 +1064,6 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     with pytest.raises(DatabaseError):
         RepositoryPackageAuthorization.objects.filter(pk=authorized.json()["id"]).update(reason="Changed")
     browser.force_login(reviewer)
-    sibling = create_organization(
-        tenant=installation.tenant,
-        actor_id=installation.owner.id,
-        name="Package Sibling",
-        legal_name="Package Sibling LLC",
-        website="",
-        classifications=["client"],
-    )
     sibling_url = reverse(
         "organization-repository-publication-evidence-package", args=[sibling.entity_id, evidence_id]
     )
@@ -1035,10 +1098,34 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     foreign_tenant = Tenant.objects.create(name="Foreign package MSP", slug="foreign-package-msp")
     foreign_user = User.objects.create_user(email="foreign-package@example.invalid", display_name="Foreign")
     TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.ADMINISTRATOR)
+    foreign_organization = create_organization(
+        tenant=foreign_tenant,
+        actor_id=foreign_user.id,
+        name="Foreign client",
+        legal_name="Foreign client LLC",
+        website="",
+        classifications=["client"],
+    )
+    foreign_portal_user = User.objects.create_user(
+        email="foreign-package-portal@example.invalid", display_name="Foreign client reader"
+    )
+    TenantMembership.objects.create(
+        tenant=foreign_tenant,
+        user=foreign_portal_user,
+        role=BuiltInRole.CLIENT_USER,
+        organization=foreign_organization,
+    )
+    browser.force_login(foreign_portal_user)
+    assert browser.get(portal_list_url).status_code == 403
+    assert browser.get(portal_detail_url).status_code == 403
+    assert browser.get(portal_pdf_url).status_code == 403
     Authenticator.objects.create(
         user=foreign_user, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
     )
     browser.force_login(foreign_user)
+    assert browser.get(portal_list_url).status_code == 403
+    assert browser.get(portal_detail_url).status_code == 403
+    assert browser.get(portal_pdf_url).status_code == 403
     assert browser.get(package_url).status_code in {403, 404}
     assert browser.post(package_url).status_code in {403, 404}
     assert browser.get(authorization_url).status_code in {403, 404}
@@ -1101,13 +1188,6 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     with pytest.raises(DatabaseError):
         RepositoryEvidenceReviewDecision.objects.filter(evidence_id=evidence_id).update(reason="Changed")
 
-    portal_user = User.objects.create_user(email="decision-client@example.invalid", display_name="Client")
-    TenantMembership.objects.create(
-        tenant=installation.tenant,
-        user=portal_user,
-        role=BuiltInRole.CLIENT_USER,
-        organization=organization,
-    )
     browser.force_login(portal_user)
     assert browser.get(url).status_code == 403
     assert browser.post(url, data=payload, content_type="application/json").status_code == 403

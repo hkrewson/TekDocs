@@ -1705,7 +1705,12 @@ A separate append-only, MFA-gated client-delivery authorization now requires
 the active release, intact retained chain, and currently client-visible entity
 references. It becomes ineffective on withdrawal, supersession, corruption, or
 reference-visibility loss. This is approval for a future delivery path, not
-client access; repository portal projection and downloads remain open gates.
+client access; full repository portal projection and attachment downloads remain open gates.
+An exact-client portal API now projects only currently effective, separately
+authorized repository STATIC records and returns their signed sanitized HTML
+or an integrity-checked retained PDF. The existing portal Documentation UI,
+retained attachment downloads, notifications, exports, migration authority
+handoff, and recovery acceptance remain open `0.9.7` work.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

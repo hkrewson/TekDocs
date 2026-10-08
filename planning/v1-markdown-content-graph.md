@@ -488,6 +488,12 @@ active internal release. It rechecks the signed retained chain and current
 client-visible entity references; it is ineffective after withdrawal,
 supersession, artifact corruption, or a reference-visibility change. It does
 not itself add a portal read or download path.
+The first client delivery path adds bounded, exact-organization portal API
+listing and detail reads plus a checked PDF download. Every request rechecks
+current delivery authorization, signed retained artifacts, and referenced
+entity visibility; it does not re-render live Git. The existing portal UI,
+attachment delivery, notifications, exports, and authority handoff remain
+separate work.
 
 ### `0.9.8` — version 1 acceptance
 

@@ -1,4 +1,4 @@
-"""Explicit authorization for a future repository STATIC client-delivery path."""
+"""Explicit authorization for repository STATIC client delivery."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from .repository_static_publications import verify_repository_static_publication
 
 
 class RepositoryStaticDeliveryError(RuntimeError):
-    """The record cannot be approved for a future client delivery path."""
+    """The record cannot be approved for client delivery."""
 
 
 def _client_reference_projection_safe(publication: RepositoryStaticPublication) -> bool:
@@ -52,7 +52,7 @@ def _client_reference_projection_safe(publication: RepositoryStaticPublication) 
 
 
 def repository_static_delivery_ready(publication: RepositoryStaticPublication) -> bool:
-    """Current readiness for a future portal; this does not expose a client route."""
+    """Current readiness for the bounded client portal projection."""
     evidence = publication.authorization.package.decision.evidence
     return (
         evidence.audience == PublicationAudience.CLIENT_VISIBLE

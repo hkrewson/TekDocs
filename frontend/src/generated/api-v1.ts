@@ -1716,6 +1716,54 @@ export interface paths {
         readonly patch: operations["client_portal_notifications_read_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/portal/repository-publications": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_repository_publications_list"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/portal/repository-publications/{publication_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_repository_publications_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/portal/repository-publications/{publication_id}/pdf": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["client_portal_repository_publications_pdf_download"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/recycle-bin": {
         readonly parameters: {
             readonly query?: never;
@@ -14787,6 +14835,31 @@ export interface components {
             readonly has_more: boolean;
             readonly next_cursor: string | null;
         };
+        readonly PortalRepositoryPublication: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly content_id: string;
+            readonly title: string;
+            /** Format: date-time */
+            readonly created_at: string;
+        };
+        readonly PortalRepositoryPublicationDetail: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly content_id: string;
+            readonly title: string;
+            /** Format: date-time */
+            readonly created_at: string;
+            readonly rendered_html: string;
+        };
+        readonly PortalRepositoryPublicationResult: {
+            readonly results: readonly components["schemas"]["PortalRepositoryPublication"][];
+            readonly count: number;
+            readonly has_more: boolean;
+            readonly next_cursor: string | null;
+        };
         readonly PreflightCode: {
             readonly code: string;
             /**
@@ -21303,6 +21376,86 @@ export interface operations {
                 };
             };
             /** @description Notification unavailable */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly client_portal_repository_publications_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly cursor?: string;
+            };
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["PortalRepositoryPublicationResult"];
+                };
+            };
+        };
+    };
+    readonly client_portal_repository_publications_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly publication_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["PortalRepositoryPublicationDetail"];
+                };
+            };
+        };
+    };
+    readonly client_portal_repository_publications_pdf_download: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly publication_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/pdf": string;
+                };
+            };
+            /** @description Unavailable publication */
             readonly 404: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */

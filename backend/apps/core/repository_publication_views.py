@@ -6,8 +6,9 @@ from typing import cast
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -29,6 +30,7 @@ from .repository_publication_evidence import (
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
 )
+from .repository_publication_render import MAX_RENDERED_PDF_BYTES, verify_retained_pdf_snapshot
 from .repository_service import RepositoryServiceError
 from .workspaces import ResolvedWorkspace
 
@@ -184,6 +186,27 @@ def _review(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respons
     )
 
 
+def _review_pdf(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> HttpResponse:  # type: ignore[no-untyped-def]
+    require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    if not verify_repository_publication_evidence(evidence)["pdf_snapshot_attested"]:
+        response = HttpResponse("Retained publication evidence failed verification", status=409)
+    else:
+        try:
+            with evidence.pdf_file.storage.open(evidence.pdf_file.name, "rb") as stream:
+                content = bytes(stream.read(MAX_RENDERED_PDF_BYTES + 1))
+        except (OSError, ValueError, TypeError):
+            content = b""
+        if not verify_retained_pdf_snapshot(manifest=evidence.manifest, content=content):
+            response = HttpResponse("Retained publication PDF failed verification", status=409)
+        else:
+            response = HttpResponse(content, content_type="application/pdf")
+            response["Content-Disposition"] = 'attachment; filename="repository-evidence-snapshot.pdf"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 def _decision(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Response:  # type: ignore[no-untyped-def]
     require_permission(request.user, PermissionKey.DOCUMENTS_VIEW, organization=workspace.organization)
     evidence = _evidence(workspace, evidence_id)
@@ -274,6 +297,15 @@ class MSPRepositoryEvidenceReviewView(APIView):
         return _review(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
 
 
+class MSPRepositoryEvidenceReviewPDFView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_msp_review_pdf",
+        responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, evidence_id):  # type: ignore[no-untyped-def]
+        return _review_pdf(request, _msp_workspace(request, PermissionKey.DOCUMENTS_APPROVE), evidence_id)
+
+
 class OrganizationRepositoryEvidenceCollectionView(APIView):
     @extend_schema(
         operation_id="repository_evidence_organization_list",
@@ -313,6 +345,19 @@ class OrganizationRepositoryEvidenceReviewView(APIView):
     )
     def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
         return _review(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryEvidenceReviewPDFView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_review_pdf",
+        responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _review_pdf(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,

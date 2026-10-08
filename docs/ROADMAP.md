@@ -1750,6 +1750,9 @@ file downloads, portal delivery, and authority handoff are still open.
 The internal review-decision foundation records one immutable, exact-evidence
 client-visible outcome after MFA and integrity checks. Acceptance for packaging
 does not approve a STATIC publication or authorize any client distribution.
+The retained PDF can be downloaded for authorized staff review only after
+signed-evidence and exact returned-byte checks. It has no client route or
+distribution authority.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

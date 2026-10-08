@@ -5,6 +5,7 @@ import hashlib
 import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from threading import Event
 
 import pytest
@@ -382,10 +383,18 @@ def test_repository_evidence_api_retains_safe_staff_summary_and_denies_portal(co
     detail_url = reverse("msp-repository-publication-evidence-detail", args=[summary["id"]])
     assert browser.get(detail_url).json()["verified"] is True
     review_url = reverse("msp-repository-publication-evidence-review", args=[summary["id"]])
+    review_pdf_url = reverse("msp-repository-publication-evidence-review-pdf", args=[summary["id"]])
     reviewed = browser.get(review_url)
     assert reviewed.status_code == 200
     assert "Private body." in reviewed.json()["canonical_markdown"]
     assert "manifest" not in reviewed.json() and "pdf_file" not in reviewed.json()
+    reviewed_pdf = browser.get(review_pdf_url)
+    assert reviewed_pdf.status_code == 200
+    assert reviewed_pdf.content.startswith(b"%PDF-")
+    assert reviewed_pdf["Content-Type"] == "application/pdf"
+    assert reviewed_pdf["Cache-Control"] == "private, no-store"
+    assert reviewed_pdf["X-Content-Type-Options"] == "nosniff"
+    assert reviewed_pdf["Content-Disposition"].startswith("attachment;")
 
     organization = create_organization(
         tenant=installation.tenant,
@@ -406,6 +415,7 @@ def test_repository_evidence_api_retains_safe_staff_summary_and_denies_portal(co
     assert browser.get(url).status_code == 403
     assert browser.get(detail_url).status_code == 403
     assert browser.get(review_url).status_code == 403
+    assert browser.get(review_pdf_url).status_code == 403
     assert browser.post(url, data=payload, content_type="application/json").status_code == 403
 
 
@@ -456,11 +466,24 @@ def test_repository_evidence_api_enforces_exact_organization_scope(composition_r
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
     own_review = reverse("organization-repository-publication-evidence-review", args=[first.entity_id, evidence_id])
     other_review = reverse("organization-repository-publication-evidence-review", args=[second.entity_id, evidence_id])
+    own_review_pdf = reverse(
+        "organization-repository-publication-evidence-review-pdf", args=[first.entity_id, evidence_id]
+    )
+    other_review_pdf = reverse(
+        "organization-repository-publication-evidence-review-pdf", args=[second.entity_id, evidence_id]
+    )
     assert browser.get(own_review).status_code == 200
     assert browser.get(other_review).status_code == 404
+    assert browser.get(own_review_pdf).status_code == 200
+    assert browser.get(other_review_pdf).status_code == 404
+    foreign_tenant = Tenant.objects.create(name="Foreign review MSP", slug="foreign-review-msp")
+    foreign_reviewer = User.objects.create_user(email="foreign-reviewer@example.invalid", display_name="Foreign")
+    TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_reviewer, role=BuiltInRole.ADMINISTRATOR)
+    browser.force_login(foreign_reviewer)
+    assert browser.get(own_review_pdf).status_code in {403, 404}
 
 
-def test_repository_evidence_review_uses_retained_source_and_fails_closed(composition_repository):
+def test_repository_evidence_review_uses_retained_source_and_fails_closed(composition_repository, monkeypatch):
     installation, _workspace, repository = composition_repository
     document_id = uuid.uuid4()
     initial = repository_service.commit_repository_files(
@@ -483,6 +506,10 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     assert created.status_code == 201
     evidence_id = created.json()["id"]
     review_url = reverse("msp-repository-publication-evidence-review", args=[evidence_id])
+    review_pdf_url = reverse("msp-repository-publication-evidence-review-pdf", args=[evidence_id])
+    evidence = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
+    with evidence.pdf_file.storage.open(evidence.pdf_file.name, "rb") as stream:
+        retained_pdf = stream.read()
     updated = repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=initial.object_id,
@@ -496,18 +523,38 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     assert reviewed.json()["source_commit"] == initial.object_id
     assert "Retained text." in reviewed.json()["canonical_markdown"]
     assert "New text." not in reviewed.content.decode()
+    assert browser.get(review_pdf_url).content == retained_pdf
+
+    storage = evidence.pdf_file.storage
+    original_open = storage.open
+    reads = 0
+
+    def changed_between_checks(name, mode="rb"):
+        nonlocal reads
+        if name != evidence.pdf_file.name:
+            return original_open(name, mode)
+        reads += 1
+        return BytesIO(retained_pdf if reads == 1 else retained_pdf + b"altered")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(storage, "open", changed_between_checks)
+        changed = browser.get(review_pdf_url)
+    assert reads == 2
+    assert changed.status_code == 409
+    assert not changed.content.startswith(b"%PDF-")
 
     read_only_user = User.objects.create_user(email="review-reader@example.invalid", display_name="Reader")
     TenantMembership.objects.create(tenant=installation.tenant, user=read_only_user, role=BuiltInRole.READ_ONLY)
     browser.force_login(read_only_user)
     assert browser.get(review_url).status_code == 403
+    assert browser.get(review_pdf_url).status_code == 403
 
-    evidence = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
     evidence.pdf_file.storage.delete(evidence.pdf_file.name)
     browser.force_login(installation.owner)
     rejected = browser.get(review_url)
     assert rejected.status_code == 409
     assert "Retained text." not in rejected.content.decode()
+    assert browser.get(review_pdf_url).status_code == 409
 
 
 def test_repository_evidence_decision_is_separate_from_distribution(composition_repository):
@@ -557,6 +604,10 @@ def test_repository_evidence_decision_is_separate_from_distribution(composition_
     )
     browser.force_login(reviewer)
     assert browser.post(url, data=payload, content_type="application/json").status_code == 403
+    review_pdf_url = reverse(
+        "organization-repository-publication-evidence-review-pdf", args=[organization.entity_id, evidence_id]
+    )
+    assert browser.get(review_pdf_url).status_code == 403
     Authenticator.objects.create(user=reviewer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()})
     accepted = browser.post(url, data=payload, content_type="application/json")
     assert accepted.status_code == 201

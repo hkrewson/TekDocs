@@ -3,22 +3,31 @@
 import os
 import uuid
 
+import yaml
 from django.db import transaction
 
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
-from apps.core.models import ContentNode, WorkspaceKind, WorkspaceRepository
-from apps.core.repository_service import read_repository_markdown_files_at_commit
+from apps.core.models import ContentNode, Organization, WorkspaceKind, WorkspaceRepository
+from apps.core.repository_manifests import ORGANIZATION_DIRECTORY_PATH
+from apps.core.repository_service import (
+    RepositoryFileNotFoundError,
+    read_accepted_repository_file,
+    read_repository_markdown_files_at_commit,
+)
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 
 
 OWNER_EMAIL = "validation-recovery@example.invalid"
+ORGANIZATION_NAME = "Validation Recovery Client"
 FRAGMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.fragment")
 DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.document")
+ORGANIZATION_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
 INITIAL_FRAGMENT = "Confirm the device serial number.\n"
 UPDATED_FRAGMENT = "Confirm the device serial number and enrollment status.\n"
 DOCUMENT_MARKDOWN = "# Laptop setup\n\nFollow the retained prerequisite.\n"
+ORGANIZATION_MARKDOWN = "# Client enrollment\n\nUse this client's device policy.\n"
 
 
 def _repository(owner):
@@ -26,6 +35,21 @@ def _repository(owner):
         tenant=owner.tenant_memberships.get(organization__isnull=True).tenant,
         workspace__kind=WorkspaceKind.MSP,
     )
+
+
+def _organization_repository(owner, organization):
+    return WorkspaceRepository.objects.select_related("accepted_commit", "indexed_commit").get(
+        tenant=owner.tenant_memberships.get(organization__isnull=True).tenant,
+        workspace__organization=organization,
+    )
+
+
+def _assert_absent(*, repository, content_id):
+    try:
+        read_authored_content(repository=repository, content_id=content_id)
+    except RepositoryFileNotFoundError:
+        return
+    raise AssertionError("content from another Workspace appeared in this repository")
 
 
 def create_fixture(owner):
@@ -82,7 +106,25 @@ def create_fixture(owner):
         metadata_patch={},
     )
     assert updated.accepted_commit == updated.indexed_commit
-    print("repository Markdown recovery fixture created")
+
+
+def create_organization_fixture(owner, organization):
+    repository = _organization_repository(owner, organization)
+    document = author_content(
+        repository=repository,
+        actor_id=owner.id,
+        request_id=None,
+        operation="create",
+        content_id=ORGANIZATION_DOCUMENT_ID,
+        base_commit=repository.accepted_commit.object_id,
+        base_blob=None,
+        kind="document",
+        path=None,
+        title="Client enrollment",
+        markdown=ORGANIZATION_MARKDOWN,
+        metadata_patch={},
+    )
+    assert document.accepted_commit == document.indexed_commit
 
 
 def verify_fixture(owner):
@@ -105,21 +147,60 @@ def verify_fixture(owner):
     )
     assert dict(historical_files)[fragment.path].decode() != fragment.source
     assert dict(historical_files)[fragment.path].endswith(INITIAL_FRAGMENT.encode())
-    print("repository Markdown, pinned composition, and Git history restored")
+    _assert_absent(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID)
+    directory = yaml.safe_load(
+        read_accepted_repository_file(repository_id=repository.id, path=ORGANIZATION_DIRECTORY_PATH)
+    )
+    organization = Organization.objects.get(tenant=repository.tenant, entity__display_name=ORGANIZATION_NAME)
+    matching = [
+        entry for entry in directory["organizations"] if entry["organization_id"] == str(organization.id)
+    ]
+    assert len(matching) == 1
+    assert matching[0]["display_name"] == ORGANIZATION_NAME
+    assert matching[0]["classifications"] == ["client"]
+    return matching[0]
+
+
+def verify_organization_fixture(owner, organization, directory_entry):
+    repository = _organization_repository(owner, organization)
+    document = read_authored_content(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID)
+    assert document.markdown == ORGANIZATION_MARKDOWN
+    assert document.accepted_commit == document.indexed_commit
+    assert ContentNode.objects.get(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID).markdown == (
+        ORGANIZATION_MARKDOWN
+    )
+    assert directory_entry["repository_id"] == str(repository.id)
+    assert directory_entry["workspace_id"] == str(repository.workspace_id)
+    _assert_absent(repository=repository, content_id=DOCUMENT_ID)
 
 
 owner = User.objects.get(email=OWNER_EMAIL)
+tenant = owner.tenant_memberships.get(organization__isnull=True).tenant
+mode = os.environ.get("TEKDOCS_RECOVERY_CONTENT_MODE")
 with transaction.atomic():
     bind_local_rls_scope(
-        DataScope.tenant(owner.tenant_memberships.get(organization__isnull=True).tenant),
+        DataScope.tenant(tenant),
         organization_mode=OrganizationRLSMode.MSP_ONLY,
         actor_user_id=owner.id,
         principal_mode=RLSPrincipalMode.USER,
     )
-    mode = os.environ.get("TEKDOCS_RECOVERY_CONTENT_MODE")
+    organization = Organization.objects.get(tenant=tenant, entity__display_name=ORGANIZATION_NAME)
     if mode == "create":
         create_fixture(owner)
     elif mode == "verify":
-        verify_fixture(owner)
+        directory_entry = verify_fixture(owner)
     else:
         raise RuntimeError("TEKDOCS_RECOVERY_CONTENT_MODE must be create or verify")
+with transaction.atomic():
+    bind_local_rls_scope(
+        DataScope.organization(tenant, organization),
+        organization_mode=OrganizationRLSMode.ORGANIZATION,
+        actor_user_id=owner.id,
+        principal_mode=RLSPrincipalMode.USER,
+    )
+    if mode == "create":
+        create_organization_fixture(owner, organization)
+        print("MSP and client repository Markdown recovery fixtures created")
+    else:
+        verify_organization_fixture(owner, organization, directory_entry)
+        print("MSP directory, client isolation, Markdown composition, and Git history restored")

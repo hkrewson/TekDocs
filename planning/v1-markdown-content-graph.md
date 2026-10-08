@@ -492,6 +492,12 @@ gates after file, template, review, key, publication and recovery parity.
   indexed composition, and both Git revisions; repository manifests alone
   no longer satisfy this evidence. This is local recovery evidence, not an
   authority handoff or production restore acceptance.
+- The same rehearsal now retains a client-owned Markdown document in its
+  organization's separate repository while the MSP repository retains the
+  portable organization directory entry. After restore it checks the exact
+  directory-to-repository mapping, client content, and absence of each
+  Workspace's document identity from the other repository. This proves the
+  local storage partition, not authorization or hosted Git integration.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

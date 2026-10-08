@@ -1730,6 +1730,10 @@ The network-isolated restore now also verifies an authored Markdown document,
 a revised reusable fragment, the document's pinned historical fragment source,
 and its indexed composition. This is local exact-content recovery evidence,
 not an authority transition or a deployed restore acceptance.
+The same local rehearsal now verifies the MSP's organization directory maps
+to the restored client repository, while client-owned Markdown remains in
+that separate repository with no cross-repository document identities.
+Permission and production cutover gates remain separate.
 
 The first `0.9.7` foundation produces a deterministic internal dependency
 proof for one repository document: the accepted commit, exact root and

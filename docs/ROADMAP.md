@@ -1735,6 +1735,13 @@ values and provenance into protected, signed evidence while leaving Git-authored
 Markdown and portable metadata value-free. Content expansion and withheld or
 unavailable keys remain blocked. It does not create a distribution path or move
 document-write authority.
+The next evidence-integrity slice records the selected topic type and replays
+repository publication preflight during offline verification against retained
+source text and frozen dependency identities. Attachment descriptors must
+exactly cover referenced attachments. Earlier evidence remains verifiable
+without claiming the newer closure attestation. Source pinning additionally
+checks indexed topic and frontmatter parity with the accepted Git root. This
+is not distribution or authority handoff.
 
 `0.9.2` is complete: accepted repository commits are parsed under the strict
 `tekdocs.content/v1` document/fragment profile; bounded UUID wikilinks ignore

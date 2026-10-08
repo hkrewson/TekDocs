@@ -59,6 +59,7 @@ from .publications import (
 )
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
+from .topic_schemas import SCHEMAS
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
 EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v1"
@@ -341,6 +342,7 @@ def _retain_pinned_evidence(
             "source_commit": source_commit.object_id,
             "content_id": str(content_id),
             "audience": audience,
+            "topic_type": node.topic_type,
             "signed_at": signed_at_text,
             "signed_by": str(actor.id),
             "source": source,
@@ -445,6 +447,39 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
     )
     if preflight is not None:
         identity_valid = identity_valid and preflight_attested
+    topic_type = manifest.get("topic_type") if isinstance(manifest, dict) else None
+    dependency_closure_attested = False
+    if isinstance(topic_type, str) and (not topic_type or topic_type in SCHEMAS) and isinstance(preflight, dict):
+        descriptors = manifest.get("attachments")
+        cards_for_preflight = manifest.get("entity_cards")
+        if isinstance(descriptors, list) and isinstance(cards_for_preflight, list):
+            attachment_targets = {
+                descriptor["source_id"] for descriptor in descriptors
+                if isinstance(descriptor, dict) and isinstance(descriptor.get("source_id"), str)
+            }
+            entity_targets = {
+                card["id"] for card in cards_for_preflight
+                if isinstance(card, dict) and isinstance(card.get("id"), str)
+            }
+            try:
+                frozen_attachments = {uuid.UUID(item) for item in attachment_targets}
+                frozen_entities = {uuid.UUID(item) for item in entity_targets}
+            except ValueError:
+                pass
+            else:
+                key_targets = key_targets_in_markdown(evidence.canonical_markdown)
+                dependency_closure_attested = (
+                    len(attachment_targets) == len(descriptors)
+                    and len(entity_targets) == len(cards_for_preflight)
+                    and preflight == repository_publication_preflight(
+                        markdown=evidence.canonical_markdown,
+                        audience=evidence.audience,
+                        topic_type=topic_type,
+                        frozen_attachment_ids=frozen_attachments,
+                        frozen_entity_ids=frozen_entities,
+                        frozen_key_targets=set(key_targets) if manifest.get("key_snapshot") is not None else None,
+                    )
+                )
     requested_entities = entity_ids_in_markdown(evidence.canonical_markdown)
     cards = manifest.get("entity_cards") if isinstance(manifest, dict) else None
     entity_cards_valid = (
@@ -473,6 +508,14 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         if not isinstance(descriptors, list) or len(descriptors) > MAX_RETAINED_ATTACHMENTS:
             attachments_valid = False
         else:
+            requested_attachments = {str(item) for item in attachment_ids_in_markdown(evidence.canonical_markdown)}
+            descriptor_sources = [item.get("source_id") for item in descriptors if isinstance(item, dict)]
+            if (
+                len(descriptor_sources) != len(descriptors)
+                or not all(isinstance(item, str) for item in descriptor_sources)
+                or set(descriptor_sources) != requested_attachments
+            ):
+                attachments_valid = False
             artifacts = {str(item.id): item for item in evidence.attachments.all()}
             if len(artifacts) != len(descriptors):
                 attachments_valid = False
@@ -540,6 +583,7 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         and attachments_valid
         and entity_cards_valid
         and key_snapshot_valid
+        and (topic_type is None or preflight is None or dependency_closure_attested)
     )
     return {
         "valid": valid,
@@ -552,4 +596,5 @@ def verify_repository_publication_evidence(evidence: RepositoryPublicationEviden
         "attachments_valid": attachments_valid,
         "entity_cards_valid": entity_cards_valid,
         "key_snapshot_valid": key_snapshot_valid,
+        "dependency_closure_attested": valid and dependency_closure_attested,
     }

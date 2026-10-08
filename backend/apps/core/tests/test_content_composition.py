@@ -203,6 +203,16 @@ def test_publication_source_freeze_rejects_stale_or_tampered_projection(composit
         freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
 
     index_repository_content(repository_id=repository.id, force=True)
+    ContentNode.objects.filter(repository=repository, content_id=document_id).update(topic_type="procedure")
+    with pytest.raises(ContentPublicationSourceError, match="metadata differs"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+    index_repository_content(repository_id=repository.id, force=True)
+    ContentNode.objects.filter(repository=repository, content_id=document_id).update(frontmatter={})
+    with pytest.raises(ContentPublicationSourceError, match="metadata differs"):
+        freeze_git_document_dependencies(repository_id=repository.id, content_id=document_id, audience="msp_internal")
+
+    index_repository_content(repository_id=repository.id, force=True)
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=first.object_id,
@@ -376,6 +386,22 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     assert evidence.manifest["preflight"]["markdown_sha256"] == evidence.manifest["source"]["markdown_sha256"]
     assert verify_repository_publication_evidence(evidence)["valid"]
     assert verify_repository_publication_evidence(evidence)["preflight_attested"]
+    assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
+
+    inconsistent = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    inconsistent.manifest["topic_type"] = "procedure"
+    inconsistent_digest = hashlib.sha256(
+        evidence_payload(manifest=inconsistent.manifest, markdown=inconsistent.canonical_markdown)
+    ).digest()
+    inconsistent.content_digest = inconsistent_digest.hex()
+    inconsistent.signature = base64.urlsafe_b64encode(
+        publication_signing_key().sign(inconsistent_digest)
+    ).decode("ascii")
+    assert verify_repository_publication_evidence(inconsistent)["signature_valid"]
+    assert not verify_repository_publication_evidence(inconsistent)["dependency_closure_attested"]
+    assert not verify_repository_publication_evidence(inconsistent)["valid"]
+    inconsistent.manifest["topic_type"] = "unsupported-topic"
+    assert not verify_repository_publication_evidence(inconsistent)["dependency_closure_attested"]
 
     prior_format = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
     prior_format.manifest.pop("preflight")
@@ -386,6 +412,17 @@ def test_repository_publication_evidence_is_signed_append_only_and_independent_o
     prior_format.signature = base64.urlsafe_b64encode(publication_signing_key().sign(prior_digest)).decode("ascii")
     assert verify_repository_publication_evidence(prior_format)["valid"]
     assert not verify_repository_publication_evidence(prior_format)["preflight_attested"]
+    assert not verify_repository_publication_evidence(prior_format)["dependency_closure_attested"]
+
+    legacy_format = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    legacy_format.manifest.pop("topic_type")
+    legacy_digest = hashlib.sha256(
+        evidence_payload(manifest=legacy_format.manifest, markdown=legacy_format.canonical_markdown)
+    ).digest()
+    legacy_format.content_digest = legacy_digest.hex()
+    legacy_format.signature = base64.urlsafe_b64encode(publication_signing_key().sign(legacy_digest)).decode("ascii")
+    assert verify_repository_publication_evidence(legacy_format)["valid"]
+    assert not verify_repository_publication_evidence(legacy_format)["dependency_closure_attested"]
 
     foreign_tenant = Tenant.objects.create(name="Foreign evidence MSP", slug=f"foreign-evidence-{uuid.uuid4()}")
     with django_runtime_role(), transaction.atomic():
@@ -489,6 +526,7 @@ def test_repository_evidence_freezes_portable_field_keys_without_changing_git(co
     assert snapshot["markdown"] == "Device First laptop.\n"
     assert snapshot["records"][0]["value"] == "First laptop"
     assert verify_repository_publication_evidence(evidence)["key_snapshot_valid"]
+    assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
 
     asset.entity.display_name = "Renamed laptop"
     asset.entity.save(update_fields=("display_name", "updated_at"))
@@ -570,6 +608,19 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
             evidence.manifest["attachments"][0]["checksum"] == hashlib.sha256(b"Original attachment bytes").hexdigest()
         )
         assert verify_repository_publication_evidence(evidence)["valid"]
+        assert verify_repository_publication_evidence(evidence)["dependency_closure_attested"]
+        incomplete = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+        incomplete.manifest["attachments"][0]["source_id"] = str(uuid.uuid4())
+        incomplete_digest = hashlib.sha256(
+            evidence_payload(manifest=incomplete.manifest, markdown=incomplete.canonical_markdown)
+        ).digest()
+        incomplete.content_digest = incomplete_digest.hex()
+        incomplete.signature = base64.urlsafe_b64encode(
+            publication_signing_key().sign(incomplete_digest)
+        ).decode("ascii")
+        assert verify_repository_publication_evidence(incomplete)["signature_valid"]
+        assert not verify_repository_publication_evidence(incomplete)["dependency_closure_attested"]
+        assert not verify_repository_publication_evidence(incomplete)["attachments_valid"]
         attachment.file.storage.delete(attachment.file.name)
         assert verify_repository_publication_evidence(evidence)["valid"]
         with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.integrity"):

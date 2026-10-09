@@ -1884,6 +1884,10 @@ recovery and authority handoff remain open.
 The disposable restore rehearsal now refuses repository attachment corruption,
 repairs it and requires a passing sweep, then independently refuses legacy PDF
 corruption. This does not simulate a deployed cutover.
+The legacy document copy-status preflight now verifies retained ordinary
+attachment bytes before reporting an in-sync copy and matched shadow read;
+missing or altered bytes report divergence. This diagnostic guard does not
+switch document authority or close the remaining file parity gates.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

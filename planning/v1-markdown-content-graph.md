@@ -575,6 +575,10 @@ gates after file, template, review, key, publication and recovery parity.
   it, and checks that a restored file loss is detected. This broadens custody
   evidence beyond the one exact editable bundle; it does not prove off-host
   retention, whole-host disk exhaustion, or final production restore acceptance.
+- The legacy document copy-status preflight now rechecks retained ordinary
+  attachment bytes for an otherwise in-sync copy. Changed or missing bytes
+  report divergence and suppress the shadow read match until repaired; this
+  is not an authority transition or complete file-backed-document parity.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

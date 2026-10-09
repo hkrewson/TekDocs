@@ -4,6 +4,7 @@ import io
 import json
 import uuid
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -327,6 +328,22 @@ def test_attachment_links_survive_copy_render_and_rollback(tmp_path):
         )
         assert download.status_code == 200
         assert b"".join(download.streaming_content) == b"setup steps\n"
+
+        retained_path = Path(attachment.file.path)
+        retained_path.write_bytes(b"changed steps\n")
+        damaged_status = browser.get(status_url).json()
+        assert damaged_status["content_copy_state"] == "diverged"
+        assert damaged_status["read_projection_state"] == "not_checked"
+        assert "content_copy_not_in_sync" in damaged_status["handoff_blockers"]
+        assert "changed steps" not in json.dumps(damaged_status)
+        retained_path.write_bytes(b"setup steps\n")
+        assert browser.get(status_url).json()["read_projection_state"] == "matched"
+        retained_path.unlink()
+        missing_status = browser.get(status_url).json()
+        assert missing_status["content_copy_state"] == "diverged"
+        assert missing_status["read_projection_state"] == "not_checked"
+        retained_path.write_bytes(b"setup steps\n")
+        assert browser.get(status_url).json()["read_projection_state"] == "matched"
 
         output = io.StringIO()
         call_command(

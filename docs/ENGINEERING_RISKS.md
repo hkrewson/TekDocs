@@ -231,6 +231,10 @@ refusal, partial-set cleanup, repair, and restored-state detection. This
 narrows the managed-media custody portion of `TD-RISK-006` and `TD-RISK-069`;
 off-host retention, whole-host disk exhaustion, and final production restore
 acceptance retain their recurring owners.
+The legacy document migration-status preflight separately rechecks the bytes
+of all active ordinary attachments before claiming an in-sync copy or matched
+shadow read. Missing or altered bytes now report divergence; repository
+document authority remains with the legacy store until the remaining gates pass.
 
 ## 0.9.2 Markdown/index disposition
 

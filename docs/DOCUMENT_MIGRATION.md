@@ -49,7 +49,11 @@ complete interrupted indexing; it must not create a second copy commit. Do
 not treat one of these states as successful handoff. The migration-status API
 reports `content_copy_state`, `read_projection_state` and explicit
 `handoff_blockers` for authorized staff. An `in_sync` copy can still have
-repository-read, repository-write and publication blockers.
+repository-read, repository-write and publication blockers. Status re-verifies
+the retained bytes of all active ordinary document attachments before calling
+a copy `in_sync`; a missing or altered file reports `diverged` and does not
+run the repository read comparison. Repairing the exact retained bytes can
+restore the shadow match, but does not promote repository authority.
 
 ## Roll back an unchanged copy
 

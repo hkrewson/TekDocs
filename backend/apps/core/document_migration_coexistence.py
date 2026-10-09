@@ -11,6 +11,7 @@ from .content_read import document_detail
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
+from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
 from .document_migration_export import (
     DocumentMigrationBindingError,
     DocumentMigrationExportError,
@@ -206,6 +207,14 @@ def _document_copy_status(*, workspace: Workspace, document: Document) -> dict[s
         not isinstance(markdown, str)
         or hashlib.sha256(markdown.encode()).hexdigest() != export.resolved_markdown_sha256
     ):
+        response["content_copy_state"] = "diverged"
+        return response
+    try:
+        attachment_digests = portable_document_attachments(document, markdown, verify_content=True)
+    except DocumentMigrationAttachmentError:
+        response["content_copy_state"] = "diverged"
+        return response
+    if attachment_digests != export.attachment_digests:
         response["content_copy_state"] = "diverged"
         return response
     response["content_copy_state"] = "in_sync"

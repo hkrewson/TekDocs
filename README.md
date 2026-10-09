@@ -84,7 +84,10 @@ The read-only migration-status endpoint reports copy parity and explicit
 `handoff_blockers`. For an `in_sync` copy, `read_projection_state` also checks
 the permission-scoped repository detail route against the legacy title,
 composed Markdown and reader-visible rendered HTML, plus viewer-visible
-outgoing legacy `references` links.
+outgoing legacy `references` links. Before reporting `in_sync`, status also
+rechecks the bytes of every active ordinary attachment retained outside Git;
+a missing or altered file marks the copy `diverged` and leaves the read
+projection unchecked.
 This is a narrow shadow check, not full read parity or an
 authority transition: legacy reads and writes remain authoritative until their
 parity and publication gates are implemented and verified.

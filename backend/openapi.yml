@@ -15302,6 +15302,11 @@ paths:
       operationId: repository_evidence_msp_list
       parameters:
       - in: query
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
         name: page
         schema:
           type: integer
@@ -32431,6 +32436,11 @@ paths:
     get:
       operationId: repository_evidence_organization_list
       parameters:
+      - in: query
+        name: content_id
+        schema:
+          type: string
+          format: uuid
       - in: path
         name: organization_entity_id
         schema:

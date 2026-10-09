@@ -489,6 +489,10 @@ def test_repository_evidence_api_enforces_exact_organization_scope(composition_r
     evidence_id = response.json()["id"]
     assert browser.get(first_url).json()["count"] == 1
     assert browser.get(second_url).json()["results"] == []
+    assert browser.get(first_url, {"content_id": str(document_id)}).json()["count"] == 1
+    assert browser.get(second_url, {"content_id": str(document_id)}).json()["count"] == 0
+    msp_url = reverse("msp-repository-publication-evidence")
+    assert browser.get(msp_url, {"content_id": str(document_id)}).json()["count"] == 0
     other_detail = reverse("organization-repository-publication-evidence-detail", args=[second.entity_id, evidence_id])
     assert browser.get(other_detail).status_code == 404
     assert browser.get(reverse("msp-repository-publication-evidence-detail", args=[evidence_id])).status_code == 404
@@ -518,6 +522,46 @@ def test_repository_evidence_api_enforces_exact_organization_scope(composition_r
     browser.force_login(foreign_reviewer)
     assert browser.get(own_review_html).status_code in {403, 404}
     assert browser.get(own_review_pdf).status_code in {403, 404}
+
+
+def test_repository_evidence_list_filters_one_document_before_pagination(composition_repository):
+    installation, _workspace, repository = composition_repository
+    first_id, second_id = uuid.uuid4(), uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "documents/first.md": _content(content_id=first_id, title="First", body="First private body.\n"),
+            "documents/second.md": _content(content_id=second_id, title="Second", body="Second private body.\n"),
+        },
+        message="Add two evidence candidates",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("msp-repository-publication-evidence")
+    for content_id in (first_id, second_id):
+        created = browser.post(
+            url,
+            data=json.dumps({"content_id": str(content_id), "audience": "msp_internal"}),
+            content_type="application/json",
+        )
+        assert created.status_code == 201, created.content
+    selected = browser.get(url, {"content_id": str(first_id), "page_size": 1})
+    assert selected.status_code == 200
+    assert selected.json()["count"] == 1
+    assert selected.json()["has_more"] is False
+    assert [item["content_id"] for item in selected.json()["results"]] == [str(first_id)]
+    assert browser.get(url, {"content_id": str(second_id)}).json()["count"] == 1
+    assert browser.get(url, {"content_id": str(uuid.uuid4())}).json()["results"] == []
+    assert browser.get(url, {"content_id": "not-a-uuid"}).status_code == 400
+    reader = User.objects.create_user(email="evidence-list-reader@example.invalid", display_name="Reader")
+    TenantMembership.objects.create(tenant=installation.tenant, user=reader, role=BuiltInRole.READ_ONLY)
+    browser.force_login(reader)
+    assert browser.get(url, {"content_id": str(first_id)}).status_code == 403
 
 
 def test_repository_evidence_attachment_review_enforces_organization_boundary(composition_repository, tmp_path):

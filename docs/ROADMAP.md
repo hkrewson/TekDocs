@@ -1804,6 +1804,10 @@ the returned export class and revision, retains dirty drafts on denial, and
 requires reopening the file after an intervening Git revision. Fragments and
 unindexed revisions remain ineligible; live values and repository PDF/DOCX
 parity remain separate work.
+The staff publication-evidence list can now filter by exact repository
+document content ID before pagination. It still requires publication access
+and returns only the selected Workspace's evidence; it does not expose a new
+artifact, approve a publication, or switch document authority.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

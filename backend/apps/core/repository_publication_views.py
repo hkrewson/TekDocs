@@ -89,6 +89,7 @@ class RepositoryEvidenceSummarySerializer(serializers.Serializer):
 
 
 class RepositoryEvidenceQuerySerializer(serializers.Serializer):
+    content_id = serializers.UUIDField(required=False)
     page = serializers.IntegerField(min_value=1, required=False, default=1)
     page_size = serializers.IntegerField(min_value=1, max_value=100, required=False, default=25)
 
@@ -240,6 +241,8 @@ def _collection(request, workspace: ResolvedWorkspace) -> Response:  # type: ign
     if request.method == "GET":
         query = RepositoryEvidenceQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
+        if content_id := query.validated_data.get("content_id"):
+            records = records.filter(content_id=content_id)
         page = query.validated_data["page"]
         page_size = query.validated_data["page_size"]
         count = records.count()

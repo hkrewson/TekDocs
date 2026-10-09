@@ -462,6 +462,10 @@ gates after file, template, review, key, publication and recovery parity.
   repository STATIC record after its full retained chain verifies. This private,
   audited download may contain frozen field-key values and is not a sanitized
   source export, a client route, or editable-format parity.
+- The staff publication-evidence list can filter by one exact document content
+  ID before pagination. It remains scoped to the caller's Workspace and
+  publication permission; this is a discovery aid, not a publication decision,
+  artifact download, or authority change.
 - The same final STATIC record permits private, approval-scoped retained HTML
   and PDF downloads. HTML is forced and sandboxed; PDF bytes are rechecked
   after reading. Neither route rerenders Git or changes legacy document authority.

@@ -28281,6 +28281,7 @@ export interface operations {
     readonly repository_evidence_msp_list: {
         readonly parameters: {
             readonly query?: {
+                readonly content_id?: string;
                 readonly page?: number;
                 readonly page_size?: number;
             };
@@ -39700,6 +39701,7 @@ export interface operations {
     readonly repository_evidence_organization_list: {
         readonly parameters: {
             readonly query?: {
+                readonly content_id?: string;
                 readonly page?: number;
                 readonly page_size?: number;
             };

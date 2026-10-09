@@ -304,8 +304,11 @@ Store the recovery key separately from the backup. Neither is sufficient without
 Current recovery sets include PostgreSQL, managed media, every managed local Git
 repository, and the allowlisted deployment secrets. Backup briefly pauses active
 TekDocs writers to keep accepted Git heads aligned with the database snapshot.
-Restore validates all encrypted components and repository bundles before
-destructive work, then verifies the restored repositories against PostgreSQL.
+It checks every retained managed document file against its database size and
+SHA-256 before publishing a recovery set; missing or changed files abort the
+backup. Restore validates all encrypted components and repository bundles before
+destructive work, then verifies the restored repositories, publications, and
+managed files against PostgreSQL before reporting success.
 Use `--network-isolated` during a recovery rehearsal or controlled restore to
 keep the restored stack off external networks until verification is complete.
 GitHub and other optional remotes are replication targets, not backups, and are

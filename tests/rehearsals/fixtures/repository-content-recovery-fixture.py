@@ -5,6 +5,7 @@ import os
 import uuid
 
 import yaml
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 
@@ -263,8 +264,10 @@ with transaction.atomic():
     elif mode == "verify":
         directory_entry = verify_fixture(owner)
         msp_snapshot_digest = _source_snapshot_digest(_repository(owner))
+    elif mode in {"break_managed_file", "repair_managed_file"}:
+        pass
     else:
-        raise RuntimeError("TEKDOCS_RECOVERY_CONTENT_MODE must be create or verify")
+        raise RuntimeError("Unsupported TEKDOCS_RECOVERY_CONTENT_MODE")
 with transaction.atomic():
     bind_local_rls_scope(
         DataScope.organization(tenant, organization),
@@ -282,11 +285,27 @@ with transaction.atomic():
         print(f"ORGANIZATION_EDITABLE_SHA256={organization_editable_digest}")
         print("MSP and client repository Markdown and managed-file recovery fixtures created")
     else:
-        attachment = verify_organization_fixture(owner, organization, directory_entry)
-        organization_repository = _organization_repository(owner, organization)
-        organization_snapshot_digest = _source_snapshot_digest(organization_repository)
-        organization_editable_digest = _editable_bundle_digest(organization_repository, attachment)
-        assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
-        assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]
-        assert organization_editable_digest == os.environ["TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256"]
-        print("MSP directory, client isolation, Markdown, Git history, and managed-file bundle restored")
+        legacy_document = Document.objects.get(
+            tenant=tenant, organization=organization, entity__display_name=PUBLICATION_DOCUMENT_TITLE
+        )
+        attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
+        if mode == "break_managed_file":
+            attachment.file.storage.delete(attachment.file.name)
+            assert not attachment.file.storage.exists(attachment.file.name)
+            print("Disposable managed-file custody removed for recovery fault injection")
+        elif mode == "repair_managed_file":
+            assert not attachment.file.storage.exists(attachment.file.name)
+            assert attachment.file.storage.save(
+                attachment.file.name, ContentFile(PUBLICATION_ATTACHMENT_BYTES)
+            ) == attachment.file.name
+            assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
+            print("Disposable managed-file custody repaired")
+        else:
+            attachment = verify_organization_fixture(owner, organization, directory_entry)
+            organization_repository = _organization_repository(owner, organization)
+            organization_snapshot_digest = _source_snapshot_digest(organization_repository)
+            organization_editable_digest = _editable_bundle_digest(organization_repository, attachment)
+            assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
+            assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]
+            assert organization_editable_digest == os.environ["TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256"]
+            print("MSP directory, client isolation, Markdown, Git history, and managed-file bundle restored")

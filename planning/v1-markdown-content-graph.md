@@ -563,6 +563,13 @@ gates after file, template, review, key, publication and recovery parity.
   portal attachment-download mismatch: the final retained-file check now
   accepts either the public ID or the older record ID already accepted by
   signed evidence verification, with both paths in the regression suite.
+- The supported backup now checks every retained document attachment and
+  primary-file version against private storage before publishing a recovery
+  set. Restore repeats that check after recovery. The production-shaped
+  rehearsal removes a client file, proves backup refusal and cleanup, repairs
+  it, and checks that a restored file loss is detected. This broadens custody
+  evidence beyond the one exact editable bundle; it does not prove off-host
+  retention, whole-host disk exhaustion, or final production restore acceptance.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

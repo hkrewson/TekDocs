@@ -223,6 +223,15 @@ entity-card, image, unsupported TekDocs-link or Mermaid output references.
 This narrows signed evidence to content whose retained proof is complete; it
 does not close artifact custody or distribution risks.
 
+The `0.9.7` recovery path also checks every retained document attachment and
+primary-file version against its database size and checksum before backup can
+publish a recovery set, and again after restore before reporting success. The
+production-shaped rehearsal injects a missing client file to prove backup
+refusal, partial-set cleanup, repair, and restored-state detection. This
+narrows the managed-media custody portion of `TD-RISK-006` and `TD-RISK-069`;
+off-host retention, whole-host disk exhaustion, and final production restore
+acceptance retain their recurring owners.
+
 ## 0.9.2 Markdown/index disposition
 
 `TD-RISK-069` is mitigated for the index boundary with later recurrence. The

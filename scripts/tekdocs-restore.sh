@@ -139,5 +139,6 @@ restore_compose up -d --build --wait
 restore_compose run --rm --no-deps -v "$work_directory:/recovery:ro" backend \
   python manage.py repository_recovery verify --archive /recovery/repositories.tar
 restore_compose exec -T backend python manage.py verify_recovery_publications
+restore_compose exec -T backend python manage.py verify_recovery_managed_files
 restore_compose exec -T backend python manage.py check
 echo "TekDocs recovery completed for explicitly confirmed project $project_name"

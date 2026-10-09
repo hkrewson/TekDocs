@@ -20,6 +20,7 @@ function setup(overrides: Partial<RepositoryClient> = {}) {
     list: vi.fn().mockResolvedValue({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false }),
     source: vi.fn().mockResolvedValue(initial),
     exportSources: vi.fn().mockResolvedValue({ content: new Blob(['snapshot']), name: 'tekdocs-repository-aaaaaaaaaaaa.zip' }),
+    exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
     save,
     ...overrides,
   }
@@ -49,6 +50,79 @@ it('preserves a dirty draft through navigation and sends exact base identities o
     markdown: 'Changed revision.', title: undefined,
   }), undefined))
   expect(await screen.findByText('Saved as one accepted Git commit.')).toBeInTheDocument()
+})
+
+it('downloads only saved indexed HTML while keeping a dirty draft', async () => {
+  const user = userEvent.setup()
+  const exportHtml = vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit })
+  const createObjectURL = vi.fn().mockReturnValue('blob:saved-html')
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('repository-document.html')
+    expect(this.href).toBe('blob:saved-html')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  try {
+    setup({ exportHtml })
+    expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    expect(screen.getByText(/live entity and field values/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Download saved HTML' }))
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(exportHtml).toHaveBeenCalledWith('content-1', undefined)
+    const exported = createObjectURL.mock.calls[0][0] as Blob
+    expect(exported.type).toBe('text/html')
+    const reader = new FileReader()
+    const loaded = new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string) })
+    reader.readAsText(exported)
+    expect(await loaded).toBe('<html>Saved</html>')
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    click.mockRestore()
+  }
+})
+
+it('keeps a denied HTML download retryable and refuses a changed revision', async () => {
+  const user = userEvent.setup()
+  const exportHtml = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValueOnce({ content: new Blob(['stale']), name: 'repository-document.html', commit: 'c'.repeat(40) })
+    .mockResolvedValue({ content: new Blob(['current']), name: 'repository-document.html', commit })
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn().mockReturnValue('blob:html') })
+  try {
+    setup({ exportHtml })
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    const download = screen.getByRole('button', { name: 'Download saved HTML' })
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('could not be downloaded')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('revision changed')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(exportHtml).toHaveBeenCalledTimes(3)
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    click.mockRestore()
+  }
+})
+
+it('does not offer HTML for a fragment or a document awaiting indexing', async () => {
+  const user = userEvent.setup()
+  const source = vi.fn().mockResolvedValueOnce({ ...initial, kind: 'fragment' }).mockResolvedValue({ ...initial, indexed_commit: 'c'.repeat(40) })
+  setup({ source })
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: /Guide/ }))
+  await waitFor(() => expect(source).toHaveBeenCalledTimes(2))
+  expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
 })
 
 it('downloads a current Workspace snapshot and keeps a failed attempt recoverable', async () => {

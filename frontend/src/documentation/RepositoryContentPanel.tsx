@@ -33,9 +33,11 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [htmlExporting, setHtmlExporting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
+  const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
     || draft.path !== source.path || draft.metadataText !== '{}'
@@ -43,6 +45,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null)
 
   useEffect(() => { headingRef.current?.focus() }, [])
+  useEffect(() => { sourceRef.current = source }, [source])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -147,6 +150,30 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     } finally { setExporting(false) }
   }
 
+  async function downloadHtml() {
+    if (htmlExporting || busy || source?.kind !== 'document' || !source.accepted_commit
+      || source.accepted_commit !== source.indexed_commit) return
+    const selectedId = source.content_id
+    const selectedCommit = source.accepted_commit
+    setHtmlExporting(true); setError('')
+    try {
+      const result = await client.exportHtml(selectedId, organizationId)
+      if (result.commit !== selectedCommit || sourceRef.current?.content_id !== selectedId
+        || sourceRef.current.accepted_commit !== selectedCommit) {
+        setError(translate('repository.htmlRevisionChanged'))
+        return
+      }
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setError(translate('repository.htmlFailed'))
+    } finally { setHtmlExporting(false) }
+  }
+
   return <section className="repository-authoring">
     <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="secondary-button" onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
     <p className="form-message">{translate('repository.snapshotNotice')}</p>
@@ -172,7 +199,8 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
         </div>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
         {source?.accepted_commit && <p className="form-message">{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</p>}
-        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>{source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}<button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
+        {source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <p className="form-message">{translate('repository.htmlNotice')}</p>}
+        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>{source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}{source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}<button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
       </section>
     </div>
   </section>

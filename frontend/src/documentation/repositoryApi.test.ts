@@ -30,3 +30,35 @@ it('refuses a successful upstream response that is not a ZIP', async () => {
   })))
   await expect(browserRepositoryClient.exportSources()).rejects.toThrow('could not be downloaded')
 })
+
+it('downloads live repository HTML only from the exact organization route with revision evidence', async () => {
+  const commit = 'a'.repeat(40)
+  const fetch = vi.fn().mockResolvedValue(new Response('<html>Saved</html>', {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="repository-document.html"',
+      'X-TekDocs-Export-Class': 'live_repository_revision',
+      'X-TekDocs-Repository-Commit': commit,
+    },
+  }))
+  vi.stubGlobal('fetch', fetch)
+  const result = await browserRepositoryClient.exportHtml('content-1', 'org-1')
+  expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/org-1/content-graph/documents/content-1/export/html', {
+    credentials: 'same-origin',
+  })
+  expect(result).toMatchObject({ name: 'repository-document.html', commit })
+  const reader = new FileReader()
+  const loaded = new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string) })
+  reader.readAsText(result.content)
+  expect(await loaded).toBe('<html>Saved</html>')
+})
+
+it('refuses denied or unlabeled HTML responses', async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response('Denied', { status: 403 }))
+    .mockResolvedValueOnce(new Response('<html>Unexpected</html>', { status: 200, headers: { 'Content-Type': 'text/html' } }))
+  vi.stubGlobal('fetch', fetch)
+  await expect(browserRepositoryClient.exportHtml('content-1')).rejects.toThrow('could not be downloaded')
+  await expect(browserRepositoryClient.exportHtml('content-1')).rejects.toThrow('could not be downloaded')
+})

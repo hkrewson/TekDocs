@@ -109,6 +109,20 @@ export const browserRepositoryClient = {
     const name = disposition.match(/filename="(tekdocs-repository-[a-f0-9]{12}\.zip)"/)?.[1] || 'tekdocs-repository-source.zip'
     return { content: await response.blob(), name }
   },
+  async exportHtml(contentId: string, organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/documents/${encodeURIComponent(contentId)}/export/html`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) throw new Error(translate('repository.htmlFailed'))
+    const commit = response.headers.get('X-TekDocs-Repository-Commit')
+    if (!response.headers.get('Content-Type')?.startsWith('text/html')
+      || response.headers.get('X-TekDocs-Export-Class') !== 'live_repository_revision'
+      || !commit || !/^[a-f0-9]{40}$|^[a-f0-9]{64}$/.test(commit)
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-document.html"') {
+      throw new Error(translate('repository.htmlFailed'))
+    }
+    return { content: await response.blob(), name: 'repository-document.html', commit }
+  },
   async save(mutation: RepositoryMutation, organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring`, {
       method: 'POST', credentials: 'same-origin',

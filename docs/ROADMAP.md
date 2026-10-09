@@ -1799,6 +1799,11 @@ not editable-format parity or a document-authority change.
 Staff can separately download a live, permission-scoped HTML projection of an
 accepted-and-indexed repository document. It carries the Git revision, is
 private and audited, and is not a signed STATIC artifact or full format parity.
+The repository editor exposes this as a saved-document-only action. It checks
+the returned export class and revision, retains dirty drafts on denial, and
+requires reopening the file after an intervening Git revision. Fragments and
+unindexed revisions remain ineligible; live values and repository PDF/DOCX
+parity remain separate work.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

@@ -1719,6 +1719,11 @@ Recovery fault evidence now includes a production-shaped refusal of a
 database/Git accepted-head mismatch without a partial backup, followed by
 maintenance repair and a healthy network-isolated restore. Storage-exhaustion
 and full authority-handoff recovery acceptance remain open.
+The local Valkey outage exposed a readiness blind spot. Backend readiness and
+the authorized System status page now check the configured broker with a
+bounded, pooled connection and report only coarse availability or persistence
+failure. This operational guard does not prove queued-job recovery or close the
+remaining `0.9.7` recovery and authority gates.
 Repository-artifact fault tests additionally cover exhausted space while Git
 creates a bundle and while the archive is written; they prove cleanup and a
 successful retry, not whole-host encrypted-backup exhaustion.

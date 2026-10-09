@@ -51543,6 +51543,19 @@ components:
           $ref: '#/components/schemas/DiagramRendererDiagnostics'
         repositories:
           $ref: '#/components/schemas/RepositoryDiagnostics'
+        valkey:
+          enum:
+          - ready
+          - degraded
+          - unavailable
+          - not_configured
+          type: string
+          description: |-
+            * `ready` - ready
+            * `degraded` - degraded
+            * `unavailable` - unavailable
+            * `not_configured` - not_configured
+          x-spec-enum-id: 0f93b07f8f9887ee
       required:
       - application_version
       - checked_at
@@ -51550,6 +51563,7 @@ components:
       - diagram_renderer
       - repositories
       - status
+      - valkey
     Taxonomy:
       type: object
       properties:

@@ -13,6 +13,7 @@ from apps.core.api_contracts import ApiRootSerializer, SystemDiagnosticsSerializ
 from apps.core.diagram_exports import diagram_renderer_diagnostics, diagram_renderer_health
 from apps.core.models import InstallationState
 from apps.core.repository_service import repository_health_diagnostics
+from apps.core.valkey_health import valkey_health
 from tekdocs.version import VERSION
 
 
@@ -69,20 +70,24 @@ class ReadyHealthView(APIView):
             return Response({"status": "unavailable", "database": "unavailable"}, status=503)
         renderer = diagram_renderer_health()
         repositories = repository_health_diagnostics()
+        valkey = valkey_health()
         renderer_status = {} if renderer == "not_configured" else {"diagram_renderer": renderer}
         repository_status = (
             {} if repositories["status"] == "not_configured" else {"repositories": repositories["status"]}
         )
-        if renderer not in {"not_configured", "ready"} or repositories["status"] not in {
-            "not_configured",
-            "ready",
-        }:
+        valkey_status = {} if valkey == "not_configured" else {"valkey": valkey}
+        if (
+            renderer not in {"not_configured", "ready"}
+            or repositories["status"] not in {"not_configured", "ready"}
+            or valkey not in {"not_configured", "ready"}
+        ):
             return Response(
                 {
                     "status": "unavailable",
                     "database": "ready",
                     **renderer_status,
                     **repository_status,
+                    **valkey_status,
                     "version": VERSION,
                 },
                 status=503,
@@ -98,12 +103,20 @@ class ReadyHealthView(APIView):
                     "bootstrap": "unavailable",
                     **renderer_status,
                     **repository_status,
+                    **valkey_status,
                     "version": VERSION,
                 },
                 status=503,
             )
         return Response(
-            {"status": "ok", "database": "ready", **renderer_status, **repository_status, "version": VERSION}
+            {
+                "status": "ok",
+                "database": "ready",
+                **renderer_status,
+                **repository_status,
+                **valkey_status,
+                "version": VERSION,
+            }
         )
 
 
@@ -116,11 +129,14 @@ class SystemDiagnosticsView(APIView):
             cursor.fetchone()
         renderer = diagram_renderer_diagnostics()
         repositories = repository_health_diagnostics()
+        valkey = valkey_health()
         return Response(
             {
                 "status": (
                     "ready"
-                    if renderer["status"] == "ready" and repositories["status"] in {"ready", "not_configured"}
+                    if renderer["status"] == "ready"
+                    and repositories["status"] in {"ready", "not_configured"}
+                    and valkey in {"ready", "not_configured"}
                     else "degraded"
                 ),
                 "checked_at": timezone.now(),
@@ -128,5 +144,6 @@ class SystemDiagnosticsView(APIView):
                 "database": "ready",
                 "diagram_renderer": renderer,
                 "repositories": repositories,
+                "valkey": valkey,
             }
         )

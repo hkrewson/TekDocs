@@ -6,6 +6,7 @@ export type SystemDiagnostics = {
   checked_at: string
   application_version: string
   database: 'ready'
+  valkey: 'ready' | 'degraded' | 'unavailable' | 'not_configured'
   diagram_renderer: {
     status: 'ready' | 'stale' | 'unavailable' | 'not_configured'
     version: string | null

@@ -92,6 +92,7 @@ class SystemDiagnosticsSerializer(serializers.Serializer):
     database = serializers.ChoiceField(choices=("ready",))
     diagram_renderer = DiagramRendererDiagnosticsSerializer()
     repositories = RepositoryDiagnosticsSerializer()
+    valkey = serializers.ChoiceField(choices=("ready", "degraded", "unavailable", "not_configured"))
 
 
 IDEMPOTENCY_KEY_PARAMETER = OpenApiParameter(

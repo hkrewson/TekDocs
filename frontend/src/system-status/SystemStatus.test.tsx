@@ -9,6 +9,7 @@ const diagnostics: SystemDiagnostics = {
   checked_at: '2026-09-05T12:00:00Z',
   application_version: '0.9.0',
   database: 'ready',
+  valkey: 'ready',
   diagram_renderer: {
     status: 'ready',
     version: '@mermaid-js/mermaid-cli@11.16.0',
@@ -39,6 +40,7 @@ it('shows bounded renderer diagnostics and refreshes them', async () => {
   expect(screen.getByText('Diagram service').closest('li')).toHaveTextContent('2 of 8 slots in use · 1 waiting, 1 processing')
   expect(screen.getByText('renderer_timeout')).toBeInTheDocument()
   expect(screen.getByText('Workspace repositories').closest('li')).toHaveTextContent('2 of 2 healthy')
+  expect(screen.getByText('Background jobs (Valkey)').closest('li')).toHaveTextContent('Ready')
   expect(screen.getByText(/does not include documents/)).toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Check again' }))
@@ -57,11 +59,12 @@ it('reports an unavailable request and retries without reloading the page', asyn
 })
 
 it('keeps service details visible when the system is degraded', async () => {
-  const client: SystemStatusClient = { load: vi.fn().mockResolvedValue({ ...diagnostics, status: 'degraded', diagram_renderer: { ...diagnostics.diagram_renderer, status: 'stale' }, repositories: { ...diagnostics.repositories, status: 'degraded', healthy: 1, degraded: 1, repair: 'reconcile_to_accepted' } }) }
+  const client: SystemStatusClient = { load: vi.fn().mockResolvedValue({ ...diagnostics, status: 'degraded', valkey: 'unavailable', diagram_renderer: { ...diagnostics.diagram_renderer, status: 'stale' }, repositories: { ...diagnostics.repositories, status: 'degraded', healthy: 1, degraded: 1, repair: 'reconcile_to_accepted' } }) }
   render(<SystemStatus client={client} />)
   expect(await screen.findByRole('alert')).toHaveTextContent('services need attention')
   expect(screen.getByText('Check overdue')).toBeInTheDocument()
   expect(screen.getByText('Version 0.9.0')).toBeInTheDocument()
   expect(screen.getByText('Needs attention')).toBeInTheDocument()
   expect(screen.getByText(/Writes are paused/)).toBeInTheDocument()
+  expect(screen.getByText('Background jobs (Valkey)').closest('li')).toHaveTextContent('Unavailable')
 })

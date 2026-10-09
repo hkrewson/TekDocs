@@ -16248,6 +16248,14 @@ export interface components {
             readonly database: "ready";
             readonly diagram_renderer: components["schemas"]["DiagramRendererDiagnostics"];
             readonly repositories: components["schemas"]["RepositoryDiagnostics"];
+            /**
+             * @description * `ready` - ready
+             *     * `degraded` - degraded
+             *     * `unavailable` - unavailable
+             *     * `not_configured` - not_configured
+             * @enum {string}
+             */
+            readonly valkey: "ready" | "degraded" | "unavailable" | "not_configured";
         };
         readonly Taxonomy: {
             /** Format: uuid */

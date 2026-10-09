@@ -150,6 +150,8 @@
   "systemStatus.versionSummary": "Version {version}",
   "systemStatus.database": "Database",
   "systemStatus.databaseHelp": "Primary application data store",
+  "systemStatus.valkey": "Background jobs (Valkey)",
+  "systemStatus.valkeyHelp": "Job queue connection and persistence health",
   "systemStatus.diagramService": "Diagram service",
   "systemStatus.diagramServiceVersion": "Diagram service version",
   "systemStatus.diagramJobs": "Diagram jobs",

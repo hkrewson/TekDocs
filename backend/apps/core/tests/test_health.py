@@ -20,6 +20,11 @@ from apps.core.models import (
 from tekdocs.version import VERSION
 
 
+@pytest.fixture(autouse=True)
+def isolated_broker(settings):
+    settings.CELERY_BROKER_URL = "memory://"
+
+
 @pytest.mark.django_db
 def test_liveness_contract(client):
     response = client.get(reverse("health-live"))
@@ -35,6 +40,54 @@ def test_readiness_checks_database(client):
     response = client.get(reverse("health-ready"))
     assert response.status_code == 200
     assert response.json()["database"] == "ready"
+
+
+@pytest.mark.django_db
+@override_settings(CELERY_BROKER_URL="redis://127.0.0.1:1/0", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
+def test_readiness_rejects_unavailable_valkey_without_exposing_connection_details(client):
+    response = client.get(reverse("health-ready"))
+
+    assert response.status_code == 503
+    assert response.json()["valkey"] == "unavailable"
+    assert "127.0.0.1" not in response.content.decode()
+
+
+@pytest.mark.django_db
+@override_settings(CELERY_BROKER_URL="redis://private-broker.invalid/0", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
+def test_readiness_rejects_failed_valkey_persistence_without_exposing_url(client, monkeypatch):
+    class FailedPersistence:
+        def ping(self):
+            return True
+
+        def info(self, section):
+            assert section == "persistence"
+            return {"aof_enabled": 1, "aof_last_write_status": "err", "rdb_last_bgsave_status": "ok"}
+
+    monkeypatch.setattr("apps.core.valkey_health._client", lambda _url: FailedPersistence())
+    response = client.get(reverse("health-ready"))
+
+    assert response.status_code == 503
+    assert response.json()["valkey"] == "degraded"
+    assert "private-broker.invalid" not in response.content.decode()
+
+
+@pytest.mark.django_db
+@override_settings(CELERY_BROKER_URL="redis://private-broker.invalid/0", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
+def test_readiness_accepts_healthy_valkey_without_exposing_url(client, monkeypatch):
+    class HealthyPersistence:
+        def ping(self):
+            return True
+
+        def info(self, section):
+            assert section == "persistence"
+            return {"aof_enabled": 1, "aof_last_write_status": "ok", "rdb_last_bgsave_status": "ok"}
+
+    monkeypatch.setattr("apps.core.valkey_health._client", lambda _url: HealthyPersistence())
+    response = client.get(reverse("health-ready"))
+
+    assert response.status_code == 200
+    assert response.json()["valkey"] == "ready"
+    assert "private-broker.invalid" not in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -129,6 +182,7 @@ def test_system_diagnostics_are_authorized_bounded_and_value_free(client, tmp_pa
     assert payload["status"] == "ready"
     assert payload["application_version"] == VERSION
     assert payload["database"] == "ready"
+    assert payload["valkey"] == "not_configured"
     assert payload["diagram_renderer"] == {
         "status": "ready",
         "version": "@mermaid-js/mermaid-cli@11.16.0",
@@ -143,6 +197,25 @@ def test_system_diagnostics_are_authorized_bounded_and_value_free(client, tmp_pa
     assert "customer diagram source" not in serialized
     assert "/private/path" not in serialized
     assert str(tmp_path) not in serialized
+
+
+@pytest.mark.django_db
+@override_settings(CELERY_BROKER_URL="redis://127.0.0.1:1/0", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
+def test_system_diagnostics_reports_valkey_outage_without_connection_details(client):
+    result = bootstrap_owner(
+        tenant_name="Broker Health MSP",
+        owner_email="broker-health@example.invalid",
+        owner_display_name="Broker Health Owner",
+        password=f"{secrets.token_urlsafe(24)}Aa7!",
+    )
+    client.force_login(result.owner)
+
+    response = client.get(reverse("system-diagnostics"))
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "degraded"
+    assert response.json()["valkey"] == "unavailable"
+    assert "127.0.0.1" not in response.content.decode()
 
 
 @pytest.mark.django_db

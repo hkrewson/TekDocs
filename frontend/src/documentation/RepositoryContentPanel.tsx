@@ -36,6 +36,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [exporting, setExporting] = useState(false)
   const [htmlExporting, setHtmlExporting] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
+  const [docxExporting, setDocxExporting] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
@@ -44,6 +45,8 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
     || draft.path !== source.path || draft.metadataText !== '{}'
   ), [draft, source])
+  const canDownloadSaved = source?.kind === 'document' && !!source.accepted_commit
+    && source.accepted_commit === source.indexed_commit
   const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null)
 
   useEffect(() => { headingRef.current?.focus() }, [])
@@ -153,7 +156,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   }
 
   async function downloadHtml() {
-    if (htmlExporting || pdfExporting || busy || source?.kind !== 'document' || !source.accepted_commit
+    if (htmlExporting || pdfExporting || docxExporting || busy || source?.kind !== 'document' || !source.accepted_commit
       || source.accepted_commit !== source.indexed_commit) return
     const selectedId = source.content_id
     const selectedCommit = source.accepted_commit
@@ -177,7 +180,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   }
 
   async function downloadPdf() {
-    if (pdfExporting || htmlExporting || busy || source?.kind !== 'document' || !source.accepted_commit
+    if (pdfExporting || htmlExporting || docxExporting || busy || source?.kind !== 'document' || !source.accepted_commit
       || source.accepted_commit !== source.indexed_commit) return
     const selectedId = source.content_id
     const selectedCommit = source.accepted_commit
@@ -198,6 +201,30 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     } catch {
       setError(translate('repository.pdfFailed'))
     } finally { setPdfExporting(false) }
+  }
+
+  async function downloadDocx() {
+    if (docxExporting || htmlExporting || pdfExporting || busy || source?.kind !== 'document' || !source.accepted_commit
+      || source.accepted_commit !== source.indexed_commit) return
+    const selectedId = source.content_id
+    const selectedCommit = source.accepted_commit
+    setDocxExporting(true); setError('')
+    try {
+      const result = await client.exportDocx(selectedId, organizationId)
+      if (result.commit !== selectedCommit || sourceRef.current?.content_id !== selectedId
+        || sourceRef.current.accepted_commit !== selectedCommit) {
+        setError(translate('repository.docxRevisionChanged'))
+        return
+      }
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setError(translate('repository.docxFailed'))
+    } finally { setDocxExporting(false) }
   }
 
   return <section className="repository-authoring">
@@ -225,9 +252,17 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
         </div>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
         {source?.accepted_commit && <p className="form-message">{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</p>}
-        {source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <p className="form-message">{translate('repository.htmlNotice')}</p>}
-        {source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <p className="form-message">{translate('repository.pdfNotice')}</p>}
-        <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>{source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}{source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}{source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <button type="button" className="secondary-button" onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting}>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</button>}<button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
+        {canDownloadSaved && <p className="form-message">{translate('repository.htmlNotice')}</p>}
+        {canDownloadSaved && <p className="form-message">{translate('repository.pdfNotice')}</p>}
+        {canDownloadSaved && <p className="form-message">{translate('repository.docxNotice')}</p>}
+        <div className="form-actions">
+          <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
+          {source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}
+          {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}
+          {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</button>}
+          {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadDocx() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{docxExporting ? translate('repository.docxPreparing') : translate('repository.docxDownload')}</button>}
+          <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
+        </div></>}
         {source?.kind === 'document' && source.accepted_commit && <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} />}
       </section>
     </div>

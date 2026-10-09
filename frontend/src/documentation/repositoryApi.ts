@@ -232,6 +232,29 @@ export const browserRepositoryClient = {
     }
     return { content: new Blob([bytes], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }
   },
+  async exportDocx(contentId: string, organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/documents/${encodeURIComponent(contentId)}/export/docx`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) throw new Error(translate('repository.docxFailed'))
+    const commit = response.headers.get('X-TekDocs-Repository-Commit')
+    const mediaType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    if (response.headers.get('Content-Type') !== mediaType
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-document.docx"'
+      || response.headers.get('X-TekDocs-Export-Class') !== 'live_repository_revision'
+      || !commit || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit)
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') {
+      throw new Error(translate('repository.docxFailed'))
+    }
+    const bytes = await response.arrayBuffer()
+    const signature = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 4))
+    if (bytes.byteLength < 4 || bytes.byteLength > 8 * 1024 * 1024
+      || signature[0] !== 0x50 || signature[1] !== 0x4b || signature[2] !== 0x03 || signature[3] !== 0x04) {
+      throw new Error(translate('repository.docxFailed'))
+    }
+    return { content: new Blob([bytes], { type: mediaType }), name: 'repository-document.docx', commit }
+  },
   async save(mutation: RepositoryMutation, organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring`, {
       method: 'POST', credentials: 'same-origin',

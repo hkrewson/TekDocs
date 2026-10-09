@@ -22,6 +22,7 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     exportSources: vi.fn().mockResolvedValue({ content: new Blob(['snapshot']), name: 'tekdocs-repository-aaaaaaaaaaaa.zip' }),
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
     exportPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-saved'], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }),
+    exportDocx: vi.fn().mockResolvedValue({ content: new Blob(['PK\x03\x04saved']), name: 'repository-document.docx', commit }),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
     reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
@@ -293,7 +294,7 @@ it('offers live PDF only for an indexed document and keeps denial and stale revi
     expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
-    expect(screen.getByText(/not a retained STATIC publication/)).toBeInTheDocument()
+    expect(screen.getByText(/PDF uses the saved, indexed Git revision/)).toBeInTheDocument()
     const download = screen.getByRole('button', { name: 'Download saved PDF' })
     await user.click(download)
     expect(await screen.findByRole('alert')).toHaveTextContent('saved PDF could not be downloaded')
@@ -315,17 +316,62 @@ it('offers live PDF only for an indexed document and keeps denial and stale revi
   }
 })
 
-it('does not offer live HTML or PDF for a fragment or a document awaiting indexing', async () => {
+it('offers live DOCX only for an indexed document and preserves an unsaved draft on denial or revision change', async () => {
+  const user = userEvent.setup()
+  const exportDocx = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValueOnce({ content: new Blob(['PK\x03\x04stale']), name: 'repository-document.docx', commit: 'c'.repeat(40) })
+    .mockResolvedValue({ content: new Blob(['PK\x03\x04current']), name: 'repository-document.docx', commit })
+  const createObjectURL = vi.fn().mockReturnValue('blob:saved-docx')
+  const revokeObjectURL = vi.fn()
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('repository-document.docx')
+    expect(this.href).toBe('blob:saved-docx')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+  try {
+    setup({ exportDocx })
+    expect(screen.queryByRole('button', { name: 'Download saved DOCX' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    expect(screen.getByText(/DOCX uses the saved, indexed Git revision/)).toBeInTheDocument()
+    const download = screen.getByRole('button', { name: 'Download saved DOCX' })
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('saved DOCX could not be downloaded')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('revision changed while preparing DOCX')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(exportDocx).toHaveBeenCalledWith('content-1', undefined)
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:saved-docx'))
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+    click.mockRestore()
+  }
+})
+
+it('does not offer live exports for a fragment or a document awaiting indexing', async () => {
   const user = userEvent.setup()
   const source = vi.fn().mockResolvedValueOnce({ ...initial, kind: 'fragment' }).mockResolvedValue({ ...initial, indexed_commit: 'c'.repeat(40) })
   setup({ source })
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download saved DOCX' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: /Guide/ }))
   await waitFor(() => expect(source).toHaveBeenCalledTimes(2))
   expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download saved DOCX' })).not.toBeInTheDocument()
 })
 
 it('downloads a current Workspace snapshot and keeps a failed attempt recoverable', async () => {

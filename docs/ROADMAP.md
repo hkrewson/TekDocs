@@ -1814,9 +1814,10 @@ PDF headers and bytes before saving. Denial or revision mismatch leaves a dirty
 draft intact. A separate staff-only live DOCX route now exports the same
 reader-authorized entity, attachment and field-key projection for an accepted,
 indexed document. It is bounded, audited, revision-labeled and excludes
-fragments, portal users, foreign Workspaces and indexing lag. The editor does
-not yet expose DOCX; complete editable dependency bundles remain open parity
-work.
+fragments, portal users, foreign Workspaces and indexing lag. The editor now
+offers the saved-document DOCX with response, revision and size checks; denial
+or revision mismatch preserves an unsaved draft. Complete editable dependency
+bundles remain open parity work.
 The staff publication-evidence list can now filter by exact repository
 document content ID before pagination. It still requires publication access
 and returns only the selected Workspace's evidence; it does not expose a new

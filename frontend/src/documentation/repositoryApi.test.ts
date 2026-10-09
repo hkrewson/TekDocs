@@ -105,6 +105,50 @@ it('refuses denied, mislabeled, or non-PDF live responses', async () => {
   await expect(browserRepositoryClient.exportPdf('content-1')).rejects.toThrow('saved PDF could not be downloaded')
 })
 
+it.each([undefined, 'org-1'])('downloads a revision-labeled live DOCX in workspace %s', async (organizationId) => {
+  const commit = 'a'.repeat(40)
+  const mediaType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  const fetch = vi.fn().mockResolvedValue(new Response('PK\x03\x04saved', {
+    status: 200,
+    headers: {
+      'Content-Type': mediaType,
+      'Content-Disposition': 'attachment; filename="repository-document.docx"',
+      'X-TekDocs-Export-Class': 'live_repository_revision',
+      'X-TekDocs-Repository-Commit': commit,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  }))
+  vi.stubGlobal('fetch', fetch)
+  const result = await browserRepositoryClient.exportDocx('content-1', organizationId)
+  expect(result).toMatchObject({ name: 'repository-document.docx', commit })
+  expect(result.content.type).toBe(mediaType)
+  expect(result.content.size).toBe(9)
+  const scope = organizationId ? `/api/v1/workspaces/organizations/${organizationId}` : '/api/v1/workspaces/msp'
+  expect(fetch).toHaveBeenCalledWith(`${scope}/content-graph/documents/content-1/export/docx`, {
+    credentials: 'same-origin',
+  })
+})
+
+it('refuses denied, mislabeled, or non-DOCX live responses', async () => {
+  const headers = {
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'Content-Disposition': 'attachment; filename="repository-document.docx"',
+    'X-TekDocs-Export-Class': 'live_repository_revision',
+    'X-TekDocs-Repository-Commit': 'a'.repeat(40),
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  }
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(new Response('Denied', { status: 403 }))
+    .mockResolvedValueOnce(new Response('PK\x03\x04wrong', { status: 200, headers: { ...headers, 'X-TekDocs-Export-Class': 'immutable_static_publication' } }))
+    .mockResolvedValueOnce(new Response('PK\x03\x04wrong', { status: 200, headers: { ...headers, 'X-TekDocs-Repository-Commit': 'wrong' } }))
+    .mockResolvedValueOnce(new Response('not a DOCX', { status: 200, headers })))
+  for (let index = 0; index < 4; index += 1) {
+    await expect(browserRepositoryClient.exportDocx('content-1')).rejects.toThrow('saved DOCX could not be downloaded')
+  }
+})
+
 it('pages exact-document evidence and checks finalized state in the selected organization', async () => {
   const fetch = vi.fn()
     .mockResolvedValueOnce(new Response(JSON.stringify({ results: [], page: 2, page_size: 25, count: 0, has_more: false }), { status: 200 }))

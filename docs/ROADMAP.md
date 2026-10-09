@@ -1818,6 +1818,11 @@ or certifying retained publication delivery after restore.
 The encrypted recovery scripts also fail closed when no SHA-256 host utility is
 available or a digest is invalid; macOS `shasum` is supported alongside
 `sha256sum`. This closes an empty-manifest-digest failure found during rehearsal.
+The network-isolated recovery fixture now retains a released, independently
+authorized repository STATIC publication and checks its signed chain, active
+client delivery, sanitized HTML and retained PDF after restore against the
+pre-backup portal digests. Attachment delivery and deployed recovery acceptance
+remain open.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

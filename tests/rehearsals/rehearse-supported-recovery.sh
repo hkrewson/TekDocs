@@ -98,6 +98,18 @@ organization_snapshot_sha=$(sed -n 's/^ORGANIZATION_SOURCE_SHA256=//p' "$source_
 printf '%s\n' "$msp_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$organization_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/repository Markdown recovery fixtures created/p' "$source_snapshot_log"
+publication_log="$work_directory/repository-publication.log"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py" \
+  > "$publication_log"
+publication_id=$(sed -n 's/^REPOSITORY_PUBLICATION_ID=//p' "$publication_log")
+publication_html_sha=$(sed -n 's/^REPOSITORY_PUBLICATION_HTML_SHA256=//p' "$publication_log")
+publication_pdf_sha=$(sed -n 's/^REPOSITORY_PUBLICATION_PDF_SHA256=//p' "$publication_log")
+printf '%s\n' "$publication_id" | grep -Eq '^[0-9a-f-]{36}$'
+printf '%s\n' "$publication_html_sha" | grep -Eq '^[0-9a-f]{64}$'
+printf '%s\n' "$publication_pdf_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Released repository publication recovery fixture created/p' "$publication_log"
 
 echo "Checking bounded encrypted-backup write failure before a normal retry"
 limited_backup="$work_directory/limited-backup"
@@ -208,7 +220,14 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_ORG_SOURCE_SHA256="$organization_snapshot_sha" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=verify \
+  -e TEKDOCS_RECOVERY_PUBLICATION_ID="$publication_id" \
+  -e TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256="$publication_html_sha" \
+  -e TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256="$publication_pdf_sha" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history and source ZIPs, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs and released publication, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

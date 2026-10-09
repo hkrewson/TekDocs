@@ -9426,6 +9426,40 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/attachments:
+    post:
+      operationId: content_authoring_msp_attachment_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentAttachment'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
@@ -19493,6 +19527,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/attachments:
+    post:
+      operationId: content_authoring_organization_attachment_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentAttachmentWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentAttachment'
           description: ''
           headers:
             X-Request-ID:

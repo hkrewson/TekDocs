@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -22,6 +23,8 @@ from .content_authoring import (
 )
 from .content_index import ContentIndexValidationError
 from .content_read import repository_for_reader
+from .document_attachments import create_repository_document_attachment
+from .document_file_serializers import DocumentAttachmentSerializer, DocumentAttachmentWriteSerializer
 from .document_views import _msp_workspace, _organization_workspace
 from .models import AuditEvent, WorkspaceRepository
 from .repository_editable_bundles import RepositoryEditableBundleError, export_repository_editable_bundle
@@ -172,6 +175,47 @@ class OrganizationContentAuthoringSourceView(APIView):
     )
     def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _read(request, content_id, organization_entity_id)
+
+
+def _upload_file(request, content_id: UUID, organization_entity_id: UUID | None = None) -> Response:  # type: ignore[no-untyped-def]
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT)
+    serializer = DocumentAttachmentWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        repository = repository_for_reader(workspace)
+    except WorkspaceRepository.DoesNotExist:
+        return Response({"detail": "Repository document is unavailable"}, status=status.HTTP_404_NOT_FOUND)
+    attachment = create_repository_document_attachment(
+        repository=repository,
+        content_id=content_id,
+        actor_id=request.user.id,
+        upload=serializer.validated_data["file"],
+    )
+    return Response(DocumentAttachmentSerializer(attachment).data, status=status.HTTP_201_CREATED)
+
+
+class MSPContentAuthoringAttachmentView(APIView):
+    parser_classes = (MultiPartParser,)
+
+    @extend_schema(
+        operation_id="content_authoring_msp_attachment_create",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentAttachmentSerializer},
+    )
+    def post(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _upload_file(request, content_id)
+
+
+class OrganizationContentAuthoringAttachmentView(APIView):
+    parser_classes = (MultiPartParser,)
+
+    @extend_schema(
+        operation_id="content_authoring_organization_attachment_create",
+        request=DocumentAttachmentWriteSerializer,
+        responses={201: DocumentAttachmentSerializer},
+    )
+    def post(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _upload_file(request, content_id, organization_entity_id)
 
 
 def _source_snapshot(request, organization_entity_id: UUID | None = None) -> HttpResponse | Response:  # type: ignore[no-untyped-def]

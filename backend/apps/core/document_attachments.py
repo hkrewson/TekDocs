@@ -19,7 +19,18 @@ from .attachment_security import (
     attachment_scanner,
     attachment_storage_provider,
 )
-from .models import AuditEvent, Document, DocumentAttachment, DocumentAttachmentPurpose, Entity
+from .content_index_models import ContentNode
+from .models import (
+    AuditEvent,
+    Document,
+    DocumentAttachment,
+    DocumentAttachmentPurpose,
+    Entity,
+    Organization,
+    Tenant,
+    Workspace,
+    WorkspaceRepository,
+)
 from .rendering import RenderedAttachment, attachment_ids_in_markdown
 from .workspaces import ResolvedWorkspace
 
@@ -100,6 +111,45 @@ def create_document_attachment(
     version_number: int | None = None,
     replaces: DocumentAttachment | None = None,
 ) -> DocumentAttachment:
+    return _create_managed_attachment(
+        tenant=document.tenant,
+        organization=document.organization,
+        workspace=document.entity.workspace,
+        content_id=document.id,
+        document=document,
+        actor_id=actor_id,
+        upload=upload,
+        entity_id=entity_id,
+        purpose=purpose,
+        version_number=version_number,
+        replaces=replaces,
+    )
+
+
+def create_repository_document_attachment(
+    *, repository: WorkspaceRepository, content_id: UUID, actor_id: UUID, upload: UploadedFile
+) -> DocumentAttachment:
+    """Attach a scanned file to an indexed Git document, never to a fragment."""
+    return _create_managed_attachment(
+        tenant=repository.tenant,
+        organization=repository.workspace.organization,
+        workspace=repository.workspace,
+        content_id=content_id,
+        document=None,
+        actor_id=actor_id,
+        upload=upload,
+    )
+
+
+def _create_managed_attachment(
+    *, tenant: Tenant, organization: Organization | None, workspace: Workspace, content_id: UUID,
+    document: Document | None,
+    actor_id: UUID, upload: UploadedFile, entity_id: UUID | None = None,
+    purpose: str = DocumentAttachmentPurpose.ATTACHMENT,
+    version_number: int | None = None, replaces: DocumentAttachment | None = None,
+) -> DocumentAttachment:
+    if document is None and purpose != DocumentAttachmentPurpose.ATTACHMENT:
+        raise ValidationError("Repository documents support ordinary attachments only.")
     validated = validate_attachment_upload(upload)
     attachment_id = uuid4()
     attachment_entity_id = entity_id or uuid4()
@@ -114,7 +164,7 @@ def create_document_attachment(
             content=validated.content,
         )
         clean_key = "/".join(
-            ("document-attachments", str(document.tenant_id), str(document.id), str(attachment_id))
+            ("document-attachments", str(tenant.id), str(content_id), str(attachment_id))
         )
         stored_name = provider.promote(
             quarantine_key=quarantine_key,
@@ -134,21 +184,36 @@ def create_document_attachment(
     attachment: DocumentAttachment | None = None
     try:
         with transaction.atomic():
+            if document is None:
+                repository = WorkspaceRepository.objects.select_for_update().filter(
+                    workspace=workspace, tenant=tenant
+                ).first()
+                if (
+                    repository is None
+                    or repository.accepted_commit_id is None
+                    or repository.accepted_commit_id != repository.indexed_commit_id
+                    or not ContentNode.objects.filter(
+                        repository=repository, workspace=workspace, tenant=tenant,
+                        organization=organization, indexed_commit_id=repository.indexed_commit_id,
+                        content_id=content_id, kind="document",
+                    ).exists()
+                ):
+                    raise ValidationError({"content_id": "An accepted, indexed document is required."})
             entity = Entity.objects.create(
                 id=attachment_entity_id,
-                tenant=document.tenant,
-                workspace=document.entity.workspace,
-                organization=document.organization,
+                tenant=tenant,
+                workspace=workspace,
+                organization=organization,
                 entity_type="document_attachment",
                 display_name=validated.filename,
             )
             attachment = DocumentAttachment(
                 id=attachment_id,
-                tenant=document.tenant,
-                organization=document.organization,
+                tenant=tenant,
+                organization=organization,
                 document=document,
-                owner_workspace=document.entity.workspace,
-                owner_content_id=document.id,
+                owner_workspace=workspace,
+                owner_content_id=content_id,
                 entity=entity,
                 original_filename=validated.filename,
                 media_type=validated.media_type,
@@ -167,7 +232,7 @@ def create_document_attachment(
             attachment.full_clean()
             attachment.save()  # type: ignore[no-untyped-call]
             AuditEvent.objects.create(
-                tenant=document.tenant,
+                tenant=tenant,
                 actor_id=actor_id,
                 action=(
                     "document.primary_file.created"
@@ -176,7 +241,7 @@ def create_document_attachment(
                 ),
                 entity_id=attachment.entity_id,
                 metadata={
-                    "document_id": str(document.entity_id),
+                    **({"document_id": str(document.entity_id)} if document else {"content_id": str(content_id)}),
                     **({"version_number": version_number} if version_number is not None else {}),
                 },
             )

@@ -27,7 +27,7 @@ from apps.core.content_authoring import (
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
 from apps.core.document_attachments import create_document_attachment
 from apps.core.documents import create_document
-from apps.core.models import AuditEvent, ContentNode, InstallationState, Workspace, WorkspaceKind
+from apps.core.models import AuditEvent, ContentNode, DocumentAttachment, InstallationState, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
 from apps.core.repository_editable_bundle_validation import (
     RepositoryEditableBundleValidationError,
@@ -291,6 +291,102 @@ def test_authoring_api_checks_permissions_and_returns_conflicts(authoring_contex
         kwargs={"organization_entity_id": organization.entity_id, "content_id": document_id},
     )
     assert browser.get(foreign_source).status_code == 404
+
+
+def test_native_attachment_upload_scans_and_requires_exact_indexed_document(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse("msp-content-authoring-attachment-create", args=[document.content_id])
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        response = browser.post(url, {"file": SimpleUploadedFile("instructions.txt", b"Safe instructions\n")})
+        assert response.status_code == 201, response.content
+        attachment = DocumentAttachment.objects.get(entity_id=response.json()["id"])
+        assert attachment.document_id is None
+        assert attachment.owner_workspace_id == repository.workspace_id
+        assert attachment.owner_content_id == document.content_id
+        assert attachment.organization_id is None
+        assert attachment.scan_status == "clean"
+        assert attachment.file.name.startswith(f"document-attachments/{installation.tenant.id}/{document.content_id}/")
+        call_command("verify_recovery_managed_files", verbosity=0)
+        assert AuditEvent.objects.filter(action="document.attachment.created", entity_id=attachment.entity_id).exists()
+
+        count = DocumentAttachment.objects.count()
+        missing_url = reverse("msp-content-authoring-attachment-create", args=[uuid.uuid4()])
+        assert browser.post(missing_url, {"file": SimpleUploadedFile("missing.txt", b"No target\n")}).status_code == 400
+        fragment_id = uuid.uuid4()
+        repository.refresh_from_db()
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="create", content_id=fragment_id,
+            base_commit=repository.accepted_commit.object_id, base_blob=None,
+            kind="fragment", path=None, title="Reusable fragment", markdown="Shared text.\n", metadata_patch={},
+        )
+        fragment_url = reverse("msp-content-authoring-attachment-create", args=[fragment_id])
+        assert browser.post(
+            fragment_url, {"file": SimpleUploadedFile("fragment.txt", b"No fragment\n")}
+        ).status_code == 400
+        assert browser.post(
+            url, {"file": SimpleUploadedFile("unsafe.txt", b"EICAR-STANDARD-ANTIVIRUS-TEST-FILE")}
+        ).status_code == 400
+
+        repository.refresh_from_db()
+        repository.indexed_commit = None
+        repository.save(update_fields=["indexed_commit", "updated_at"])
+        assert browser.post(url, {"file": SimpleUploadedFile("lag.txt", b"Index lag\n")}).status_code == 400
+        assert DocumentAttachment.objects.count() == count
+        assert Client().post(url, {"file": SimpleUploadedFile("anon.txt", b"No access\n")}).status_code in {401, 403}
+
+
+def test_native_attachment_upload_rejects_sibling_workspace(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    sibling = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="Sibling attachment workspace",
+        legal_name="Sibling attachment workspace", website="", classifications=["client"],
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-content-authoring-attachment-create",
+        kwargs={"organization_entity_id": sibling.entity_id, "content_id": document.content_id},
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        assert browser.post(url, {"file": SimpleUploadedFile("foreign.txt", b"Wrong workspace\n")}).status_code == 400
+    assert not DocumentAttachment.objects.exists()
+
+
+def test_native_attachment_upload_accepts_exact_organization_workspace(authoring_context, tmp_path):
+    installation, _repository = authoring_context
+    organization = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="File-owning client",
+        legal_name="File-owning client", website="", classifications=["client"],
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=organization)
+    repository = repository_storage.ensure_workspace_repository(workspace).repository
+    repository.refresh_from_db()
+    content_id = uuid.uuid4()
+    author_content(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        operation="create", content_id=content_id,
+        base_commit=repository.accepted_commit.object_id, base_blob=None,
+        kind="document", path=None, title="Client onboarding", markdown="Onboard.\n", metadata_patch={},
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse(
+        "organization-content-authoring-attachment-create",
+        kwargs={"organization_entity_id": organization.entity_id, "content_id": content_id},
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        response = browser.post(url, {"file": SimpleUploadedFile("client.txt", b"Client steps\n")})
+        assert response.status_code == 201, response.content
+        attachment = DocumentAttachment.objects.get(entity_id=response.json()["id"])
+        assert attachment.document_id is None
+        assert attachment.owner_workspace_id == workspace.id
+        assert attachment.organization_id == organization.id
+        call_command("verify_recovery_managed_files", verbosity=0)
 
 
 def test_accepted_index_marker_retries_without_rewriting_git(authoring_context):

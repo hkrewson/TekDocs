@@ -1903,7 +1903,10 @@ document requirement remains on user-facing file paths until repository-native
 upload, read and publication are proven.
 The next internal custody shape permits a managed attachment record without a
 legacy document only when its exact-Workspace Git document is accepted and
-indexed; no repository upload or download route is enabled by that schema step.
+indexed. A later staff API now accepts ordinary scanned uploads for that owner,
+with an exact Workspace and accepted/indexed-document check under lock. It has
+no repository file download, inline render, or editor control yet; those paths
+remain blocked until their own authorization and retained-byte checks pass.
 The `0.9.7` exit checklist now names that custody path and its authorization,
 publication and recovery tests before any authority handoff.
 The next entity-card slice resolves narrative entity links through the existing

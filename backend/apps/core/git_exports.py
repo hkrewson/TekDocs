@@ -29,8 +29,8 @@ from .workspaces import ResolvedWorkspace
 
 MAX_EXPORT_DOCUMENTS = 250
 MAX_EXPORT_BYTES = 20 * 1024 * 1024
-ENTITY_LINK = re.compile(r"tekdocs://entity/([0-9a-fA-F-]{36})")
-ATTACHMENT_LINK = re.compile(r"tekdocs://attachment/[0-9a-fA-F-]{36}")
+ENTITY_LINK = re.compile(r"tekdocs://entity/([0-9a-fA-F-]{36})", re.IGNORECASE)
+ATTACHMENT_LINK = re.compile(r"tekdocs://attachment/[0-9a-fA-F-]{36}", re.IGNORECASE)
 ONEPASSWORD_LINK = re.compile(r"https://(?:[A-Za-z0-9-]+\.)?1password\.com/[^\s)>]+", re.IGNORECASE)
 
 

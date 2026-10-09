@@ -454,6 +454,11 @@ gates after file, template, review, key, publication and recovery parity.
   key values; those values occur in both signed metadata and canonical Markdown
   and cannot be safely removed without falsifying the publication evidence.
   Endpoint tests retain ordinary publication selection and exact-client denial.
+- Sanitized legacy-selection and repository-snapshot exports now redact known
+  credential-reference and managed-attachment URI targets even when the TekDocs
+  URI scheme or target type uses mixed case. Both exported ZIP paths have
+  regression evidence. This closes a known-reference omission, not arbitrary
+  secret detection or full export parity.
 - The staff repository editor can download the exact loaded Markdown file,
   including portable frontmatter, for one document or fragment. It labels the
   accepted Git revision and excludes unsaved edits. This is a per-file editable

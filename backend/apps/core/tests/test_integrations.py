@@ -1077,6 +1077,23 @@ def test_dispatcher_submits_provider_io_to_an_exact_workspace_worker_task(instal
 def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_links(installation, tmp_path, settings):
     settings.MEDIA_ROOT = tmp_path
     record = organization(installation, "Export client")
+    credential_entity = Entity.objects.create_owned(
+        tenant=installation.tenant,
+        organization=record,
+        entity_type="credential_reference",
+        display_name="Export credential",
+    )
+    CredentialReference.objects.create(
+        tenant=installation.tenant,
+        organization=record,
+        entity=credential_entity,
+        provider="onepassword",
+        reference_url=(
+            "https://start.1password.com/open/i?"
+            "a=aaaaaaaaaaaaaaaaaaaaaaaaaa&v=vvvvvvvvvvvvvvvvvvvvvvvvvv&"
+            "i=iiiiiiiiiiiiiiiiiiiiiiiiii&h=example.1password.com"
+        ),
+    )
     document = create_document(
         tenant=installation.tenant,
         organization=record,
@@ -1086,6 +1103,8 @@ def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_lin
             "# Runbook\n\n"
             "[Open vault](https://start.1password.com/open/i?a=acct&v=vault&i=item)\n\n"
             "[Attachment](tekdocs://attachment/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)\n"
+            "[Mixed-case attachment](TeKDoCs://AtTaChMeNt/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb)\n"
+            f"[Mixed-case credential](TeKDoCs://EnTiTy/{credential_entity.id})\n"
         ),
     )
     workspace = resolve_organization_workspace(installation.owner, entity_id=record.entity_id)
@@ -1110,6 +1129,8 @@ def test_git_export_is_deterministic_and_sanitizes_credential_and_attachment_lin
         export_manifest = json.loads(archive.read("tekdocs-export.json"))
     assert b"start.1password.com" not in exported_markdown
     assert b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in exported_markdown
+    assert b"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" not in exported_markdown
+    assert str(credential_entity.id).encode() not in exported_markdown
     assert "attachment_content" in export_manifest["exclusions"]
     assert GitExportBundle.objects.count() == 2
 
@@ -1350,6 +1371,7 @@ def test_git_export_includes_exact_sanitized_repository_snapshot(repository_inst
         "---\n# Export runbook\n\n"
         f"[Credential](tekdocs://entity/{credential_entity.id})\n\n"
         "[File](tekdocs://attachment/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)\n"
+        "[Mixed-case file](TeKDoCs://AtTaChMeNt/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb)\n"
     ).encode()
     committed = repository_service.commit_repository_files(
         repository_id=repository.id,
@@ -1383,6 +1405,7 @@ def test_git_export_includes_exact_sanitized_repository_snapshot(repository_inst
     assert parsed.entity_links == ()
     assert str(credential_entity.id).encode() not in exported
     assert b"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" not in exported
+    assert b"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb" not in exported
     assert manifest["repository"]["accepted_commit"] == committed.object_id
     assert manifest["repository"]["snapshot_only"] is True
     assert manifest["repository"]["files"][0]["sha256"] == hashlib.sha256(exported).hexdigest()

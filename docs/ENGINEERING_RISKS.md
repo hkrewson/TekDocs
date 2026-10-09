@@ -305,6 +305,14 @@ closure, not Git provenance or live database custody. `TD-RISK-069` remains
 open for full repository-inclusive recovery acceptance and authority handoff;
 this editable handoff must not be described or used as a backup.
 
+For sanitized Git export, `TD-RISK-070` also has a narrower known-reference
+control: both legacy-selected and repository-snapshot ZIPs remove managed-file
+URI targets and known credential-reference IDs regardless of TekDocs URI case.
+This prevents a spelling variant from bypassing the declared redaction, but
+authored prose may still contain sensitive material and requires review before
+external sharing. Sanitized export remains distinct from an editable bundle or
+complete backup.
+
 The supported local recovery rehearsal now checks one client-owned Markdown
 reference to a managed file through the encrypted backup and network-isolated
 restore. It compares the exact editable-bundle digest on both sides and reads

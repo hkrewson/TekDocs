@@ -396,7 +396,7 @@ describe('Invoices', () => {
     const createCreditNote = vi.fn().mockResolvedValue(credit)
     renderInvoice(invoiceClient({
       list: vi.fn().mockResolvedValue({ results: [issued], page: 1, page_size: 25, count: 1, has_more: false, can_manage: true, can_issue: true, can_void: true }),
-      get: vi.fn().mockResolvedValue(issued),
+      get: vi.fn().mockImplementation((_workspace, id) => Promise.resolve(id === 'credit-1' ? credit : issued)),
       createCreditNote,
     }))
 

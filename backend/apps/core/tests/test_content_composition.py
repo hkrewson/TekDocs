@@ -564,7 +564,10 @@ def test_repository_evidence_list_filters_one_document_before_pagination(composi
     assert browser.get(url, {"content_id": str(first_id)}).status_code == 403
 
 
-def test_repository_evidence_attachment_review_enforces_organization_boundary(composition_repository, tmp_path):
+@pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])
+def test_repository_evidence_attachment_review_enforces_organization_boundary(
+    composition_repository, tmp_path, link_id_kind
+):
     installation, _workspace, _repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         first = create_organization(
@@ -590,7 +593,7 @@ def test_repository_evidence_attachment_review_enforces_organization_boundary(co
             repository_id=repository.id, expected_base=_accepted(repository),
             changes={"documents/client-attachment.md": _content(
                 content_id=document.id, title="Client attachment",
-                body=f"[Private](tekdocs://attachment/{attachment.id})\n",
+                body=f"[Private](tekdocs://attachment/{getattr(attachment, link_id_kind)})\n",
             )},
             message="Add scoped attachment source",
         )
@@ -1995,7 +1998,10 @@ def test_repository_evidence_freezes_portable_field_keys_without_changing_git(co
         )
 
 
-def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_repository, tmp_path, monkeypatch):
+@pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])
+def test_repository_evidence_retains_exact_managed_attachment_bytes(
+    composition_repository, tmp_path, monkeypatch, link_id_kind
+):
     installation, workspace, repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         document = create_document(
@@ -2010,6 +2016,7 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
             actor_id=installation.owner.id,
             upload=SimpleUploadedFile("guide.txt", b"Original attachment bytes"),
         )
+        source_id = getattr(attachment, link_id_kind)
         repository_service.commit_repository_files(
             repository_id=repository.id,
             expected_base=_accepted(repository),
@@ -2017,7 +2024,7 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
                 "documents/attachment-guide.md": _content(
                     content_id=document.id,
                     title="Attachment guide",
-                    body=f"[Guide](tekdocs://attachment/{attachment.id})\n",
+                    body=f"[Guide](tekdocs://attachment/{source_id})\n",
                 )
             },
             message="Add attachment guide",
@@ -2048,7 +2055,7 @@ def test_repository_evidence_retains_exact_managed_attachment_bytes(composition_
         assert review.status_code == 200
         assert review.json()["attachments"] == [{
             "id": str(artifact.id),
-            "source_id": str(attachment.id),
+            "source_id": str(source_id),
             "filename": "guide.txt",
             "media_type": artifact.media_type,
             "size": len(b"Original attachment bytes"),
@@ -2145,7 +2152,8 @@ def test_repository_evidence_rejects_attachment_without_exact_document(compositi
     assert RepositoryPublicationEvidence.objects.count() == 0
 
 
-def test_repository_evidence_rejects_sibling_client_attachment(composition_repository, tmp_path):
+@pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])
+def test_repository_evidence_rejects_sibling_client_attachment(composition_repository, tmp_path, link_id_kind):
     installation, _workspace, _repository = composition_repository
     owner = create_organization(
         tenant=installation.tenant,
@@ -2186,7 +2194,7 @@ def test_repository_evidence_rejects_sibling_client_attachment(composition_repos
                 "documents/sibling.md": _content(
                     content_id=foreign_document.id,
                     title="Sibling guide",
-                    body=f"[File](tekdocs://attachment/{foreign_attachment.id})\n",
+                    body=f"[File](tekdocs://attachment/{getattr(foreign_attachment, link_id_kind)})\n",
                 )
             },
             message="Add sibling reference",
@@ -2519,8 +2527,18 @@ def test_repository_evidence_attachment_upgrade_installs_forced_rls_and_append_o
     try:
         MigrationExecutor(connection).migrate([("core", "0168_repositorypublicationevidence")])
         assert "core_repositoryevidenceattachment" not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate([("core", "0178_repository_publication_notification_topics")])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_evidence_attachment()'::regprocedure)"
+            )
+            assert "attachment.entity_id::text" not in cursor.fetchone()[0]
         MigrationExecutor(connection).migrate(head)
         with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_evidence_attachment()'::regprocedure)"
+            )
+            assert "attachment.entity_id::text" in cursor.fetchone()[0]
             cursor.execute(
                 "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
                 "WHERE relname = 'core_repositoryevidenceattachment'"

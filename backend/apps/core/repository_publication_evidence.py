@@ -19,6 +19,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -270,6 +271,7 @@ def _retain_pinned_evidence(
                 "Repository publication preflight blocked: repository.attachment.limit"
             )
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
+        source_ids_by_attachment_id: dict[uuid.UUID, uuid.UUID] = {}
         document: Document | None = None
         if attachment_ids or key_targets:
             document = (
@@ -292,7 +294,7 @@ def _retain_pinned_evidence(
             attachments = (
                 DocumentAttachment.objects.select_for_update()
                 .filter(
-                    id__in=attachment_ids,
+                    Q(entity_id__in=attachment_ids) | Q(id__in=attachment_ids),
                     document=document,
                     tenant_id=repository.tenant_id,
                     organization=repository.workspace.organization,
@@ -308,6 +310,14 @@ def _retain_pinned_evidence(
                 )
             total_bytes = 0
             for attachment in attachments:
+                # Public Markdown uses the attachment Entity ID. Continue to
+                # accept record-ID links already present in repository sources.
+                matches = attachment_ids.intersection({attachment.entity_id, attachment.id})
+                if len(matches) != 1:
+                    raise RepositoryPublicationEvidenceError(
+                        "Repository publication preflight blocked: repository.attachment.unavailable"
+                    )
+                source_ids_by_attachment_id[attachment.id] = next(iter(matches))
                 try:
                     content = copy_attachment_content(attachment)
                 except ValidationError as exc:
@@ -320,6 +330,10 @@ def _retain_pinned_evidence(
                         "Repository publication preflight blocked: repository.attachment.limit"
                     )
                 retained.append((attachment, content, uuid.uuid4()))
+            if set(source_ids_by_attachment_id.values()) != attachment_ids:
+                raise RepositoryPublicationEvidenceError(
+                    "Repository publication preflight blocked: repository.attachment.unavailable"
+                )
         key_snapshot = _frozen_key_snapshot(
             repository=repository, node=node, document=document,
             markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
@@ -331,7 +345,7 @@ def _retain_pinned_evidence(
             markdown=markdown,
             audience=audience,
             topic_type=node.topic_type,
-            frozen_attachment_ids={item.id for item, _content, _id in retained},
+            frozen_attachment_ids=set(source_ids_by_attachment_id.values()),
             frozen_entity_ids={uuid.UUID(item["id"]) for item in entity_cards},
             frozen_key_targets=set(key_targets) if key_snapshot is not None else None,
         )
@@ -361,7 +375,7 @@ def _retain_pinned_evidence(
             "attachments": [
                 {
                     "id": str(artifact_id),
-                    "source_id": str(attachment.id),
+                    "source_id": str(source_ids_by_attachment_id[attachment.id]),
                     "checksum": attachment.checksum,
                     "size": len(content),
                     "media_type": attachment.media_type,
@@ -578,7 +592,9 @@ def verify_repository_publication_evidence(
                 artifact = artifacts.get(descriptor_id) if isinstance(descriptor_id, str) else None
                 if artifact is None or any(
                     (
-                        descriptor.get("source_id") != str(artifact.source_attachment_id),
+                        descriptor.get("source_id") not in {
+                            str(artifact.source_attachment_id), str(artifact.source_attachment.entity_id)
+                        },
                         descriptor.get("checksum") != artifact.checksum,
                         descriptor.get("size") != artifact.size,
                         descriptor.get("media_type") != artifact.media_type,

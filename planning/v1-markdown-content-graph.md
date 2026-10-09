@@ -575,6 +575,11 @@ MFA-gated API now retains and lists scoped evidence summaries for review; it
 does not approve publications or distribute artifacts. A separate approver-only
 read verifies the retained evidence before returning exact canonical Markdown;
 it does not expose frozen key values or downloadable files.
+Managed-file references in repository Markdown use the attachment's public
+Entity ID. Retention now resolves that ID to the exact legacy document and
+Workspace, freezes the verified bytes, and verifies the same ID on staff
+review. Earlier evidence that used the attachment record ID remains verifiable;
+neither spelling bypasses ownership, scanner, or checksum checks.
 The internal path now requires independent evidence review, package creation,
 authorization, and a signed repository STATIC record before an MFA-enabled
 approver can release it. Release and withdrawal are append-only exact-Workspace

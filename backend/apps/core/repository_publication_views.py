@@ -388,7 +388,9 @@ def _review_attachment(  # type: ignore[no-untyped-def]
             or len(content) > MAX_RETAINED_ATTACHMENT_BYTES
             or hashlib.sha256(content).hexdigest() != descriptor.get("checksum")
             or descriptor.get("size") != artifact.size
-            or descriptor.get("source_id") != str(artifact.source_attachment_id)
+            or descriptor.get("source_id") not in {
+                str(artifact.source_attachment_id), str(artifact.source_attachment.entity_id)
+            }
         ):
             response = HttpResponse("Retained publication attachment failed verification", status=409)
         else:

@@ -4587,8 +4587,9 @@ class DocumentTaxonomyTerm(TimestampedModel):
 def document_attachment_upload_to(instance: "DocumentAttachment", _filename: str) -> str:
     """Return an opaque storage key that never includes an authored filename."""
 
+    content_id = instance.document_id or instance.owner_content_id
     return str(
-        PurePosixPath("document-attachments") / str(instance.tenant_id) / str(instance.document_id) / str(instance.id)
+        PurePosixPath("document-attachments") / str(instance.tenant_id) / str(content_id) / str(instance.id)
     )
 
 
@@ -4620,7 +4621,7 @@ class DocumentAttachment(TimestampedModel):
         null=True,
         blank=True,
     )
-    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="attachments")
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="attachments", null=True, blank=True)
     owner_workspace = models.ForeignKey(
         Workspace, on_delete=models.PROTECT, related_name="managed_document_attachments", null=True, blank=True
     )
@@ -4677,6 +4678,11 @@ class DocumentAttachment(TimestampedModel):
                 ),
                 name="document_attachment_purpose_version",
             ),
+            models.CheckConstraint(
+                condition=models.Q(document__isnull=False)
+                | models.Q(purpose=DocumentAttachmentPurpose.ATTACHMENT),
+                name="native_attachment_not_primary_file",
+            ),
             models.UniqueConstraint(
                 fields=("document", "version_number"),
                 condition=models.Q(purpose=DocumentAttachmentPurpose.PRIMARY_FILE),
@@ -4713,18 +4719,34 @@ class DocumentAttachment(TimestampedModel):
         return super().delete(*args, **kwargs)
 
     def clean(self) -> None:
-        if self.document_id and (
-            self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
+        if self.document_id is None and (
+            self.owner_workspace_id is None
+            or self.owner_content_id is None
+            or self.purpose != DocumentAttachmentPurpose.ATTACHMENT
+        ):
+            raise ValidationError(
+                "Repository-owned attachments require a Workspace, content ID, and ordinary file role"
+            )
+        document = self.document if self.document_id else None
+        if document is not None and (
+            document.tenant_id != self.tenant_id or document.organization_id != self.organization_id
         ):
             raise ValidationError("Attachment must use its document workspace scope")
-        if self.document_id and self.owner_workspace_id is not None and (
-            self.owner_workspace_id != self.document.entity.workspace_id or self.owner_content_id != self.document_id
+        if document is not None and self.owner_workspace_id is not None and (
+            self.owner_workspace_id != document.entity.workspace_id or self.owner_content_id != self.document_id
         ):
             raise ValidationError("Attachment content owner must match its legacy document")
         if self.entity_id and (
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):
             raise ValidationError("Attachment entity must use the attachment workspace scope")
+        owner_workspace = self.owner_workspace if self.owner_workspace_id else None
+        if owner_workspace is not None and (
+            owner_workspace.tenant_id != self.tenant_id
+            or owner_workspace.organization_id != self.organization_id
+            or (self.entity_id and self.entity.workspace_id != self.owner_workspace_id)
+        ):
+            raise ValidationError("Attachment owner must use its exact Workspace")
         if self.scan_status != "clean" or not self.scan_engine or not self.storage_provider or not self.scanned_at:
             raise ValidationError("Only clean, scanned attachments may enter managed storage")
         if self.purpose == DocumentAttachmentPurpose.PRIMARY_FILE:

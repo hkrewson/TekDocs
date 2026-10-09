@@ -198,12 +198,17 @@ def archive_document_attachment(*, attachment: DocumentAttachment, actor_id: UUI
     locked.archived_at = timezone.now()
     locked.save(update_fields=["archived_at", "updated_at"])  # type: ignore[no-untyped-call]
     Entity.objects.filter(pk=locked.entity_id, archived_at__isnull=True).update(archived_at=locked.archived_at)
+    legacy_document = locked.document
     AuditEvent.objects.create(
         tenant=locked.tenant,
         actor_id=actor_id,
         action="document.attachment.archived",
         entity_id=locked.entity_id,
-        metadata={"document_id": str(locked.document.entity_id)},
+        metadata=(
+            {"document_id": str(legacy_document.entity_id)}
+            if legacy_document is not None
+            else {"content_id": str(locked.owner_content_id)}
+        ),
     )
 
 

@@ -590,10 +590,11 @@ GitHub access.
 
 #### Open `0.9.7` file-ownership and authority gates
 
-The current managed-file record requires a legacy `Document` owner. A document
-created only through repository authoring has no such row: its attachment links
-cannot resolve through the repository detail reader, and repository publication
-preflight requires a matching legacy document when an attachment is present.
+The managed-file record previously required a legacy `Document` owner. That
+schema requirement is now optional for an indexed Git document, but a document
+created only through repository authoring still cannot use a file in the
+product: its attachment links cannot resolve through the repository detail
+reader, and publication preflight requires a matching legacy document.
 The editable bundle can verify bytes of referenced, same-Workspace legacy
 files, but that is not repository-native file ownership. This is a verified
 implementation gap, not an assumption that the bundle closes file parity.
@@ -605,6 +606,10 @@ expand/backfill slice adds nullable Workspace/content UUID ownership, dual-write
 it for legacy uploads, and rejects mismatched legacy owners in PostgreSQL.
 Existing file IDs, checksums, and mandatory legacy `Document` links remain
 unchanged. Git-only ownership is not enabled by this slice.
+The following custody-shape slice makes the legacy link optional only for an
+ordinary attachment with an accepted-and-indexed Git document owner in the
+same Workspace. It also keeps the owner immutable and excludes native primary
+versions. It is not the repository upload/read/export/publication/recovery gate.
 
 - [ ] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

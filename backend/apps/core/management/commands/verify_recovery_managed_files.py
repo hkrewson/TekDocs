@@ -30,9 +30,7 @@ class Command(BaseCommand):
                 files = DocumentAttachment.objects.filter(
                     tenant=tenant,
                     organization_id=organization_id,
-                    document__tenant=tenant,
-                    document__organization_id=organization_id,
-                    document__entity__workspace_id=workspace_id,
+                    owner_workspace_id=workspace_id,
                     entity__workspace_id=workspace_id,
                 ).order_by("id")
                 for attachment in files.iterator(chunk_size=50):

@@ -1823,6 +1823,11 @@ authorized repository STATIC publication and checks its signed chain, active
 client delivery, sanitized HTML, retained PDF, and independently retained
 attachment bytes after restore against pre-backup portal digests. Deployed
 recovery acceptance remains open.
+The supported restore now also verifies every retained repository STATIC
+record's signed chain and private artifacts before reporting success. The local
+rehearsal corrupts a disposable restored attachment after a passing restore and
+requires client denial and a nonzero integrity check. This does not certify
+legacy STATIC artifact parity or a deployed recovery.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

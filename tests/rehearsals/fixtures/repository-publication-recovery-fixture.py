@@ -7,6 +7,7 @@ import uuid
 
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
+from django.core.files.base import ContentFile
 from django.db import transaction
 from django.test import Client
 from django.urls import reverse
@@ -200,5 +201,27 @@ elif mode == "verify":
     assert pdf_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256"]
     assert attachment_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256"]
     print("Signed released publication, client HTML, retained PDF, and attachment restored")
+elif mode == "corrupt":
+    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            pk=artifact_id, source_attachment=source_attachment, organization=organization,
+        )
+        path = artifact.file.name
+        artifact.file.storage.delete(path)
+        assert artifact.file.storage.save(path, ContentFile(b"corrupt recovery fixture bytes")) == path
+    client = User.objects.get(email=CLIENT_EMAIL)
+    browser.force_login(client)
+    assert browser.get(reverse("client-portal-repository-publication-list"), secure=True).json()["results"] == []
+    assert browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True).status_code == 404
+    assert browser.get(
+        reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]), secure=True,
+    ).status_code == 404
+    print("Restored retained attachment corruption refused by client routes")
 else:
-    raise RuntimeError("TEKDOCS_RECOVERY_PUBLICATION_MODE must be create or verify")
+    raise RuntimeError("TEKDOCS_RECOVERY_PUBLICATION_MODE must be create, verify, or corrupt")

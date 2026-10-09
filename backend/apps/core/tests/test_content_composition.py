@@ -15,6 +15,8 @@ from allauth.mfa.totp.internal.auth import generate_totp_secret
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import DatabaseError, connection, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -943,6 +945,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert portal_attachment["Content-Disposition"].startswith("attachment;")
     assert portal_attachment["Cache-Control"] == "private, no-store"
     assert portal_attachment["X-Content-Type-Options"] == "nosniff"
+    call_command("verify_recovery_publications")
     assert browser.get(reverse(
         "client-portal-repository-publication-attachment", args=[publication.id, uuid.uuid4()]
     )).status_code == 404
@@ -965,6 +968,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert changed.content != b"Changed attachment bytes"
     retained_pdf.storage.delete(retained_pdf.name)
     try:
+        with pytest.raises(CommandError, match="Retained repository publication integrity check failed"):
+            call_command("verify_recovery_publications")
         assert browser.get(portal_list_url).json()["results"] == []
         assert browser.get(portal_detail_url).status_code == 404
         assert browser.get(portal_pdf_url).status_code == 404

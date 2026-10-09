@@ -233,7 +233,21 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256="$publication_attachment_sha" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+echo "Checking restored retained-attachment corruption refusal"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt \
+  -e TEKDOCS_RECOVERY_PUBLICATION_ID="$publication_id" \
+  -e TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID="$publication_attachment_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_publication_log="$work_directory/corrupt-publication.log"
+if compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications > "$corrupt_publication_log" 2>&1; then
+  echo "Retained publication verification accepted corrupt restored media" >&2
+  exit 1
+fi
+grep -q 'Retained repository publication integrity check failed' "$corrupt_publication_log"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs and released publication with retained attachment, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs and released publication with retained attachment, restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

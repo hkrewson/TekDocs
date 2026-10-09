@@ -1796,6 +1796,9 @@ The same final-record boundary now permits approval-scoped downloads of the
 signed retained HTML and PDF. PDF bytes are rechecked after the response read;
 HTML is sandboxed and forced to download. These are immutable STATIC exports,
 not editable-format parity or a document-authority change.
+Staff can separately download a live, permission-scoped HTML projection of an
+accepted-and-indexed repository document. It carries the Git revision, is
+private and audited, and is not a signed STATIC artifact or full format parity.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

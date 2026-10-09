@@ -465,6 +465,11 @@ gates after file, template, review, key, publication and recovery parity.
 - The same final STATIC record permits private, approval-scoped retained HTML
   and PDF downloads. HTML is forced and sandboxed; PDF bytes are rechecked
   after reading. Neither route rerenders Git or changes legacy document authority.
+- Staff can download the permission-scoped rendered HTML for one current
+  repository document only when its accepted and indexed Git revisions match.
+  The private, audited download labels that revision as a live projection,
+  never as signed STATIC evidence. Repository PDF/DOCX and complete editable
+  dependency bundles remain separate parity gates.
 - Staff can also download a bounded, deterministic ZIP of every current Markdown
   file in one accepted-and-indexed Workspace commit plus reachable historical
   include, template-source, and copy-provenance Markdown. Dependencies are

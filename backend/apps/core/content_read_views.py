@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from drf_spectacular.utils import extend_schema
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -12,9 +14,14 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey
 
-from .content_read import document_collection, document_detail, entity_documentation
+from .content_index_models import ContentNode
+from .content_read import document_collection, document_detail, entity_documentation, repository_for_reader
+from .document_exports import export_html
 from .document_views import _msp_workspace, _organization_workspace
+from .models import AuditEvent
 from .workspaces import ResolvedWorkspace
+
+MAX_HTML_EXPORT_BYTES = 4 * 1024 * 1024
 
 
 class ContentReadQuerySerializer(serializers.Serializer):
@@ -151,6 +158,66 @@ class OrganizationContentReadDetailView(APIView):
                 )
             ).data
         )
+
+
+def _export_document_html(request, workspace: ResolvedWorkspace, content_id: UUID) -> HttpResponse | Response:  # type: ignore[no-untyped-def]
+    """Export one staff-visible accepted/indexed projection, never a STATIC artifact."""
+
+    repository = repository_for_reader(workspace)
+    get_object_or_404(ContentNode.objects.filter(repository=repository, kind="document"), content_id=content_id)
+    accepted = repository.accepted_commit
+    if accepted is None or accepted.id != repository.indexed_commit_id:
+        return Response({"detail": "Repository content is not fully indexed"}, status=409)
+    revision = accepted.object_id
+    detail = document_detail(workspace=workspace, content_id=content_id, audience="msp_internal")
+    repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
+    current = repository.accepted_commit
+    if (
+        current is None
+        or current.id != repository.indexed_commit_id
+        or current.object_id != revision
+        or detail["indexed_commit"] != revision
+    ):
+        return Response({"detail": "Repository content changed during export"}, status=409)
+    content = export_html(
+        title=detail["title"], markdown=detail["markdown"], retained_html=detail["sanitized_html"]
+    )
+    if len(content) > MAX_HTML_EXPORT_BYTES:
+        return Response({"detail": "Repository HTML export exceeds the size limit"}, status=409)
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="repository_document.exported",
+        entity_id=content_id,
+        request_id=getattr(request, "request_id", None),
+        metadata={"format": "html", "accepted_commit": revision},
+    )
+    response = HttpResponse(content, content_type="text/html; charset=utf-8")
+    response["Content-Disposition"] = 'attachment; filename="repository-document.html"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Content-Security-Policy"] = "sandbox; default-src 'none'"
+    response["X-TekDocs-Export-Class"] = "live_repository_revision"
+    response["X-TekDocs-Repository-Commit"] = revision
+    return response
+
+
+class MSPContentReadHTMLExportView(APIView):
+    @extend_schema(
+        operation_id="content_read_msp_html_export",
+        responses={(200, "text/html"): bytes, 409: OpenApiResponse(description="Repository revision conflict")},
+    )
+    def get(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _export_document_html(request, _scope(request), content_id)
+
+
+class OrganizationContentReadHTMLExportView(APIView):
+    @extend_schema(
+        operation_id="content_read_organization_html_export",
+        responses={(200, "text/html"): bytes, 409: OpenApiResponse(description="Repository revision conflict")},
+    )
+    def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _export_document_html(request, _scope(request, organization_entity_id), content_id)
 
 
 class MSPEntityContentView(APIView):

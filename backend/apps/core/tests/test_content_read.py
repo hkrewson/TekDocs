@@ -8,9 +8,10 @@ from django.test import Client, override_settings
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
-from apps.core.models import ContentEntityLink, InstallationState, Tenant, Workspace, WorkspaceKind
+from apps.core.models import AuditEvent, ContentEntityLink, InstallationState, Tenant, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
@@ -202,3 +203,72 @@ def test_cross_organization_entity_and_content_are_unavailable(read_context):
     assert Client().get(
         reverse("organization-content-documents", kwargs={"organization_entity_id": organization.entity_id})
     ).status_code in {401, 403}
+
+
+def test_staff_html_export_uses_only_a_fully_indexed_repository_document(read_context):
+    installation, organization, _asset, repository = read_context
+    document_id, fragment_id = uuid.uuid4(), uuid.uuid4()
+    accepted = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        changes={
+            "docs/export.md": _content(content_id=document_id, title="Export guide", body="## Setup\nSafe text.\n"),
+            "fragments/notes.md": _content(
+                content_id=fragment_id, title="Notes", body="Fragment text.\n", kind="fragment"
+            ),
+        },
+        message="Add HTML export source",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    kwargs = {"organization_entity_id": organization.entity_id, "content_id": document_id}
+    export_url = reverse("organization-content-document-html-export", kwargs=kwargs)
+    exported = browser.get(export_url)
+    assert exported.status_code == 200, exported.content
+    assert exported["Content-Type"] == "text/html; charset=utf-8"
+    assert exported["Content-Disposition"] == 'attachment; filename="repository-document.html"'
+    assert exported["Cache-Control"] == "private, no-store"
+    assert exported["Content-Security-Policy"] == "sandbox; default-src 'none'"
+    assert exported["X-Content-Type-Options"] == "nosniff"
+    assert exported["X-TekDocs-Export-Class"] == "live_repository_revision"
+    assert exported["X-TekDocs-Repository-Commit"] == accepted.object_id
+    assert b"<h2>Setup</h2>" in exported.content
+    assert b"Safe text." in exported.content
+    assert b"Fragment text." not in exported.content
+    assert AuditEvent.objects.filter(action="repository_document.exported", entity_id=document_id).count() == 1
+
+    fragment_url = reverse(
+        "organization-content-document-html-export",
+        kwargs={"organization_entity_id": organization.entity_id, "content_id": fragment_id},
+    )
+    assert browser.get(fragment_url).status_code == 404
+    other = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Export sibling",
+        legal_name="Export sibling",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    sibling_url = reverse(
+        "organization-content-document-html-export",
+        kwargs={"organization_entity_id": other.entity_id, "content_id": document_id},
+    )
+    assert browser.get(sibling_url).status_code == 404
+    portal_user = User.objects.create_user(email="content-export-client@example.invalid", display_name="Client")
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization
+    )
+    browser.force_login(portal_user)
+    assert browser.get(export_url).status_code == 403
+    browser.force_login(installation.owner)
+
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=accepted.object_id,
+        changes={"docs/export.md": _content(content_id=document_id, title="Export guide", body="New text.\n")},
+        message="Advance accepted source before indexing",
+    )
+    assert browser.get(export_url).status_code == 409
+    assert AuditEvent.objects.filter(action="repository_document.exported", entity_id=document_id).count() == 1

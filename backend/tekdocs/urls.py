@@ -95,9 +95,11 @@ from apps.core.content_graph_views import MSPContentGraphView, OrganizationConte
 from apps.core.content_read_views import (
     MSPContentReadCollectionView,
     MSPContentReadDetailView,
+    MSPContentReadHTMLExportView,
     MSPEntityContentView,
     OrganizationContentReadCollectionView,
     OrganizationContentReadDetailView,
+    OrganizationContentReadHTMLExportView,
     OrganizationEntityContentView,
 )
 from apps.core.credential_reference_views import (
@@ -584,6 +586,11 @@ urlpatterns = [
         name="msp-content-document-detail",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/documents/<uuid:content_id>/export/html",
+        MSPContentReadHTMLExportView.as_view(),
+        name="msp-content-document-html-export",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/entities/<uuid:entity_id>/documentation",
         MSPEntityContentView.as_view(),
         name="msp-content-entity-documentation",
@@ -697,6 +704,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>",
         OrganizationContentReadDetailView.as_view(),
         name="organization-content-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>/export/html",
+        OrganizationContentReadHTMLExportView.as_view(),
+        name="organization-content-document-html-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/entities/<uuid:entity_id>/documentation",

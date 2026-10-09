@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import cast
+from typing import Literal, cast
 from uuid import UUID
 
 from django.db import IntegrityError, transaction
@@ -570,8 +570,8 @@ def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID
     return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
 
 
-def _static_markdown_export(  # type: ignore[no-untyped-def]
-    request, workspace: ResolvedWorkspace, evidence_id: UUID
+def _static_export(  # type: ignore[no-untyped-def]
+    request, workspace: ResolvedWorkspace, evidence_id: UUID, format_name: Literal["md", "html", "pdf"]
 ) -> HttpResponse:
     require_permission(request.user, PermissionKey.DOCUMENTS_APPROVE, organization=workspace.organization)
     evidence = _evidence(workspace, evidence_id)
@@ -585,20 +585,48 @@ def _static_markdown_export(  # type: ignore[no-untyped-def]
     if not verify_repository_static_publication(publication):
         response = HttpResponse("Retained STATIC publication failed verification", status=409)
     else:
-        AuditEvent.objects.create(
-            tenant=workspace.member.tenant,
-            actor=request.user,
-            action="repository_static_publication.exported",
-            entity_id=publication.id,
-            request_id=getattr(request, "request_id", None),
-            metadata={"format": "md", "publication_digest": publication.content_digest},
-        )
-        response = HttpResponse(
-            evidence.canonical_markdown.encode("utf-8"), content_type="text/markdown; charset=utf-8"
-        )
-        response["Content-Disposition"] = 'attachment; filename="repository-static-publication.md"'
-        response["X-TekDocs-Export-Class"] = "immutable_static_publication"
-        response["X-TekDocs-Publication-Digest"] = publication.content_digest
+        content: bytes | None
+        if format_name == "md":
+            content = evidence.canonical_markdown.encode("utf-8")
+            media_type = "text/markdown; charset=utf-8"
+        elif format_name == "html":
+            snapshot = evidence.manifest.get("rendered_snapshot")
+            content = (
+                snapshot["html"].encode("utf-8")
+                if isinstance(snapshot, dict) and verify_retained_rendered_snapshot(manifest=evidence.manifest)
+                else None
+            )
+            media_type = "text/html; charset=utf-8"
+        else:
+            content = None
+            if evidence.pdf_file.name:
+                try:
+                    with evidence.pdf_file.storage.open(evidence.pdf_file.name, "rb") as stream:
+                        candidate = bytes(stream.read(MAX_RENDERED_PDF_BYTES + 1))
+                    if verify_retained_pdf_snapshot(manifest=evidence.manifest, content=candidate):
+                        content = candidate
+                except (OSError, ValueError, TypeError):
+                    pass
+            media_type = "application/pdf"
+        if content is None:
+            response = HttpResponse("Retained STATIC publication export failed verification", status=409)
+        else:
+            AuditEvent.objects.create(
+                tenant=workspace.member.tenant,
+                actor=request.user,
+                action="repository_static_publication.exported",
+                entity_id=publication.id,
+                request_id=getattr(request, "request_id", None),
+                metadata={"format": format_name, "publication_digest": publication.content_digest},
+            )
+            response = HttpResponse(content, content_type=media_type)
+            response["Content-Disposition"] = (
+                f'attachment; filename="repository-static-publication.{format_name}"'
+            )
+            response["X-TekDocs-Export-Class"] = "immutable_static_publication"
+            response["X-TekDocs-Publication-Digest"] = publication.content_digest
+            if format_name == "html":
+                response["Content-Security-Policy"] = "sandbox; default-src 'none'"
     response["Cache-Control"] = "private, no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
@@ -948,10 +976,39 @@ class OrganizationRepositoryStaticMarkdownExportView(APIView):
         responses={(200, "text/markdown"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
     )
     def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
-        return _static_markdown_export(
+        return _static_export(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,
+            "md",
+        )
+
+
+class OrganizationRepositoryStaticHTMLExportView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_html_export",
+        responses={(200, "text/html"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_export(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+            "html",
+        )
+
+
+class OrganizationRepositoryStaticPDFExportView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_pdf_export",
+        responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_export(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
+            evidence_id,
+            "pdf",
         )
 
 

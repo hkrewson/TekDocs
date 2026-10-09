@@ -1416,6 +1416,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
     ),
     route(
+        "organization-repository-publication-evidence-static-html-export", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-static-pdf-export", ("GET",),
+        PermissionKey.DOCUMENTS_APPROVE, organization_scoped=True,
+    ),
+    route(
         "organization-repository-publication-evidence-static-control", ("GET", "POST"),
         PermissionKey.DOCUMENTS_APPROVE, (PermissionKey.DOCUMENTS_APPROVE,), organization_scoped=True,
     ),

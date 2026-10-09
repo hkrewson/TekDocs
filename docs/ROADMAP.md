@@ -1792,6 +1792,10 @@ signed Markdown download that verifies the complete retained chain and audits
 the export without reading live Git. It may contain frozen field-key values;
 client delivery, editable HTML/PDF/DOCX parity and authority handoff do not
 follow from this route.
+The same final-record boundary now permits approval-scoped downloads of the
+signed retained HTML and PDF. PDF bytes are rechecked after the response read;
+HTML is sandboxed and forced to download. These are immutable STATIC exports,
+not editable-format parity or a document-authority change.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

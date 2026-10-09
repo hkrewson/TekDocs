@@ -771,8 +771,18 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         "organization-repository-publication-evidence-static-markdown-export",
         args=[organization.entity_id, evidence_id],
     )
+    html_export_url = reverse(
+        "organization-repository-publication-evidence-static-html-export",
+        args=[organization.entity_id, evidence_id],
+    )
+    pdf_export_url = reverse(
+        "organization-repository-publication-evidence-static-pdf-export",
+        args=[organization.entity_id, evidence_id],
+    )
     assert browser.get(static_url).status_code == 409
     assert browser.get(markdown_export_url).status_code == 404
+    assert browser.get(html_export_url).status_code == 404
+    assert browser.get(pdf_export_url).status_code == 404
     assert browser.post(static_url).status_code == 409
     authorization_payload = json.dumps(
         {"outcome": "authorized_for_publication", "reason": "Exact package approved for publication creation"}
@@ -819,7 +829,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert recorded.json()["verified"] is True
     assert recorded.json()["permits_distribution"] is False
     publication = RepositoryStaticPublication.objects.get(pk=recorded.json()["id"])
-    signed_markdown = RepositoryPublicationEvidence.objects.get(pk=evidence_id).canonical_markdown.encode()
+    evidence_record = RepositoryPublicationEvidence.objects.get(pk=evidence_id)
+    signed_markdown = evidence_record.canonical_markdown.encode()
     exported_markdown = browser.get(markdown_export_url)
     assert exported_markdown.status_code == 200
     assert exported_markdown.content == signed_markdown
@@ -829,9 +840,41 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert exported_markdown["X-Content-Type-Options"] == "nosniff"
     assert exported_markdown["X-TekDocs-Export-Class"] == "immutable_static_publication"
     assert exported_markdown["X-TekDocs-Publication-Digest"] == publication.content_digest
+    exported_html = browser.get(html_export_url)
+    assert exported_html.status_code == 200
+    assert exported_html.content == evidence_record.manifest["rendered_snapshot"]["html"].encode()
+    assert exported_html["Content-Type"] == "text/html; charset=utf-8"
+    assert exported_html["Content-Disposition"].startswith("attachment;")
+    assert exported_html["Cache-Control"] == "private, no-store"
+    assert exported_html["Content-Security-Policy"] == "sandbox; default-src 'none'"
+    exported_pdf = browser.get(pdf_export_url)
+    assert exported_pdf.status_code == 200
+    assert exported_pdf.content == pdf_bytes
+    assert exported_pdf["Content-Type"] == "application/pdf"
+    assert exported_pdf["Content-Disposition"].startswith("attachment;")
+    assert exported_pdf["X-TekDocs-Export-Class"] == "immutable_static_publication"
     assert AuditEvent.objects.filter(
         action="repository_static_publication.exported", entity_id=publication.id
-    ).count() == 1
+    ).count() == 3
+    original_open = retained_pdf.storage.open
+    reads = 0
+
+    def changed_pdf_between_checks(name, mode="rb"):
+        nonlocal reads
+        if name != retained_pdf.name:
+            return original_open(name, mode)
+        reads += 1
+        return BytesIO(pdf_bytes if reads == 1 else b"Changed retained PDF")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(retained_pdf.storage, "open", changed_pdf_between_checks)
+        changed_pdf_export = browser.get(pdf_export_url)
+    assert reads >= 2
+    assert changed_pdf_export.status_code == 409
+    assert changed_pdf_export.content != b"Changed retained PDF"
+    assert AuditEvent.objects.filter(
+        action="repository_static_publication.exported", entity_id=publication.id
+    ).count() == 3
     control_url = reverse(
         "organization-repository-publication-evidence-static-control",
         args=[organization.entity_id, evidence_id],
@@ -869,9 +912,11 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     try:
         assert browser.post(control_url, data=release_payload, content_type="application/json").status_code == 409
         assert browser.get(markdown_export_url).status_code == 409
+        assert browser.get(html_export_url).status_code == 409
+        assert browser.get(pdf_export_url).status_code == 409
         assert AuditEvent.objects.filter(
             action="repository_static_publication.exported", entity_id=publication.id
-        ).count() == 1
+        ).count() == 3
         assert not RepositoryStaticPublicationControlEvent.objects.exists()
     finally:
         assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
@@ -894,6 +939,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     )
     browser.force_login(portal_user)
     assert browser.get(markdown_export_url).status_code == 403
+    assert browser.get(html_export_url).status_code == 403
+    assert browser.get(pdf_export_url).status_code == 403
     inbox_url = reverse("client-portal-notification-list")
     assert browser.get(inbox_url).json()["results"] == []
     assert browser.get(portal_list_url).json()["results"] == []
@@ -1217,8 +1264,18 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         "organization-repository-publication-evidence-static-markdown-export",
         args=[sibling.entity_id, evidence_id],
     )
+    sibling_html_export_url = reverse(
+        "organization-repository-publication-evidence-static-html-export",
+        args=[sibling.entity_id, evidence_id],
+    )
+    sibling_pdf_export_url = reverse(
+        "organization-repository-publication-evidence-static-pdf-export",
+        args=[sibling.entity_id, evidence_id],
+    )
     assert browser.get(sibling_static_url).status_code == 404
     assert browser.get(sibling_markdown_export_url).status_code == 404
+    assert browser.get(sibling_html_export_url).status_code == 404
+    assert browser.get(sibling_pdf_export_url).status_code == 404
     assert browser.post(sibling_static_url).status_code == 404
     sibling_control_url = reverse(
         "organization-repository-publication-evidence-static-control", args=[sibling.entity_id, evidence_id]
@@ -1272,6 +1329,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     ).status_code in {403, 404}
     assert browser.get(static_url).status_code in {403, 404}
     assert browser.get(markdown_export_url).status_code in {403, 404}
+    assert browser.get(html_export_url).status_code in {403, 404}
+    assert browser.get(pdf_export_url).status_code in {403, 404}
     assert browser.post(static_url).status_code in {403, 404}
     assert browser.get(control_url).status_code in {403, 404}
     assert browser.post(control_url, data=release_payload, content_type="application/json").status_code in {403, 404}

@@ -8411,6 +8411,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/export/html": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_static_html_export"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/export/markdown": {
         readonly parameters: {
             readonly query?: never;
@@ -8419,6 +8435,22 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["repository_evidence_organization_static_markdown_export"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/export/pdf": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["repository_evidence_organization_static_pdf_export"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -39955,6 +39987,41 @@ export interface operations {
             };
         };
     };
+    readonly repository_evidence_organization_static_html_export: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/html": string;
+                };
+            };
+            /** @description Integrity conflict */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     readonly repository_evidence_organization_static_markdown_export: {
         readonly parameters: {
             readonly query?: never;
@@ -39975,6 +40042,41 @@ export interface operations {
                 };
                 content: {
                     readonly "text/markdown": string;
+                };
+            };
+            /** @description Integrity conflict */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly repository_evidence_organization_static_pdf_export: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly evidence_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/pdf": string;
                 };
             };
             /** @description Integrity conflict */

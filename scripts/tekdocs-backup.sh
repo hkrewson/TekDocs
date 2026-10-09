@@ -10,6 +10,7 @@ set -eu
 #=======================# VARIABLES #=======================#
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+. "$repository_root/scripts/lib/recovery-checksum.sh"
 environment_file=.env
 secret_directory=
 output_directory=
@@ -203,10 +204,10 @@ fi
 wait "$secrets_crypto_pid"
 rm -f "$secrets_pipe"
 
-database_sha=$(sha256sum "$partial_directory/database.tdr" | awk '{print $1}')
-media_sha=$(sha256sum "$partial_directory/media.tdr" | awk '{print $1}')
-secrets_sha=$(sha256sum "$partial_directory/deployment-secrets.tdr" | awk '{print $1}')
-repositories_sha=$(sha256sum "$partial_directory/repositories.tdr" | awk '{print $1}')
+database_sha=$(recovery_sha256 "$partial_directory/database.tdr")
+media_sha=$(recovery_sha256 "$partial_directory/media.tdr")
+secrets_sha=$(recovery_sha256 "$partial_directory/deployment-secrets.tdr")
+repositories_sha=$(recovery_sha256 "$partial_directory/repositories.tdr")
 created_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 version=$(tr -d '[:space:]' < "$repository_root/VERSION")
 printf '%s\n' \

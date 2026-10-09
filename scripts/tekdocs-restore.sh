@@ -10,6 +10,7 @@ set -eu
 #=======================# VARIABLES #=======================#
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
+. "$repository_root/scripts/lib/recovery-checksum.sh"
 environment_file=.env
 backup_directory=
 key_file=
@@ -89,7 +90,7 @@ crypto verify-manifest --input /recovery/manifest.json --expected-mac "$expected
 grep -q '"format": "tekdocs-recovery-v2"' "$absolute_backup/manifest.json"
 for artifact in database.tdr media.tdr deployment-secrets.tdr repositories.tdr; do
   expected=$(sed -n "s/.*\"$artifact\": \"\([0-9a-f]\{64\}\)\".*/\1/p" "$absolute_backup/manifest.json")
-  actual=$(sha256sum "$absolute_backup/$artifact" | awk '{print $1}')
+  actual=$(recovery_sha256 "$absolute_backup/$artifact")
   [ -n "$expected" ] && [ "$expected" = "$actual" ] || { echo "Recovery artifact checksum validation failed." >&2; exit 1; }
 done
 

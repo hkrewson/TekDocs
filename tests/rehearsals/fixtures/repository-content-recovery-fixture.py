@@ -1,5 +1,6 @@
 """Retain and verify real Markdown, composition, and Git history across recovery."""
 
+import hashlib
 import os
 import uuid
 
@@ -15,6 +16,9 @@ from apps.core.repository_service import (
     read_accepted_repository_file,
     read_repository_markdown_files_at_commit,
 )
+from apps.core.repository_source_exports import export_repository_sources
+from apps.core.repository_source_git_validation import verify_repository_source_against_git
+from apps.core.repository_source_validation import verify_repository_source_snapshot
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 
@@ -50,6 +54,13 @@ def _assert_absent(*, repository, content_id):
     except RepositoryFileNotFoundError:
         return
     raise AssertionError("content from another Workspace appeared in this repository")
+
+
+def _source_snapshot_digest(repository):
+    snapshot = export_repository_sources(repository)
+    manifest = verify_repository_source_snapshot(snapshot.content)
+    verify_repository_source_against_git(manifest, repository_id=repository.id)
+    return hashlib.sha256(snapshot.content).hexdigest()
 
 
 def create_fixture(owner):
@@ -187,8 +198,10 @@ with transaction.atomic():
     organization = Organization.objects.get(tenant=tenant, entity__display_name=ORGANIZATION_NAME)
     if mode == "create":
         create_fixture(owner)
+        msp_snapshot_digest = _source_snapshot_digest(_repository(owner))
     elif mode == "verify":
         directory_entry = verify_fixture(owner)
+        msp_snapshot_digest = _source_snapshot_digest(_repository(owner))
     else:
         raise RuntimeError("TEKDOCS_RECOVERY_CONTENT_MODE must be create or verify")
 with transaction.atomic():
@@ -200,7 +213,13 @@ with transaction.atomic():
     )
     if mode == "create":
         create_organization_fixture(owner, organization)
+        organization_snapshot_digest = _source_snapshot_digest(_organization_repository(owner, organization))
+        print(f"MSP_SOURCE_SHA256={msp_snapshot_digest}")
+        print(f"ORGANIZATION_SOURCE_SHA256={organization_snapshot_digest}")
         print("MSP and client repository Markdown recovery fixtures created")
     else:
         verify_organization_fixture(owner, organization, directory_entry)
-        print("MSP directory, client isolation, Markdown composition, and Git history restored")
+        organization_snapshot_digest = _source_snapshot_digest(_organization_repository(owner, organization))
+        assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
+        assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]
+        print("MSP directory, client isolation, Markdown composition, Git history, and source ZIPs restored")

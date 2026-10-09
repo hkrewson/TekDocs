@@ -1810,6 +1810,14 @@ the current Markdown inventory must match exactly, and every listed historical
 file must match its retained commit. Wrong ownership, stale heads, missing
 history, and byte differences fail closed. This comparison is not an
 independent Git signature, an import path, or a complete backup check.
+The supported network-isolated recovery rehearsal now compares deterministic
+MSP and organization source-ZIP digests across backup/restore and re-verifies
+both restored ZIPs offline and against their own local Git histories. This
+extends source/export recovery evidence without treating the ZIP as a backup
+or certifying retained publication delivery after restore.
+The encrypted recovery scripts also fail closed when no SHA-256 host utility is
+available or a digest is invalid; macOS `shasum` is supported alongside
+`sha256sum`. This closes an empty-manifest-digest failure found during rehearsal.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

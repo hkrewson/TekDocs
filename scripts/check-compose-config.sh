@@ -7,6 +7,11 @@ bash -n \
   "$repository_root/scripts/setup-production.sh" \
   "$repository_root/scripts/update-production.sh" \
   "$repository_root/scripts/lib/production-images.sh"
+sh -n \
+  "$repository_root/scripts/tekdocs-backup.sh" \
+  "$repository_root/scripts/tekdocs-restore.sh" \
+  "$repository_root/scripts/lib/recovery-checksum.sh" \
+  "$repository_root/tests/rehearsals/rehearse-supported-recovery.sh"
 "$repository_root/scripts/bootstrap-env.sh" --help >/dev/null
 "$repository_root/scripts/setup-production.sh" --help >/dev/null
 "$repository_root/tests/rehearsals/test-production-setup.sh"

@@ -36,6 +36,21 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
+if PATH="$work_directory" /bin/sh -c '. "$1"; recovery_sha256 "$2"' sh \
+  "$repository_root/scripts/lib/recovery-checksum.sh" "$repository_root/VERSION" \
+  > "$work_directory/no-checksum.log" 2>&1; then
+  echo "Recovery checksum validation accepted a host without a SHA-256 utility." >&2
+  exit 1
+fi
+grep -q 'A SHA-256 checksum utility is required for recovery' "$work_directory/no-checksum.log"
+if /bin/sh -c '. "$1"; sha256sum() { printf "%s\n" invalid; }; recovery_sha256 "$2"' sh \
+  "$repository_root/scripts/lib/recovery-checksum.sh" "$repository_root/VERSION" \
+  > "$work_directory/invalid-checksum.log" 2>&1; then
+  echo "Recovery checksum validation accepted an invalid SHA-256 digest." >&2
+  exit 1
+fi
+grep -q 'Recovery artifact checksum is invalid' "$work_directory/invalid-checksum.log"
+
 "$repository_root/scripts/bootstrap-env.sh" "$source_environment" >/dev/null
 mkdir -m 0700 "$source_secrets"
 copy_secret() {
@@ -73,9 +88,16 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py initialize_workspace_repositories
+source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
-  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py" \
+  > "$source_snapshot_log"
+msp_snapshot_sha=$(sed -n 's/^MSP_SOURCE_SHA256=//p' "$source_snapshot_log")
+organization_snapshot_sha=$(sed -n 's/^ORGANIZATION_SOURCE_SHA256=//p' "$source_snapshot_log")
+printf '%s\n' "$msp_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
+printf '%s\n' "$organization_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/repository Markdown recovery fixtures created/p' "$source_snapshot_log"
 
 echo "Checking bounded encrypted-backup write failure before a normal retry"
 limited_backup="$work_directory/limited-backup"
@@ -181,9 +203,12 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
-  -e TEKDOCS_RECOVERY_CONTENT_MODE=verify backend python manage.py shell --no-imports \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=verify \
+  -e TEKDOCS_RECOVERY_MSP_SOURCE_SHA256="$msp_snapshot_sha" \
+  -e TEKDOCS_RECOVERY_ORG_SOURCE_SHA256="$organization_snapshot_sha" \
+  backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history and source ZIPs, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

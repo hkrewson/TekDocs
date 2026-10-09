@@ -211,6 +211,27 @@ export const browserRepositoryClient = {
     }
     return { content: await response.blob(), name: 'repository-document.html', commit }
   },
+  async exportPdf(contentId: string, organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/documents/${encodeURIComponent(contentId)}/export/pdf`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) throw new Error(translate('repository.pdfFailed'))
+    const commit = response.headers.get('X-TekDocs-Repository-Commit')
+    if (response.headers.get('Content-Type') !== 'application/pdf'
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-document.pdf"'
+      || response.headers.get('X-TekDocs-Export-Class') !== 'live_repository_revision'
+      || !commit || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit)
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') {
+      throw new Error(translate('repository.pdfFailed'))
+    }
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength < 5 || bytes.byteLength > 8 * 1024 * 1024
+      || new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') {
+      throw new Error(translate('repository.pdfFailed'))
+    }
+    return { content: new Blob([bytes], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }
+  },
   async save(mutation: RepositoryMutation, organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring`, {
       method: 'POST', credentials: 'same-origin',

@@ -21,6 +21,7 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     source: vi.fn().mockResolvedValue(initial),
     exportSources: vi.fn().mockResolvedValue({ content: new Blob(['snapshot']), name: 'tekdocs-repository-aaaaaaaaaaaa.zip' }),
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
+    exportPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-saved'], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
     reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
@@ -224,7 +225,7 @@ it('downloads only saved indexed HTML while keeping a dirty draft', async () => 
     expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
-    expect(screen.getByText(/live entity and field values/)).toBeInTheDocument()
+    expect(screen.getByText(/^HTML uses the saved, indexed Git revision/)).toHaveTextContent('live entity and field values')
     await user.click(screen.getByRole('button', { name: 'Download saved HTML' }))
     await waitFor(() => expect(click).toHaveBeenCalledOnce())
     expect(exportHtml).toHaveBeenCalledWith('content-1', undefined)
@@ -271,15 +272,60 @@ it('keeps a denied HTML download retryable and refuses a changed revision', asyn
   }
 })
 
-it('does not offer HTML for a fragment or a document awaiting indexing', async () => {
+it('offers live PDF only for an indexed document and keeps denial and stale revisions download-free', async () => {
+  const user = userEvent.setup()
+  const exportPdf = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValueOnce({ content: new Blob(['%PDF-stale']), name: 'repository-document.pdf', commit: 'c'.repeat(40) })
+    .mockResolvedValue({ content: new Blob(['%PDF-current'], { type: 'application/pdf' }), name: 'repository-document.pdf', commit })
+  const createObjectURL = vi.fn().mockReturnValue('blob:saved-pdf')
+  const revokeObjectURL = vi.fn()
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('repository-document.pdf')
+    expect(this.href).toBe('blob:saved-pdf')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+  try {
+    setup({ exportPdf })
+    expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    expect(screen.getByText(/not a retained STATIC publication/)).toBeInTheDocument()
+    const download = screen.getByRole('button', { name: 'Download saved PDF' })
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('saved PDF could not be downloaded')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('revision changed while preparing PDF')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(exportPdf).toHaveBeenCalledWith('content-1', undefined)
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:saved-pdf'))
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+    click.mockRestore()
+  }
+})
+
+it('does not offer live HTML or PDF for a fragment or a document awaiting indexing', async () => {
   const user = userEvent.setup()
   const source = vi.fn().mockResolvedValueOnce({ ...initial, kind: 'fragment' }).mockResolvedValue({ ...initial, indexed_commit: 'c'.repeat(40) })
   setup({ source })
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: /Guide/ }))
   await waitFor(() => expect(source).toHaveBeenCalledTimes(2))
   expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
 })
 
 it('downloads a current Workspace snapshot and keeps a failed attempt recoverable', async () => {

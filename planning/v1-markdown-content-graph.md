@@ -483,13 +483,16 @@ gates after file, template, review, key, publication and recovery parity.
 - Staff can download the permission-scoped rendered HTML for one current
   repository document only when its accepted and indexed Git revisions match.
   The private, audited download labels that revision as a live projection,
-  never as signed STATIC evidence. Repository PDF/DOCX and complete editable
+  never as signed STATIC evidence. Repository DOCX and complete editable
   dependency bundles remain separate parity gates.
 - A staff-only live PDF API now renders the same permission-scoped repository
   context as the HTML read, including resolved or withheld field keys. It
   requires an accepted-and-indexed document, labels its exact Git revision,
   and refuses fragments, client-portal and foreign-Workspace requests. Editor
-  access, DOCX and complete editable dependency bundles remain open gates.
+  access is now limited to that saved, indexed document and verifies the
+  returned revision and PDF response before saving. Denial or a stale response
+  leaves the draft untouched. DOCX and complete editable dependency bundles
+  remain open gates.
 - Staff can also download a bounded, deterministic ZIP of every current Markdown
   file in one accepted-and-indexed Workspace commit plus reachable historical
   include, template-source, and copy-provenance Markdown. Dependencies are

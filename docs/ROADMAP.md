@@ -1802,14 +1802,17 @@ private and audited, and is not a signed STATIC artifact or full format parity.
 The repository editor exposes this as a saved-document-only action. It checks
 the returned export class and revision, retains dirty drafts on denial, and
 requires reopening the file after an intervening Git revision. Fragments and
-unindexed revisions remain ineligible; live values and repository PDF/DOCX
-parity remain separate work.
+unindexed revisions remain ineligible; repository DOCX parity remains separate
+work.
 An independent staff-only live PDF route now renders the same reader-authorized
 entity, attachment and field-key context for a fully accepted-and-indexed
 repository document. It is size-bounded, private, audited and revision-labeled;
 fragments, portal users, foreign Workspaces and indexing lag fail closed. It is
-not retained STATIC output. Editor access to this PDF, DOCX and complete
-editable dependency bundles remain open parity work.
+not retained STATIC output. The repository editor now offers it only for a
+saved, indexed document and checks the live-export class, exact Git revision,
+PDF headers and bytes before saving. Denial or revision mismatch leaves a dirty
+draft intact. DOCX and complete editable dependency bundles remain open parity
+work.
 The staff publication-evidence list can now filter by exact repository
 document content ID before pagination. It still requires publication access
 and returns only the selected Workspace's evidence; it does not expose a new

@@ -12,7 +12,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
-from apps.core.models import Organization, RepositoryStaticPublication
+from apps.core.models import Document, Organization, RepositoryEvidenceAttachment, RepositoryStaticPublication
 from apps.core.repository_static_delivery import repository_static_delivery_ready
 from apps.core.repository_static_publications import verify_repository_static_publication
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
@@ -21,7 +21,9 @@ from apps.core.scoping import DataScope
 
 OWNER_EMAIL = "validation-recovery@example.invalid"
 ORGANIZATION_NAME = "Validation Recovery Client"
-DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
+DOCUMENT_TITLE = "Client setup guide"
+ATTACHMENT_NAME = "recovery-guide.txt"
+ATTACHMENT_BYTES = b"Client setup instructions retained for recovery.\n"
 REVIEWER_EMAIL = "publication-recovery-reviewer@example.invalid"
 AUTHORIZER_EMAIL = "publication-recovery-authorizer@example.invalid"
 CLIENT_EMAIL = "publication-recovery-client@example.invalid"
@@ -36,22 +38,38 @@ def _post(browser, url, value=None):
     return response.json()
 
 
-def _portal_snapshot(browser, publication_id):
+def _portal_snapshot(browser, publication_id, artifact_id):
     list_response = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
     assert list_response.status_code == 200
     assert [item["id"] for item in list_response.json()["results"]] == [str(publication_id)]
     detail = browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True)
     assert detail.status_code == 200
     assert detail["Cache-Control"] == "private, no-store"
-    assert "Client enrollment" in detail.json()["rendered_html"]
-    assert detail.json()["attachments"] == []
+    assert "Client setup guide" in detail.json()["rendered_html"]
+    assert detail.json()["attachments"] == [{
+        "id": str(artifact_id),
+        "filename": ATTACHMENT_NAME,
+        "media_type": "text/plain",
+        "size": len(ATTACHMENT_BYTES),
+    }]
     pdf = browser.get(reverse("client-portal-repository-publication-pdf", args=[publication_id]), secure=True)
     assert pdf.status_code == 200
     assert pdf["Content-Type"] == "application/pdf"
     assert pdf["Cache-Control"] == "private, no-store"
+    attachment = browser.get(
+        reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]),
+        secure=True,
+    )
+    assert attachment.status_code == 200
+    assert attachment.content == ATTACHMENT_BYTES
+    assert attachment["Content-Type"] == "application/octet-stream"
+    assert attachment["Content-Disposition"].startswith("attachment;")
+    assert attachment["Cache-Control"] == "private, no-store"
+    assert attachment["X-Content-Type-Options"] == "nosniff"
     return (
         hashlib.sha256(detail.json()["rendered_html"].encode()).hexdigest(),
         hashlib.sha256(pdf.content).hexdigest(),
+        hashlib.sha256(attachment.content).hexdigest(),
     )
 
 
@@ -63,6 +81,14 @@ with transaction.atomic():
         actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
     )
     organization = Organization.objects.get(tenant=tenant, entity__display_name=ORGANIZATION_NAME)
+with transaction.atomic():
+    bind_local_rls_scope(
+        DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+        actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+    )
+    document = Document.objects.get(tenant=tenant, organization=organization, entity__display_name=DOCUMENT_TITLE)
+    source_attachment = document.attachments.get(original_filename=ATTACHMENT_NAME)
+    assert source_attachment.checksum == hashlib.sha256(ATTACHMENT_BYTES).hexdigest()
 mode = os.environ.get("TEKDOCS_RECOVERY_PUBLICATION_MODE")
 browser = Client(HTTP_HOST="localhost")
 
@@ -92,9 +118,18 @@ if mode == "create":
     evidence_url = reverse("organization-repository-publication-evidence", args=[organization.entity_id])
     browser.force_login(owner)
     evidence = _post(
-        browser, evidence_url, {"content_id": str(DOCUMENT_ID), "audience": "client_visible"}
+        browser, evidence_url, {"content_id": str(document.id), "audience": "client_visible"}
     )
     evidence_id = evidence["id"]
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            evidence_id=evidence_id, source_attachment=source_attachment,
+        )
+        assert artifact.checksum == source_attachment.checksum
     decision_url = reverse(
         "organization-repository-publication-evidence-decision", args=[organization.entity_id, evidence_id]
     )
@@ -130,13 +165,16 @@ if mode == "create":
     _post(browser, delivery_url, {"reason": "Recovery fixture delivery"})
     publication_id = uuid.UUID(publication["id"])
     browser.force_login(client)
-    html_sha, pdf_sha = _portal_snapshot(browser, publication_id)
+    html_sha, pdf_sha, attachment_sha = _portal_snapshot(browser, publication_id, artifact.id)
     print(f"REPOSITORY_PUBLICATION_ID={publication_id}")
     print(f"REPOSITORY_PUBLICATION_HTML_SHA256={html_sha}")
     print(f"REPOSITORY_PUBLICATION_PDF_SHA256={pdf_sha}")
+    print(f"REPOSITORY_PUBLICATION_ATTACHMENT_ID={artifact.id}")
+    print(f"REPOSITORY_PUBLICATION_ATTACHMENT_SHA256={attachment_sha}")
     print("Released repository publication recovery fixture created")
 elif mode == "verify":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
@@ -147,11 +185,20 @@ elif mode == "verify":
         )
         assert verify_repository_static_publication(publication)
         assert repository_static_delivery_ready(publication)
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            pk=artifact_id,
+            evidence=publication.authorization.package.decision.evidence,
+            source_attachment=source_attachment,
+            tenant=tenant,
+            organization=organization,
+        )
+        assert artifact.checksum == hashlib.sha256(ATTACHMENT_BYTES).hexdigest()
     client = User.objects.get(email=CLIENT_EMAIL)
     browser.force_login(client)
-    html_sha, pdf_sha = _portal_snapshot(browser, publication_id)
+    html_sha, pdf_sha, attachment_sha = _portal_snapshot(browser, publication_id, artifact_id)
     assert html_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256"]
     assert pdf_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256"]
-    print("Signed released publication, client HTML, and retained PDF restored")
+    assert attachment_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256"]
+    print("Signed released publication, client HTML, retained PDF, and attachment restored")
 else:
     raise RuntimeError("TEKDOCS_RECOVERY_PUBLICATION_MODE must be create or verify")

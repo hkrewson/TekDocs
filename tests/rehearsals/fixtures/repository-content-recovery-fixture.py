@@ -5,11 +5,14 @@ import os
 import uuid
 
 import yaml
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
-from apps.core.models import ContentNode, Organization, WorkspaceKind, WorkspaceRepository
+from apps.core.document_attachments import create_document_attachment
+from apps.core.documents import create_document
+from apps.core.models import ContentNode, Document, Organization, WorkspaceKind, WorkspaceRepository
 from apps.core.repository_manifests import ORGANIZATION_DIRECTORY_PATH
 from apps.core.repository_service import (
     RepositoryFileNotFoundError,
@@ -32,6 +35,9 @@ INITIAL_FRAGMENT = "Confirm the device serial number.\n"
 UPDATED_FRAGMENT = "Confirm the device serial number and enrollment status.\n"
 DOCUMENT_MARKDOWN = "# Laptop setup\n\nFollow the retained prerequisite.\n"
 ORGANIZATION_MARKDOWN = "# Client enrollment\n\nUse this client's device policy.\n"
+PUBLICATION_DOCUMENT_TITLE = "Client setup guide"
+PUBLICATION_ATTACHMENT_NAME = "recovery-guide.txt"
+PUBLICATION_ATTACHMENT_BYTES = b"Client setup instructions retained for recovery.\n"
 
 
 def _repository(owner):
@@ -136,6 +142,33 @@ def create_organization_fixture(owner, organization):
         metadata_patch={},
     )
     assert document.accepted_commit == document.indexed_commit
+    legacy_document = create_document(
+        tenant=repository.tenant,
+        organization=organization,
+        actor_id=owner.id,
+        title=PUBLICATION_DOCUMENT_TITLE,
+        markdown="Legacy attachment owner.\n",
+    )
+    attachment = create_document_attachment(
+        document=legacy_document,
+        actor_id=owner.id,
+        upload=SimpleUploadedFile(PUBLICATION_ATTACHMENT_NAME, PUBLICATION_ATTACHMENT_BYTES),
+    )
+    publication_source = author_content(
+        repository=repository,
+        actor_id=owner.id,
+        request_id=None,
+        operation="create",
+        content_id=legacy_document.id,
+        base_commit=document.accepted_commit,
+        base_blob=None,
+        kind="document",
+        path=None,
+        title=PUBLICATION_DOCUMENT_TITLE,
+        markdown=f"# {PUBLICATION_DOCUMENT_TITLE}\n\n[Guide](tekdocs://attachment/{attachment.id})\n",
+        metadata_patch={},
+    )
+    assert publication_source.accepted_commit == publication_source.indexed_commit
 
 
 def verify_fixture(owner):
@@ -179,6 +212,16 @@ def verify_organization_fixture(owner, organization, directory_entry):
     assert document.accepted_commit == document.indexed_commit
     assert ContentNode.objects.get(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID).markdown == (
         ORGANIZATION_MARKDOWN
+    )
+    legacy_document = Document.objects.get(
+        tenant=repository.tenant,
+        organization=organization,
+        entity__display_name=PUBLICATION_DOCUMENT_TITLE,
+    )
+    attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
+    publication_source = read_authored_content(repository=repository, content_id=legacy_document.id)
+    assert publication_source.markdown == (
+        f"# {PUBLICATION_DOCUMENT_TITLE}\n\n[Guide](tekdocs://attachment/{attachment.id})\n"
     )
     assert directory_entry["repository_id"] == str(repository.id)
     assert directory_entry["workspace_id"] == str(repository.workspace_id)

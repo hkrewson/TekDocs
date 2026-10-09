@@ -17,14 +17,18 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
   const [staticPhase, setStaticPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [exporting, setExporting] = useState<RepositoryStaticFormat | null>(null)
   const [downloadError, setDownloadError] = useState(false)
+  const [reviewing, setReviewing] = useState(false)
+  const [reviewError, setReviewError] = useState(false)
   const listRequest = useRef<AbortController | null>(null)
   const staticRequest = useRef<AbortController | null>(null)
   const exportRequest = useRef<AbortController | null>(null)
+  const reviewRequest = useRef<AbortController | null>(null)
 
   useEffect(() => () => {
     listRequest.current?.abort()
     staticRequest.current?.abort()
     exportRequest.current?.abort()
+    reviewRequest.current?.abort()
   }, [])
 
   async function load(nextPage: number) {
@@ -48,6 +52,7 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
   async function inspect(record: RepositoryEvidence) {
     staticRequest.current?.abort()
     exportRequest.current?.abort()
+    reviewRequest.current?.abort()
     const controller = new AbortController()
     staticRequest.current = controller
     setSelected(record)
@@ -55,6 +60,8 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
     setStaticPhase('loading')
     setDownloadError(false)
     setExporting(null)
+    setReviewing(false)
+    setReviewError(false)
     try {
       const result = await client.staticPublication(record.id, organizationId, controller.signal)
       if (controller.signal.aborted) return
@@ -62,6 +69,29 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
       setStaticPhase('ready')
     } catch {
       if (!controller.signal.aborted) setStaticPhase('error')
+    }
+  }
+
+  async function downloadReviewPdf() {
+    if (!selected || reviewing) return
+    const evidenceId = selected.id
+    const controller = new AbortController()
+    reviewRequest.current = controller
+    setReviewing(true)
+    setReviewError(false)
+    try {
+      const result = await client.reviewPdf(evidenceId, organizationId, controller.signal)
+      if (controller.signal.aborted) return
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      if (!controller.signal.aborted) setReviewError(true)
+    } finally {
+      if (!controller.signal.aborted) setReviewing(false)
     }
   }
 
@@ -102,6 +132,9 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
     {phase === 'ready' && hasMore && <button type="button" className="secondary-button" onClick={() => { void load(page + 1) }}>{translate('repository.publicationHistoryMore')}</button>}
     {selected && <div className="repository-publication-detail">
       <h3>{translate('repository.publicationEvidenceSelected')}</h3>
+      <p>{translate('repository.reviewPdfNotice')}</p>
+      <button type="button" className="secondary-button" disabled={reviewing} onClick={() => { void downloadReviewPdf() }}>{reviewing ? translate('repository.reviewPdfPreparing') : translate('repository.reviewPdfDownload')}</button>
+      {reviewError && <p role="alert" className="form-message error">{translate('repository.reviewPdfFailed')}</p>}
       {staticPhase === 'loading' && <p role="status">{translate('repository.staticChecking')}</p>}
       {staticPhase === 'error' && <p role="alert" className="form-message error">{translate('repository.staticCheckFailed')} <button type="button" className="secondary-button" onClick={() => { void inspect(selected) }}>{translate('common.retry')}</button></p>}
       {staticPhase === 'ready' && !staticRecord && <p>{translate('repository.staticNotFinalized')}</p>}

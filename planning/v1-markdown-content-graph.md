@@ -473,6 +473,10 @@ gates after file, template, review, key, publication and recovery parity.
   approval-gated retained Markdown, HTML, and PDF downloads. Denial or an
   invalid response saves no file; an unsaved editor draft stays intact. The
   view still cannot approve, release, or authorize client delivery.
+- A selected signed evidence entry also offers its retained staff review PDF
+  in either Workspace scope. Approval and integrity are checked again; a
+  denied, corrupt, or mislabeled response saves no file. This review copy
+  does not assert finalized STATIC status or client delivery.
 - The same final STATIC record permits private, approval-scoped retained HTML
   and PDF downloads. HTML is forced and sandboxed; PDF bytes are rechecked
   after reading. Neither route rerenders Git or changes legacy document authority.

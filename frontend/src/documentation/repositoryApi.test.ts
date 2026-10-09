@@ -89,6 +89,42 @@ it('treats unfinished STATIC records as unavailable while preserving authorizati
   await expect(browserRepositoryClient.staticPublication('evidence-1')).rejects.toThrow('Denied')
 })
 
+it.each([undefined, 'org-1'])('downloads a verified review PDF in workspace %s', async (organizationId) => {
+  const fetch = vi.fn().mockResolvedValue(new Response('%PDF-review', {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="repository-evidence-snapshot.pdf"',
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  }))
+  vi.stubGlobal('fetch', fetch)
+  const result = await browserRepositoryClient.reviewPdf('evidence-1', organizationId)
+  expect(result.name).toBe('repository-evidence-snapshot.pdf')
+  expect(result.content.size).toBe(11)
+  const prefix = organizationId ? `/api/v1/workspaces/organizations/${organizationId}` : '/api/v1/workspaces/msp'
+  expect(fetch).toHaveBeenCalledWith(`${prefix}/repository-publication-evidence/evidence-1/review/pdf`, {
+    credentials: 'same-origin', signal: undefined,
+  })
+})
+
+it('refuses denial, a mislabeled review response, or non-PDF bytes', async () => {
+  const headers = {
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': 'attachment; filename="repository-evidence-snapshot.pdf"',
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  }
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(new Response('Denied', { status: 403 }))
+    .mockResolvedValueOnce(new Response('%PDF-review', { status: 200, headers: { ...headers, 'Content-Disposition': 'inline' } }))
+    .mockResolvedValueOnce(new Response('not a pdf', { status: 200, headers })))
+  await expect(browserRepositoryClient.reviewPdf('evidence-1')).rejects.toThrow('review PDF could not be downloaded')
+  await expect(browserRepositoryClient.reviewPdf('evidence-1')).rejects.toThrow('review PDF could not be downloaded')
+  await expect(browserRepositoryClient.reviewPdf('evidence-1')).rejects.toThrow('review PDF could not be downloaded')
+})
+
 it.each([
   ['md', 'markdown', 'text/markdown; charset=utf-8'],
   ['html', 'html', 'text/html; charset=utf-8'],

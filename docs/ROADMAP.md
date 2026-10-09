@@ -1816,6 +1816,10 @@ Workspace, a verified finalized record now offers retained Markdown, HTML,
 and PDF downloads through separate approval-permission and integrity checks.
 Denial or a mismatched export response saves no file. Client delivery and
 write-authority transition remain separate gates.
+The same selected signed evidence also offers an approval-gated retained review
+PDF in MSP and organization Workspaces. The browser checks the PDF response
+before saving; an unavailable or damaged snapshot remains retryable and never
+implies a finalized STATIC record or client delivery.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

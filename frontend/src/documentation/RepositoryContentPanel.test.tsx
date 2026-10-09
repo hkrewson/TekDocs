@@ -23,6 +23,7 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
+    reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
     exportStatic: vi.fn().mockResolvedValue({ content: new Blob(['retained']), name: 'repository-static-publication.pdf' }),
     save,
     ...overrides,
@@ -94,6 +95,51 @@ it('keeps publication history denial retryable and does not claim unfinalized ev
   await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
   expect(await screen.findByText(/No finalized STATIC record exists/)).toBeInTheDocument()
   expect(listEvidence).toHaveBeenCalledTimes(2)
+})
+
+it('keeps review-PDF denial retryable without turning signed evidence into a publication', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: 'content-1', title: 'Evidence A', audience: 'msp_internal', source_commit: commit, signed_at: '2026-10-09T12:00:00Z' }
+  const reviewPdf = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValue({ content: new Blob(['%PDF-review'], { type: 'application/pdf' }), name: 'repository-evidence-snapshot.pdf' })
+  const createObjectURL = vi.fn().mockReturnValue('blob:review-pdf')
+  const revokeObjectURL = vi.fn()
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('repository-evidence-snapshot.pdf')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+  try {
+    setup({
+      listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, page_size: 25, count: 1, has_more: false }),
+      staticPublication: vi.fn().mockResolvedValue(null),
+      reviewPdf,
+    })
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    await user.click(screen.getByRole('button', { name: 'Load publication history' }))
+    await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
+    expect(await screen.findByText(/No finalized STATIC record exists/)).toBeInTheDocument()
+    expect(screen.getByText(/not a finalized STATIC publication or client download/)).toBeInTheDocument()
+    const download = screen.getByRole('button', { name: 'Download review PDF' })
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('review PDF could not be downloaded')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(reviewPdf).toHaveBeenCalledWith('evidence-1', undefined, expect.any(AbortSignal))
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:review-pdf'))
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+    click.mockRestore()
+  }
 })
 
 it('keeps a denied STATIC check retryable and flags an unverified finalized record', async () => {

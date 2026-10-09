@@ -142,6 +142,24 @@ export const browserRepositoryClient = {
     if (response.status === 404 || response.status === 409) return null
     return parse<RepositoryStaticPublication>(response)
   },
+  async reviewPdf(evidenceId: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/review/pdf`, {
+      credentials: 'same-origin', signal,
+    })
+    if (!response.ok
+      || response.headers.get('Content-Type') !== 'application/pdf'
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-evidence-snapshot.pdf"'
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') {
+      throw new Error(translate('repository.reviewPdfFailed'))
+    }
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength < 5 || bytes.byteLength > 8 * 1024 * 1024
+      || new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') {
+      throw new Error(translate('repository.reviewPdfFailed'))
+    }
+    return { content: new Blob([bytes], { type: 'application/pdf' }), name: 'repository-evidence-snapshot.pdf' }
+  },
   async exportStatic(evidenceId: string, format: RepositoryStaticFormat, expectedDigest: string, organizationId?: string, signal?: AbortSignal) {
     if (!organizationId) throw new Error(translate('repository.staticDownloadFailed'))
     const endpoint = format === 'md' ? 'markdown' : format

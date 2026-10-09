@@ -1893,6 +1893,10 @@ missing or altered Git source cannot pass merely because indexed rows still
 match the legacy export. The referenced-file editable bundle and offline
 verifier are implemented; database records, Git history and unreferenced files
 remain outside that editing handoff, not outside the separate backup path.
+Repository-native managed-file ownership is still open: the current attachment
+record, renderer and publication preflight require a legacy `Document` row.
+The `0.9.7` exit checklist now names that custody path and its authorization,
+publication and recovery tests before any authority handoff.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

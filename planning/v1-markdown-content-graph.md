@@ -588,6 +588,32 @@ Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or
 GitHub access.
 
+#### Open `0.9.7` file-ownership and authority gates
+
+The current managed-file record requires a legacy `Document` owner. A document
+created only through repository authoring has no such row: its attachment links
+cannot resolve through the repository detail reader, and repository publication
+preflight requires a matching legacy document when an attachment is present.
+The editable bundle can verify bytes of referenced, same-Workspace legacy
+files, but that is not repository-native file ownership. This is a verified
+implementation gap, not an assumption that the bundle closes file parity.
+
+- [ ] Give a repository-native document a stable managed-file owner independent
+  of the rebuildable content index, while preserving existing legacy file IDs,
+  clean-only storage and retained primary-file history.
+- [ ] Enforce exact tenant/Workspace/content ownership in database guards, RLS,
+  upload, archive, read and download paths; prove sibling and cross-tenant
+  denial and fail closed on missing or changed retained bytes.
+- [ ] Resolve authorized file links in repository reads and editable exports,
+  and snapshot exact file identities and bytes into publication evidence and
+  client delivery without requiring a legacy body row.
+- [ ] Include the new ownership state and bytes in fresh-install, upgrade,
+  backup/restore and corrupt-file rehearsals before allowing handoff.
+- [ ] Only then add an explicit per-document authority transition with legacy
+  write retirement, full review/template/key/file/publication parity, and
+  demonstrated rollback. The existing read-only migration status must not
+  silently promote a document.
+
 First foundation (implemented, not the exit condition): an internal source
 freezer re-reads the exact accepted Git snapshot, recomputes the audience
 composition, compares it with the indexed projection, and records root and

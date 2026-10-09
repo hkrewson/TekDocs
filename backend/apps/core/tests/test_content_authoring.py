@@ -8,6 +8,8 @@ import zipfile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import Client, override_settings
 from django.urls import reverse
 
@@ -24,6 +26,7 @@ from apps.core.content_authoring import (
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
 from apps.core.models import AuditEvent, ContentNode, InstallationState, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
+from apps.core.repository_source_exports import export_repository_sources
 from apps.core.repository_source_validation import verify_repository_source_snapshot
 from apps.core.tasks import reconcile_content_indexes
 
@@ -334,6 +337,68 @@ def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(
     assert events.count() == 2
 
 
+def test_source_snapshot_git_verification_requires_exact_workspace_and_accepted_head(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    _create(installation, repository)
+    snapshot = export_repository_sources(repository)
+    archive = tmp_path / "sources.zip"
+    archive.write_bytes(snapshot.content)
+    repository.refresh_from_db()
+    reconciled_at = repository.last_reconciled_at
+    call_command("verify_repository_source_snapshot", archive, repository_id=repository.id)
+    repository.refresh_from_db()
+    assert repository.last_reconciled_at == reconciled_at
+
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Verification client",
+        legal_name="Verification client",
+        website="https://example.invalid",
+        classifications=["client"],
+    )
+    other_workspace = Workspace.objects.get(
+        tenant=installation.tenant, kind=WorkspaceKind.ORGANIZATION, organization=organization
+    )
+    other_repository = repository_storage.ensure_workspace_repository(other_workspace).repository
+    with pytest.raises(CommandError, match="different Workspace"):
+        call_command("verify_repository_source_snapshot", archive, repository_id=other_repository.id)
+
+    _create(installation, repository, title="New guide")
+    with pytest.raises(CommandError, match="accepted Git revision"):
+        call_command("verify_repository_source_snapshot", archive, repository_id=repository.id)
+
+
+def test_source_snapshot_git_verification_rejects_index_lag(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    _create(installation, repository)
+    archive = tmp_path / "sources.zip"
+    archive.write_bytes(export_repository_sources(repository).content)
+    repository.indexed_commit = None
+    repository.save(update_fields=["indexed_commit", "updated_at"])
+    with pytest.raises(CommandError, match="unavailable or unready"):
+        call_command("verify_repository_source_snapshot", archive, repository_id=repository.id)
+
+
+def test_source_snapshot_git_verification_rejects_current_git_byte_difference(authoring_context, tmp_path, monkeypatch):
+    installation, repository = authoring_context
+    _create(installation, repository)
+    archive = tmp_path / "sources.zip"
+    archive.write_bytes(export_repository_sources(repository).content)
+    original_reader = repository_service.read_accepted_repository_markdown_files
+
+    def changed_current(**kwargs):
+        commit, files = original_reader(**kwargs)
+        return commit, tuple((path, source + b"changed") for path, source in files)
+
+    monkeypatch.setattr(
+        "apps.core.repository_source_git_validation.read_accepted_repository_markdown_files",
+        changed_current,
+    )
+    with pytest.raises(CommandError, match="current files differ"):
+        call_command("verify_repository_source_snapshot", archive, repository_id=repository.id)
+
+
 def test_repository_source_snapshot_does_not_cross_workspace(authoring_context):
     installation, repository = authoring_context
     authored = _create(installation, repository)
@@ -374,7 +439,7 @@ def test_repository_source_snapshot_fails_closed_on_file_limit(authoring_context
     assert response["Content-Type"].startswith("application/json")
 
 
-def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(authoring_context, monkeypatch):
+def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(authoring_context, monkeypatch, tmp_path):
     installation, repository = authoring_context
     parent_id, nested_id, unrelated_id, document_id = (uuid.uuid4() for _ in range(4))
 
@@ -421,6 +486,26 @@ def test_repository_source_snapshot_retains_only_reachable_pinned_fragments(auth
     response = browser.get(url)
     assert response.status_code == 200, response.content
     assert len(verify_repository_source_snapshot(response.content)["historical_files"]) == 2
+    source_archive = tmp_path / "pinned-sources.zip"
+    source_archive.write_bytes(response.content)
+    call_command("verify_repository_source_snapshot", source_archive, repository_id=repository.id)
+    original_reader = repository_service.read_repository_markdown_files_at_commit
+
+    def changed_history(*, repository_id, object_id, record_reconciliation):
+        commit, files = original_reader(
+            repository_id=repository_id, object_id=object_id, record_reconciliation=record_reconciliation
+        )
+        return commit, tuple(
+            (path, source + b"changed" if path == "fragments/parent.md" else source)
+            for path, source in files
+        )
+
+    monkeypatch.setattr(
+        "apps.core.repository_source_git_validation.read_repository_markdown_files_at_commit",
+        changed_history,
+    )
+    with pytest.raises(CommandError, match="historical source file differs"):
+        call_command("verify_repository_source_snapshot", source_archive, repository_id=repository.id)
     assert browser.get(url).content == response.content
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         manifest = json.loads(archive.read("tekdocs-source.json"))

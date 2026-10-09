@@ -832,7 +832,11 @@ def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> byt
 
 
 def read_accepted_repository_markdown_files(
-    *, repository_id: uuid.UUID, max_files: int | None = None, max_bytes: int | None = None
+    *,
+    repository_id: uuid.UUID,
+    max_files: int | None = None,
+    max_bytes: int | None = None,
+    record_reconciliation: bool = True,
 ) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
     """Read a bounded, stable Markdown snapshot from exactly one accepted commit."""
 
@@ -847,7 +851,8 @@ def read_accepted_repository_markdown_files(
             raise RepositoryInputError("Repository has no accepted content")
         git = _GitRepository(repository.id, repository_path, object_format)
         reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
-        _record_reconciliation(repository, reconciliation)
+        if record_reconciliation:
+            _record_reconciliation(repository, reconciliation)
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         paths = git.markdown_paths(accepted)
@@ -884,7 +889,7 @@ def list_accepted_repository_history(*, repository_id: uuid.UUID, limit: int = 3
 
 
 def read_repository_markdown_files_at_commit(
-    *, repository_id: uuid.UUID, object_id: str
+    *, repository_id: uuid.UUID, object_id: str, record_reconciliation: bool = True
 ) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
     """Read one retained commit from the selected repository without widening its scope."""
 
@@ -897,7 +902,8 @@ def read_repository_markdown_files_at_commit(
             raise RepositoryInputError("Repository has no accepted content")
         git = _GitRepository(repository.id, repository_path, object_format)
         reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
-        _record_reconciliation(repository, reconciliation)
+        if record_reconciliation:
+            _record_reconciliation(repository, reconciliation)
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         try:

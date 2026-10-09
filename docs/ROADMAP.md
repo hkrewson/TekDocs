@@ -1804,6 +1804,12 @@ v3 manifest. It also reconstructs the transitive Markdown dependency graph,
 rejecting omitted, unreferenced or incorrectly labelled historical sources.
 This is an internal-consistency check, not Git authenticity,
 import, attachment parity, or recovery verification.
+An optional operator-only `--repository-id` mode now compares that validated
+ZIP with the selected Workspace's stable accepted-and-indexed local Git head:
+the current Markdown inventory must match exactly, and every listed historical
+file must match its retained commit. Wrong ownership, stale heads, missing
+history, and byte differences fail closed. This comparison is not an
+independent Git signature, an import path, or a complete backup check.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

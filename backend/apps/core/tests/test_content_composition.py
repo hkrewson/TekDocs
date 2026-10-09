@@ -716,8 +716,9 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     assert browser.get(review_pdf_url).status_code == 409
 
 
+@pytest.mark.parametrize("source_id_kind", ("record", "entity"))
 def test_repository_evidence_decision_is_separate_from_distribution(
-    composition_repository, tmp_path, settings, monkeypatch
+    composition_repository, tmp_path, settings, monkeypatch, source_id_kind
 ):
     installation, _workspace, _repository = composition_repository
     settings.MEDIA_ROOT = str(tmp_path / "media")
@@ -743,13 +744,14 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         actor_id=installation.owner.id,
         upload=SimpleUploadedFile("decision-guide.txt", b"Client setup instructions"),
     )
+    linked_attachment_id = attachment.entity_id if source_id_kind == "entity" else attachment.id
     content_id = document.id
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=_accepted(repository),
         changes={"documents/decision.md": _content(
             content_id=content_id, title="Decision",
-            body=f"Review me.\n\n[Guide](tekdocs://attachment/{attachment.id})\n",
+            body=f"Review me.\n\n[Guide](tekdocs://attachment/{linked_attachment_id})\n",
         )},
         message="Add review decision source",
     )

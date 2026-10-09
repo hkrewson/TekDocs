@@ -293,8 +293,19 @@ by current or reachable historical Markdown, and fails closed on missing,
 changed, or foreign files. The download is private, audited, bounded, and
 explicitly unsanitized. Its offline verifier proves internal byte and reference
 closure, not Git provenance or live database custody. `TD-RISK-069` remains
-open for a backup-complete bundle and network-isolated restore; this handoff
-must not be described or used as a backup.
+open for full repository-inclusive recovery acceptance and authority handoff;
+this editable handoff must not be described or used as a backup.
+
+The supported local recovery rehearsal now checks one client-owned Markdown
+reference to a managed file through the encrypted backup and network-isolated
+restore. It compares the exact editable-bundle digest on both sides and reads
+the restored file through checksum-verified custody. This narrows `TD-RISK-069`
+for that source/file combination, but does not prove production restore
+acceptance or transfer legacy read/write authority. The editable bundle itself
+still omits database records, Git history, and unreferenced managed files. The
+same fixture caught a portal download check that rejected public-ID attachment
+links after valid signed evidence; it now accepts the public and legacy record
+IDs under the same retained-byte, Workspace, and delivery checks.
 
 ## 0.8.43 money-foundation disposition
 

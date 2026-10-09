@@ -95,9 +95,11 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   > "$source_snapshot_log"
 msp_snapshot_sha=$(sed -n 's/^MSP_SOURCE_SHA256=//p' "$source_snapshot_log")
 organization_snapshot_sha=$(sed -n 's/^ORGANIZATION_SOURCE_SHA256=//p' "$source_snapshot_log")
+organization_editable_sha=$(sed -n 's/^ORGANIZATION_EDITABLE_SHA256=//p' "$source_snapshot_log")
 printf '%s\n' "$msp_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$organization_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
-sed -n '/repository Markdown recovery fixtures created/p' "$source_snapshot_log"
+printf '%s\n' "$organization_editable_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/repository Markdown and managed-file recovery fixtures created/p' "$source_snapshot_log"
 publication_log="$work_directory/repository-publication.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=create backend python manage.py shell --no-imports \
@@ -226,6 +228,7 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=verify \
   -e TEKDOCS_RECOVERY_MSP_SOURCE_SHA256="$msp_snapshot_sha" \
   -e TEKDOCS_RECOVERY_ORG_SOURCE_SHA256="$organization_snapshot_sha" \
+  -e TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256="$organization_editable_sha" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
@@ -278,4 +281,4 @@ grep -q 'Retained legacy publication integrity check failed' "$corrupt_legacy_lo
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs, legacy and released repository publications, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, exact managed-file editable bundle, legacy and released repository publications, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

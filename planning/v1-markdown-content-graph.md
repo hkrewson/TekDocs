@@ -553,6 +553,16 @@ gates after file, template, review, key, publication and recovery parity.
   directory-to-repository mapping, client content, and absence of each
   Workspace's document identity from the other repository. This proves the
   local storage partition, not authorization or hosted Git integration.
+- The network-isolated recovery rehearsal now also retains a client-owned
+  managed file referenced by its public ID from repository Markdown. It
+  compares a byte-verified editable-bundle digest before backup and after
+  restore, in addition to reading the restored file through managed custody.
+  This proves one exact source/file combination survives the supported local
+  recovery path; it does not turn the editable bundle into a backup or prove
+  legacy authority handoff. Exercising the public ID also exposed and closed a
+  portal attachment-download mismatch: the final retained-file check now
+  accepts either the public ID or the older record ID already accepted by
+  signed evidence verification, with both paths in the regression suite.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

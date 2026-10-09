@@ -267,7 +267,9 @@ class ClientPortalRepositoryPublicationAttachmentView(APIView):
             or hashlib.sha256(content).hexdigest() != artifact.checksum
             or descriptor.get("checksum") != artifact.checksum
             or descriptor.get("size") != artifact.size
-            or descriptor.get("source_id") != str(artifact.source_attachment_id)
+            or descriptor.get("source_id") not in {
+                str(artifact.source_attachment_id), str(artifact.source_attachment.entity_id)
+            }
         ):
             raise Http404
         response = HttpResponse(content, content_type="application/octet-stream")

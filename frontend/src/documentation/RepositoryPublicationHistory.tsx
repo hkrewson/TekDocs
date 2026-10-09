@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDateTime, translate } from '../i18n/localization'
-import { type RepositoryClient, type RepositoryEvidence, type RepositoryStaticPublication } from './repositoryApi'
+import { type RepositoryClient, type RepositoryEvidence, type RepositoryStaticFormat, type RepositoryStaticPublication } from './repositoryApi'
 
 export function RepositoryPublicationHistory({ contentId, organizationId, client }: {
   contentId: string
@@ -15,12 +15,16 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
   const [selected, setSelected] = useState<RepositoryEvidence | null>(null)
   const [staticRecord, setStaticRecord] = useState<RepositoryStaticPublication | null>(null)
   const [staticPhase, setStaticPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [exporting, setExporting] = useState<RepositoryStaticFormat | null>(null)
+  const [downloadError, setDownloadError] = useState(false)
   const listRequest = useRef<AbortController | null>(null)
   const staticRequest = useRef<AbortController | null>(null)
+  const exportRequest = useRef<AbortController | null>(null)
 
   useEffect(() => () => {
     listRequest.current?.abort()
     staticRequest.current?.abort()
+    exportRequest.current?.abort()
   }, [])
 
   async function load(nextPage: number) {
@@ -43,11 +47,14 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
 
   async function inspect(record: RepositoryEvidence) {
     staticRequest.current?.abort()
+    exportRequest.current?.abort()
     const controller = new AbortController()
     staticRequest.current = controller
     setSelected(record)
     setStaticRecord(null)
     setStaticPhase('loading')
+    setDownloadError(false)
+    setExporting(null)
     try {
       const result = await client.staticPublication(record.id, organizationId, controller.signal)
       if (controller.signal.aborted) return
@@ -57,6 +64,32 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
       if (!controller.signal.aborted) setStaticPhase('error')
     }
   }
+
+  async function download(format: RepositoryStaticFormat) {
+    if (!organizationId || !selected || !staticRecord?.verified || staticRecord.source_commit !== selected.source_commit
+      || !/^[a-f0-9]{64}$/.test(staticRecord.content_digest) || exporting) return
+    const controller = new AbortController()
+    exportRequest.current = controller
+    setExporting(format)
+    setDownloadError(false)
+    try {
+      const result = await client.exportStatic(selected.id, format, staticRecord.content_digest, organizationId, controller.signal)
+      if (controller.signal.aborted) return
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      if (!controller.signal.aborted) setDownloadError(true)
+    } finally {
+      if (!controller.signal.aborted) setExporting(null)
+    }
+  }
+
+  const verifiedStatic = staticPhase === 'ready' && staticRecord?.verified
+    && staticRecord.source_commit === selected?.source_commit && /^[a-f0-9]{64}$/.test(staticRecord.content_digest)
 
   return <section className="repository-publication-history" aria-label={translate('repository.publicationHistory')}>
     <h2>{translate('repository.publicationHistory')}</h2>
@@ -72,7 +105,10 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
       {staticPhase === 'loading' && <p role="status">{translate('repository.staticChecking')}</p>}
       {staticPhase === 'error' && <p role="alert" className="form-message error">{translate('repository.staticCheckFailed')} <button type="button" className="secondary-button" onClick={() => { void inspect(selected) }}>{translate('common.retry')}</button></p>}
       {staticPhase === 'ready' && !staticRecord && <p>{translate('repository.staticNotFinalized')}</p>}
-      {staticPhase === 'ready' && staticRecord && <p role="status">{translate(staticRecord.verified ? 'repository.staticVerified' : 'repository.staticUnverified')}</p>}
+      {staticPhase === 'ready' && staticRecord && <p role="status">{translate(verifiedStatic ? 'repository.staticVerified' : 'repository.staticUnverified')}</p>}
+      {verifiedStatic && organizationId && <><p>{translate('repository.staticDownloadNotice')}</p><div className="form-actions">{(['md', 'html', 'pdf'] as const).map((format) => <button key={format} type="button" className="secondary-button" disabled={exporting !== null} onClick={() => { void download(format) }}>{translate(format === 'md' ? 'repository.staticDownloadMarkdown' : format === 'html' ? 'repository.staticDownloadHtml' : 'repository.staticDownloadPdf')}</button>)}</div></>}
+      {exporting && <p role="status">{translate('repository.staticDownloading')}</p>}
+      {downloadError && <p role="alert" className="form-message error">{translate('repository.staticDownloadFailed')}</p>}
     </div>}
   </section>
 }

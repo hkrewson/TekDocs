@@ -14,7 +14,7 @@ const initial: RepositorySource = {
   source_blob: blob, accepted_commit: commit, indexed_commit: commit,
 }
 
-function setup(overrides: Partial<RepositoryClient> = {}) {
+function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string) {
   const save = vi.fn().mockResolvedValue({ ...initial, markdown: 'Changed revision.\n', accepted_commit: 'c'.repeat(40), indexed_commit: 'c'.repeat(40) })
   const client = {
     list: vi.fn().mockResolvedValue({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false }),
@@ -23,12 +23,13 @@ function setup(overrides: Partial<RepositoryClient> = {}) {
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
+    exportStatic: vi.fn().mockResolvedValue({ content: new Blob(['retained']), name: 'repository-static-publication.pdf' }),
     save,
     ...overrides,
   }
   const onClose = vi.fn()
   const router = createMemoryRouter([{
-    path: '*', element: <NavigationGuardProvider><RepositoryContentPanel client={client} onClose={onClose} /></NavigationGuardProvider>,
+    path: '*', element: <NavigationGuardProvider><RepositoryContentPanel client={client} organizationId={organizationId} onClose={onClose} /></NavigationGuardProvider>,
   }])
   render(<RouterProvider router={router} />)
   return { client, onClose, save }
@@ -111,7 +112,55 @@ it('keeps a denied STATIC check retryable and flags an unverified finalized reco
   expect(await screen.findByRole('alert')).toHaveTextContent('STATIC record could not be checked')
   await user.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByText(/failed integrity verification/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download retained PDF' })).not.toBeInTheDocument()
   expect(staticPublication).toHaveBeenCalledTimes(2)
+})
+
+it('downloads a verified retained file after approval and keeps denial retryable with a dirty draft', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: 'content-1', title: 'Evidence A', audience: 'msp_internal', source_commit: commit, signed_at: '2026-10-09T12:00:00Z' }
+  const exportStatic = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValue({ content: new Blob(['%PDF-retained'], { type: 'application/pdf' }), name: 'repository-static-publication.pdf' })
+  const createObjectURL = vi.fn().mockReturnValue('blob:retained-pdf')
+  const revokeObjectURL = vi.fn()
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+    expect(this.download).toBe('repository-static-publication.pdf')
+    expect(this.href).toBe('blob:retained-pdf')
+  })
+  const originalCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
+  const originalRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
+  try {
+    setup({
+      listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, page_size: 25, count: 1, has_more: false }),
+      staticPublication: vi.fn().mockResolvedValue({ id: 'static-1', source_commit: commit, content_digest: 'd'.repeat(64), verified: true, permits_distribution: false }),
+      exportStatic,
+    }, 'org-1')
+    await user.click(await screen.findByRole('button', { name: /Guide/ }))
+    await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    expect(screen.queryByRole('button', { name: 'Download retained PDF' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Load publication history' }))
+    await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
+    const download = await screen.findByRole('button', { name: 'Download retained PDF' })
+    expect(screen.getByRole('button', { name: 'Download retained Markdown' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download retained HTML' })).toBeInTheDocument()
+    await user.click(download)
+    expect(await screen.findByRole('alert')).toHaveTextContent('retained file could not be downloaded')
+    expect(click).not.toHaveBeenCalled()
+    await user.click(download)
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(exportStatic).toHaveBeenCalledWith('evidence-1', 'pdf', 'd'.repeat(64), 'org-1', expect.any(AbortSignal))
+    expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:retained-pdf'))
+  } finally {
+    if (originalCreate) Object.defineProperty(URL, 'createObjectURL', originalCreate)
+    else Reflect.deleteProperty(URL, 'createObjectURL')
+    if (originalRevoke) Object.defineProperty(URL, 'revokeObjectURL', originalRevoke)
+    else Reflect.deleteProperty(URL, 'revokeObjectURL')
+    click.mockRestore()
+  }
 })
 
 it('downloads only saved indexed HTML while keeping a dirty draft', async () => {

@@ -88,3 +88,51 @@ it('treats unfinished STATIC records as unavailable while preserving authorizati
   expect(await browserRepositoryClient.staticPublication('evidence-1')).toBeNull()
   await expect(browserRepositoryClient.staticPublication('evidence-1')).rejects.toThrow('Denied')
 })
+
+it.each([
+  ['md', 'markdown', 'text/markdown; charset=utf-8'],
+  ['html', 'html', 'text/html; charset=utf-8'],
+  ['pdf', 'pdf', 'application/pdf'],
+] as const)('downloads a verified retained %s file from the organization approval route', async (format, endpoint, mediaType) => {
+  const digest = 'd'.repeat(64)
+  const fetch = vi.fn().mockResolvedValue(new Response('retained', {
+    status: 200,
+    headers: {
+      'Content-Type': mediaType,
+      'Content-Disposition': `attachment; filename="repository-static-publication.${format}"`,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, no-store',
+      'X-TekDocs-Export-Class': 'immutable_static_publication',
+      'X-TekDocs-Publication-Digest': digest,
+      ...(format === 'html' ? { 'Content-Security-Policy': "sandbox; default-src 'none'" } : {}),
+    },
+  }))
+  vi.stubGlobal('fetch', fetch)
+  const result = await browserRepositoryClient.exportStatic('evidence-1', format, digest, 'org-1')
+  expect(result.name).toBe(`repository-static-publication.${format}`)
+  expect(result.content.size).toBe(8)
+  expect(fetch).toHaveBeenCalledWith(`/api/v1/workspaces/organizations/org-1/repository-publication-evidence/evidence-1/package/static-publication/export/${endpoint}`, {
+    credentials: 'same-origin', signal: undefined,
+  })
+})
+
+it('refuses denied, mislabeled, or wrong-publication retained responses', async () => {
+  const digest = 'd'.repeat(64)
+  const headers = {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="repository-static-publication.html"',
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'private, no-store',
+    'X-TekDocs-Export-Class': 'immutable_static_publication',
+    'X-TekDocs-Publication-Digest': 'a'.repeat(64),
+    'Content-Security-Policy': "sandbox; default-src 'none'",
+  }
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(new Response('Denied', { status: 403 }))
+    .mockResolvedValueOnce(new Response('<html>Other record</html>', { status: 200, headers }))
+    .mockResolvedValueOnce(new Response('<html>Wrong class</html>', { status: 200, headers: { ...headers, 'X-TekDocs-Publication-Digest': digest, 'X-TekDocs-Export-Class': 'live_repository_revision' } })))
+  await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest, 'org-1')).rejects.toThrow('could not be downloaded')
+  await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest, 'org-1')).rejects.toThrow('could not be downloaded')
+  await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest, 'org-1')).rejects.toThrow('could not be downloaded')
+  await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest)).rejects.toThrow('could not be downloaded')
+})

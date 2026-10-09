@@ -53,6 +53,8 @@ export type RepositoryStaticPublication = {
   permits_distribution: boolean
 }
 
+export type RepositoryStaticFormat = 'md' | 'html' | 'pdf'
+
 export type RepositoryMutation = {
   operation: 'create' | 'update' | 'move'
   content_id: string
@@ -139,6 +141,29 @@ export const browserRepositoryClient = {
     })
     if (response.status === 404 || response.status === 409) return null
     return parse<RepositoryStaticPublication>(response)
+  },
+  async exportStatic(evidenceId: string, format: RepositoryStaticFormat, expectedDigest: string, organizationId?: string, signal?: AbortSignal) {
+    if (!organizationId) throw new Error(translate('repository.staticDownloadFailed'))
+    const endpoint = format === 'md' ? 'markdown' : format
+    const response = await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/package/static-publication/export/${endpoint}`, {
+      credentials: 'same-origin', signal,
+    })
+    if (!response.ok) throw new Error(translate('repository.staticDownloadFailed'))
+    const mediaType = format === 'md' ? 'text/markdown' : format === 'html' ? 'text/html' : 'application/pdf'
+    const digest = response.headers.get('X-TekDocs-Publication-Digest')
+    if (!/^[a-f0-9]{64}$/.test(expectedDigest)
+      || digest !== expectedDigest
+      || response.headers.get('X-TekDocs-Export-Class') !== 'immutable_static_publication'
+      || !response.headers.get('Content-Type')?.startsWith(mediaType)
+      || response.headers.get('Content-Disposition') !== `attachment; filename="repository-static-publication.${format}"`
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff'
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || (format === 'html' && response.headers.get('Content-Security-Policy') !== "sandbox; default-src 'none'")) {
+      throw new Error(translate('repository.staticDownloadFailed'))
+    }
+    const content = await response.blob()
+    if (content.size > 8 * 1024 * 1024) throw new Error(translate('repository.staticDownloadFailed'))
+    return { content, name: `repository-static-publication.${format}` }
   },
   async exportSources(organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring/export`, {

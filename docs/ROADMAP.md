@@ -1811,7 +1811,10 @@ artifact, approve a publication, or switch document authority.
 The repository editor now offers an on-demand, paginated history for its
 selected document. Selecting signed evidence checks separately for a finalized
 STATIC record and its verification result; missing, denied, and failed-integrity
-states do not imply publication or client delivery. Artifact downloads and
+states do not imply publication or client delivery. In an organization
+Workspace, a verified finalized record now offers retained Markdown, HTML,
+and PDF downloads through separate approval-permission and integrity checks.
+Denial or a mismatched export response saves no file. Client delivery and
 write-authority transition remain separate gates.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes

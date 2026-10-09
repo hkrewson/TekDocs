@@ -466,6 +466,10 @@ gates after file, template, review, key, publication and recovery parity.
   ID before pagination. It remains scoped to the caller's Workspace and
   publication permission; this is a discovery aid, not a publication decision,
   artifact download, or authority change.
+- The repository editor can now load that document-scoped evidence history on
+  demand, page through it, and check a selected record for a verified finalized
+  STATIC record. Denial, unfinished evidence, and integrity failure have distinct
+  states. This read-only view does not approve, release, or download artifacts.
 - The same final STATIC record permits private, approval-scoped retained HTML
   and PDF downloads. HTML is forced and sandboxed; PDF bytes are rechecked
   after reading. Neither route rerenders Git or changes legacy document authority.

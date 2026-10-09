@@ -1808,6 +1808,11 @@ The staff publication-evidence list can now filter by exact repository
 document content ID before pagination. It still requires publication access
 and returns only the selected Workspace's evidence; it does not expose a new
 artifact, approve a publication, or switch document authority.
+The repository editor now offers an on-demand, paginated history for its
+selected document. Selecting signed evidence checks separately for a finalized
+STATIC record and its verification result; missing, denied, and failed-integrity
+states do not imply publication or client delivery. Artifact downloads and
+write-authority transition remain separate gates.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

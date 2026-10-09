@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -201,6 +202,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
         {source?.accepted_commit && <p className="form-message">{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</p>}
         {source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <p className="form-message">{translate('repository.htmlNotice')}</p>}
         <div className="form-actions"><button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>{source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}{source?.kind === 'document' && source.accepted_commit && source.accepted_commit === source.indexed_commit && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}<button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button></div></>}
+        {source?.kind === 'document' && source.accepted_commit && <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} />}
       </section>
     </div>
   </section>

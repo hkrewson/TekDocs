@@ -235,6 +235,16 @@
   overflow-wrap: anywhere;
 }
 
+.repository-publication-history {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+}
+
+.repository-publication-history h2 { margin: 0 0 0.5rem; }
+.repository-publication-detail { margin-top: 1rem; overflow-wrap: anywhere; }
+
 @media (max-width: 48rem) {
   .repository-authoring-grid { grid-template-columns: minmax(0, 1fr); }
 }

@@ -21,6 +21,8 @@ function setup(overrides: Partial<RepositoryClient> = {}) {
     source: vi.fn().mockResolvedValue(initial),
     exportSources: vi.fn().mockResolvedValue({ content: new Blob(['snapshot']), name: 'tekdocs-repository-aaaaaaaaaaaa.zip' }),
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
+    listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
+    staticPublication: vi.fn().mockResolvedValue(null),
     save,
     ...overrides,
   }
@@ -50,6 +52,66 @@ it('preserves a dirty draft through navigation and sends exact base identities o
     markdown: 'Changed revision.', title: undefined,
   }), undefined))
   expect(await screen.findByText('Saved as one accepted Git commit.')).toBeInTheDocument()
+})
+
+it('loads document-scoped publication history and distinguishes signed evidence from a verified STATIC record', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: 'content-1', title: 'Evidence A', audience: 'msp_internal', source_commit: commit, signed_at: '2026-10-09T12:00:00Z' }
+  const second = { ...evidence, id: 'evidence-2', title: 'Evidence B', audience: 'client_visible' }
+  const listEvidence = vi.fn()
+    .mockResolvedValueOnce({ results: [evidence], page: 1, page_size: 25, count: 2, has_more: true })
+    .mockResolvedValue({ results: [second], page: 2, page_size: 25, count: 2, has_more: false })
+  const staticPublication = vi.fn().mockResolvedValue({ id: 'static-1', source_commit: commit, content_digest: 'd'.repeat(64), verified: true, permits_distribution: false })
+  setup({ listEvidence, staticPublication })
+  expect(screen.queryByRole('button', { name: 'Load publication history' })).not.toBeInTheDocument()
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+  expect(listEvidence).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
+  expect(await screen.findByRole('button', { name: /Evidence A/ })).toBeInTheDocument()
+  expect(screen.getByText(/MSP internal/)).toBeInTheDocument()
+  expect(listEvidence).toHaveBeenCalledWith('content-1', undefined, 1, expect.any(AbortSignal))
+  await user.click(screen.getByRole('button', { name: 'Load more evidence' }))
+  expect(await screen.findByRole('button', { name: /Evidence B/ })).toBeInTheDocument()
+  expect(listEvidence).toHaveBeenCalledWith('content-1', undefined, 2, expect.any(AbortSignal))
+  await user.click(screen.getByRole('button', { name: /Evidence A/ }))
+  expect(await screen.findByText(/passed integrity verification/)).toBeInTheDocument()
+  expect(staticPublication).toHaveBeenCalledWith('evidence-1', undefined, expect.any(AbortSignal))
+  expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n Unsaved')
+})
+
+it('keeps publication history denial retryable and does not claim unfinalized evidence is published', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: 'content-1', title: 'Evidence A', audience: 'msp_internal', source_commit: commit, signed_at: '2026-10-09T12:00:00Z' }
+  const listEvidence = vi.fn().mockRejectedValueOnce(new Error('Denied')).mockResolvedValue({ results: [evidence], page: 1, page_size: 25, count: 1, has_more: false })
+  const staticPublication = vi.fn().mockResolvedValue(null)
+  setup({ listEvidence, staticPublication })
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Publication history is unavailable')
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
+  expect(await screen.findByText(/No finalized STATIC record exists/)).toBeInTheDocument()
+  expect(listEvidence).toHaveBeenCalledTimes(2)
+})
+
+it('keeps a denied STATIC check retryable and flags an unverified finalized record', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: 'content-1', title: 'Evidence A', audience: 'msp_internal', source_commit: commit, signed_at: '2026-10-09T12:00:00Z' }
+  const staticPublication = vi.fn()
+    .mockRejectedValueOnce(new Error('Denied'))
+    .mockResolvedValue({ id: 'static-1', source_commit: commit, content_digest: 'd'.repeat(64), verified: false, permits_distribution: false })
+  setup({
+    listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, page_size: 25, count: 1, has_more: false }),
+    staticPublication,
+  })
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
+  await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('STATIC record could not be checked')
+  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  expect(await screen.findByText(/failed integrity verification/)).toBeInTheDocument()
+  expect(staticPublication).toHaveBeenCalledTimes(2)
 })
 
 it('downloads only saved indexed HTML while keeping a dirty draft', async () => {

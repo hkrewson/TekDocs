@@ -62,3 +62,29 @@ it('refuses denied or unlabeled HTML responses', async () => {
   await expect(browserRepositoryClient.exportHtml('content-1')).rejects.toThrow('could not be downloaded')
   await expect(browserRepositoryClient.exportHtml('content-1')).rejects.toThrow('could not be downloaded')
 })
+
+it('pages exact-document evidence and checks finalized state in the selected organization', async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ results: [], page: 2, page_size: 25, count: 0, has_more: false }), { status: 200 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: 'static-1', verified: true }), { status: 200 }))
+  vi.stubGlobal('fetch', fetch)
+  expect((await browserRepositoryClient.listEvidence('content-1', 'org-1', 2)).page).toBe(2)
+  expect(fetch).toHaveBeenNthCalledWith(1, '/api/v1/workspaces/organizations/org-1/repository-publication-evidence?content_id=content-1&page=2&page_size=25', {
+    credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: undefined,
+  })
+  expect(await browserRepositoryClient.staticPublication('evidence-1', 'org-1')).toMatchObject({ id: 'static-1', verified: true })
+  expect(fetch).toHaveBeenNthCalledWith(2, '/api/v1/workspaces/organizations/org-1/repository-publication-evidence/evidence-1/package/static-publication', {
+    credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: undefined,
+  })
+})
+
+it('treats unfinished STATIC records as unavailable while preserving authorization denial', async () => {
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response('Pending', { status: 409 }))
+    .mockResolvedValueOnce(new Response('Not found', { status: 404 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Denied' }), { status: 403 }))
+  vi.stubGlobal('fetch', fetch)
+  expect(await browserRepositoryClient.staticPublication('evidence-1')).toBeNull()
+  expect(await browserRepositoryClient.staticPublication('evidence-1')).toBeNull()
+  await expect(browserRepositoryClient.staticPublication('evidence-1')).rejects.toThrow('Denied')
+})

@@ -28,6 +28,31 @@ export type RepositorySource = {
   indexed_commit: string | null
 }
 
+export type RepositoryEvidence = {
+  id: string
+  content_id: string
+  audience: string
+  title: string
+  source_commit: string
+  signed_at: string
+}
+
+export type RepositoryEvidencePage = {
+  results: RepositoryEvidence[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+}
+
+export type RepositoryStaticPublication = {
+  id: string
+  source_commit: string
+  content_digest: string
+  verified: boolean
+  permits_distribution: boolean
+}
+
 export type RepositoryMutation = {
   operation: 'create' | 'update' | 'move'
   content_id: string
@@ -62,6 +87,12 @@ function path(organizationId?: string) {
     : '/api/v1/workspaces/msp/content-graph'
 }
 
+function evidencePath(organizationId?: string) {
+  return organizationId
+    ? `/api/v1/workspaces/organizations/${encodeURIComponent(organizationId)}/repository-publication-evidence`
+    : '/api/v1/workspaces/msp/repository-publication-evidence'
+}
+
 async function token() {
   let value = browserCsrfToken()
   if (!value) {
@@ -94,6 +125,20 @@ export const browserRepositoryClient = {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
     })
     return parse<RepositorySource>(response)
+  },
+  async listEvidence(contentId: string, organizationId?: string, page = 1, signal?: AbortSignal) {
+    const query = new URLSearchParams({ content_id: contentId, page: String(page), page_size: '25' })
+    const response = await fetch(`${evidencePath(organizationId)}?${query}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    return parse<RepositoryEvidencePage>(response)
+  },
+  async staticPublication(evidenceId: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/package/static-publication`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    if (response.status === 404 || response.status === 409) return null
+    return parse<RepositoryStaticPublication>(response)
   },
   async exportSources(organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/authoring/export`, {

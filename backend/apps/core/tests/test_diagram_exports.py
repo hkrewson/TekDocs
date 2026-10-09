@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 import pytest
 from django.test import override_settings
+from docx import Document as read_word_document
 
 from apps.core.diagram_exports import (
     MAX_DIAGRAMS,
@@ -43,6 +44,31 @@ flowchart LR
   Browser --> API
 ```
 """
+
+
+def test_live_docx_uses_reader_resolutions_without_leaking_key_source():
+    key = "tekdocs://key/device.serial"
+    markdown = f"See [asset](tekdocs://entity/123e4567-e89b-42d3-a456-426614174000) and [serial]({key})."
+    content = export_docx(
+        title="Reader copy",
+        markdown=markdown,
+        entity_mentions={
+            "123e4567-e89b-42d3-a456-426614174000": {
+                "id": "123e4567-e89b-42d3-a456-426614174000",
+                "display_name": "Visible laptop",
+                "entity_type": "hardware_asset",
+                "workspace_label": "Client",
+            }
+        },
+        attachments={},
+        key_resolutions={key: {"state": "withheld", "label": "Serial"}},
+    )
+    word_document = read_word_document(BytesIO(content))
+    text = "\n".join(paragraph.text for paragraph in word_document.paragraphs)
+    assert "Visible laptop" in text
+    assert "Withheld" in text
+    assert "device.serial" not in text
+    assert "tekdocs://" not in text
 
 
 def test_mermaid_source_metadata_and_manifest_are_stable():

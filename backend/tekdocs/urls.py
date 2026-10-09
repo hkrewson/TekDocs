@@ -95,11 +95,13 @@ from apps.core.content_graph_views import MSPContentGraphView, OrganizationConte
 from apps.core.content_read_views import (
     MSPContentReadCollectionView,
     MSPContentReadDetailView,
+    MSPContentReadDOCXExportView,
     MSPContentReadHTMLExportView,
     MSPContentReadPDFExportView,
     MSPEntityContentView,
     OrganizationContentReadCollectionView,
     OrganizationContentReadDetailView,
+    OrganizationContentReadDOCXExportView,
     OrganizationContentReadHTMLExportView,
     OrganizationContentReadPDFExportView,
     OrganizationEntityContentView,
@@ -598,6 +600,11 @@ urlpatterns = [
         name="msp-content-document-pdf-export",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/documents/<uuid:content_id>/export/docx",
+        MSPContentReadDOCXExportView.as_view(),
+        name="msp-content-document-docx-export",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/entities/<uuid:entity_id>/documentation",
         MSPEntityContentView.as_view(),
         name="msp-content-entity-documentation",
@@ -721,6 +728,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>/export/pdf",
         OrganizationContentReadPDFExportView.as_view(),
         name="organization-content-document-pdf-export",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>/export/docx",
+        OrganizationContentReadDOCXExportView.as_view(),
+        name="organization-content-document-docx-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/entities/<uuid:entity_id>/documentation",

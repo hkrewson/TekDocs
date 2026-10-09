@@ -87,6 +87,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-content-document-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-html-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-pdf-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-content-document-docx-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-entity-documentation", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-migration-status", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-document-preflight", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1449,6 +1450,9 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-content-document-pdf-export", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True
+    ),
+    route(
+        "organization-content-document-docx-export", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True
     ),
     route(
         "organization-content-entity-documentation",

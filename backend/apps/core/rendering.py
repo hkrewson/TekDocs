@@ -362,6 +362,26 @@ _MARKDOWN = (
     .use(_resolved_key_values)
 )
 _REFERENCE_SCAN_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": False, "typographer": False})
+
+
+def parse_markdown_for_reader(
+    markdown: str,
+    *,
+    entity_mentions: Mapping[str, RenderedEntityMention] | None = None,
+    attachments: Mapping[str, RenderedAttachment] | None = None,
+    key_resolutions: Mapping[str, RenderedKey] | None = None,
+) -> list[Token]:
+    """Parse with the same permission-scoped references used by live reader output."""
+    return _MARKDOWN.parse(
+        markdown,
+        {
+            "entity_mentions": entity_mentions or {},
+            "attachments": attachments or {},
+            "key_resolutions": key_resolutions or {},
+        },
+    )
+
+
 _TAGS = {
     "a",
     "blockquote",

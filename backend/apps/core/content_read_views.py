@@ -16,7 +16,7 @@ from apps.accounts.policy import PermissionKey
 
 from .content_index_models import ContentNode
 from .content_read import document_collection, document_detail, entity_documentation, repository_for_reader
-from .document_exports import export_html
+from .document_exports import export_docx, export_html
 from .document_views import _msp_workspace, _organization_workspace
 from .models import AuditEvent
 from .rendering import render_pdf
@@ -24,6 +24,8 @@ from .workspaces import ResolvedWorkspace
 
 MAX_HTML_EXPORT_BYTES = 4 * 1024 * 1024
 MAX_PDF_EXPORT_BYTES = 8 * 1024 * 1024
+MAX_DOCX_SOURCE_BYTES = 4 * 1024 * 1024
+MAX_DOCX_EXPORT_BYTES = 8 * 1024 * 1024
 
 
 class ContentReadQuerySerializer(serializers.Serializer):
@@ -281,6 +283,75 @@ class OrganizationContentReadPDFExportView(APIView):
     )
     def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _export_document_pdf(request, _scope(request, organization_entity_id), content_id)
+
+
+def _export_document_docx(request, workspace: ResolvedWorkspace, content_id: UUID) -> HttpResponse | Response:  # type: ignore[no-untyped-def]
+    """Export a staff-authorized live revision, not a retained STATIC publication."""
+
+    repository = repository_for_reader(workspace)
+    get_object_or_404(ContentNode.objects.filter(repository=repository, kind="document"), content_id=content_id)
+    accepted = repository.accepted_commit
+    if accepted is None or accepted.id != repository.indexed_commit_id:
+        return Response({"detail": "Repository content is not fully indexed"}, status=409)
+    revision = accepted.object_id
+    detail = document_detail(
+        workspace=workspace, content_id=content_id, audience="msp_internal", include_render_context=True
+    )
+    repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
+    current = repository.accepted_commit
+    if (
+        current is None
+        or current.id != repository.indexed_commit_id
+        or current.object_id != revision
+        or detail["indexed_commit"] != revision
+    ):
+        return Response({"detail": "Repository content changed during export"}, status=409)
+    if len(detail["markdown"].encode("utf-8")) > MAX_DOCX_SOURCE_BYTES:
+        return Response({"detail": "Repository DOCX source exceeds the size limit"}, status=409)
+    content = export_docx(title=detail["title"], markdown=detail["markdown"], **detail["_render_context"])
+    if not content.startswith(b"PK\x03\x04") or len(content) > MAX_DOCX_EXPORT_BYTES:
+        return Response({"detail": "Repository DOCX export exceeds the size limit"}, status=409)
+    AuditEvent.objects.create(
+        tenant=workspace.member.tenant,
+        actor=request.user,
+        action="repository_document.exported",
+        entity_id=content_id,
+        request_id=getattr(request, "request_id", None),
+        metadata={"format": "docx", "accepted_commit": revision},
+    )
+    response = HttpResponse(
+        content, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+    response["Content-Disposition"] = 'attachment; filename="repository-document.docx"'
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    response["X-TekDocs-Export-Class"] = "live_repository_revision"
+    response["X-TekDocs-Repository-Commit"] = revision
+    return response
+
+
+class MSPContentReadDOCXExportView(APIView):
+    @extend_schema(
+        operation_id="content_read_msp_docx_export",
+        responses={
+            (200, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"): bytes,
+            409: OpenApiResponse(description="Repository revision conflict"),
+        },
+    )
+    def get(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _export_document_docx(request, _scope(request), content_id)
+
+
+class OrganizationContentReadDOCXExportView(APIView):
+    @extend_schema(
+        operation_id="content_read_organization_docx_export",
+        responses={
+            (200, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"): bytes,
+            409: OpenApiResponse(description="Repository revision conflict"),
+        },
+    )
+    def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _export_document_docx(request, _scope(request, organization_entity_id), content_id)
 
 
 class MSPEntityContentView(APIView):

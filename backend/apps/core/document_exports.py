@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import escape
@@ -37,8 +38,11 @@ from .entity_mentions import resolve_entity_mentions
 from .models import Document, DocumentAttachment
 from .rendering import (
     RenderedAttachment,
+    RenderedEntityMention,
+    RenderedKey,
     attachment_ids_in_markdown,
     entity_ids_in_markdown,
+    parse_markdown_for_reader,
     render_markdown,
     render_pdf,
 )
@@ -406,7 +410,15 @@ def _normalize_docx_archive(content: bytes) -> bytes:
     return target.getvalue()
 
 
-def export_docx(*, title: str, markdown: str, diagrams: tuple[DiagramExportArtifact, ...] = ()) -> bytes:
+def export_docx(
+    *,
+    title: str,
+    markdown: str,
+    diagrams: tuple[DiagramExportArtifact, ...] = (),
+    entity_mentions: Mapping[str, RenderedEntityMention] | None = None,
+    attachments: Mapping[str, RenderedAttachment] | None = None,
+    key_resolutions: Mapping[str, RenderedKey] | None = None,
+) -> bytes:
     document = create_word_document()
     section = document.sections[0]
     section.top_margin = section.bottom_margin = Inches(0.75)
@@ -425,7 +437,16 @@ def export_docx(*, title: str, markdown: str, diagrams: tuple[DiagramExportArtif
     quote_style.font.italic = True
     document.add_heading(title, level=0)
 
-    tokens = _MARKDOWN.parse(markdown)
+    tokens = (
+        parse_markdown_for_reader(
+            markdown,
+            entity_mentions=entity_mentions,
+            attachments=attachments,
+            key_resolutions=key_resolutions,
+        )
+        if entity_mentions is not None or attachments is not None or key_resolutions is not None
+        else _MARKDOWN.parse(markdown)
+    )
     list_styles: list[str] = []
     heading_level: int | None = None
     blockquote_depth = 0

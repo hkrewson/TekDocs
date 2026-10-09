@@ -464,6 +464,7 @@ from apps.core.repository_publication_views import (
     OrganizationRepositoryPackageAuthorizationView,
     OrganizationRepositoryStaticControlView,
     OrganizationRepositoryStaticDeliveryView,
+    OrganizationRepositoryStaticMarkdownExportView,
     OrganizationRepositoryStaticPublicationView,
 )
 from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
@@ -639,6 +640,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/package/static-publication",
         OrganizationRepositoryStaticPublicationView.as_view(),
         name="organization-repository-publication-evidence-static-publication",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/package/static-publication/export/markdown",
+        OrganizationRepositoryStaticMarkdownExportView.as_view(),
+        name="organization-repository-publication-evidence-static-markdown-export",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/package/static-publication/control",

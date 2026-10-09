@@ -458,6 +458,10 @@ gates after file, template, review, key, publication and recovery parity.
   including portable frontmatter, for one document or fragment. It labels the
   accepted Git revision and excludes unsaved edits. This is a per-file editable
   source export, not a complete dependency bundle, Git-history transfer or backup.
+- A staff approver can download the signed canonical Markdown from a finalized
+  repository STATIC record after its full retained chain verifies. This private,
+  audited download may contain frozen field-key values and is not a sanitized
+  source export, a client route, or editable-format parity.
 - Staff can also download a bounded, deterministic ZIP of every current Markdown
   file in one accepted-and-indexed Workspace commit plus reachable historical
   include, template-source, and copy-provenance Markdown. Dependencies are

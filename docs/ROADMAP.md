@@ -1787,6 +1787,11 @@ before sanitized export creation, because the signed manifest and canonical
 Markdown both retain the resolved values. Ordinary publication selection and
 cross-client refusal are covered by live endpoint tests; broader format parity
 remains open.
+Finalized repository STATIC records now have a staff-only, approval-permission
+signed Markdown download that verifies the complete retained chain and audits
+the export without reading live Git. It may contain frozen field-key values;
+client delivery, editable HTML/PDF/DOCX parity and authority handoff do not
+follow from this route.
 The repository editor now offers a per-file download of the exact loaded,
 accepted Markdown source and portable frontmatter. Its revision label makes
 clear that unsaved drafts are excluded. This is editable source for one file,

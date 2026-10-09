@@ -20,6 +20,7 @@ from apps.accounts.policy import PermissionKey, require_permission
 from .content_publication_sources import ContentPublicationSourceError
 from .document_views import _msp_workspace, _organization_workspace
 from .models import (
+    AuditEvent,
     PublicationAudience,
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
@@ -569,6 +570,40 @@ def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID
     return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
 
 
+def _static_markdown_export(  # type: ignore[no-untyped-def]
+    request, workspace: ResolvedWorkspace, evidence_id: UUID
+) -> HttpResponse:
+    require_permission(request.user, PermissionKey.DOCUMENTS_APPROVE, organization=workspace.organization)
+    evidence = _evidence(workspace, evidence_id)
+    publication = get_object_or_404(
+        RepositoryStaticPublication,
+        authorization__package__decision__evidence=evidence,
+        workspace=evidence.workspace,
+        tenant=evidence.tenant,
+        organization=evidence.organization,
+    )
+    if not verify_repository_static_publication(publication):
+        response = HttpResponse("Retained STATIC publication failed verification", status=409)
+    else:
+        AuditEvent.objects.create(
+            tenant=workspace.member.tenant,
+            actor=request.user,
+            action="repository_static_publication.exported",
+            entity_id=publication.id,
+            request_id=getattr(request, "request_id", None),
+            metadata={"format": "md", "publication_digest": publication.content_digest},
+        )
+        response = HttpResponse(
+            evidence.canonical_markdown.encode("utf-8"), content_type="text/markdown; charset=utf-8"
+        )
+        response["Content-Disposition"] = 'attachment; filename="repository-static-publication.md"'
+        response["X-TekDocs-Export-Class"] = "immutable_static_publication"
+        response["X-TekDocs-Publication-Digest"] = publication.content_digest
+    response["Cache-Control"] = "private, no-store"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 def _static_control_data(publication: RepositoryStaticPublication) -> dict[str, object]:
     return cast(
         dict[str, object],
@@ -903,6 +938,19 @@ class OrganizationRepositoryStaticPublicationView(APIView):
         return _static_publication(
             request,
             _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_PUBLISH),
+            evidence_id,
+        )
+
+
+class OrganizationRepositoryStaticMarkdownExportView(APIView):
+    @extend_schema(
+        operation_id="repository_evidence_organization_static_markdown_export",
+        responses={(200, "text/markdown"): bytes, 409: OpenApiResponse(description="Integrity conflict")},
+    )
+    def get(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
+        return _static_markdown_export(
+            request,
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_APPROVE),
             evidence_id,
         )
 

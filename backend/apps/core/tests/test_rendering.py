@@ -9,6 +9,43 @@ from apps.core.models import InstallationState
 from apps.core.rendering import render_markdown, render_pdf, split_markdown_sections
 
 
+def test_live_pdf_uses_reader_resolved_references_not_raw_key_or_entity_tokens(monkeypatch) -> None:
+    from apps.core import rendering
+
+    entity_id = "a1e1d448-a609-4f54-9e3f-ff443c11fd12"
+    attachment_id = "21c94d0f-36c0-4f4f-bae4-523c7e95c204"
+    key = "tekdocs://key/support-contact"
+    visible_key = "tekdocs://key/site-name"
+    captured: list[str] = []
+    paragraph = rendering.Paragraph
+
+    def capture(value, style):  # type: ignore[no-untyped-def]
+        captured.append(value)
+        return paragraph(value, style)
+
+    monkeypatch.setattr(rendering, "Paragraph", capture)
+    content = render_pdf(
+        f"Setup [device](tekdocs://entity/{entity_id}) with "
+        f"[file](tekdocs://attachment/{attachment_id}), [contact]({key}), and [site]({visible_key}).\n",
+        title="Reader view",
+        entity_mentions={entity_id: {
+            "id": entity_id, "display_name": "Reader laptop",
+            "entity_type": "hardware_asset", "workspace_label": "Client",
+        }},
+        attachments={attachment_id: {"id": attachment_id, "filename": "setup.pdf", "size": 12}},
+        key_resolutions={
+            key: {"state": "withheld", "label": "Support contact"},
+            visible_key: {"state": "resolved", "label": "Site name", "value": "North office"},
+        },
+    )
+    visible = " ".join(captured)
+    assert content.startswith(b"%PDF-")
+    assert "Reader laptop" in visible and "setup.pdf" in visible and "Withheld" in visible
+    assert "North office" in visible
+    assert entity_id not in visible and attachment_id not in visible and key not in visible
+    assert visible_key not in visible
+
+
 class RenderedHTMLProbe(HTMLParser):
     def __init__(self) -> None:
         super().__init__()

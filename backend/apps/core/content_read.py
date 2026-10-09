@@ -35,7 +35,9 @@ def _visible_entity_context(workspace: ResolvedWorkspace, ids: set[uuid.UUID]) -
     return {entity.id: entity_projection(entity, workspace) for entity in entities}
 
 
-def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audience: str) -> dict[str, Any]:
+def document_detail(
+    *, workspace: ResolvedWorkspace, content_id: uuid.UUID, audience: str, include_render_context: bool = False
+) -> dict[str, Any]:
     repository = repository_for_reader(workspace)
     node = get_object_or_404(ContentNode.objects.filter(repository=repository), content_id=content_id)
     links = list(node.entity_links.all())
@@ -72,7 +74,9 @@ def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audi
         }
         if node.frontmatter.get("key_bindings", {}) == active_key_bindings:
             key_document = legacy_document
-    return {
+    attachments = resolve_rendered_attachments(workspace=workspace, document=legacy_document, markdown=markdown)
+    key_resolutions = resolve_rendered_keys(workspace=workspace, document=key_document, markdown=markdown)
+    result: dict[str, Any] = {
         "id": node.content_id,
         "kind": node.kind,
         "title": node.title,
@@ -82,16 +86,8 @@ def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audi
         "sanitized_html": render_markdown(
             markdown,
             entity_mentions=mentions,
-            attachments=resolve_rendered_attachments(
-                workspace=workspace,
-                document=legacy_document,
-                markdown=markdown,
-            ),
-            key_resolutions=resolve_rendered_keys(
-                workspace=workspace,
-                document=key_document,
-                markdown=markdown,
-            ),
+            attachments=attachments,
+            key_resolutions=key_resolutions,
         ),
         "entity_context": [
             {
@@ -108,6 +104,13 @@ def document_detail(*, workspace: ResolvedWorkspace, content_id: uuid.UUID, audi
             {"code": item.code, "severity": item.severity, "detail": item.detail} for item in node.findings.all()
         ],
     }
+    if include_render_context:
+        result["_render_context"] = {
+            "entity_mentions": mentions,
+            "attachments": attachments,
+            "key_resolutions": key_resolutions,
+        }
+    return result
 
 
 def document_collection(

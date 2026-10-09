@@ -517,6 +517,9 @@ def render_pdf(
     audience: str = "",
     reason: str = "",
     diagrams: tuple[DiagramExportArtifact, ...] = (),
+    entity_mentions: Mapping[str, RenderedEntityMention] | None = None,
+    attachments: Mapping[str, RenderedAttachment] | None = None,
+    key_resolutions: Mapping[str, RenderedKey] | None = None,
 ) -> bytes:
     output = BytesIO()
     styles = getSampleStyleSheet()
@@ -541,7 +544,13 @@ def render_pdf(
             )
         )
 
-    for token in _MARKDOWN.parse(markdown):
+    resolved_context = entity_mentions is not None or attachments is not None or key_resolutions is not None
+    environment = {
+        "entity_mentions": entity_mentions or {},
+        "attachments": attachments or {},
+        "key_resolutions": key_resolutions or {},
+    } if resolved_context else {}
+    for token in _MARKDOWN.parse(markdown, environment):
         if token.type == "table_open":
             table_rows = []
         elif token.type == "tr_open" and table_rows is not None:
@@ -579,13 +588,21 @@ def render_pdf(
         elif token.type in {"bullet_list_close", "ordered_list_close"}:
             list_depth = max(0, list_depth - 1)
         elif token.type == "inline" and token.content.strip():
+            visible_text = (
+                "".join(
+                    child.content if child.type in {"text", "code_inline", "image"}
+                    else " " if child.type in {"softbreak", "hardbreak"} else ""
+                    for child in token.children or ()
+                )
+                if resolved_context else token.content
+            )
             if table_row is not None:
                 cell_style = styles["Heading5"] if table_header_cell else styles["BodyText"]
-                table_row.append(Paragraph(escape(token.content), cell_style))
+                table_row.append(Paragraph(escape(visible_text), cell_style))
             else:
                 style = styles[f"Heading{min(heading_level, 3)}"] if heading_level else styles["BodyText"]
                 prefix = f"{'  ' * (list_depth - 1)}- " if list_depth else ""
-                story.extend((Paragraph(escape(prefix + token.content), style), Spacer(1, 6)))
+                story.extend((Paragraph(escape(prefix + visible_text), style), Spacer(1, 6)))
         elif token.type == "fence" and token.info.strip().casefold() == "mermaid":
             item = diagrams[diagram_index] if diagram_index < len(diagrams) else None
             diagram_index += 1

@@ -272,3 +272,67 @@ def test_staff_html_export_uses_only_a_fully_indexed_repository_document(read_co
     )
     assert browser.get(export_url).status_code == 409
     assert AuditEvent.objects.filter(action="repository_document.exported", entity_id=document_id).count() == 1
+
+
+def test_staff_pdf_export_is_live_permission_scoped_and_refuses_stale_or_foreign_source(read_context):
+    installation, organization, asset, repository = read_context
+    document_id, fragment_id = uuid.uuid4(), uuid.uuid4()
+    accepted = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        changes={
+            "docs/pdf.md": _content(
+                content_id=document_id, title="PDF guide",
+                body=f"## Setup\nSee [laptop](tekdocs://entity/{asset.entity_id}).\n",
+            ),
+            "fragments/pdf.md": _content(
+                content_id=fragment_id, title="PDF notes", body="Private fragment.\n", kind="fragment"
+            ),
+        },
+        message="Add PDF export source",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    kwargs = {"organization_entity_id": organization.entity_id, "content_id": document_id}
+    export_url = reverse("organization-content-document-pdf-export", kwargs=kwargs)
+    exported = browser.get(export_url)
+    assert exported.status_code == 200, exported.content
+    assert exported.content.startswith(b"%PDF-")
+    assert exported["Content-Type"] == "application/pdf"
+    assert exported["Content-Disposition"] == 'attachment; filename="repository-document.pdf"'
+    assert exported["Cache-Control"] == "private, no-store"
+    assert exported["X-Content-Type-Options"] == "nosniff"
+    assert exported["X-TekDocs-Export-Class"] == "live_repository_revision"
+    assert exported["X-TekDocs-Repository-Commit"] == accepted.object_id
+    assert AuditEvent.objects.filter(
+        action="repository_document.exported", entity_id=document_id, metadata__format="pdf"
+    ).count() == 1
+    assert browser.get(reverse(
+        "organization-content-document-pdf-export",
+        kwargs={"organization_entity_id": organization.entity_id, "content_id": fragment_id},
+    )).status_code == 404
+    sibling = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="PDF sibling",
+        legal_name="PDF sibling", website="https://example.invalid", classifications=["client"],
+    )
+    assert browser.get(reverse(
+        "organization-content-document-pdf-export",
+        kwargs={"organization_entity_id": sibling.entity_id, "content_id": document_id},
+    )).status_code == 404
+    portal_user = User.objects.create_user(email="pdf-client@example.invalid", display_name="PDF client")
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization
+    )
+    browser.force_login(portal_user)
+    assert browser.get(export_url).status_code == 403
+    browser.force_login(installation.owner)
+    repository_service.commit_repository_files(
+        repository_id=repository.id, expected_base=accepted.object_id,
+        changes={"docs/pdf.md": _content(content_id=document_id, title="PDF guide", body="New text.\n")},
+        message="Advance PDF source before indexing",
+    )
+    assert browser.get(export_url).status_code == 409
+    assert AuditEvent.objects.filter(
+        action="repository_document.exported", entity_id=document_id, metadata__format="pdf"
+    ).count() == 1

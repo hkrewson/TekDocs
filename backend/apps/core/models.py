@@ -4609,7 +4609,7 @@ class DocumentAttachmentPurpose(models.TextChoices):
 
 
 class DocumentAttachment(TimestampedModel):
-    """A private managed file owned by exactly one document."""
+    """A private managed file with a stable content owner."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="document_attachments")
@@ -4621,6 +4621,10 @@ class DocumentAttachment(TimestampedModel):
         blank=True,
     )
     document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="attachments")
+    owner_workspace = models.ForeignKey(
+        Workspace, on_delete=models.PROTECT, related_name="managed_document_attachments", null=True, blank=True
+    )
+    owner_content_id = models.UUIDField(null=True, blank=True)
     entity = models.OneToOneField(Entity, on_delete=models.PROTECT, related_name="document_attachment_record")
     file = models.FileField(upload_to=document_attachment_upload_to, max_length=500)
     original_filename = models.CharField(max_length=240)
@@ -4713,6 +4717,10 @@ class DocumentAttachment(TimestampedModel):
             self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
         ):
             raise ValidationError("Attachment must use its document workspace scope")
+        if self.document_id and self.owner_workspace_id is not None and (
+            self.owner_workspace_id != self.document.entity.workspace_id or self.owner_content_id != self.document_id
+        ):
+            raise ValidationError("Attachment content owner must match its legacy document")
         if self.entity_id and (
             self.entity.tenant_id != self.tenant_id or self.entity.organization_id != self.organization_id
         ):

@@ -6,6 +6,7 @@ from importlib import import_module
 
 import psycopg
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
@@ -25,6 +26,7 @@ from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
+from apps.core.document_attachments import create_document_attachment
 from apps.core.documents import create_document
 from apps.core.invoicing import (
     configure_issue_settings,
@@ -41,6 +43,7 @@ from apps.core.models import (
     CustomFieldDefinition,
     DataFlowRevision,
     DataFlowSnapshot,
+    DocumentAttachment,
     DocumentPublication,
     Entity,
     EntityLink,
@@ -337,6 +340,51 @@ def migration_head_restored(transactional_db):
                     cursor.execute("CHECKPOINT")
             except DatabaseError:  # pragma: no cover - requires a non-superuser test role
                 pass
+
+
+@pytest.mark.django_db(transaction=True)
+def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_restored, tmp_path):
+    if connection.vendor != "postgresql":
+        pytest.skip("Attachment owner upgrade validation requires PostgreSQL")
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Attachment owner upgrade MSP",
+        owner_email=f"attachment-upgrade-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Attachment Upgrade Owner",
+        password="AttachmentUpgrade-2026!",
+    )
+    document = create_document(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        title="Upgrade file owner",
+        markdown="Retained guide.\n",
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        attachment = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("guide.txt", b"Retained guide bytes\n"),
+        )
+    original_id = attachment.id
+    original_entity_id = attachment.entity_id
+    original_checksum = attachment.checksum
+
+    call_command("migrate", "core", "0179_repository_evidence_public_attachment_ids", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        columns = {
+            column.name for column in connection.introspection.get_table_description(cursor, "core_documentattachment")
+        }
+    assert "owner_workspace_id" not in columns
+    assert "owner_content_id" not in columns
+
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    upgraded = DocumentAttachment.objects.get(pk=original_id)
+    assert upgraded.entity_id == original_entity_id
+    assert upgraded.checksum == original_checksum
+    assert upgraded.owner_workspace_id == document.entity.workspace_id
+    assert upgraded.owner_content_id == document.id
 
 
 @pytest.mark.django_db(transaction=True)

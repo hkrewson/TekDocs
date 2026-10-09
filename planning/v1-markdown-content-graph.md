@@ -598,6 +598,14 @@ The editable bundle can verify bytes of referenced, same-Workspace legacy
 files, but that is not repository-native file ownership. This is a verified
 implementation gap, not an assumption that the bundle closes file parity.
 
+[ADR 0114](../docs/adr/0114-stable-managed-file-content-ownership.md) selects
+the existing attachment table for this transition because signed publication
+evidence already references its stable file IDs. The first
+expand/backfill slice adds nullable Workspace/content UUID ownership, dual-writes
+it for legacy uploads, and rejects mismatched legacy owners in PostgreSQL.
+Existing file IDs, checksums, and mandatory legacy `Document` links remain
+unchanged. Git-only ownership is not enabled by this slice.
+
 - [ ] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,
   clean-only storage and retained primary-file history.

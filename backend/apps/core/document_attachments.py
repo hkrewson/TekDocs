@@ -147,6 +147,8 @@ def create_document_attachment(
                 tenant=document.tenant,
                 organization=document.organization,
                 document=document,
+                owner_workspace=document.entity.workspace,
+                owner_content_id=document.id,
                 entity=entity,
                 original_filename=validated.filename,
                 media_type=validated.media_type,

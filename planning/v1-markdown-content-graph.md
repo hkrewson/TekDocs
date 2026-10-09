@@ -493,8 +493,8 @@ gates after file, template, review, key, publication and recovery parity.
   returned revision and PDF response before saving. Denial or a stale response
   leaves the draft untouched. A separate staff-only DOCX API and saved-document
   editor action now check the same accepted/indexed revision and reader context,
-  with response validation and dirty-draft preservation. Complete editable
-  dependency bundles remain an open gate.
+  with response validation and dirty-draft preservation. The managed-file
+  editable handoff was the next gate; backup-complete bundles remain separate.
 - Staff can also download a bounded, deterministic ZIP of every current Markdown
   file in one accepted-and-indexed Workspace commit plus reachable historical
   include, template-source, and copy-provenance Markdown. Dependencies are
@@ -508,6 +508,15 @@ gates after file, template, review, key, publication and recovery parity.
   refuses omitted, unreferenced or mislabelled historical sources. It proves
   internal consistency only: the manifest is not signed against
   Git, and this neither imports content nor verifies attachments or backup state.
+- A separate editable-bundle option now wraps the exact v3 Markdown snapshot
+  and every managed file linked from its current or reachable historical
+  Markdown. It resolves only active, scanner-clean files in the exact Workspace,
+  verifies retained bytes, caps files and ZIP size, and fails before download or
+  audit if any link cannot be satisfied. A v1 bundle manifest lists public file
+  IDs, owning document IDs, hashes, sizes and paths; an offline verifier checks
+  source and file closure. This is an unsanitized editing handoff, not a backup:
+  database records, Git history and unreferenced files remain excluded. The
+  original Markdown-only v3 download remains available unchanged.
 - Extend encrypted backup/restore to repositories and add an accepted-head
   manifest tying repository state to PostgreSQL and retained files.
 - Produce complete repository bundles rather than relying on working-tree copies
@@ -687,6 +696,16 @@ release, hosted service, external certification or independent security audit.
 - Expanded conditional-content profiles, hierarchical key scopes, remote Git
   collaboration, pull-request authoring and bidirectional provider writeback
   remain post-1.0 unless separately promoted with bounded acceptance criteria.
+- **Synced-block-style reuse interaction:** carry forward as an interface
+  backlog item for the `0.9.3`–`0.9.5` Git-backed authoring experience, with final
+  acceptance during the `0.9.8` interface review. Present reusable fragments as
+  visibly shared content in place, show the canonical source and where-used
+  locations, disclose which live placements an edit will update, and make
+  “edit everywhere,” “keep this version,” and “make an independent copy” clear
+  actions. Preserve live, pinned, audience, authorization, conflict-preview and
+  detach semantics; this is an interaction direction, not a second persistence
+  model or a commitment to match Notion pixel for pixel. Validate it in an early
+  usability check and refine against the Git-backed graph before final review.
 - The accepted remote-Git follow-on in #107 is one optional connection and private
   repository per organization workspace. It supports local-only, MSP-owned and
   organization-owned custody; a single all-organizations remote is prohibited.

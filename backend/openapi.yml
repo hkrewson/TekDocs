@@ -9429,6 +9429,16 @@ paths:
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
+      parameters:
+      - in: query
+        name: bundle
+        schema:
+          enum:
+          - editable
+          type: string
+          x-spec-enum-id: d95204717f169046
+          minLength: 1
+        description: '* `editable` - editable'
       tags:
       - workspaces
       security:
@@ -19494,6 +19504,15 @@ paths:
     get:
       operationId: content_authoring_organization_export
       parameters:
+      - in: query
+        name: bundle
+        schema:
+          enum:
+          - editable
+          type: string
+          x-spec-enum-id: d95204717f169046
+          minLength: 1
+        description: '* `editable` - editable'
       - in: path
         name: organization_entity_id
         schema:

@@ -24249,7 +24249,10 @@ export interface operations {
     };
     readonly content_authoring_msp_export: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /** @description * `editable` - editable */
+                readonly bundle?: "editable";
+            };
             readonly header?: never;
             readonly path?: never;
             readonly cookie?: never;
@@ -31260,7 +31263,10 @@ export interface operations {
     };
     readonly content_authoring_organization_export: {
         readonly parameters: {
-            readonly query?: never;
+            readonly query?: {
+                /** @description * `editable` - editable */
+                readonly bundle?: "editable";
+            };
             readonly header?: never;
             readonly path: {
                 readonly organization_entity_id: string;

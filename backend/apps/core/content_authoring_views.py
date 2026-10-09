@@ -24,6 +24,7 @@ from .content_index import ContentIndexValidationError
 from .content_read import repository_for_reader
 from .document_views import _msp_workspace, _organization_workspace
 from .models import AuditEvent, WorkspaceRepository
+from .repository_editable_bundles import RepositoryEditableBundleError, export_repository_editable_bundle
 from .repository_service import (
     RepositoryFileNotFoundError,
     RepositoryInputError,
@@ -72,6 +73,10 @@ class ContentAuthoringConflictSerializer(serializers.Serializer):
 
 class ContentPathQuerySerializer(serializers.Serializer):
     path = serializers.CharField(max_length=512)
+
+
+class ContentSourceExportQuerySerializer(serializers.Serializer):
+    bundle = serializers.ChoiceField(choices=("editable",), required=False)
 
 
 def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey):  # type: ignore[no-untyped-def]
@@ -171,25 +176,42 @@ class OrganizationContentAuthoringSourceView(APIView):
 
 def _source_snapshot(request, organization_entity_id: UUID | None = None) -> HttpResponse | Response:  # type: ignore[no-untyped-def]
     workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+    query = ContentSourceExportQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    editable = query.validated_data.get("bundle") == "editable"
     try:
         repository = repository_for_reader(workspace)
-        result = export_repository_sources(repository)
+        if editable:
+            bundle = export_repository_editable_bundle(repository)
+            content = bundle.content
+            accepted_commit = bundle.accepted_commit
+            audit_metadata = {
+                "accepted_commit": accepted_commit,
+                "file_count": bundle.source_file_count,
+                "attachment_count": bundle.attachment_count,
+            }
+        else:
+            snapshot = export_repository_sources(repository)
+            content = snapshot.content
+            accepted_commit = snapshot.accepted_commit
+            audit_metadata = {"accepted_commit": accepted_commit, "file_count": snapshot.file_count}
     except WorkspaceRepository.DoesNotExist:
         return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_404_NOT_FOUND)
-    except RepositorySourceExportError as exc:
+    except (RepositorySourceExportError, RepositoryEditableBundleError) as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     except (RepositoryServiceError, RepositoryStorageError):
         return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     AuditEvent.objects.create(
         tenant=workspace.member.tenant,
         actor=request.user,
-        action="repository_source_export.downloaded",
+        action="repository_editable_bundle.downloaded" if editable else "repository_source_export.downloaded",
         entity_id=repository.id,
         request_id=getattr(request, "request_id", None),
-        metadata={"accepted_commit": result.accepted_commit, "file_count": result.file_count},
+        metadata=audit_metadata,
     )
-    response = HttpResponse(result.content, content_type="application/zip")
-    response["Content-Disposition"] = f'attachment; filename="tekdocs-repository-{result.accepted_commit[:12]}.zip"'
+    response = HttpResponse(content, content_type="application/zip")
+    name = "tekdocs-repository-editable" if editable else "tekdocs-repository"
+    response["Content-Disposition"] = f'attachment; filename="{name}-{accepted_commit[:12]}.zip"'
     response["Cache-Control"] = "no-store"
     response["X-Content-Type-Options"] = "nosniff"
     return response
@@ -198,6 +220,7 @@ def _source_snapshot(request, organization_entity_id: UUID | None = None) -> Htt
 class MSPContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_msp_export",
+        parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,
             404: OpenApiResponse(description="Workspace repository is unavailable"),
@@ -212,6 +235,7 @@ class MSPContentAuthoringExportView(APIView):
 class OrganizationContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_organization_export",
+        parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,
             404: OpenApiResponse(description="Workspace repository is unavailable"),

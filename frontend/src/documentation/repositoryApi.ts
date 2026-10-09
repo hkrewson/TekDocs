@@ -197,6 +197,25 @@ export const browserRepositoryClient = {
     const name = disposition.match(/filename="(tekdocs-repository-[a-f0-9]{12}\.zip)"/)?.[1] || 'tekdocs-repository-source.zip'
     return { content: await response.blob(), name }
   },
+  async exportEditableBundle(organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/authoring/export?bundle=editable`, {
+      credentials: 'same-origin',
+    })
+    if (!response.ok) {
+      let detail: unknown
+      try { detail = (await response.json() as { detail?: unknown }).detail } catch { /* Upstream errors may be HTML. */ }
+      throw new Error(typeof detail === 'string' && detail.length < 300 ? detail : translate('repository.bundleFailed'))
+    }
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const match = disposition.match(/^attachment; filename="(tekdocs-repository-editable-[a-f0-9]{12}\.zip)"$/)
+    if (!response.headers.get('Content-Type')?.startsWith('application/zip')
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff'
+      || response.headers.get('Cache-Control') !== 'no-store'
+      || !match) throw new Error(translate('repository.bundleFailed'))
+    const content = await response.blob()
+    if (content.size > 75 * 1024 * 1024) throw new Error(translate('repository.bundleFailed'))
+    return { content, name: match[1] }
+  },
   async exportHtml(contentId: string, organizationId?: string) {
     const response = await fetch(`${path(organizationId)}/documents/${encodeURIComponent(contentId)}/export/html`, {
       credentials: 'same-origin',

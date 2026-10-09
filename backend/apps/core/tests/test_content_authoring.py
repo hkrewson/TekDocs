@@ -8,6 +8,7 @@ import zipfile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, override_settings
@@ -24,8 +25,15 @@ from apps.core.content_authoring import (
     resolve_authored_path,
 )
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
+from apps.core.document_attachments import create_document_attachment
+from apps.core.documents import create_document
 from apps.core.models import AuditEvent, ContentNode, InstallationState, Workspace, WorkspaceKind
 from apps.core.organizations import create_organization
+from apps.core.repository_editable_bundle_validation import (
+    RepositoryEditableBundleValidationError,
+    verify_repository_editable_bundle,
+)
+from apps.core.repository_editable_bundles import _archive
 from apps.core.repository_source_exports import export_repository_sources
 from apps.core.repository_source_validation import verify_repository_source_snapshot
 from apps.core.tasks import reconcile_content_indexes
@@ -335,6 +343,155 @@ def test_repository_source_snapshot_exports_exact_current_files_and_rejects_lag(
     repository.save(update_fields=["indexed_commit", "updated_at"])
     assert browser.get(url).status_code == 409
     assert events.count() == 2
+
+
+def test_editable_bundle_includes_exact_referenced_file_and_verifies_offline(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = create_document(
+            tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+            title="Bundle guide", markdown="Legacy source.\n",
+        )
+        attachment = create_document_attachment(
+            document=document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("guide.txt", b"Exact managed bytes"),
+        )
+        authored = _create(installation, repository, content_id=document.id, title="Bundle guide")
+        source = authored.source.replace(
+            "Initial instructions.\n", f"[Guide](tekdocs://attachment/{attachment.entity_id})\n"
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=authored.accepted_commit,
+            changes={authored.path: source.encode()}, message="Link managed file",
+        )
+        index_repository_content(repository_id=repository.id)
+        browser = Client()
+        browser.force_login(installation.owner)
+        url = reverse("msp-content-authoring-export") + "?bundle=editable"
+        response = browser.get(url)
+        assert response.status_code == 200
+        assert response["Content-Type"] == "application/zip"
+        assert "tekdocs-repository-editable-" in response["Content-Disposition"]
+        manifest = verify_repository_editable_bundle(response.content)
+        assert manifest["attachments"][0]["id"] == str(attachment.entity_id)
+        assert manifest["attachments"][0]["document_id"] == str(document.id)
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            assert archive.read(f"attachments/{attachment.entity_id}") == b"Exact managed bytes"
+            entries = {name: archive.read(name) for name in archive.namelist()}
+        changed = dict(entries)
+        changed[f"attachments/{attachment.entity_id}"] = b"Alter managed bytes"
+        with pytest.raises(RepositoryEditableBundleValidationError, match="checksum"):
+            verify_repository_editable_bundle(_archive(changed))
+        omitted = dict(entries)
+        omitted.pop(f"attachments/{attachment.entity_id}")
+        with pytest.raises(RepositoryEditableBundleValidationError, match="descriptor"):
+            verify_repository_editable_bundle(_archive(omitted))
+        archive_path = tmp_path / "editable.zip"
+        archive_path.write_bytes(response.content)
+        call_command("verify_repository_editable_bundle", archive_path)
+        assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
+        assert Client().get(url).status_code in {401, 403}
+
+        attachment.file.storage.delete(attachment.file.name)
+        assert browser.get(url).status_code == 409
+        assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
+
+
+def test_editable_bundle_rejects_extra_file_bytes(authoring_context):
+    installation, repository = authoring_context
+    authored = _create(installation, repository)
+    response = Client()
+    response.force_login(installation.owner)
+    content = response.get(reverse("msp-content-authoring-export") + "?bundle=editable").content
+    assert verify_repository_editable_bundle(content)["attachments"] == []
+    with zipfile.ZipFile(io.BytesIO(content)) as original:
+        entries = {name: original.read(name) for name in original.namelist()}
+    entries["attachments/" + str(uuid.uuid4())] = b"unlisted"
+    with pytest.raises(RepositoryEditableBundleValidationError, match="unlisted"):
+        verify_repository_editable_bundle(_archive(entries))
+    assert authored.content_id
+
+
+def test_editable_bundle_rejects_foreign_workspace_file(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    organization = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Other client", legal_name="Other client", website="https://example.invalid",
+        classifications=["client"],
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        foreign_document = create_document(
+            tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+            title="Foreign file", markdown="Private.\n",
+        )
+        foreign_attachment = create_document_attachment(
+            document=foreign_document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("private.txt", b"Foreign bytes"),
+        )
+        authored = _create(installation, repository)
+        source = authored.source.replace(
+            "Initial instructions.\n", f"[Foreign](tekdocs://attachment/{foreign_attachment.entity_id})\n"
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=authored.accepted_commit,
+            changes={authored.path: source.encode()}, message="Reference foreign file",
+        )
+        index_repository_content(repository_id=repository.id)
+        browser = Client()
+        browser.force_login(installation.owner)
+        assert browser.get(reverse("msp-content-authoring-export") + "?bundle=editable").status_code == 409
+        assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 0
+
+
+def test_editable_bundle_includes_file_referenced_only_by_pinned_fragment(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = create_document(
+            tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+            title="Pinned guide", markdown="Legacy source.\n",
+        )
+        attachment = create_document_attachment(
+            document=document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("pinned.txt", b"Pinned file bytes"),
+        )
+        fragment_id = uuid.uuid4()
+
+        def source(content_id, kind, body, includes=""):  # type: ignore[no-untyped-def]
+            return (
+                f"---\nschema: tekdocs.content/v1\nid: {content_id}\nkind: {kind}\n"
+                f"title: Pinned guide\n{includes}---\n{body}"
+            ).encode()
+
+        first = repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+            changes={"fragments/step.md": source(
+                fragment_id, "fragment", f"[File](tekdocs://attachment/{attachment.entity_id})\n"
+            )}, message="Add original fragment",
+        )
+        second = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=first.object_id,
+            changes={"fragments/step.md": source(fragment_id, "fragment", "Revised step.\n")},
+            message="Revise fragment",
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=second.object_id,
+            changes={"documents/pinned-guide.md": source(
+                document.id, "document", "Use the original step.\n",
+                f"includes:\n  - id: {fragment_id}\n    mode: pinned\n    audience: shared\n"
+                f"    commit: {first.object_id}\n",
+            )}, message="Pin original fragment",
+        )
+        index_repository_content(repository_id=repository.id)
+        browser = Client()
+        browser.force_login(installation.owner)
+        response = browser.get(reverse("msp-content-authoring-export") + "?bundle=editable")
+        assert response.status_code == 200
+        manifest = verify_repository_editable_bundle(response.content)
+        assert [item["id"] for item in manifest["attachments"]] == [str(attachment.entity_id)]
+        with zipfile.ZipFile(io.BytesIO(response.content)) as outer:
+            with zipfile.ZipFile(io.BytesIO(outer.read("source-snapshot.zip"))) as inner:
+                assert f"pinned/{first.object_id}/fragments/step.md" in inner.namelist()
 
 
 def test_source_snapshot_git_verification_requires_exact_workspace_and_accepted_head(authoring_context, tmp_path):

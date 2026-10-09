@@ -34,6 +34,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [bundleExporting, setBundleExporting] = useState(false)
   const [htmlExporting, setHtmlExporting] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
   const [docxExporting, setDocxExporting] = useState(false)
@@ -155,6 +156,22 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     } finally { setExporting(false) }
   }
 
+  async function downloadEditableBundle() {
+    if (bundleExporting) return
+    setBundleExporting(true); setError('')
+    try {
+      const result = await client.exportEditableBundle(organizationId)
+      const url = URL.createObjectURL(result.content)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.name
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    } catch {
+      setError(translate('repository.bundleFailed'))
+    } finally { setBundleExporting(false) }
+  }
+
   async function downloadHtml() {
     if (htmlExporting || pdfExporting || docxExporting || busy || source?.kind !== 'document' || !source.accepted_commit
       || source.accepted_commit !== source.indexed_commit) return
@@ -228,8 +245,9 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   }
 
   return <section className="repository-authoring">
-    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="secondary-button" onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
+    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1><p>{translate('repository.description')}</p></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}>{translate('repository.return')}</button><button type="button" className="secondary-button" onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</button><button type="button" className="secondary-button" onClick={() => { void downloadEditableBundle() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || bundleExporting}>{bundleExporting ? translate('repository.bundlePreparing') : translate('repository.bundleDownload')}</button><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}>{translate('repository.new')}</button></div></header>
     <p className="form-message">{translate('repository.snapshotNotice')}</p>
+    <p className="form-message">{translate('repository.bundleNotice')}</p>
     {error && <p role="alert" className="form-message error">{error}</p>}
     {message && <p role="status" className="form-message success">{message}</p>}
     {listing && listing.accepted_commit !== listing.indexed_commit && <p role="status" className="form-message">{translate('repository.indexPending')}</p>}

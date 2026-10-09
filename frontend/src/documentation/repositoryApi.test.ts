@@ -24,6 +24,31 @@ it('reports a denied source snapshot instead of treating the error as a download
   await expect(browserRepositoryClient.exportSources()).rejects.toThrow('Repository is not indexed')
 })
 
+it('downloads a checked editable bundle from the exact selected Workspace', async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response('bundle', {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': 'attachment; filename="tekdocs-repository-editable-aaaaaaaaaaaa.zip"',
+      'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
+    },
+  }))
+  vi.stubGlobal('fetch', fetch)
+  const result = await browserRepositoryClient.exportEditableBundle('org-1')
+  expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/org-1/content-graph/authoring/export?bundle=editable', {
+    credentials: 'same-origin',
+  })
+  expect(result.name).toBe('tekdocs-repository-editable-aaaaaaaaaaaa.zip')
+  expect(result.content.size).toBe(6)
+})
+
+it('refuses an editable bundle response without the expected download headers', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>sign in</html>', {
+    status: 200, headers: { 'Content-Type': 'text/html' },
+  })))
+  await expect(browserRepositoryClient.exportEditableBundle()).rejects.toThrow('could not be downloaded')
+})
+
 it('refuses a successful upstream response that is not a ZIP', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>sign in</html>', {
     status: 200, headers: { 'Content-Type': 'text/html' },

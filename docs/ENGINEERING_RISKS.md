@@ -284,6 +284,18 @@ requires a deliberate rebase. Accepted/indexed markers recover interrupted
 projection work without rewriting Git. PostgreSQL and Git are still separate
 stores; the repository-inclusive restore and outage proof remains `0.9.7`.
 
+## 0.9.7 editable-bundle disposition
+
+`TD-RISK-070` is mitigated for staff editable handoff: the export uses the
+existing exact-Workspace permission boundary, retains the accepted Markdown
+source snapshot, includes only active scanner-clean managed files referenced
+by current or reachable historical Markdown, and fails closed on missing,
+changed, or foreign files. The download is private, audited, bounded, and
+explicitly unsanitized. Its offline verifier proves internal byte and reference
+closure, not Git provenance or live database custody. `TD-RISK-069` remains
+open for a backup-complete bundle and network-isolated restore; this handoff
+must not be described or used as a backup.
+
 ## 0.8.43 money-foundation disposition
 
 `TD-RISK-063` is **mitigated with recurring owners through `0.9.0`**. One arithmetic module now rejects floats, unknown/withdrawn codes, excess minor-unit precision, and non-finite values; its registry exactly matches the usable numeric-minor-unit entries in the ISO maintenance agency's 2026-01-01 List One. Explicit commercial rounding and full-registry property generation prove rendered line, tax, subtotal, and total strings reconcile. `TD-RISK-064` through `TD-RISK-066` remain future invoice-numbering, immutability, and client-disclosure obligations; this slice creates no invoice, number, issue, delivery, payment, or portal path.

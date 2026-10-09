@@ -18,6 +18,8 @@ from defusedxml import ElementTree
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import Client
@@ -64,7 +66,13 @@ from apps.core.models import (
     OrganizationClassification,
     PublicationArtifactKind,
 )
-from apps.core.publications import canonical_json, publish_document, snapshot_payload, verify_publication
+from apps.core.publications import (
+    canonical_json,
+    publish_document,
+    snapshot_payload,
+    verify_publication,
+    verify_retained_publication_custody,
+)
 from apps.core.workspaces import resolve_msp_workspace
 
 
@@ -615,6 +623,21 @@ def test_static_publication_freezes_dependencies_and_verifies_after_source_chang
             artifact.original_filename not in artifact.file.name
             for artifact in DocumentPublicationArtifact.objects.all()
         )
+        assert verify_retained_publication_custody(publication)
+        call_command("verify_recovery_publications")
+        retained_record = publication.artifacts.get(kind=PublicationArtifactKind.ATTACHMENT)
+        with retained_record.file.open("rb") as stream:
+            retained_bytes = stream.read()
+        retained_record.file.storage.delete(retained_record.file.name)
+        try:
+            assert not verify_retained_publication_custody(publication)
+            with pytest.raises(CommandError, match="Retained legacy publication integrity check failed"):
+                call_command("verify_recovery_publications")
+        finally:
+            assert (
+                retained_record.file.storage.save(retained_record.file.name, ContentFile(retained_bytes))
+                == retained_record.file.name
+            )
 
 
 @pytest.mark.django_db

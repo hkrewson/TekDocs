@@ -13,7 +13,10 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
-from apps.core.models import Document, Organization, RepositoryEvidenceAttachment, RepositoryStaticPublication
+from apps.core.models import (
+    Document, DocumentPublication, Organization, RepositoryEvidenceAttachment, RepositoryStaticPublication,
+)
+from apps.core.publications import read_publication_artifact, verify_retained_publication_custody
 from apps.core.repository_static_delivery import repository_static_delivery_ready
 from apps.core.repository_static_publications import verify_repository_static_publication
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
@@ -118,6 +121,23 @@ if mode == "create":
     reviewer, authorizer = actors
     evidence_url = reverse("organization-repository-publication-evidence", args=[organization.entity_id])
     browser.force_login(owner)
+    legacy = _post(
+        browser,
+        reverse(
+            "organization-document-publication-list-create",
+            kwargs={"organization_entity_id": organization.entity_id, "document_entity_id": document.entity_id},
+        ),
+        {"reason": "Recovery fixture legacy publication", "audience": "msp_internal", "retention": "permanent"},
+    )
+    legacy_id = uuid.UUID(legacy["id"])
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        legacy_publication = DocumentPublication.objects.get(entity_id=legacy_id)
+        assert verify_retained_publication_custody(legacy_publication)
+        legacy_pdf = read_publication_artifact(legacy_publication.artifacts.get(kind="pdf"))
     evidence = _post(
         browser, evidence_url, {"content_id": str(document.id), "audience": "client_visible"}
     )
@@ -172,6 +192,8 @@ if mode == "create":
     print(f"REPOSITORY_PUBLICATION_PDF_SHA256={pdf_sha}")
     print(f"REPOSITORY_PUBLICATION_ATTACHMENT_ID={artifact.id}")
     print(f"REPOSITORY_PUBLICATION_ATTACHMENT_SHA256={attachment_sha}")
+    print(f"LEGACY_PUBLICATION_ID={legacy_id}")
+    print(f"LEGACY_PUBLICATION_PDF_SHA256={hashlib.sha256(legacy_pdf).hexdigest()}")
     print("Released repository publication recovery fixture created")
 elif mode == "verify":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
@@ -194,13 +216,20 @@ elif mode == "verify":
             organization=organization,
         )
         assert artifact.checksum == hashlib.sha256(ATTACHMENT_BYTES).hexdigest()
+        legacy_publication = DocumentPublication.objects.get(
+            entity_id=uuid.UUID(os.environ["TEKDOCS_RECOVERY_LEGACY_PUBLICATION_ID"]),
+            tenant=tenant, organization=organization,
+        )
+        assert verify_retained_publication_custody(legacy_publication)
+        legacy_pdf = read_publication_artifact(legacy_publication.artifacts.get(kind="pdf"))
+        assert hashlib.sha256(legacy_pdf).hexdigest() == os.environ["TEKDOCS_RECOVERY_LEGACY_PDF_SHA256"]
     client = User.objects.get(email=CLIENT_EMAIL)
     browser.force_login(client)
     html_sha, pdf_sha, attachment_sha = _portal_snapshot(browser, publication_id, artifact_id)
     assert html_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256"]
     assert pdf_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256"]
     assert attachment_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256"]
-    print("Signed released publication, client HTML, retained PDF, and attachment restored")
+    print("Signed legacy PDF and released repository publication, client HTML, PDF, and attachment restored")
 elif mode == "corrupt":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
     artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])

@@ -738,6 +738,48 @@ def read_publication_artifact(artifact: DocumentPublicationArtifact) -> bytes:
     return content
 
 
+def verify_retained_publication_custody(publication: DocumentPublication) -> bool:
+    """Verify the signed legacy STATIC record and its exact retained artifact set."""
+
+    if not verify_publication(publication)["valid"]:
+        return False
+    manifest = publication.manifest
+    if manifest.get("format") == "tekdocs-static-publication/v1":
+        # The original format did not attest separate retained file artifacts.
+        return "artifacts" not in manifest and not publication.artifacts.exists()
+    descriptors = manifest.get("artifacts")
+    if not isinstance(descriptors, list):
+        return False
+    expected: dict[str, dict[str, object]] = {}
+    for descriptor in descriptors:
+        if not isinstance(descriptor, dict) or not isinstance(descriptor.get("id"), str):
+            return False
+        if descriptor["id"] in expected:
+            return False
+        expected[descriptor["id"]] = descriptor
+    pdf_count = 0
+    try:
+        for artifact in publication.artifacts.select_related("source_attachment").iterator(chunk_size=50):
+            source_attachment = artifact.source_attachment if artifact.source_attachment_id else None
+            actual = {
+                "id": str(artifact.id),
+                "entity_id": str(artifact.entity_id),
+                "kind": artifact.kind,
+                "filename": artifact.original_filename,
+                "media_type": artifact.media_type,
+                "size": artifact.size,
+                "checksum": artifact.checksum,
+                "source_attachment_id": str(source_attachment.entity_id) if source_attachment else None,
+            }
+            if expected.pop(str(artifact.id), None) != actual:
+                return False
+            read_publication_artifact(artifact)
+            pdf_count += artifact.kind == PublicationArtifactKind.PDF
+    except (PublicationConflict, OSError, ValueError, TypeError, AttributeError):
+        return False
+    return not expected and pdf_count == 1
+
+
 def retained_publication_diagrams(
     publication: DocumentPublication,
 ) -> tuple[DiagramExportArtifact, ...]:

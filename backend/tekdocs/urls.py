@@ -95,12 +95,14 @@ from apps.core.content_authoring_views import (
 )
 from apps.core.content_graph_views import MSPContentGraphView, OrganizationContentGraphView
 from apps.core.content_read_views import (
+    MSPContentReadAttachmentDownloadView,
     MSPContentReadCollectionView,
     MSPContentReadDetailView,
     MSPContentReadDOCXExportView,
     MSPContentReadHTMLExportView,
     MSPContentReadPDFExportView,
     MSPEntityContentView,
+    OrganizationContentReadAttachmentDownloadView,
     OrganizationContentReadCollectionView,
     OrganizationContentReadDetailView,
     OrganizationContentReadDOCXExportView,
@@ -597,6 +599,11 @@ urlpatterns = [
         name="msp-content-document-detail",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/documents/<uuid:content_id>/attachments/<uuid:attachment_entity_id>/download",
+        MSPContentReadAttachmentDownloadView.as_view(),
+        name="msp-content-document-attachment-download",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/documents/<uuid:content_id>/export/html",
         MSPContentReadHTMLExportView.as_view(),
         name="msp-content-document-html-export",
@@ -730,6 +737,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>",
         OrganizationContentReadDetailView.as_view(),
         name="organization-content-document-detail",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>/attachments/<uuid:attachment_entity_id>/download",
+        OrganizationContentReadAttachmentDownloadView.as_view(),
+        name="organization-content-document-attachment-download",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/documents/<uuid:content_id>/export/html",

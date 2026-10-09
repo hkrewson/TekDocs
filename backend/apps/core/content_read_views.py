@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from django.http import HttpResponse
+from django.db import transaction
+from django.http import Http404, HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,8 +19,8 @@ from apps.accounts.policy import PermissionKey
 from .content_index_models import ContentNode
 from .content_read import document_collection, document_detail, entity_documentation, repository_for_reader
 from .document_exports import export_docx, export_html
-from .document_views import _msp_workspace, _organization_workspace
-from .models import AuditEvent
+from .document_views import _msp_workspace, _organization_workspace, attachment_download_response
+from .models import AuditEvent, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
 from .rendering import render_pdf
 from .workspaces import ResolvedWorkspace
 
@@ -161,6 +163,74 @@ class OrganizationContentReadDetailView(APIView):
                     workspace=_scope(request, organization_entity_id), content_id=content_id, audience="msp_internal"
                 )
             ).data
+        )
+
+
+def _download_document_attachment(
+    request: Request, workspace: ResolvedWorkspace, content_id: UUID, attachment_entity_id: UUID
+) -> HttpResponseBase:
+    with transaction.atomic():
+        try:
+            repository = repository_for_reader(workspace)
+        except WorkspaceRepository.DoesNotExist as exc:
+            raise Http404("Repository document is unavailable") from exc
+        locked = WorkspaceRepository.objects.select_for_update().get(
+            pk=repository.pk, tenant=workspace.member.tenant, workspace=repository.workspace
+        )
+        node = get_object_or_404(
+            ContentNode.objects.filter(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                workspace=locked.workspace,
+                repository=locked,
+                kind="document",
+            ),
+            content_id=content_id,
+        )
+        if (
+            locked.accepted_commit_id is None
+            or locked.accepted_commit_id != locked.indexed_commit_id
+            or node.indexed_commit_id != locked.indexed_commit_id
+        ):
+            return JsonResponse({"detail": "Repository content is not fully indexed"}, status=409)
+        attachment = get_object_or_404(
+            DocumentAttachment.objects.filter(
+                tenant=workspace.member.tenant,
+                organization=workspace.organization,
+                owner_workspace=locked.workspace,
+                owner_content_id=content_id,
+                document__isnull=True,
+                archived_at__isnull=True,
+                scan_status="clean",
+                purpose=DocumentAttachmentPurpose.ATTACHMENT,
+            ),
+            entity_id=attachment_entity_id,
+        )
+        return attachment_download_response(
+            workspace=workspace,
+            attachment=attachment,
+            request=request,
+            action="repository_document.attachment.downloaded",
+        )
+
+
+class MSPContentReadAttachmentDownloadView(APIView):
+    @extend_schema(
+        operation_id="content_read_msp_attachment_download",
+        responses={(200, "application/octet-stream"): bytes, (206, "application/octet-stream"): bytes},
+    )
+    def get(self, request, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _download_document_attachment(request, _scope(request), content_id, attachment_entity_id)
+
+
+class OrganizationContentReadAttachmentDownloadView(APIView):
+    @extend_schema(
+        operation_id="content_read_organization_attachment_download",
+        responses={(200, "application/octet-stream"): bytes, (206, "application/octet-stream"): bytes},
+    )
+    def get(self, request, organization_entity_id, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _download_document_attachment(
+            request, _scope(request, organization_entity_id), content_id, attachment_entity_id
         )
 
 

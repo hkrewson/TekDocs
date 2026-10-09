@@ -9666,6 +9666,54 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/content-graph/documents/{content_id}/attachments/{attachment_entity_id}/download:
+    get:
+      operationId: content_read_msp_attachment_download
+      parameters:
+      - in: path
+        name: attachment_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/content-graph/documents/{content_id}/export/docx:
     get:
       operationId: content_read_msp_docx_export
@@ -19797,6 +19845,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContentReadDetail'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/documents/{content_id}/attachments/{attachment_entity_id}/download
+  : get:
+      operationId: content_read_organization_attachment_download
+      parameters:
+      - in: path
+        name: attachment_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '206':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
           description: ''
           headers:
             X-Request-ID:

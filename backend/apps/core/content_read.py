@@ -10,7 +10,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from .content_index_models import ContentEntityLink, ContentFinding, ContentNode, ContentProperty
-from .document_attachments import resolve_rendered_attachments
+from .document_attachments import resolve_rendered_attachments, resolve_repository_rendered_attachments
 from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
 from .document_keys import key_targets_in_markdown
@@ -75,6 +75,10 @@ def document_detail(
         if node.frontmatter.get("key_bindings", {}) == active_key_bindings:
             key_document = legacy_document
     attachments = resolve_rendered_attachments(workspace=workspace, document=legacy_document, markdown=markdown)
+    if node.kind == "document":
+        attachments.update(resolve_repository_rendered_attachments(
+            workspace=workspace, repository=repository, content_id=node.content_id, markdown=markdown
+        ))
     key_resolutions = resolve_rendered_keys(workspace=workspace, document=key_document, markdown=markdown)
     result: dict[str, Any] = {
         "id": node.content_id,

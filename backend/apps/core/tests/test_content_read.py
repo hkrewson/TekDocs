@@ -4,6 +4,9 @@ import uuid
 from io import BytesIO
 
 import pytest
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import Client, override_settings
 from django.urls import reverse
@@ -13,13 +16,129 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
-from apps.core.models import AuditEvent, ContentEntityLink, InstallationState, Tenant, Workspace, WorkspaceKind
+from apps.core.document_attachments import archive_document_attachment
+from apps.core.models import (
+    AuditEvent,
+    ContentEntityLink,
+    DocumentAttachment,
+    InstallationState,
+    Tenant,
+    Workspace,
+    WorkspaceKind,
+)
 from apps.core.organizations import create_organization
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrity(read_context, tmp_path):
+    installation, organization, _asset, repository = read_context
+    TOTP.activate(installation.owner, generate_totp_secret())
+    content_id = uuid.uuid4()
+    first = repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        changes={"docs/native-file.md": _content(content_id=content_id, title="Native file", body="Read the notes.\n")},
+        message="Add native document",
+    )
+    index_repository_content(repository_id=repository.id)
+    browser = Client()
+    browser.force_login(installation.owner)
+    scope = {"organization_entity_id": organization.entity_id, "content_id": content_id}
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        uploaded = browser.post(
+            reverse("organization-content-authoring-attachment-create", kwargs=scope),
+            {"file": SimpleUploadedFile("steps.txt", b"Safe steps for this client\n")},
+        )
+        assert uploaded.status_code == 201, uploaded.content
+        attachment = DocumentAttachment.objects.get(entity_id=uploaded.json()["id"])
+        assert attachment.document_id is None
+        linked = repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=first.object_id,
+            changes={
+                "docs/native-file.md": _content(
+                    content_id=content_id,
+                    title="Native file",
+                    body=f"Read [the steps](tekdocs://attachment/{attachment.entity_id}).\n",
+                )
+            },
+            message="Link native file",
+        )
+        index_repository_content(repository_id=repository.id)
+        detail_url = reverse("organization-content-document-detail", kwargs=scope)
+        download_url = reverse(
+            "organization-content-document-attachment-download",
+            kwargs={**scope, "attachment_entity_id": attachment.entity_id},
+        )
+        detail = browser.get(detail_url)
+        assert detail.status_code == 200, detail.content
+        assert f'href="{download_url}"' in detail.json()["sanitized_html"]
+        assert "steps.txt" in detail.json()["sanitized_html"]
+        downloaded = browser.get(download_url)
+        assert downloaded.status_code == 200
+        assert b"".join(downloaded.streaming_content) == b"Safe steps for this client\n"
+        assert downloaded["Cache-Control"] == "private, no-store"
+        assert downloaded["X-Content-Type-Options"] == "nosniff"
+        assert downloaded["Content-Type"] == "application/octet-stream"
+        partial = browser.get(download_url, HTTP_RANGE="bytes=5-9")
+        assert partial.status_code == 206
+        assert partial.content == b"steps"
+        assert browser.get(download_url, HTTP_RANGE="bytes=999-").status_code == 416
+        assert AuditEvent.objects.filter(
+            action="repository_document.attachment.downloaded", entity_id=attachment.entity_id
+        ).count() == 2
+        sibling = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id, name="File sibling",
+            legal_name="File sibling", website="", classifications=["client"],
+        )
+        assert browser.get(reverse(
+            "organization-content-document-attachment-download",
+            kwargs={"organization_entity_id": sibling.entity_id, "content_id": content_id,
+                    "attachment_entity_id": attachment.entity_id},
+        )).status_code == 404
+        assert browser.get(reverse(
+            "organization-content-document-attachment-download",
+            kwargs={**scope, "content_id": uuid.uuid4(), "attachment_entity_id": attachment.entity_id},
+        )).status_code == 404
+        portal_user = User.objects.create_user(email="native-file-client@example.invalid", display_name="File client")
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization
+        )
+        browser.force_login(portal_user)
+        assert browser.get(download_url).status_code == 403
+        browser.force_login(installation.owner)
+
+        repository.refresh_from_db()
+        repository.indexed_commit = None
+        repository.save(update_fields=["indexed_commit", "updated_at"])
+        assert browser.get(download_url).status_code == 409
+        repository.indexed_commit = repository.accepted_commit
+        repository.save(update_fields=["indexed_commit", "updated_at"])
+
+        stored_name = attachment.file.name
+        attachment.file.storage.delete(stored_name)
+        assert browser.get(download_url).status_code == 400
+        assert "Unavailable attachment" in browser.get(detail_url).json()["sanitized_html"]
+        assert attachment.file.storage.save(
+            stored_name, ContentFile(b"Safe steps for this client\n")
+        ) == stored_name
+        assert browser.get(download_url).status_code == 200
+        assert "steps.txt" in browser.get(detail_url).json()["sanitized_html"]
+        attachment.file.storage.delete(stored_name)
+        assert attachment.file.storage.save(stored_name, ContentFile(b"tampered file")) == stored_name
+        assert browser.get(download_url).status_code == 400
+        assert "Unavailable attachment" in browser.get(detail_url).json()["sanitized_html"]
+        archive_document_attachment(attachment=attachment, actor_id=installation.owner.id)
+        assert browser.get(download_url).status_code == 404
+        assert AuditEvent.objects.filter(
+            action="repository_document.attachment.downloaded", entity_id=attachment.entity_id
+        ).count() == 3
+        repository.refresh_from_db()
+        assert repository.accepted_commit.object_id == linked.object_id
 
 
 def _content(*, content_id: uuid.UUID, title: str, body: str, metadata: str = "", kind: str = "document") -> bytes:

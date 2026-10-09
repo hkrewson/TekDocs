@@ -86,6 +86,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-documents", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-content-document-attachment-download", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-html-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-pdf-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-docx-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1452,6 +1453,12 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("organization-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route("organization-content-documents", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route("organization-content-document-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
+    route(
+        "organization-content-document-attachment-download",
+        ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
     route(
         "organization-content-document-html-export", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True
     ),

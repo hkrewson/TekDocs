@@ -1893,8 +1893,8 @@ missing or altered Git source cannot pass merely because indexed rows still
 match the legacy export. The referenced-file editable bundle and offline
 verifier are implemented; database records, Git history and unreferenced files
 remain outside that editing handoff, not outside the separate backup path.
-Repository-native managed-file use is still open: the renderer and publication
-preflight require a legacy `Document` row.
+Repository-native managed-file use is still incomplete: publication preflight
+requires a legacy `Document` row.
 [ADR 0114](adr/0114-stable-managed-file-content-ownership.md) is accepted,
 and the first expand/backfill slice now stores stable Workspace/content UUID
 owners on existing attachment records, dual-writes
@@ -1905,8 +1905,11 @@ The next internal custody shape permits a managed attachment record without a
 legacy document only when its exact-Workspace Git document is accepted and
 indexed. A later staff API now accepts ordinary scanned uploads for that owner,
 with an exact Workspace and accepted/indexed-document check under lock. It has
-no repository file download, inline render, or editor control yet; those paths
-remain blocked until their own authorization and retained-byte checks pass.
+A subsequent staff read/download slice resolves native links through the exact
+Git document owner, checks retained bytes before displaying a link and again
+before private full or ranged download, and preserves copied legacy links on
+their existing route. The repository editor still has no upload control;
+editable-bundle, publication, and recovery parity remain open.
 The `0.9.7` exit checklist now names that custody path and its authorization,
 publication and recovery tests before any authority handoff.
 The next entity-card slice resolves narrative entity links through the existing

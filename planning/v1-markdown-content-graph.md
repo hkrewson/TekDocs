@@ -593,10 +593,9 @@ GitHub access.
 The managed-file record previously required a legacy `Document` owner. That
 schema requirement is now optional for an indexed Git document. A scoped staff
 API can now upload an ordinary file for that owner through the existing scanner
-and private storage, but a document created only through repository authoring
-still cannot use the file in the product: its attachment links cannot resolve
-through the repository detail reader, and publication preflight requires a
-matching legacy document.
+and private storage. The repository detail reader now resolves integrity-checked
+native file links for authorized staff, and its scoped private download repeats
+the byte check. Publication preflight still requires a matching legacy document.
 The editable bundle can verify bytes of referenced, same-Workspace legacy
 files, but that is not repository-native file ownership. This is a verified
 implementation gap, not an assumption that the bundle closes file parity.
@@ -613,8 +612,10 @@ ordinary attachment with an accepted-and-indexed Git document owner in the
 same Workspace. It also keeps the owner immutable and excludes native primary
 versions. A subsequent API upload slice checks the exact accepted/indexed Git
 document and Workspace under a database lock, then stores an ordinary scanned
-file with the stable owner. Neither slice is the repository read/export/
-publication/recovery or authority-handoff gate.
+file with the stable owner. A read/download slice now resolves only exact-owner
+native links, retains legacy URLs for copied documents, and fails closed on
+missing or changed bytes. Editable-bundle, publication, recovery, editor UI,
+and authority-handoff gates remain open.
 
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

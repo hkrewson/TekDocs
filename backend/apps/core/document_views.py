@@ -918,6 +918,15 @@ def _download_attachment(
     workspace: ResolvedWorkspace, document_entity_id: UUID, attachment_entity_id: UUID, request: Request
 ) -> HttpResponseBase:
     _document_record, attachment = _attachment(workspace, document_entity_id, attachment_entity_id)
+    return attachment_download_response(
+        workspace=workspace, attachment=attachment, request=request, action="document.attachment.downloaded"
+    )
+
+
+def attachment_download_response(
+    *, workspace: ResolvedWorkspace, attachment: DocumentAttachment, request: Request, action: str
+) -> HttpResponseBase:
+    """Return checked private bytes with the same bounded range policy for both owners."""
     retained = open_document_attachment(attachment)
     content = retained.read()
     range_header = request.headers.get("Range", "").strip()
@@ -970,7 +979,7 @@ def _download_attachment(
     AuditEvent.objects.create(
         tenant=workspace.member.tenant,
         actor=request.user,
-        action="document.attachment.downloaded",
+        action=action,
         entity_id=attachment.entity_id,
         metadata={"partial": status == 206, "purpose": attachment.purpose},
     )

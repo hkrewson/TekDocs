@@ -386,3 +386,46 @@ def resolve_rendered_attachments(
             "download_url": reverse(route, kwargs=kwargs),
         }
     return result
+
+
+def resolve_repository_rendered_attachments(
+    *, workspace: ResolvedWorkspace, repository: WorkspaceRepository, content_id: UUID, markdown: str
+) -> dict[str, RenderedAttachment]:
+    """Project only checked files owned by the exact indexed document."""
+    requested = attachment_ids_in_markdown(markdown)
+    if (
+        not requested
+        or repository.accepted_commit_id is None
+        or repository.accepted_commit_id != repository.indexed_commit_id
+    ):
+        return {}
+    records = DocumentAttachment.objects.filter(
+        tenant=workspace.member.tenant,
+        organization=workspace.organization,
+        owner_workspace=repository.workspace,
+        owner_content_id=content_id,
+        document__isnull=True,
+        entity_id__in=requested,
+        archived_at__isnull=True,
+        scan_status="clean",
+        purpose=DocumentAttachmentPurpose.ATTACHMENT,
+    )
+    route = "msp-content-document-attachment-download"
+    kwargs: dict[str, UUID] = {"content_id": content_id}
+    if workspace.organization is not None:
+        route = "organization-content-document-attachment-download"
+        kwargs["organization_entity_id"] = workspace.organization.entity_id
+    result: dict[str, RenderedAttachment] = {}
+    for attachment in records:
+        try:
+            retained = open_document_attachment(attachment)
+        except ValidationError:
+            continue
+        retained.close()
+        result[str(attachment.entity_id)] = {
+            "id": str(attachment.entity_id),
+            "filename": attachment.original_filename,
+            "size": attachment.size,
+            "download_url": reverse(route, kwargs={**kwargs, "attachment_entity_id": attachment.entity_id}),
+        }
+    return result

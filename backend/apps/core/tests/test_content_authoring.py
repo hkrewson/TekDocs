@@ -389,6 +389,28 @@ def test_native_attachment_upload_accepts_exact_organization_workspace(authoring
         call_command("verify_recovery_managed_files", verbosity=0)
 
 
+def test_native_msp_attachment_download_uses_content_owner(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        upload = browser.post(
+            reverse("msp-content-authoring-attachment-create", args=[document.content_id]),
+            {"file": SimpleUploadedFile("owner.txt", b"MSP only\n")},
+        )
+        assert upload.status_code == 201, upload.content
+        attachment_id = upload.json()["id"]
+        download_url = reverse(
+            "msp-content-document-attachment-download",
+            kwargs={"content_id": document.content_id, "attachment_entity_id": attachment_id},
+        )
+        download = browser.get(download_url)
+        assert download.status_code == 200
+        assert b"".join(download.streaming_content) == b"MSP only\n"
+        assert Client().get(download_url).status_code in {401, 403}
+
+
 def test_accepted_index_marker_retries_without_rewriting_git(authoring_context):
     installation, repository = authoring_context
     authored = _create(installation, repository)

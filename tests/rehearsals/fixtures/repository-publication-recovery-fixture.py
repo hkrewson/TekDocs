@@ -252,5 +252,41 @@ elif mode == "corrupt":
         reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]), secure=True,
     ).status_code == 404
     print("Restored retained attachment corruption refused by client routes")
+elif mode == "restore_repository_attachment":
+    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            pk=artifact_id, source_attachment=source_attachment, organization=organization,
+        )
+        path = artifact.file.name
+        artifact.file.storage.delete(path)
+        assert artifact.file.storage.save(path, ContentFile(ATTACHMENT_BYTES)) == path
+        publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
+        assert verify_repository_static_publication(publication)
+    print("Restored repository attachment repaired in disposable recovery stack")
+elif mode == "corrupt_legacy":
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        publication = DocumentPublication.objects.get(
+            entity_id=uuid.UUID(os.environ["TEKDOCS_RECOVERY_LEGACY_PUBLICATION_ID"]),
+            tenant=tenant, organization=organization,
+        )
+        artifact = publication.artifacts.get(kind="pdf")
+        path = artifact.file.name
+        artifact.file.storage.delete(path)
+        assert artifact.file.storage.save(path, ContentFile(b"corrupt legacy recovery fixture bytes")) == path
+        assert not verify_retained_publication_custody(publication)
+    print("Restored legacy PDF corruption refused by custody verifier")
 else:
-    raise RuntimeError("TEKDOCS_RECOVERY_PUBLICATION_MODE must be create, verify, or corrupt")
+    raise RuntimeError(
+        "TEKDOCS_RECOVERY_PUBLICATION_MODE must be create, verify, corrupt, "
+        "restore_repository_attachment, or corrupt_legacy"
+    )

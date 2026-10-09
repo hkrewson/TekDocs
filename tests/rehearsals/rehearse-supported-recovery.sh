@@ -253,7 +253,29 @@ if compose_for "$restore_environment" "$restored_secrets" exec -T \
   exit 1
 fi
 grep -q 'Retained repository publication integrity check failed' "$corrupt_publication_log"
+echo "Repairing the disposable repository attachment before the legacy corruption check"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_repository_attachment \
+  -e TEKDOCS_RECOVERY_PUBLICATION_ID="$publication_id" \
+  -e TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID="$publication_attachment_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications
+echo "Checking restored legacy PDF corruption refusal"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_legacy \
+  -e TEKDOCS_RECOVERY_LEGACY_PUBLICATION_ID="$legacy_publication_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_legacy_log="$work_directory/corrupt-legacy-publication.log"
+if compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications > "$corrupt_legacy_log" 2>&1; then
+  echo "Retained publication verification accepted corrupt restored legacy PDF" >&2
+  exit 1
+fi
+grep -q 'Retained legacy publication integrity check failed' "$corrupt_legacy_log"
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs and released publication with retained attachment, restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, source ZIPs, legacy and released repository publications, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

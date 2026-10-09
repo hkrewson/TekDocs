@@ -92,8 +92,11 @@ This is a narrow shadow check, not full read parity or an
 authority transition: legacy reads and writes remain authoritative until their
 parity and publication gates are implemented and verified.
 Copy parity also checks indexed portable properties, taxonomies, topic identity,
-title and Markdown against the parsed repository source; a stale derived row is
-reported as `diverged` until the index is rebuilt. Ordered include edges must
+title and Markdown against the parsed repository source, then re-reads each
+copied file from the accepted Git revision to require its exact source bytes;
+a stale derived row or missing/altered Git file is reported as `diverged`.
+The corresponding index or Git source must be repaired before parity can
+return. Ordered include edges must
 also retain their targets, audience, resolution mode and live source digest.
 Indexed wikilinks must retain their order, labels, fragments and resolved
 backlink pointers; missing targets remain unresolved rather than fabricated.

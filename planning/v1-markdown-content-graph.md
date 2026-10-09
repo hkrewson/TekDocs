@@ -579,6 +579,10 @@ gates after file, template, review, key, publication and recovery parity.
   attachment bytes for an otherwise in-sync copy. Changed or missing bytes
   report divergence and suppress the shadow read match until repaired; this
   is not an authority transition or complete file-backed-document parity.
+- The same preflight now re-reads each copied Markdown source from the accepted
+  Git revision and compares exact bytes with the legacy export. Missing or
+  changed Git objects report divergence even when indexed rows still match;
+  this does not itself promote repository reads or writes.
 
 Exit condition: retained publications remain verifiable and append-only, and a
 supported backup restores the exact accepted content graph without network or

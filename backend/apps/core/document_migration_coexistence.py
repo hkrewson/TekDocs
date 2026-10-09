@@ -29,6 +29,7 @@ from .entity_mentions import resolve_entity_mentions
 from .models import ContentNode, Document, Workspace, WorkspaceRepository
 from .relationships import visible_entities_for_workspace
 from .rendering import render_markdown
+from .repository_service import RepositoryServiceError, read_accepted_repository_file
 from .workspaces import ResolvedWorkspace
 
 
@@ -215,6 +216,16 @@ def _document_copy_status(*, workspace: Workspace, document: Document) -> dict[s
         response["content_copy_state"] = "diverged"
         return response
     if attachment_digests != export.attachment_digests:
+        response["content_copy_state"] = "diverged"
+        return response
+    try:
+        if any(
+            read_accepted_repository_file(repository_id=repository.id, path=path) != source
+            for path, source in export.files
+        ):
+            response["content_copy_state"] = "diverged"
+            return response
+    except RepositoryServiceError:
         response["content_copy_state"] = "diverged"
         return response
     response["content_copy_state"] = "in_sync"

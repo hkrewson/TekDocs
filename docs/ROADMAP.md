@@ -1888,6 +1888,11 @@ The legacy document copy-status preflight now verifies retained ordinary
 attachment bytes before reporting an in-sync copy and matched shadow read;
 missing or altered bytes report divergence. This diagnostic guard does not
 switch document authority or close the remaining file parity gates.
+It also re-reads the copied Markdown from the accepted Git revision, so a
+missing or altered Git source cannot pass merely because indexed rows still
+match the legacy export. The referenced-file editable bundle and offline
+verifier are implemented; database records, Git history and unreferenced files
+remain outside that editing handoff, not outside the separate backup path.
 The next entity-card slice resolves narrative entity links through the existing
 permission-filtered relationship path, limits publication evidence to active
 targets owned by the exact Workspace, and requires client visibility for a

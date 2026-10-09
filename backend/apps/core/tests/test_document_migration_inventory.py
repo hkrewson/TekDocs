@@ -46,6 +46,7 @@ from apps.core.models import (
     WorkspaceKind,
 )
 from apps.core.organizations import create_organization
+from apps.core.repository_service import RepositoryServiceError
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.topic_schemas import inspect_markdown
@@ -222,7 +223,7 @@ def test_content_keys_remain_deferred_from_document_copy(tmp_path):
         assert json.loads(output.getvalue())["blockers"] == ["content_key_parity_required"]
 
 
-def test_attachment_links_survive_copy_render_and_rollback(tmp_path):
+def test_attachment_links_survive_copy_render_and_rollback(tmp_path, monkeypatch):
     with override_settings(
         TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"),
         MEDIA_ROOT=str(tmp_path / "media"),
@@ -319,6 +320,28 @@ def test_attachment_links_survive_copy_render_and_rollback(tmp_path):
         assert "tekdocs://attachment/" not in html
         assert str(attachment.entity_id) in html
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id})
+        assert browser.get(status_url).json()["read_projection_state"] == "matched"
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                document_migration_coexistence,
+                "read_accepted_repository_file",
+                lambda **_kwargs: b"changed source",
+            )
+            source_status = browser.get(status_url).json()
+        assert source_status["content_copy_state"] == "diverged"
+        assert source_status["read_projection_state"] == "not_checked"
+        assert "content_copy_not_in_sync" in source_status["handoff_blockers"]
+        assert "changed source" not in json.dumps(source_status)
+
+        def missing_source(**_kwargs):
+            raise RepositoryServiceError("unavailable Git object")
+
+        with monkeypatch.context() as patch:
+            patch.setattr(document_migration_coexistence, "read_accepted_repository_file", missing_source)
+            missing_source_status = browser.get(status_url).json()
+        assert missing_source_status["content_copy_state"] == "diverged"
+        assert missing_source_status["read_projection_state"] == "not_checked"
+        assert "unavailable Git object" not in json.dumps(missing_source_status)
         assert browser.get(status_url).json()["read_projection_state"] == "matched"
         download = browser.get(
             reverse(

@@ -52,8 +52,11 @@ reports `content_copy_state`, `read_projection_state` and explicit
 repository-read, repository-write and publication blockers. Status re-verifies
 the retained bytes of all active ordinary document attachments before calling
 a copy `in_sync`; a missing or altered file reports `diverged` and does not
-run the repository read comparison. Repairing the exact retained bytes can
-restore the shadow match, but does not promote repository authority.
+run the repository read comparison. It also re-reads each copied Markdown file
+from the accepted Git revision and requires exact exported source bytes; an
+unavailable or changed Git file likewise reports `diverged`. Repairing the
+exact retained bytes can restore the shadow match, but does not promote
+repository authority.
 
 ## Roll back an unchanged copy
 

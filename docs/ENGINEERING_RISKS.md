@@ -235,6 +235,9 @@ The legacy document migration-status preflight separately rechecks the bytes
 of all active ordinary attachments before claiming an in-sync copy or matched
 shadow read. Missing or altered bytes now report divergence; repository
 document authority remains with the legacy store until the remaining gates pass.
+The preflight also re-reads each copied Markdown file from the accepted Git
+revision, closing a false match between intact index rows and missing or
+changed source objects without claiming full repository recovery validation.
 
 ## 0.9.2 Markdown/index disposition
 

@@ -150,6 +150,12 @@ if ! backup_compose run --rm --no-deps backend python manage.py verify_recovery_
   exit 1
 fi
 
+echo "Verifying signed publication custody before media capture"
+if ! backup_compose run --rm --no-deps backend python manage.py verify_recovery_publications; then
+  echo "Retained publication verification failed before backup." >&2
+  exit 1
+fi
+
 echo "Capturing managed media into an authenticated encrypted artifact"
 media_pipe="$partial_directory/media.pipe"
 mkfifo "$media_pipe"

@@ -156,6 +156,33 @@ compose_for "$source_environment" "$source_secrets" up -d --wait backend
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
+echo "Checking backup refusal when an older retained publication artifact is corrupt"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_primary \
+  -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_ID="$primary_version_2_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_publication_backup="$work_directory/corrupt-publication-backup"
+if "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
+  --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$corrupt_publication_backup" \
+  > "$work_directory/corrupt-publication-backup.log" 2>&1; then
+  echo "Backup accepted a corrupt retained publication artifact." >&2
+  exit 1
+fi
+grep -q 'Retained publication verification failed before backup' \
+  "$work_directory/corrupt-publication-backup.log"
+[ ! -e "$corrupt_publication_backup" ]
+[ -z "$(find "$work_directory" -maxdepth 1 -name 'corrupt-publication-backup.partial.*' -print -quit)" ]
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_primary \
+  -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  backend python manage.py verify_recovery_publications
 echo "Checking backup refusal when a retained managed file is missing"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=break_managed_file backend python manage.py shell --no-imports \

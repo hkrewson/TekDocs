@@ -1,3 +1,4 @@
+import hashlib
 import secrets
 from datetime import timedelta
 
@@ -10,7 +11,7 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.core.models import AuditEvent, Document, Entity, InstallationState, Organization, Tenant
+from apps.core.models import AuditEvent, Document, DocumentReviewState, Entity, InstallationState, Organization, Tenant
 
 
 @pytest.fixture
@@ -155,6 +156,10 @@ def test_review_request_decision_and_later_edit_invalidation(owner_client, appro
     assert requested.status_code == 200
     assert requested.json()["review_state"] == "pending"
     assert requested.json()["reviewer_name"] == "Documentation Approver"
+    document_record = Document.objects.get(entity_id=document["id"])
+    assert document_record.review_content_sha256 == hashlib.sha256(
+        b"Rotate the recovery key."
+    ).hexdigest()
 
     decision_url = reverse("msp-document-review-decision", kwargs={"document_entity_id": document["id"]})
     approved = approver_client.post(
@@ -178,6 +183,46 @@ def test_review_request_decision_and_later_edit_invalidation(owner_client, appro
     assert edited.status_code == 200
     assert edited.json()["review_state"] == "unreviewed"
     assert edited.json()["health_status"] == "unowned"
+    document_record.refresh_from_db()
+    assert document_record.review_content_sha256 is None
+
+
+@pytest.mark.django_db
+def test_review_decision_refuses_a_different_pinned_content_revision(owner_client, approver_client, approver):
+    document = create_document(owner_client)
+    requested = owner_client.post(
+        reverse("msp-document-review-request", kwargs={"document_entity_id": document["id"]}),
+        {"reviewer_id": str(approver.id), "note": "Review this exact revision."},
+        content_type="application/json",
+    )
+    assert requested.status_code == 200
+
+    edited = owner_client.put(
+        reverse("msp-document-detail", kwargs={"document_entity_id": document["id"]}),
+        {
+            "title": document["title"],
+            "markdown": "A different recovery procedure.",
+            "base_revision_id": requested.json()["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+    assert edited.status_code == 200
+    document_record = Document.objects.get(entity_id=document["id"])
+    Document.objects.filter(pk=document_record.pk).update(
+        review_state=DocumentReviewState.PENDING,
+        review_requested_by_id=owner_client.session.get("_auth_user_id"),
+        review_requested_at=timezone.now(),
+        reviewer_id=approver.id,
+        review_decided_at=None,
+    )
+
+    decision = approver_client.post(
+        reverse("msp-document-review-decision", kwargs={"document_entity_id": document["id"]}),
+        {"decision": "approved", "note": "Approved."},
+        content_type="application/json",
+    )
+    assert decision.status_code == 400
+    assert "reviewed content changed" in str(decision.json()).lower()
 
 
 @pytest.mark.django_db

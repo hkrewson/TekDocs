@@ -201,6 +201,13 @@ def _create_managed_attachment(
                     ).exists()
                 ):
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
+                if Document.objects.filter(
+                    id=content_id,
+                    tenant=tenant,
+                    organization=organization,
+                    entity__workspace=workspace,
+                ).exists():
+                    raise ValidationError({"content_id": "Legacy content remains authoritative for this document."})
                 accepted_commit = repository.accepted_commit
                 if accepted_commit is None:
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})

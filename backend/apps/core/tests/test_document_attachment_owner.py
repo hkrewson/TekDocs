@@ -14,11 +14,18 @@ from django.core.management.base import CommandError
 from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
 from django.utils import timezone
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core import repository_storage
 from apps.core.content_authoring import author_content
-from apps.core.document_attachments import archive_document_attachment, create_document_attachment
+from apps.core.content_index import index_repository_content
+from apps.core.document_attachments import (
+    archive_document_attachment,
+    create_document_attachment,
+    create_repository_document_attachment,
+)
+from apps.core.document_migration_export import build_simple_document_export
 from apps.core.documents import create_document
 from apps.core.models import (
     ContentNode,
@@ -30,6 +37,7 @@ from apps.core.models import (
     document_attachment_upload_to,
 )
 from apps.core.organizations import create_organization
+from apps.core.repository_service import RepositoryAuditAttribution, commit_repository_files
 from apps.core.rls_contract import RUNTIME_ROLE
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -236,3 +244,71 @@ def test_native_owner_requires_indexed_document_and_exact_workspace(tmp_path):
         archive_document_attachment(attachment=attachment, actor_id=installation.owner.id)
         attachment.refresh_from_db()
         assert attachment.archived_at is not None
+
+
+def test_copied_legacy_document_cannot_acquire_native_file_owner(tmp_path):
+    with override_settings(
+        TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"), MEDIA_ROOT=str(tmp_path / "media")
+    ):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Legacy file owner MSP",
+            owner_email=f"legacy-file-owner-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Legacy File Owner",
+            password="LegacyFileOwner-2026!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+        legacy = create_document(
+            tenant=installation.tenant,
+            organization=None,
+            actor_id=installation.owner.id,
+            title="Legacy guide",
+            markdown="Legacy file instructions.\n",
+        )
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        copied = build_simple_document_export(legacy)
+        commit_repository_files(
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+            changes=dict(copied.files),
+            message="Copy legacy guide for owner isolation test",
+            attribution=RepositoryAuditAttribution(
+                actor_id=installation.owner.id, action="content.migration_test_copy"
+            ),
+        )
+        index_repository_content(repository_id=repository.id)
+        with pytest.raises(ValidationError, match="Legacy content remains authoritative"):
+            create_repository_document_attachment(
+                repository=repository,
+                content_id=legacy.id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("native.txt", b"native file bytes\n"),
+            )
+
+        content = b"native file bytes\n"
+        entity = Entity.objects.create(
+            tenant=installation.tenant,
+            workspace=workspace,
+            organization=None,
+            entity_type="document_attachment",
+            display_name="bypass.txt",
+        )
+        with pytest.raises(DatabaseError), transaction.atomic():
+            DocumentAttachment.objects.create(
+                tenant=installation.tenant,
+                organization=None,
+                document=None,
+                owner_workspace=workspace,
+                owner_content_id=legacy.id,
+                entity=entity,
+                file=f"document-attachments/{installation.tenant.id}/{legacy.id}/{uuid.uuid4()}",
+                original_filename="bypass.txt",
+                media_type="text/plain",
+                size=len(content),
+                checksum=sha256(content).hexdigest(),
+                scan_status="clean",
+                scan_engine="test-scanner",
+                scanned_at=timezone.now(),
+            )
+        assert not DocumentAttachment.objects.filter(owner_content_id=legacy.id, document__isnull=True).exists()

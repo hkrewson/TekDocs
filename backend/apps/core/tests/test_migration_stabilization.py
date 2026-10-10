@@ -6,12 +6,14 @@ from importlib import import_module
 
 import psycopg
 import pytest
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
 from django.test import override_settings
 from django.utils import timezone
 from psycopg import sql
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import (
@@ -32,6 +34,7 @@ from apps.core.document_attachments import (
     create_document_attachment,
     create_repository_document_attachment,
 )
+from apps.core.document_migration_export import build_simple_document_export
 from apps.core.documents import create_document
 from apps.core.invoicing import (
     configure_issue_settings,
@@ -349,9 +352,10 @@ def migration_head_restored(transactional_db):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_restored, tmp_path):
+def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_restored, tmp_path, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("Attachment owner upgrade validation requires PostgreSQL")
+    monkeypatch.setattr(settings, "TEKDOCS_REPOSITORY_ROOT", str(tmp_path / "repositories"))
 
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     installation = bootstrap_owner(
@@ -428,6 +432,26 @@ def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_r
         assert native.owner_workspace_id == workspace.id
         assert native.owner_content_id == content_id
         assert copy_attachment_content(native) == b"Git-only bytes survive upgrade\n"
+
+        copied = build_simple_document_export(document)
+        repository.refresh_from_db()
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+            changes=dict(copied.files),
+            message="Copy upgraded legacy document for file owner test",
+            attribution=repository_service.RepositoryAuditAttribution(
+                actor_id=installation.owner.id, action="content.migration_test_copy"
+            ),
+        )
+        index_repository_content(repository_id=repository.id)
+        with pytest.raises(ValidationError, match="Legacy content remains authoritative"):
+            create_repository_document_attachment(
+                repository=repository,
+                content_id=document.id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("wrong-owner.txt", b"Wrong owner\n"),
+            )
 
 
 @pytest.mark.django_db(transaction=True)

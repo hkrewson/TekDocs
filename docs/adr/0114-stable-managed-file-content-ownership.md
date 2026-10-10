@@ -22,7 +22,11 @@ legacy-document link only for repository-native ownership after database,
 authorization and recovery guards are ready. A Git content node is validated
 at the accepted-and-indexed revision when a file operation occurs, but is not
 a foreign-key parent of retained file custody. The existing scanner, private
-storage and publication-evidence identity remain in use.
+storage and publication-evidence identity remain in use. While a legacy
+`Document` with the same stable ID exists in that exact Workspace, it remains
+the file owner too: a copied Git node cannot receive a second,
+repository-native attachment record. Both the upload service and a database
+insert guard enforce this coexistence boundary.
 
 ## Alternatives considered
 

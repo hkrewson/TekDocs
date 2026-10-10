@@ -51031,6 +51031,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RepositoryEvidenceReviewAttachment'
+        primary_file:
+          allOf:
+          - $ref: '#/components/schemas/RepositoryEvidenceReviewPrimaryFile'
+          nullable: true
         verified:
           type: boolean
       required:
@@ -51039,6 +51043,7 @@ components:
       - canonical_markdown
       - content_id
       - id
+      - primary_file
       - signed_at
       - source_commit
       - title
@@ -51064,6 +51069,58 @@ components:
       - media_type
       - size
       - source_id
+    RepositoryEvidenceReviewPrimaryFile:
+      type: object
+      properties:
+        selected_source_id:
+          type: string
+          format: uuid
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryEvidenceReviewPrimaryVersion'
+      required:
+      - selected_source_id
+      - versions
+    RepositoryEvidenceReviewPrimaryVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        source_id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+        version_number:
+          type: integer
+        replaces_id:
+          type: string
+          format: uuid
+          nullable: true
+        owner_type:
+          enum:
+          - legacy_document
+          - repository_document
+          type: string
+          description: |-
+            * `legacy_document` - legacy_document
+            * `repository_document` - repository_document
+          x-spec-enum-id: 0ca4bb128da414eb
+      required:
+      - filename
+      - id
+      - media_type
+      - owner_type
+      - replaces_id
+      - size
+      - source_id
+      - version_number
     RepositoryEvidenceSummary:
       type: object
       properties:

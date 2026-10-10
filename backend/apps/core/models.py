@@ -5140,7 +5140,10 @@ class RepositoryPublicationEvidence(models.Model):
             or (self.audience == PublicationAudience.CLIENT_VISIBLE and self.organization_id is None)
             or self.signature_algorithm != "Ed25519"
             or not isinstance(source, dict)
-            or self.manifest.get("format") != "tekdocs-repository-publication-evidence/v1"
+            or self.manifest.get("format") not in {
+                "tekdocs-repository-publication-evidence/v1",
+                "tekdocs-repository-publication-evidence/v2",
+            }
             or self.manifest.get("evidence_id") != str(self.id)
             or self.manifest.get("workspace_id") != str(self.workspace_id)
             or self.manifest.get("repository_id") != str(self.repository_id)

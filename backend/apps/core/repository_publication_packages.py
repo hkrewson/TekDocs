@@ -67,6 +67,7 @@ def verify_repository_publication_package(package: RepositoryPublicationPackage)
         or evidence.audience != PublicationAudience.CLIENT_VISIBLE
         or organization_id is None
         or evidence.signed_by_id == decision.actor_id
+        or "primary_file" in evidence.manifest
         or (package.tenant_id, package.organization_id, package.workspace_id)
         != (decision.tenant_id, decision.organization_id, decision.workspace_id)
         or (package.tenant_id, package.organization_id, package.workspace_id)
@@ -110,6 +111,7 @@ def create_repository_publication_package(
         or evidence.audience != PublicationAudience.CLIENT_VISIBLE
         or organization_id is None
         or evidence.signed_by_id == decision.actor_id
+        or "primary_file" in evidence.manifest
         or not verify_repository_publication_evidence(evidence)["valid"]
     ):
         raise RepositoryPublicationPackageError("Accepted, intact client evidence is required")

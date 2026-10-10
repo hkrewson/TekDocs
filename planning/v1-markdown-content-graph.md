@@ -645,19 +645,17 @@ metadata, typed legacy ownership and the complete editable-bundle digest
 survive an independent restore. A missing superseded version now blocks both
 backup and post-restore integrity verification in the disposable stacks, and
 repair must restore a clean sweep. It does not transfer legacy file custody.
-Until publication evidence can freeze a primary-file chain and its selected
-document role, signing a repository document with any retained primary-file
-version fails with an explicit parity-pending conflict. Ordinary-file
-publication and historical evidence verification remain available; this is a
-fail-closed guard, not publication parity.
-The next publication slice has an internal primary-file snapshot preparation
-step. It locks the exact repository/document owner, requires an explicit
+The publication path has an internal primary-file snapshot preparation
+step. It locks the exact repository/document owner, checks an explicit
 current-version selection, verifies the complete retained chain and every
 version's private bytes, and produces typed-owner descriptors for later signed
 retention. Stale selections, broken history and missing bytes fail closed.
-No evidence or publication is created by preparation; the parity-pending
-signing guard remains until signed retention, review, package delivery and
-restore verification consume the snapshot end to end.
+Signed repository evidence now retains the complete selected primary-file
+version chain and independently copied bytes under a v2 manifest. Reviewers
+can inspect each version and missing or altered retained bytes invalidate the
+whole evidence record. Earlier v1 evidence remains verifiable. Primary-file
+evidence cannot yet be accepted for packaging or distributed: package and
+STATIC delivery parity, plus independent restore verification, remain open.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

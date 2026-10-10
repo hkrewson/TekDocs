@@ -110,6 +110,17 @@ class RepositoryEvidenceReviewAttachmentSerializer(serializers.Serializer):
     size = serializers.IntegerField()
 
 
+class RepositoryEvidenceReviewPrimaryVersionSerializer(RepositoryEvidenceReviewAttachmentSerializer):
+    version_number = serializers.IntegerField()
+    replaces_id = serializers.UUIDField(allow_null=True)
+    owner_type = serializers.ChoiceField(choices=("legacy_document", "repository_document"))
+
+
+class RepositoryEvidenceReviewPrimaryFileSerializer(serializers.Serializer):
+    selected_source_id = serializers.UUIDField()
+    versions = RepositoryEvidenceReviewPrimaryVersionSerializer(many=True)
+
+
 class RepositoryEvidenceReviewSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     content_id = serializers.UUIDField()
@@ -119,6 +130,7 @@ class RepositoryEvidenceReviewSerializer(serializers.Serializer):
     signed_at = serializers.DateTimeField()
     canonical_markdown = serializers.CharField()
     attachments = RepositoryEvidenceReviewAttachmentSerializer(many=True)
+    primary_file = RepositoryEvidenceReviewPrimaryFileSerializer(allow_null=True)
     verified = serializers.BooleanField()
 
 
@@ -315,6 +327,25 @@ def _review(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respons
                     }
                     for item in evidence.manifest.get("attachments", [])
                 ],
+                "primary_file": (
+                    {
+                        "selected_source_id": evidence.manifest["primary_file"]["selected_source_id"],
+                        "versions": [
+                            {
+                                "id": item["id"],
+                                "source_id": item["source_id"],
+                                "version_number": item["version_number"],
+                                "replaces_id": item["replaces_id"],
+                                "owner_type": item["owner"]["type"],
+                                "filename": item["filename"],
+                                "media_type": item["media_type"],
+                                "size": item["size"],
+                            }
+                            for item in evidence.manifest["primary_file"]["versions"]
+                        ],
+                    }
+                    if "primary_file" in evidence.manifest else None
+                ),
                 "verified": True,
             }
         ).data
@@ -371,7 +402,10 @@ def _review_attachment(  # type: ignore[no-untyped-def]
     if not verify_repository_publication_evidence(evidence)["valid"]:
         response = HttpResponse("Retained publication evidence failed verification", status=409)
     else:
-        descriptors = evidence.manifest.get("attachments", [])
+        descriptors = [
+            *evidence.manifest.get("attachments", []),
+            *evidence.manifest.get("primary_file", {}).get("versions", []),
+        ]
         descriptor = next(
             (item for item in descriptors if isinstance(item, dict) and item.get("id") == str(artifact.id)), None
         )
@@ -421,6 +455,13 @@ def _decision(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respo
     ):
         return Response(
             {"detail": "The evidence signer cannot accept their own snapshot"}, status=status.HTTP_409_CONFLICT
+        )
+    if (
+        serializer.validated_data["outcome"] == RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING
+        and "primary_file" in evidence.manifest
+    ):
+        return Response(
+            {"detail": "Primary-file publication packaging is not yet available"}, status=status.HTTP_409_CONFLICT
         )
     if not verify_repository_publication_evidence(evidence)["valid"]:
         return Response(

@@ -79,7 +79,11 @@ from apps.core.repository_publication_evidence import (
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
 )
-from apps.core.repository_publication_packages import verify_repository_publication_package
+from apps.core.repository_publication_packages import (
+    RepositoryPublicationPackageError,
+    create_repository_publication_package,
+    verify_repository_publication_package,
+)
 from apps.core.repository_publication_preflight import repository_publication_preflight
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.repository_static_delivery import _client_reference_projection_safe
@@ -2210,7 +2214,7 @@ def test_repository_evidence_rejects_attachment_without_exact_document(compositi
 
 
 @pytest.mark.parametrize("owner_kind", ["legacy", "native"])
-def test_repository_evidence_refuses_unfrozen_primary_file_history(composition_repository, tmp_path, owner_kind):
+def test_repository_evidence_retains_primary_file_history(composition_repository, tmp_path, owner_kind):
     installation, _workspace, repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         document = (
@@ -2264,25 +2268,130 @@ def test_repository_evidence_refuses_unfrozen_primary_file_history(composition_r
                 upload=upload,
                 expected_current_entity_id=None,
             )
-        assert primary.owner_content_id == content_id
-        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.primary_file.parity_pending"):
-            retain_repository_publication_evidence(
-                repository_id=repository.id,
-                content_id=content_id,
-                audience="msp_internal",
-                actor=installation.owner,
+        if document is not None:
+            current = create_document_attachment(
+                document=document,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("source-v2.txt", b"Retained primary source, version two.\n"),
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                version_number=2,
+                replaces=primary,
             )
+        else:
+            current = append_repository_primary_document_file(
+                repository=repository,
+                content_id=content_id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("source-v2.txt", b"Retained primary source, version two.\n"),
+                expected_current_entity_id=primary.entity_id,
+            )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=content_id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        assert evidence.manifest["format"] == "tekdocs-repository-publication-evidence/v2"
+        assert evidence.manifest["primary_file"]["selected_source_id"] == str(current.entity_id)
+        assert [item["source_id"] for item in evidence.manifest["primary_file"]["versions"]] == [
+            str(primary.entity_id), str(current.entity_id)
+        ]
+        assert verify_repository_publication_evidence(evidence)["valid"]
         browser = Client()
         browser.force_login(installation.owner)
+        review = browser.get(reverse("msp-repository-publication-evidence-review", args=[evidence.id]))
+        assert review.status_code == 200
+        assert review.json()["primary_file"]["selected_source_id"] == str(current.entity_id)
+        assert len(review.json()["primary_file"]["versions"]) == 2
+        old_artifact = evidence.attachments.get(source_attachment=primary)
+        response = browser.get(
+            reverse("msp-repository-publication-evidence-review-attachment", args=[evidence.id, old_artifact.id])
+        )
+        assert response.status_code == 200
+        assert response.content == b"Retained primary source, version one.\n"
+        old_artifact.file.storage.delete(old_artifact.file.name)
+        assert not verify_repository_publication_evidence(evidence)["primary_file_valid"]
+        assert browser.get(reverse("msp-repository-publication-evidence-review", args=[evidence.id])).status_code == 409
+        assert RepositoryPublicationEvidence.objects.count() == 2
+        assert verify_repository_publication_evidence(prior_evidence)["valid"]
+
+
+def test_primary_file_evidence_cannot_be_accepted_or_packaged(composition_repository, tmp_path):
+    installation, _workspace, _repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        organization = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Primary Evidence Client", legal_name="Primary Evidence Client LLC",
+            website="", classifications=["client"],
+        )
+        workspace = Workspace.objects.get(organization=organization)
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        content_id = uuid.uuid4()
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=_accepted(repository),
+            changes={"documents/primary.md": _content(
+                content_id=content_id, title="Primary", body="Client notes.\n",
+            )},
+            message="Add client primary evidence source",
+        )
+        index_repository_content(repository_id=repository.id)
+        append_repository_primary_document_file(
+            repository=repository, content_id=content_id, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("primary.txt", b"Client primary bytes.\n"),
+            expected_current_entity_id=None,
+        )
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=content_id,
+            audience="client_visible", actor=installation.owner,
+        )
+        sibling = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Primary Evidence Sibling", legal_name="Primary Evidence Sibling LLC",
+            website="", classifications=["client"],
+        )
+        browser = Client()
+        browser.force_login(installation.owner)
+        artifact = evidence.attachments.get()
+        assert browser.get(reverse(
+            "organization-repository-publication-evidence-review-attachment",
+            args=[sibling.entity_id, evidence.id, artifact.id],
+        )).status_code == 404
+        reviewer = User.objects.create_user(
+            email="primary-evidence-reviewer@example.invalid", display_name="Primary reviewer"
+        )
+        membership = TenantMembership.objects.create(
+            tenant=installation.tenant, user=reviewer, role=BuiltInRole.ADMINISTRATOR
+        )
+        OrganizationAccessAssignment.objects.create(
+            tenant=installation.tenant, organization=organization,
+            membership=membership, created_by=installation.owner,
+        )
+        Authenticator.objects.create(
+            user=reviewer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        browser.force_login(reviewer)
+        url = reverse(
+            "organization-repository-publication-evidence-decision", args=[organization.entity_id, evidence.id]
+        )
         response = browser.post(
-            reverse("msp-repository-publication-evidence"),
-            data=json.dumps({"content_id": str(content_id), "audience": "msp_internal"}),
+            url, data=json.dumps({"outcome": "accepted_for_packaging", "reason": "Reviewed"}),
             content_type="application/json",
         )
         assert response.status_code == 409
-        assert response.json()["detail"].endswith("repository.primary_file.parity_pending")
-        assert RepositoryPublicationEvidence.objects.count() == 1
-        assert verify_repository_publication_evidence(prior_evidence)["valid"]
+        assert "not yet available" in response.json()["detail"]
+        assert not RepositoryEvidenceReviewDecision.objects.filter(evidence=evidence).exists()
+        decision = RepositoryEvidenceReviewDecision.objects.create(
+            tenant=evidence.tenant, organization=evidence.organization, workspace=evidence.workspace,
+            evidence=evidence,
+            outcome=RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING,
+            reason="Defense-in-depth package check", actor=reviewer,
+        )
+        with pytest.raises(RepositoryPublicationPackageError, match="Accepted, intact client evidence"):
+            create_repository_publication_package(decision_id=decision.id, actor=installation.owner)
+        assert RepositoryPublicationPackage.objects.count() == 0
 
 
 @pytest.mark.parametrize("owner_kind", ["legacy", "native"])
@@ -2413,13 +2522,14 @@ def test_repository_evidence_serializes_legacy_primary_upload(composition_reposi
                     future.result(timeout=0.2)
             assert future.result(timeout=10).document_id == document.id
         assert verify_repository_publication_evidence(evidence)["valid"]
-        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.primary_file.parity_pending"):
-            retain_repository_publication_evidence(
-                repository_id=repository.id,
-                content_id=document.id,
-                audience="msp_internal",
-                actor=installation.owner,
-            )
+        next_evidence = retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        assert next_evidence.manifest["format"] == "tekdocs-repository-publication-evidence/v2"
+        assert verify_repository_publication_evidence(next_evidence)["valid"]
 
 
 @pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])
@@ -2844,6 +2954,36 @@ def test_repository_evidence_attachment_upgrade_installs_forced_rls_and_append_o
                 "'core_repositoryevidenceattachment_immutable')"
             )
             assert cursor.fetchone() == (2,)
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
+def test_primary_evidence_upgrade_keeps_existing_guards_and_adds_v2():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0187_native_primary_file_versions")])
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_publication_evidence()'::regprocedure)"
+            )
+            assert "tekdocs-repository-publication-evidence/v2" not in cursor.fetchone()[0]
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_publication_evidence()'::regprocedure)"
+            )
+            assert "tekdocs-repository-publication-evidence/v2" in cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_evidence_attachment()'::regprocedure)"
+            )
+            assert "primary_file" in cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositoryevidenceattachment'"
+            )
+            assert cursor.fetchone() == (True, True)
     finally:
         MigrationExecutor(connection).migrate(head)
 

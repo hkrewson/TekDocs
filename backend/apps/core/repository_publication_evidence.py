@@ -61,6 +61,10 @@ from .publications import (
     publication_trusted_key_fingerprints,
 )
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
+from .repository_primary_publication import (
+    RepositoryPrimaryPublicationError,
+    prepare_repository_primary_publication,
+)
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
 from .repository_publication_render import (
     MAX_RENDERED_PDF_BYTES,
@@ -75,6 +79,7 @@ from .topic_schemas import SCHEMAS
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
 EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v1"
+PRIMARY_EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v2"
 
 
 class RepositoryPublicationEvidenceError(RuntimeError):
@@ -264,19 +269,25 @@ def _retain_pinned_evidence(
             )
             .first()
         )
-        # Primary files are document-owned content, not Markdown attachment links.
-        # Until evidence freezes their complete version chain and selected role,
-        # signing only the Markdown would silently omit part of the document.
-        if DocumentAttachment.objects.select_for_update().filter(
+        primary_records = DocumentAttachment.objects.select_for_update().filter(
             tenant_id=repository.tenant_id,
             organization=repository.workspace.organization,
             owner_workspace_id=repository.workspace_id,
             owner_content_id=content_id,
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
-        ).exists():
-            raise RepositoryPublicationEvidenceError(
-                "Repository publication preflight blocked: repository.primary_file.parity_pending"
-            )
+        ).order_by("-version_number")
+        primary_snapshot = None
+        if current_primary := primary_records.first():
+            try:
+                primary_snapshot = prepare_repository_primary_publication(
+                    repository=repository,
+                    content_id=content_id,
+                    expected_current_entity_id=current_primary.entity_id,
+                )
+            except RepositoryPrimaryPublicationError as exc:
+                raise RepositoryPublicationEvidenceError(
+                    f"Repository publication preflight blocked: {exc}"
+                ) from exc
         variant = node.composition_variants.get(audience)
         if not isinstance(variant, dict) or not isinstance(variant.get("markdown"), str):
             raise RepositoryPublicationEvidenceError("Indexed repository composition is unavailable")
@@ -296,6 +307,7 @@ def _retain_pinned_evidence(
                 "Repository publication preflight blocked: repository.attachment.limit"
             )
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
+        primary_retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
         source_ids_by_attachment_id: dict[uuid.UUID, uuid.UUID] = {}
         if document is None and key_targets:
             raise RepositoryPublicationEvidenceError(
@@ -350,6 +362,19 @@ def _retain_pinned_evidence(
                 raise RepositoryPublicationEvidenceError(
                     "Repository publication preflight blocked: repository.attachment.unavailable"
                 )
+        if primary_snapshot is not None:
+            if (
+                len(retained) + len(primary_snapshot.versions) > MAX_RETAINED_ATTACHMENTS
+                or sum(len(content) for _, content, _ in retained)
+                + sum(len(version.content) for version in primary_snapshot.versions)
+                > MAX_RETAINED_ATTACHMENT_BYTES
+            ):
+                raise RepositoryPublicationEvidenceError(
+                    "Repository publication preflight blocked: repository.primary_file.limit"
+                )
+            primary_retained = [
+                (version.source, version.content, uuid.uuid4()) for version in primary_snapshot.versions
+            ]
         key_snapshot = _frozen_key_snapshot(
             repository=repository, node=node, document=document,
             markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
@@ -375,7 +400,7 @@ def _retain_pinned_evidence(
         if source_commit is None:  # pragma: no cover - guarded above
             raise RepositoryPublicationEvidenceError("Repository accepted commit is unavailable")
         manifest: dict[str, Any] = {
-            "format": EVIDENCE_FORMAT,
+            "format": PRIMARY_EVIDENCE_FORMAT if primary_snapshot is not None else EVIDENCE_FORMAT,
             "evidence_id": str(evidence_id),
             "workspace_id": str(repository.workspace_id),
             "repository_id": str(repository.id),
@@ -401,6 +426,22 @@ def _retain_pinned_evidence(
             ],
             "entity_cards": entity_cards,
         }
+        if primary_snapshot is not None:
+            manifest["primary_file"] = {
+                "selected_source_id": str(primary_snapshot.selected_entity_id),
+                "versions": [
+                    {
+                        **version.descriptor,
+                        "id": str(artifact_id),
+                        "source_id": version.descriptor["id"],
+                        "source_record_id": str(version.source.id),
+                        "checksum": version.descriptor["sha256"],
+                    }
+                    for version, (_, _, artifact_id) in zip(
+                        primary_snapshot.versions, primary_retained, strict=True
+                    )
+                ],
+            }
         if key_snapshot is not None:
             manifest["key_snapshot"] = key_snapshot
         try:
@@ -436,7 +477,7 @@ def _retain_pinned_evidence(
         stored_files.append((evidence.pdf_file.storage, evidence.pdf_file.name))
         evidence.full_clean()
         evidence.save()  # type: ignore[no-untyped-call]
-        for attachment, content, artifact_id in retained:
+        for attachment, content, artifact_id in (*retained, *primary_retained):
             artifact = RepositoryEvidenceAttachment(
                 id=artifact_id,
                 tenant_id=repository.tenant_id,
@@ -462,6 +503,87 @@ def _retain_pinned_evidence(
         return evidence
 
 
+def _primary_evidence_valid(
+    evidence: RepositoryPublicationEvidence, artifacts: dict[str, RepositoryEvidenceAttachment]
+) -> bool:
+    """Prove the signed chain against independently retained artifact bytes."""
+
+    manifest = evidence.manifest
+    if manifest.get("format") == EVIDENCE_FORMAT:
+        return "primary_file" not in manifest
+    if manifest.get("format") != PRIMARY_EVIDENCE_FORMAT:
+        return False
+    primary = manifest.get("primary_file")
+    if not isinstance(primary, dict) or set(primary) != {"selected_source_id", "versions"}:
+        return False
+    versions = primary.get("versions")
+    if not isinstance(versions, list) or not 1 <= len(versions) <= MAX_RETAINED_ATTACHMENTS:
+        return False
+    previous_id: str | None = None
+    previous_record_id: str | None = None
+    seen_artifacts: set[str] = set()
+    seen_sources: set[str] = set()
+    total = 0
+    for number, descriptor in enumerate(versions, start=1):
+        if not isinstance(descriptor, dict):
+            return False
+        artifact_id = descriptor.get("id")
+        source_id = descriptor.get("source_id")
+        if not isinstance(artifact_id, str) or not isinstance(source_id, str):
+            return False
+        artifact = artifacts.get(artifact_id)
+        if (
+            artifact is None
+            or artifact_id in seen_artifacts
+            or source_id in seen_sources
+            or descriptor.get("version_number") != number
+            or descriptor.get("replaces_id") != previous_id
+            or descriptor.get("checksum") != descriptor.get("sha256")
+        ):
+            return False
+        record = artifact.source_attachment
+        owner = descriptor.get("owner")
+        expected_owner = "legacy_document" if record.document_id else "repository_document"
+        if (
+            not isinstance(owner, dict)
+            or owner != {"type": expected_owner, "id": str(evidence.content_id)}
+            or record.purpose != DocumentAttachmentPurpose.PRIMARY_FILE
+            or record.tenant_id != evidence.tenant_id
+            or record.organization_id != evidence.organization_id
+            or record.owner_workspace_id != evidence.workspace_id
+            or record.owner_content_id != evidence.content_id
+            or record.document_id not in {None, evidence.content_id}
+            or str(record.entity_id) != source_id
+            or record.version_number != number
+            or (str(record.replaces_id) if record.replaces_id else None) != previous_record_id
+            or descriptor.get("source_record_id") != str(record.id)
+            or descriptor.get("filename") != record.original_filename
+            or descriptor.get("media_type") != artifact.media_type
+            or descriptor.get("size") != artifact.size
+            or descriptor.get("checksum") != artifact.checksum
+            or artifact.evidence_id != evidence.id
+            or artifact.tenant_id != evidence.tenant_id
+            or artifact.organization_id != evidence.organization_id
+            or artifact.workspace_id != evidence.workspace_id
+        ):
+            return False
+        if artifact.size > MAX_RETAINED_ATTACHMENT_BYTES - total:
+            return False
+        try:
+            with artifact.file.storage.open(artifact.file.name, "rb") as stream:
+                content = bytes(stream.read(artifact.size + 1))
+        except (OSError, ValueError, TypeError):
+            return False
+        if len(content) != artifact.size or hashlib.sha256(content).hexdigest() != artifact.checksum:
+            return False
+        total += artifact.size
+        seen_artifacts.add(artifact_id)
+        seen_sources.add(source_id)
+        previous_id = source_id
+        previous_record_id = str(record.id)
+    return primary.get("selected_source_id") == previous_id
+
+
 def verify_repository_publication_evidence(
     evidence: RepositoryPublicationEvidence, *, compare_current_renderer: bool = False
 ) -> dict[str, bool]:
@@ -471,7 +593,7 @@ def verify_repository_publication_evidence(
     source = manifest.get("source") if isinstance(manifest, dict) else None
     identity_valid = isinstance(source, dict) and all(
         (
-            manifest.get("format") == EVIDENCE_FORMAT,
+            manifest.get("format") in {EVIDENCE_FORMAT, PRIMARY_EVIDENCE_FORMAT},
             manifest.get("evidence_id") == str(evidence.id),
             manifest.get("workspace_id") == str(evidence.workspace_id),
             manifest.get("repository_id") == str(evidence.repository_id),
@@ -585,6 +707,13 @@ def verify_repository_publication_evidence(
             pdf_snapshot_valid = False
     attachments_valid = True
     descriptors = manifest.get("attachments") if isinstance(manifest, dict) else None
+    artifacts = {str(item.id): item for item in evidence.attachments.all()}
+    primary = manifest.get("primary_file") if isinstance(manifest, dict) else None
+    primary_descriptors = primary.get("versions") if isinstance(primary, dict) else None
+    primary_ids = (
+        {item["id"] for item in primary_descriptors if isinstance(item, dict) and isinstance(item.get("id"), str)}
+        if isinstance(primary_descriptors, list) else set()
+    )
     if descriptors is not None:
         if not isinstance(descriptors, list) or len(descriptors) > MAX_RETAINED_ATTACHMENTS:
             attachments_valid = False
@@ -597,8 +726,10 @@ def verify_repository_publication_evidence(
                 or set(descriptor_sources) != requested_attachments
             ):
                 attachments_valid = False
-            artifacts = {str(item.id): item for item in evidence.attachments.all()}
-            if len(artifacts) != len(descriptors):
+            if (
+                len(artifacts) != len(descriptors) + len(primary_ids)
+                or len(primary_ids) != (len(primary_descriptors) if isinstance(primary_descriptors, list) else 0)
+            ):
                 attachments_valid = False
             for descriptor in descriptors:
                 if not isinstance(descriptor, dict):
@@ -630,6 +761,16 @@ def verify_repository_publication_evidence(
                         attachments_valid = False
                 except (OSError, ValueError, TypeError):
                     attachments_valid = False
+    primary_file_valid = _primary_evidence_valid(evidence, artifacts) if isinstance(manifest, dict) else False
+    if isinstance(descriptors, list) and primary_ids.intersection(
+        {item["id"] for item in descriptors if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    ):
+        primary_file_valid = False
+    if (
+        len(artifacts) > MAX_RETAINED_ATTACHMENTS
+        or sum(item.size for item in artifacts.values()) > MAX_RETAINED_ATTACHMENT_BYTES
+    ):
+        primary_file_valid = False
     try:
         source_commit = evidence.source_commit
         identity_valid = (
@@ -667,6 +808,7 @@ def verify_repository_publication_evidence(
         and evidence.key_fingerprint in trusted
         and evidence.signature_algorithm == SIGNATURE_ALGORITHM
         and attachments_valid
+        and primary_file_valid
         and entity_cards_valid
         and key_snapshot_valid
         and rendered_snapshot_valid
@@ -682,6 +824,7 @@ def verify_repository_publication_evidence(
         "trusted_key": evidence.key_fingerprint in trusted,
         "preflight_attested": valid and preflight_attested,
         "attachments_valid": attachments_valid,
+        "primary_file_valid": primary_file_valid,
         "entity_cards_valid": entity_cards_valid,
         "key_snapshot_valid": key_snapshot_valid,
         "renderer_comparison_performed": compare_current_renderer,

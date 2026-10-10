@@ -663,9 +663,13 @@ Independent release and client-delivery approval recheck every retained byte;
 the client portal lists the selected file and all historical versions and
 serves each through the exact-organization artifact route. Missing historical
 bytes invalidate the publication and close all portal reads. v1 STATIC
-publications retain their existing signature domain and behavior. Independent
-restore verification for this new delivery path and the final authority
-handoff remain open.
+publications retain their existing signature domain and behavior. The
+repository-inclusive encrypted recovery rehearsal now independently restores
+a released v2 publication and verifies both primary versions through the
+client portal against pre-backup hashes. Corrupting the older retained version
+after restore makes the publication unavailable to clients and fails recovery
+verification; repairing it restores integrity. Pre-backup verification of
+signed publication artifacts and the final authority handoff remain open.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

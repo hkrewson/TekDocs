@@ -110,6 +110,11 @@ publication_html_sha=$(sed -n 's/^REPOSITORY_PUBLICATION_HTML_SHA256=//p' "$publ
 publication_pdf_sha=$(sed -n 's/^REPOSITORY_PUBLICATION_PDF_SHA256=//p' "$publication_log")
 publication_attachment_id=$(sed -n 's/^REPOSITORY_PUBLICATION_ATTACHMENT_ID=//p' "$publication_log")
 publication_attachment_sha=$(sed -n 's/^REPOSITORY_PUBLICATION_ATTACHMENT_SHA256=//p' "$publication_log")
+primary_publication_id=$(sed -n 's/^PRIMARY_PUBLICATION_ID=//p' "$publication_log")
+primary_version_1_id=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_1_ID=//p' "$publication_log")
+primary_version_2_id=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_2_ID=//p' "$publication_log")
+primary_version_1_sha=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_1_SHA256=//p' "$publication_log")
+primary_version_2_sha=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_2_SHA256=//p' "$publication_log")
 legacy_publication_id=$(sed -n 's/^LEGACY_PUBLICATION_ID=//p' "$publication_log")
 legacy_publication_pdf_sha=$(sed -n 's/^LEGACY_PUBLICATION_PDF_SHA256=//p' "$publication_log")
 printf '%s\n' "$publication_id" | grep -Eq '^[0-9a-f-]{36}$'
@@ -117,6 +122,12 @@ printf '%s\n' "$publication_html_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$publication_pdf_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$publication_attachment_id" | grep -Eq '^[0-9a-f-]{36}$'
 printf '%s\n' "$publication_attachment_sha" | grep -Eq '^[0-9a-f]{64}$'
+for value in "$primary_publication_id" "$primary_version_1_id" "$primary_version_2_id"; do
+  printf '%s\n' "$value" | grep -Eq '^[0-9a-f-]{36}$'
+done
+for value in "$primary_version_1_sha" "$primary_version_2_sha"; do
+  printf '%s\n' "$value" | grep -Eq '^[0-9a-f]{64}$'
+done
 printf '%s\n' "$legacy_publication_id" | grep -Eq '^[0-9a-f-]{36}$'
 printf '%s\n' "$legacy_publication_pdf_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Released repository publication recovery fixture created/p' "$publication_log"
@@ -276,6 +287,11 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256="$publication_pdf_sha" \
   -e TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID="$publication_attachment_id" \
   -e TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256="$publication_attachment_sha" \
+  -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_ID="$primary_version_2_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_SHA256="$primary_version_1_sha" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_SHA256="$primary_version_2_sha" \
   -e TEKDOCS_RECOVERY_LEGACY_PUBLICATION_ID="$legacy_publication_id" \
   -e TEKDOCS_RECOVERY_LEGACY_PDF_SHA256="$legacy_publication_pdf_sha" \
   backend python manage.py shell --no-imports \
@@ -333,6 +349,29 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   backend python manage.py verify_recovery_publications
+echo "Checking restored historical primary-publication corruption refusal"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_primary \
+  -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_ID="$primary_version_2_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_primary_publication_log="$work_directory/corrupt-primary-publication.log"
+if compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications > "$corrupt_primary_publication_log" 2>&1; then
+  echo "Retained publication verification accepted corrupt restored historical primary media" >&2
+  exit 1
+fi
+grep -q 'Retained repository publication integrity check failed' "$corrupt_primary_publication_log"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_primary \
+  -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
+  -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications
 echo "Checking restored legacy PDF corruption refusal"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_legacy \
@@ -349,4 +388,4 @@ grep -q 'Retained legacy publication integrity check failed' "$corrupt_legacy_lo
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, exact managed-file editable bundle, legacy and released repository publications, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, exact managed-file editable bundle, legacy and released v1/v2 repository publications with primary-file history, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

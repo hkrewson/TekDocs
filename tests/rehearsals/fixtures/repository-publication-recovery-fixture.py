@@ -14,7 +14,7 @@ from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import (
-    Document, DocumentAttachment, DocumentPublication, Organization, RepositoryEvidenceAttachment,
+    Document, DocumentAttachment, DocumentAttachmentPurpose, DocumentPublication, Organization, RepositoryEvidenceAttachment,
     RepositoryStaticPublication, Workspace,
 )
 from apps.core.publications import read_publication_artifact, verify_retained_publication_custody
@@ -31,6 +31,8 @@ REPOSITORY_DOCUMENT_TITLE = "Client enrollment"
 REPOSITORY_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
 ATTACHMENT_NAME = "client-enrollment.txt"
 ATTACHMENT_BYTES = b"Client enrollment instructions retained for recovery.\n"
+PRIMARY_V1_BYTES = b"Client setup primary file, original version.\n"
+PRIMARY_V2_BYTES = b"Client setup primary file, revised version.\n"
 REVIEWER_EMAIL = "publication-recovery-reviewer@example.invalid"
 AUTHORIZER_EMAIL = "publication-recovery-authorizer@example.invalid"
 CLIENT_EMAIL = "publication-recovery-client@example.invalid"
@@ -48,7 +50,7 @@ def _post(browser, url, value=None):
 def _portal_snapshot(browser, publication_id, artifact_id):
     list_response = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
     assert list_response.status_code == 200
-    assert [item["id"] for item in list_response.json()["results"]] == [str(publication_id)]
+    assert str(publication_id) in [item["id"] for item in list_response.json()["results"]]
     detail = browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True)
     assert detail.status_code == 200
     assert detail["Cache-Control"] == "private, no-store"
@@ -78,6 +80,29 @@ def _portal_snapshot(browser, publication_id, artifact_id):
         hashlib.sha256(pdf.content).hexdigest(),
         hashlib.sha256(attachment.content).hexdigest(),
     )
+
+
+def _primary_portal_snapshot(browser, publication_id, version_ids, source_ids):
+    listing = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
+    assert listing.status_code == 200
+    assert str(publication_id) in [item["id"] for item in listing.json()["results"]]
+    detail = browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True)
+    assert detail.status_code == 200
+    primary = detail.json()["primary_file"]
+    assert primary["selected_source_id"] == str(source_ids[1])
+    assert [item["id"] for item in primary["versions"]] == [str(item) for item in version_ids]
+    assert [item["version_number"] for item in primary["versions"]] == [1, 2]
+    digests = []
+    for artifact_id, expected in zip(version_ids, (PRIMARY_V1_BYTES, PRIMARY_V2_BYTES), strict=True):
+        response = browser.get(
+            reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]),
+            secure=True,
+        )
+        assert response.status_code == 200
+        assert response.content == expected
+        assert response["Cache-Control"] == "private, no-store"
+        digests.append(hashlib.sha256(response.content).hexdigest())
+    return tuple(digests)
 
 
 owner = User.objects.get(email=OWNER_EMAIL)
@@ -200,6 +225,66 @@ if mode == "create":
     publication_id = uuid.UUID(publication["id"])
     browser.force_login(client)
     html_sha, pdf_sha, attachment_sha = _portal_snapshot(browser, publication_id, artifact.id)
+    browser.force_login(owner)
+    primary_evidence = _post(
+        browser, evidence_url, {"content_id": str(legacy_document.id), "audience": "client_visible"}
+    )
+    primary_evidence_id = primary_evidence["id"]
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        primary_sources = list(legacy_document.attachments.filter(
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert len(primary_sources) == 2
+        primary_artifacts = [RepositoryEvidenceAttachment.objects.get(
+            evidence_id=primary_evidence_id, source_attachment=source,
+        ) for source in primary_sources]
+    primary_decision_url = reverse(
+        "organization-repository-publication-evidence-decision", args=[organization.entity_id, primary_evidence_id]
+    )
+    primary_package_url = reverse(
+        "organization-repository-publication-evidence-package", args=[organization.entity_id, primary_evidence_id]
+    )
+    primary_authorization_url = reverse(
+        "organization-repository-publication-evidence-package-authorization",
+        args=[organization.entity_id, primary_evidence_id],
+    )
+    primary_static_url = reverse(
+        "organization-repository-publication-evidence-static-publication", args=[organization.entity_id, primary_evidence_id]
+    )
+    primary_control_url = reverse(
+        "organization-repository-publication-evidence-static-control", args=[organization.entity_id, primary_evidence_id]
+    )
+    primary_delivery_url = reverse(
+        "organization-repository-publication-evidence-static-delivery", args=[organization.entity_id, primary_evidence_id]
+    )
+    browser.force_login(reviewer)
+    _post(browser, primary_decision_url, {"outcome": "accepted_for_packaging", "reason": "Primary history reviewed"})
+    primary_package = _post(browser, primary_package_url)
+    assert primary_package["verified"] is True
+    browser.force_login(authorizer)
+    _post(
+        browser, primary_authorization_url,
+        {"outcome": "authorized_for_publication", "reason": "Primary history authorized"},
+    )
+    browser.force_login(reviewer)
+    primary_publication = _post(browser, primary_static_url)
+    primary_publication_id = uuid.UUID(primary_publication["id"])
+    browser.force_login(authorizer)
+    _post(browser, primary_control_url, {"action": "released", "reason": "Primary history released"})
+    _post(browser, primary_delivery_url, {"reason": "Primary history delivered"})
+    browser.force_login(client)
+    primary_hashes = _primary_portal_snapshot(
+        browser, primary_publication_id,
+        [item.id for item in primary_artifacts], [item.entity_id for item in primary_sources],
+    )
+    print(f"PRIMARY_PUBLICATION_ID={primary_publication_id}")
+    for number, (artifact_record, digest) in enumerate(zip(primary_artifacts, primary_hashes, strict=True), start=1):
+        print(f"PRIMARY_PUBLICATION_VERSION_{number}_ID={artifact_record.id}")
+        print(f"PRIMARY_PUBLICATION_VERSION_{number}_SHA256={digest}")
     print(f"REPOSITORY_PUBLICATION_ID={publication_id}")
     print(f"REPOSITORY_PUBLICATION_HTML_SHA256={html_sha}")
     print(f"REPOSITORY_PUBLICATION_PDF_SHA256={pdf_sha}")
@@ -242,7 +327,40 @@ elif mode == "verify":
     assert html_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256"]
     assert pdf_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256"]
     assert attachment_sha == os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_SHA256"]
-    print("Signed legacy PDF and released repository publication, client HTML, PDF, and attachment restored")
+    primary_publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID"])
+    primary_version_ids = [
+        uuid.UUID(os.environ[f"TEKDOCS_RECOVERY_PRIMARY_VERSION_{number}_ID"])
+        for number in (1, 2)
+    ]
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        primary_publication = RepositoryStaticPublication.objects.get(
+            pk=primary_publication_id, tenant=tenant, organization=organization,
+        )
+        assert primary_publication.manifest["format"] == "tekdocs-repository-static-publication/v2"
+        assert verify_repository_static_publication(primary_publication)
+        assert repository_static_delivery_ready(primary_publication)
+        sources = list(legacy_document.attachments.filter(
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert len(sources) == 2
+        for source, artifact_id, expected in zip(
+            sources, primary_version_ids, (PRIMARY_V1_BYTES, PRIMARY_V2_BYTES), strict=True,
+        ):
+            artifact = RepositoryEvidenceAttachment.objects.get(
+                pk=artifact_id, evidence=primary_publication.authorization.package.decision.evidence,
+                source_attachment=source, organization=organization,
+            )
+            assert artifact.checksum == hashlib.sha256(expected).hexdigest()
+    primary_hashes = _primary_portal_snapshot(
+        browser, primary_publication_id, primary_version_ids, [item.entity_id for item in sources],
+    )
+    for number, digest in enumerate(primary_hashes, start=1):
+        assert digest == os.environ[f"TEKDOCS_RECOVERY_PRIMARY_VERSION_{number}_SHA256"]
+    print("Signed legacy PDF and released v1/v2 repository publications restored with complete primary history")
 elif mode == "corrupt":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
     artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])
@@ -259,7 +377,8 @@ elif mode == "corrupt":
         assert artifact.file.storage.save(path, ContentFile(b"corrupt recovery fixture bytes")) == path
     client = User.objects.get(email=CLIENT_EMAIL)
     browser.force_login(client)
-    assert browser.get(reverse("client-portal-repository-publication-list"), secure=True).json()["results"] == []
+    listing = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
+    assert str(publication_id) not in [item["id"] for item in listing.json()["results"]]
     assert browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True).status_code == 404
     assert browser.get(
         reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]), secure=True,
@@ -282,6 +401,59 @@ elif mode == "restore_repository_attachment":
         publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
         assert verify_repository_static_publication(publication)
     print("Restored repository attachment repaired in disposable recovery stack")
+elif mode == "corrupt_primary":
+    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID"])
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        first_source = legacy_document.attachments.get(
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            pk=artifact_id, source_attachment=first_source, organization=organization,
+        )
+        path = artifact.file.name
+        artifact.file.storage.delete(path)
+        assert artifact.file.storage.save(path, ContentFile(b"corrupt historical primary bytes")) == path
+        publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
+        assert not verify_repository_static_publication(publication)
+    client = User.objects.get(email=CLIENT_EMAIL)
+    browser.force_login(client)
+    listing = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
+    assert str(publication_id) not in [item["id"] for item in listing.json()["results"]]
+    assert browser.get(
+        reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True,
+    ).status_code == 404
+    for version_number in (1, 2):
+        version_id = uuid.UUID(os.environ[f"TEKDOCS_RECOVERY_PRIMARY_VERSION_{version_number}_ID"])
+        assert browser.get(
+            reverse("client-portal-repository-publication-attachment", args=[publication_id, version_id]),
+            secure=True,
+        ).status_code == 404
+    print("Restored historical primary corruption refused by all client routes")
+elif mode == "restore_primary":
+    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID"])
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        first_source = legacy_document.attachments.get(
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+        )
+        artifact = RepositoryEvidenceAttachment.objects.get(
+            pk=artifact_id, source_attachment=first_source, organization=organization,
+        )
+        path = artifact.file.name
+        artifact.file.storage.delete(path)
+        assert artifact.file.storage.save(path, ContentFile(PRIMARY_V1_BYTES)) == path
+        publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
+        assert verify_repository_static_publication(publication)
+    print("Restored historical primary artifact repaired in disposable recovery stack")
 elif mode == "corrupt_legacy":
     with transaction.atomic():
         bind_local_rls_scope(
@@ -301,5 +473,5 @@ elif mode == "corrupt_legacy":
 else:
     raise RuntimeError(
         "TEKDOCS_RECOVERY_PUBLICATION_MODE must be create, verify, corrupt, "
-        "restore_repository_attachment, or corrupt_legacy"
+        "restore_repository_attachment, corrupt_primary, restore_primary, or corrupt_legacy"
     )

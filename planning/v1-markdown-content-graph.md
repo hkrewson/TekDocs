@@ -764,11 +764,13 @@ legacy `Document` row, ties the signed artifact to the exact Git-owned file
 record and checksum, and verifies the retained file through client delivery.
 Template, review, key and whole-document authority parity remain separate.
 
-The read-only legacy migration status now names additional handoff blockers
-when a document retains a template or enrollment, primary-file history,
-active field-key bindings, or review decisions. An in-sync Markdown copy can
-still have these blockers. They are diagnostics for the remaining parity work,
-not proof of parity or an authority transition.
+The read-only legacy migration status names additional handoff blockers when a
+document retains a template or enrollment, primary-file history, or review
+decisions. Field-key values and permissions remain PostgreSQL-authoritative;
+portable references and their rendered projection are verified as part of the
+content-copy/read-projection checks rather than treated as data that must move
+to Git. These diagnostics are not proof of whole-document parity or an
+authority transition.
 
 First foundation (implemented, not the exit condition): an internal source
 freezer re-reads the exact accepted Git snapshot, recomputes the audience

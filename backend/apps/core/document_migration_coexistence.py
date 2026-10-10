@@ -10,7 +10,6 @@ from .content_profile import ContentProfileError, parse_content
 from .content_read import document_detail
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
-from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
 from .document_migration_attachments import (
     DocumentMigrationAttachmentError,
@@ -137,8 +136,6 @@ def document_coexistence_status(
             response["primary_file_state"] = "retained_bytes_verified"
     if DocumentPublication.objects.filter(document=document).exists():
         blockers.append("legacy_publication_history_present")
-    if DocumentKeyBinding.objects.filter(document=document, archived_at__isnull=True).exists():
-        blockers.append("field_key_authority_not_transferred")
     if (
         document.review_state != DocumentReviewState.UNREVIEWED
         or document.review_due_on is not None

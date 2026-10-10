@@ -179,7 +179,9 @@ def test_field_key_bindings_are_portable_preview_bound_and_reader_scoped(tmp_pat
         )
         matched_status = browser.get(status_url).json()
         assert matched_status["read_projection_state"] == "matched"
-        assert "field_key_authority_not_transferred" in matched_status["handoff_blockers"]
+        # Field-key values and permissions remain PostgreSQL-authoritative;
+        # matching portable references and rendered output do not block handoff.
+        assert "field_key_authority_not_transferred" not in matched_status["handoff_blockers"]
         binding.archived_at = timezone.now()
         binding.save(update_fields=("archived_at", "updated_at"))
         assert "Unresolved key" in browser.get(detail_url).json()["sanitized_html"]

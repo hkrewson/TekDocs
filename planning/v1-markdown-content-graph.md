@@ -665,12 +665,18 @@ editor and private download. This is file discovery, not an authority switch.
 - [ ] Resolve authorized file links in repository reads and editable exports,
   and snapshot exact file identities and bytes into publication evidence and
   client delivery without requiring a legacy body row.
-- [ ] Include the new ownership state and bytes in fresh-install, upgrade,
+- [x] Include the new ownership state and bytes in fresh-install, upgrade,
   backup/restore and corrupt-file rehearsals before allowing handoff.
 - [ ] Only then add an explicit per-document authority transition with legacy
   write retirement, full review/template/key/file/publication parity, and
   demonstrated rollback. The existing read-only migration status must not
   silently promote a document.
+
+The checked custody gate passed the isolated fresh-install rehearsal, the
+PostgreSQL owner-upgrade test, and the supported repository-inclusive,
+network-isolated backup/restore rehearsal. The latter restored native and
+legacy files plus a released Git-backed publication and refused missing or
+corrupted retained bytes. It does not establish the remaining authority gates.
 
 The read-only legacy migration status now names additional handoff blockers
 when a document retains a template or enrollment, primary-file history,

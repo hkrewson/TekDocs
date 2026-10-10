@@ -614,8 +614,13 @@ versions. A subsequent API upload slice checks the exact accepted/indexed Git
 document and Workspace under a database lock, then stores an ordinary scanned
 file with the stable owner. A read/download slice now resolves only exact-owner
 native links, retains legacy URLs for copied documents, and fails closed on
-missing or changed bytes. Editable-bundle, publication, recovery, editor UI,
-and authority-handoff gates remain open.
+missing or changed bytes. The repository editor now lets staff upload to a
+saved, indexed Git document and inserts the returned private-file link into
+the unsaved Markdown draft for explicit saving; denied uploads do not change
+the draft. A successful upload whose draft link is later discarded leaves a
+retained but unlinked file; native cleanup/reconciliation remains a separate
+open gate. Editable-bundle, publication, recovery, and authority-handoff gates
+remain open.
 
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

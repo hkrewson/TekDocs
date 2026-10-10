@@ -3,6 +3,34 @@ import { browserRepositoryClient } from './repositoryApi'
 
 afterEach(() => vi.unstubAllGlobals())
 
+it.each([undefined, 'org/1'])('uploads a scanned file to the exact saved document in workspace %s', async (organizationId) => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  const attachment = { id: '11111111-1111-4111-8111-111111111111', filename: 'steps.txt', size: 5, scan_status: 'clean' }
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(attachment), { status: 201 }))
+  vi.stubGlobal('fetch', fetch)
+  const file = new File(['steps'], 'steps.txt', { type: 'text/plain' })
+  expect(await browserRepositoryClient.uploadAttachment('doc/1', file, organizationId)).toEqual(attachment)
+  const scope = organizationId ? '/api/v1/workspaces/organizations/org%2F1' : '/api/v1/workspaces/msp'
+  const [url, request] = fetch.mock.calls[0] as [string, RequestInit]
+  expect(url).toBe(`${scope}/content-graph/authoring/doc%2F1/attachments`)
+  expect(request.method).toBe('POST')
+  expect(request.credentials).toBe('same-origin')
+  expect(new Headers(request.headers).get('X-CSRFToken')).toBe('repository-csrf')
+  expect(new Headers(request.headers).has('Content-Type')).toBe(false)
+  expect(request.body).toBeInstanceOf(FormData)
+  expect((request.body as FormData).get('file')).toBe(file)
+})
+
+it('reports upload denial and refuses an unscanned response', async () => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Upload denied' }), { status: 403 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ id: '11111111-1111-4111-8111-111111111111', filename: 'steps.txt', size: 5, scan_status: 'pending' }), { status: 201 })))
+  const file = new File(['steps'], 'steps.txt')
+  await expect(browserRepositoryClient.uploadAttachment('doc-1', file)).rejects.toThrow('Upload denied')
+  await expect(browserRepositoryClient.uploadAttachment('doc-1', file)).rejects.toThrow('could not be attached')
+})
+
 it('downloads an organization source ZIP without requesting an unsupported JSON renderer', async () => {
   const fetch = vi.fn().mockResolvedValue(new Response('zip', {
     status: 200,

@@ -24,6 +24,7 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     exportHtml: vi.fn().mockResolvedValue({ content: new Blob(['<html>Saved</html>'], { type: 'text/html' }), name: 'repository-document.html', commit }),
     exportPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-saved'], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }),
     exportDocx: vi.fn().mockResolvedValue({ content: new Blob(['PK\x03\x04saved']), name: 'repository-document.docx', commit }),
+    uploadAttachment: vi.fn().mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111', filename: 'setup [staff].txt', size: 5, scan_status: 'clean' }),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
     reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
@@ -38,6 +39,64 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
   render(<RouterProvider router={router} />)
   return { client, onClose, save }
 }
+
+it('uploads to a saved indexed document and leaves its private-file link as an unsaved Markdown draft', async () => {
+  const user = userEvent.setup()
+  const { client, save } = setup({}, 'org-1')
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  const file = new File(['steps'], 'setup [staff].txt', { type: 'text/plain' })
+  await user.upload(screen.getByLabelText('Attach file to saved document'), file)
+  await waitFor(() => expect(client.uploadAttachment).toHaveBeenCalledWith('content-1', file, 'org-1'))
+  const linked = 'First revision.\n[setup \\[staff\\].txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n'
+  expect(await screen.findByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(screen.getByLabelText('Markdown body')).toHaveValue(linked)
+  expect(save).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByLabelText('Markdown body')).toHaveValue(linked)
+  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+    content_id: 'content-1', base_commit: commit, base_blob: blob, markdown: linked,
+  }), 'org-1'))
+})
+
+it('preserves a dirty draft and supports retry when attachment upload is denied', async () => {
+  const user = userEvent.setup()
+  const uploadAttachment = vi.fn()
+    .mockRejectedValueOnce(new Error('Upload denied'))
+    .mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111', filename: 'steps.txt', size: 5, scan_status: 'clean' })
+  setup({ uploadAttachment })
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  const body = screen.getByLabelText('Markdown body')
+  await user.type(body, ' Unsaved')
+  const file = new File(['steps'], 'steps.txt', { type: 'text/plain' })
+  await user.upload(screen.getByLabelText('Attach file to saved document'), file)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Upload denied')
+  expect(body).toHaveValue('First revision.\n Unsaved')
+  await user.upload(screen.getByLabelText('Attach file to saved document'), file)
+  await waitFor(() => expect(uploadAttachment).toHaveBeenCalledTimes(2))
+  expect(await screen.findByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(body).toHaveValue('First revision.\n Unsaved\n\n[steps.txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n')
+})
+
+it('does not offer attachment upload for fragments or unsaved documents', async () => {
+  const user = userEvent.setup()
+  const fragment = { ...initial, kind: 'fragment' as const }
+  const client = setup({ source: vi.fn().mockResolvedValue(fragment) }).client
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  expect(screen.queryByLabelText('Attach file to saved document')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'New Markdown file' }))
+  expect(screen.queryByLabelText('Attach file to saved document')).not.toBeInTheDocument()
+  expect(client.uploadAttachment).not.toHaveBeenCalled()
+})
+
+it('disables attachment upload while indexing is behind the accepted revision', async () => {
+  const user = userEvent.setup()
+  const client = setup({ source: vi.fn().mockResolvedValue({ ...initial, indexed_commit: null }) }).client
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  expect(screen.getByLabelText('Attach file to saved document')).toBeDisabled()
+  expect(client.uploadAttachment).not.toHaveBeenCalled()
+})
 
 it('preserves a dirty draft through navigation and sends exact base identities on save', async () => {
   const user = userEvent.setup()

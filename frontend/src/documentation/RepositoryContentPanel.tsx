@@ -33,6 +33,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [bundleExporting, setBundleExporting] = useState(false)
   const [htmlExporting, setHtmlExporting] = useState(false)
@@ -111,6 +112,25 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
       if (caught instanceof RepositoryConflictError) setConflict(caught.conflict)
       else setError(caught instanceof Error ? caught.message : translate('repository.saveFailed'))
     } finally { setBusy(false) }
+  }
+
+  async function uploadAttachment(file: File) {
+    if (!source || source.kind !== 'document' || !source.accepted_commit
+      || source.accepted_commit !== source.indexed_commit || busy) return
+    const selectedId = source.content_id
+    setBusy(true); setUploading(true); setError(''); setMessage('')
+    try {
+      const attachment = await client.uploadAttachment(selectedId, file, organizationId)
+      if (sourceRef.current?.content_id !== selectedId) return
+      const label = attachment.filename.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
+      const link = `[${label}](tekdocs://attachment/${attachment.id})`
+      setDraft((current) => current?.id === selectedId
+        ? { ...current, markdown: `${current.markdown}${current.markdown && !current.markdown.endsWith('\n') ? '\n\n' : ''}${link}\n` }
+        : current)
+      setMessage(translate('repository.attachmentLinked', { filename: attachment.filename }))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : translate('repository.attachmentFailed'))
+    } finally { setUploading(false); setBusy(false) }
   }
 
   async function rebase() {
@@ -266,6 +286,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
           <label>{translate('repository.title')}<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
           <label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label>
           <label>{translate('repository.markdown')}<textarea rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} /></label>
+          {source?.kind === 'document' && <><label>{translate('repository.attachFile')}<input type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadAttachment(file) }} /></label><p className="field-hint">{translate('repository.attachmentNotice')}</p>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}</>}
           <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
         </div>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}

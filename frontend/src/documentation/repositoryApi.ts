@@ -28,6 +28,13 @@ export type RepositorySource = {
   indexed_commit: string | null
 }
 
+export type RepositoryAttachment = {
+  id: string
+  filename: string
+  size: number
+  scan_status: 'clean'
+}
+
 export type RepositoryEvidence = {
   id: string
   content_id: string
@@ -281,6 +288,28 @@ export const browserRepositoryClient = {
       body: JSON.stringify(mutation),
     })
     return parse<RepositorySource>(response)
+  },
+  async uploadAttachment(contentId: string, file: File, organizationId?: string): Promise<RepositoryAttachment> {
+    const form = new FormData()
+    form.set('file', file)
+    const response = await fetch(`${path(organizationId)}/authoring/${encodeURIComponent(contentId)}/attachments`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'X-CSRFToken': await token() },
+      body: form,
+    })
+    if (!response.ok) {
+      let detail: unknown
+      try { detail = (await response.json() as { detail?: unknown }).detail } catch { /* An upstream error may be HTML. */ }
+      throw new Error(typeof detail === 'string' && detail.length < 300 ? detail : translate('repository.attachmentFailed'))
+    }
+    const result: unknown = await response.json()
+    if (!result || typeof result !== 'object') throw new Error(translate('repository.attachmentFailed'))
+    const attachment = result as Record<string, unknown>
+    if (typeof attachment.id !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(attachment.id)
+      || typeof attachment.filename !== 'string' || !attachment.filename || attachment.filename.length > 255
+      || typeof attachment.size !== 'number' || !Number.isSafeInteger(attachment.size) || attachment.size < 0
+      || attachment.scan_status !== 'clean') throw new Error(translate('repository.attachmentFailed'))
+    return attachment as RepositoryAttachment
   },
 }
 

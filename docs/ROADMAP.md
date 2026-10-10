@@ -1904,12 +1904,16 @@ upload, read and publication are proven.
 The next internal custody shape permits a managed attachment record without a
 legacy document only when its exact-Workspace Git document is accepted and
 indexed. A later staff API now accepts ordinary scanned uploads for that owner,
-with an exact Workspace and accepted/indexed-document check under lock. It has
+with an exact Workspace and accepted/indexed-document check under lock.
 A subsequent staff read/download slice resolves native links through the exact
 Git document owner, checks retained bytes before displaying a link and again
 before private full or ranged download, and preserves copied legacy links on
-their existing route. The repository editor still has no upload control;
-editable-bundle, publication, and recovery parity remain open.
+their existing route. The repository editor now offers a scanned file upload
+for saved, indexed documents and inserts its private link into unsaved Markdown
+for explicit Git saving. It does not offer the control for new documents or
+fragments, and a denial leaves the draft unchanged. Editable-bundle,
+publication, and recovery parity remain open. A successful upload whose
+unsaved link is discarded remains retained until native cleanup is available.
 The `0.9.7` exit checklist now names that custody path and its authorization,
 publication and recovery tests before any authority handoff.
 The next entity-card slice resolves narrative entity links through the existing

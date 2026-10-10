@@ -25,6 +25,7 @@ class DocumentMigrationStatusSerializer(serializers.Serializer):
     cutover_ready = serializers.BooleanField()
     handoff_blockers = serializers.ListField(child=serializers.CharField())
     read_projection_state = serializers.ChoiceField(choices=("not_checked", "matched", "different", "unavailable"))
+    primary_file_state = serializers.ChoiceField(choices=("absent", "retained_bytes_verified", "unavailable"))
     content_copy_state = serializers.ChoiceField(
         choices=(
             "legacy_only",

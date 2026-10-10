@@ -39767,6 +39767,17 @@ components:
             * `different` - different
             * `unavailable` - unavailable
           x-spec-enum-id: 875c9553f5d2eca0
+        primary_file_state:
+          enum:
+          - absent
+          - retained_bytes_verified
+          - unavailable
+          type: string
+          description: |-
+            * `absent` - absent
+            * `retained_bytes_verified` - retained_bytes_verified
+            * `unavailable` - unavailable
+          x-spec-enum-id: a0ee441e5760a322
         content_copy_state:
           enum:
           - legacy_only
@@ -39811,6 +39822,7 @@ components:
       - legacy_authoritative
       - legacy_revision_id
       - legacy_revision_ids
+      - primary_file_state
       - read_projection_state
     DocumentOperationsChoice:
       type: object

@@ -21,7 +21,7 @@ from apps.core import document_migration_coexistence, document_migration_import,
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_index import ContentIndexError, index_repository_content
 from apps.core.content_profile import parse_content
-from apps.core.document_attachments import create_document_attachment
+from apps.core.document_attachments import create_document_attachment, replace_primary_document_file
 from apps.core.document_migration_export import DocumentMigrationExportError, build_simple_document_export
 from apps.core.document_migration_inventory import inventory_legacy_documents
 from apps.core.documents import add_document_placement, create_document, create_document_block, update_document
@@ -481,12 +481,17 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
             title="Primary file",
             markdown="Primary file is separate.\n",
         )
-        create_document_attachment(
+        first_primary = create_document_attachment(
             document=primary,
             actor_id=installation.owner.id,
             upload=SimpleUploadedFile("primary.txt", b"primary\n", content_type="text/plain"),
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             version_number=1,
+        )
+        replace_primary_document_file(
+            document=primary,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("replacement.txt", b"replacement\n", content_type="text/plain"),
         )
         row = next(
             item
@@ -497,7 +502,24 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         browser = Client()
         browser.force_login(installation.owner)
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": primary.entity_id})
-        assert "primary_file_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
+        primary_status = browser.get(status_url).json()
+        assert primary_status["primary_file_state"] == "retained_bytes_verified"
+        assert "primary_file_parity_not_verified" in primary_status["handoff_blockers"]
+        with monkeypatch.context() as patch:
+            from apps.core.document_attachments import copy_attachment_content
+
+            def damaged_history(attachment):
+                if attachment.id == first_primary.id:
+                    raise ValidationError("Historical file is damaged")
+                return copy_attachment_content(attachment)
+
+            patch.setattr(document_migration_coexistence, "copy_attachment_content", damaged_history)
+            damaged_status = browser.get(status_url).json()
+        assert damaged_status["primary_file_state"] == "unavailable"
+        assert "primary_file_parity_not_verified" in damaged_status["handoff_blockers"]
+        assert "primary_file_storage_unavailable" in damaged_status["handoff_blockers"]
+        assert damaged_status["cutover_ready"] is False
+        assert browser.get(status_url).json()["primary_file_state"] == "retained_bytes_verified"
 
 
 def test_migration_status_identifies_retained_legacy_publication_history(tmp_path):

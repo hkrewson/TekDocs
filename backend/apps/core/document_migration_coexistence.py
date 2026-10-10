@@ -5,10 +5,11 @@ from __future__ import annotations
 import hashlib
 
 from django.http import Http404
+from rest_framework.exceptions import ValidationError
 
 from .content_profile import ContentProfileError, parse_content
 from .content_read import document_detail
-from .document_attachments import resolve_rendered_attachments
+from .document_attachments import copy_attachment_content, resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
@@ -116,10 +117,22 @@ def document_coexistence_status(
         or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
     ):
         blockers.append("template_parity_not_verified")
-    if DocumentAttachment.objects.filter(
-        document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
-    ).exists():
+    primary_versions = list(
+        DocumentAttachment.objects.filter(
+            document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
+        ).order_by("version_number", "id")
+    )
+    response["primary_file_state"] = "absent"
+    if primary_versions:
         blockers.append("primary_file_parity_not_verified")
+        try:
+            for version in primary_versions:
+                copy_attachment_content(version)
+        except ValidationError:
+            response["primary_file_state"] = "unavailable"
+            blockers.append("primary_file_storage_unavailable")
+        else:
+            response["primary_file_state"] = "retained_bytes_verified"
     if DocumentPublication.objects.filter(document=document).exists():
         blockers.append("legacy_publication_history_present")
     if DocumentKeyBinding.objects.filter(document=document, archived_at__isnull=True).exists():

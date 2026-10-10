@@ -29,6 +29,7 @@ from .content_index_models import ContentNode
 from .content_read import repository_for_reader
 from .document_attachments import (
     archive_document_attachment,
+    copy_attachment_content,
     create_repository_document_attachment,
     repository_attachment_archive_eligible,
 )
@@ -304,6 +305,7 @@ def _archive_native_attachment(
         _linked, can_archive = repository_attachment_archive_eligible(repository=repository, attachment=attachment)
         if not can_archive:
             return Response({"detail": "This file may be referenced by a saved Git revision"}, status=409)
+        copy_attachment_content(attachment)
         archive_document_attachment(attachment=attachment, actor_id=request.user.id)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -349,13 +351,19 @@ class OrganizationContentAuthoringAttachmentView(APIView):
 
 
 class MSPContentAuthoringAttachmentDetailView(APIView):
-    @extend_schema(operation_id="content_authoring_msp_attachment_archive", responses={204: None})
+    @extend_schema(
+        operation_id="content_authoring_msp_attachment_archive",
+        responses={204: None, 400: OpenApiResponse(description="Retained file is missing or has changed")},
+    )
     def delete(self, request, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
         return _archive_native_attachment(request, content_id, attachment_entity_id)
 
 
 class OrganizationContentAuthoringAttachmentDetailView(APIView):
-    @extend_schema(operation_id="content_authoring_organization_attachment_archive", responses={204: None})
+    @extend_schema(
+        operation_id="content_authoring_organization_attachment_archive",
+        responses={204: None, 400: OpenApiResponse(description="Retained file is missing or has changed")},
+    )
     def delete(self, request, organization_entity_id, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
         return _archive_native_attachment(request, content_id, attachment_entity_id, organization_entity_id)
 

@@ -24438,6 +24438,17 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Retained file is missing or has changed */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly content_authoring_msp_export: {
@@ -31563,6 +31574,17 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Retained file is missing or has changed */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };

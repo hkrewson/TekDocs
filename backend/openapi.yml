@@ -9524,6 +9524,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '400':
+          description: Retained file is missing or has changed
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
@@ -19762,6 +19774,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '400':
+          description: Retained file is missing or has changed
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export:
     get:
       operationId: content_authoring_organization_export

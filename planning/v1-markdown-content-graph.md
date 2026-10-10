@@ -649,7 +649,9 @@ is the same commit recorded at upload and no later accepted commit exists. The
 mutation rechecks exact ownership,
 current Markdown references, and commit identity under the repository lock;
 later commits and older uploads without a recorded commit fail closed. Archive
-removes the active link but deliberately retains bytes for recovery. Historical
+also verifies the retained bytes before changing the record; missing or altered
+bytes refuse the mutation. A successful archive removes the active link but
+deliberately retains bytes for recovery. Historical
 reference reconciliation and physical retention policy remain open, as do
 publication, recovery, and authority-handoff gates.
 The staff Files register now also discovers active Git-owned ordinary files
@@ -659,7 +661,7 @@ editor and private download. This is file discovery, not an authority switch.
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,
   clean-only storage and retained primary-file history.
-- [ ] Enforce exact tenant/Workspace/content ownership in database guards, RLS,
+- [x] Enforce exact tenant/Workspace/content ownership in database guards, RLS,
   upload, archive, read and download paths; prove sibling and cross-tenant
   denial and fail closed on missing or changed retained bytes.
 - [ ] Resolve authorized file links in repository reads and editable exports,
@@ -677,6 +679,10 @@ PostgreSQL owner-upgrade test, and the supported repository-inclusive,
 network-isolated backup/restore rehearsal. The latter restored native and
 legacy files plus a released Git-backed publication and refused missing or
 corrupted retained bytes. It does not establish the remaining authority gates.
+The checked ownership gate passed the content-authoring/read/RLS suite and
+database owner-guard tests. Its request cases include MFA-enabled cross-tenant
+and sibling denial; archive refuses missing or altered bytes without changing
+the file record. This does not establish publication or legacy-write parity.
 
 The read-only legacy migration status now names additional handoff blockers
 when a document retains a template or enrollment, primary-file history,

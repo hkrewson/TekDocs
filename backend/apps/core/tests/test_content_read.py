@@ -154,6 +154,19 @@ def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrit
             "organization-content-document-attachment-download",
             kwargs={**scope, "content_id": uuid.uuid4(), "attachment_entity_id": attachment.entity_id},
         )).status_code == 404
+        foreign_tenant = Tenant.objects.create(name="Foreign file MSP", slug=f"foreign-file-{uuid.uuid4()}")
+        foreign_user = User.objects.create_user(
+            email=f"foreign-file-{uuid.uuid4()}@example.invalid", display_name="Foreign File Reader"
+        )
+        TenantMembership.objects.create(
+            tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.ADMINISTRATOR
+        )
+        TOTP.activate(foreign_user, generate_totp_secret())
+        browser.force_login(foreign_user)
+        assert browser.get(detail_url).status_code in {403, 404}
+        assert browser.get(download_url).status_code in {403, 404}
+        assert browser.get(files_url).status_code in {403, 404}
+        browser.force_login(installation.owner)
         portal_user = User.objects.create_user(email="native-file-client@example.invalid", display_name="File client")
         TenantMembership.objects.create(
             tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization

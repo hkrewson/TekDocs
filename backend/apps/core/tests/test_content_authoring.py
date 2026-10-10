@@ -8,6 +8,7 @@ import zipfile
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -436,8 +437,14 @@ def test_native_attachment_upload_accepts_exact_organization_workspace(authoring
             email="foreign-archive@example.invalid", display_name="Foreign archive user"
         )
         TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.ADMINISTRATOR)
+        TOTP.activate(foreign_user, generate_totp_secret())
         browser.force_login(foreign_user)
         assert browser.get(url).status_code in {403, 404}
+        count = DocumentAttachment.objects.count()
+        assert browser.post(
+            url, {"file": SimpleUploadedFile("foreign-tenant.txt", b"Wrong tenant\n")}
+        ).status_code in {403, 404}
+        assert DocumentAttachment.objects.count() == count
         assert browser.delete(archive_url).status_code in {403, 404}
         browser.force_login(installation.owner)
         assert browser.delete(archive_url).status_code == 204
@@ -487,8 +494,20 @@ def test_native_attachment_archive_only_before_any_git_advance(authoring_context
             "msp-content-authoring-attachment-archive", args=[document.content_id, attachment_id]
         )
         assert Client().delete(archive_url).status_code in {401, 403}
-        assert browser.delete(archive_url).status_code == 204
         attachment = DocumentAttachment.objects.get(entity_id=attachment_id)
+        stored_name = attachment.file.name
+        attachment.file.storage.delete(stored_name)
+        assert browser.delete(archive_url).status_code == 400
+        attachment.refresh_from_db()
+        assert attachment.archived_at is None
+        assert attachment.file.storage.save(stored_name, ContentFile(b"Changed\n")) == stored_name
+        assert browser.delete(archive_url).status_code == 400
+        attachment.refresh_from_db()
+        assert attachment.archived_at is None
+        attachment.file.storage.delete(stored_name)
+        assert attachment.file.storage.save(stored_name, ContentFile(b"Unused\n")) == stored_name
+        assert browser.delete(archive_url).status_code == 204
+        attachment.refresh_from_db()
         assert attachment.archived_at is not None
         assert attachment.file.storage.exists(attachment.file.name)
         assert browser.get(collection).json()["count"] == 0

@@ -395,8 +395,11 @@ publication gates explicit, including when the copy is `in_sync`; it is not a
 promotion command. Promotion must wait for
 write, review, key, template, attachment and publication parity.
 For legacy primary-file documents, migration status separately reports whether
-every retained primary-file version still passes the private storage read and
-checksum check. A damaged historical version adds
+every retained primary-file version still passes its chain, private storage
+read and checksum checks. The guarded shadow-copy preview and apply can now
+carry those documents after binding the complete retained chain to the plan;
+file bytes and ownership stay in PostgreSQL-managed storage. A damaged
+historical version adds
 `primary_file_storage_unavailable`; intact bytes do not clear
 `primary_file_parity_not_verified` or authorize handoff.
 For an `in_sync` copy, `read_projection_state` separately exercises the

@@ -1888,6 +1888,10 @@ The legacy document copy-status preflight now verifies retained ordinary
 attachment bytes before reporting an in-sync copy and matched shadow read;
 missing or altered bytes report divergence. This diagnostic guard does not
 switch document authority or close the remaining file parity gates.
+Guarded shadow-copy preview and apply now accept a legacy primary-file chain
+only after checking every retained version and binding its metadata to the
+plan. This preserves legacy custody and the primary-file handoff blocker;
+copied-chain editable export and custody transition remain open.
 It also re-reads the copied Markdown from the accepted Git revision, so a
 missing or altered Git source cannot pass merely because indexed rows still
 match the legacy export. The editable bundle and offline verifier now also

@@ -5,15 +5,18 @@ from __future__ import annotations
 import hashlib
 
 from django.http import Http404
-from rest_framework.exceptions import ValidationError
 
 from .content_profile import ContentProfileError, parse_content
 from .content_read import document_detail
-from .document_attachments import copy_attachment_content, resolve_rendered_attachments
+from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
-from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
+from .document_migration_attachments import (
+    DocumentMigrationAttachmentError,
+    portable_document_attachments,
+    portable_primary_file_versions,
+)
 from .document_migration_export import (
     DocumentMigrationBindingError,
     DocumentMigrationExportError,
@@ -126,9 +129,8 @@ def document_coexistence_status(
     if primary_versions:
         blockers.append("primary_file_parity_not_verified")
         try:
-            for version in primary_versions:
-                copy_attachment_content(version)
-        except ValidationError:
+            portable_primary_file_versions(document, verify_content=True)
+        except DocumentMigrationAttachmentError:
             response["primary_file_state"] = "unavailable"
             blockers.append("primary_file_storage_unavailable")
         else:

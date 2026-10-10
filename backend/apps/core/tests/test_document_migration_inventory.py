@@ -17,7 +17,12 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.core import document_migration_coexistence, document_migration_import, repository_storage
+from apps.core import (
+    document_migration_attachments,
+    document_migration_coexistence,
+    document_migration_import,
+    repository_storage,
+)
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_index import ContentIndexError, index_repository_content
 from apps.core.content_profile import parse_content
@@ -488,7 +493,7 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             version_number=1,
         )
-        replace_primary_document_file(
+        second_primary = replace_primary_document_file(
             document=primary,
             actor_id=installation.owner.id,
             upload=SimpleUploadedFile("replacement.txt", b"replacement\n", content_type="text/plain"),
@@ -498,11 +503,44 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
             for item in inventory_legacy_documents(workspace)["documents"]
             if item["document_id"] == str(primary.id)
         )
-        assert row["reasons"] == ["primary_file_parity_required"]
+        assert row["disposition"] == "simple_candidate"
+        output = io.StringIO()
+        call_command("preview_document_migration", workspace=str(workspace.id), document=str(primary.id), stdout=output)
+        preview = json.loads(output.getvalue())
+        assert preview["eligible"] is True, preview
+        assert preview["attachment_count"] == 2
+        assert b"replacement\n" not in b"".join(source for _path, source in build_simple_document_export(primary).files)
+        third_primary = replace_primary_document_file(
+            document=primary,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("third.txt", b"third retained version\n", content_type="text/plain"),
+        )
+        output = io.StringIO()
+        call_command(
+            "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
+            base_commit=preview["base_commit"], plan_sha256=preview["plan_sha256"],
+            actor=str(installation.owner.id), apply=True, stdout=output,
+        )
+        assert json.loads(output.getvalue())["blockers"] == ["preview_changed"]
+        output = io.StringIO()
+        call_command("preview_document_migration", workspace=str(workspace.id), document=str(primary.id), stdout=output)
+        revised_preview = json.loads(output.getvalue())
+        assert revised_preview["plan_sha256"] != preview["plan_sha256"]
+        assert revised_preview["attachment_count"] == 3
+        output = io.StringIO()
+        call_command(
+            "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
+            base_commit=revised_preview["base_commit"], plan_sha256=revised_preview["plan_sha256"],
+            actor=str(installation.owner.id), apply=True, stdout=output,
+        )
+        assert json.loads(output.getvalue())["status"] == "imported"
+        assert second_primary.replaces_id == first_primary.id
+        assert third_primary.replaces_id == second_primary.id
         browser = Client()
         browser.force_login(installation.owner)
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": primary.entity_id})
         primary_status = browser.get(status_url).json()
+        assert primary_status["content_copy_state"] == "in_sync"
         assert primary_status["primary_file_state"] == "retained_bytes_verified"
         assert "primary_file_parity_not_verified" in primary_status["handoff_blockers"]
         with monkeypatch.context() as patch:
@@ -513,8 +551,15 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
                     raise ValidationError("Historical file is damaged")
                 return copy_attachment_content(attachment)
 
-            patch.setattr(document_migration_coexistence, "copy_attachment_content", damaged_history)
+            patch.setattr(document_migration_attachments, "copy_attachment_content", damaged_history)
             damaged_status = browser.get(status_url).json()
+            damaged_retry_output = io.StringIO()
+            call_command(
+                "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
+                base_commit=revised_preview["base_commit"], plan_sha256=revised_preview["plan_sha256"],
+                actor=str(installation.owner.id), apply=True, stdout=damaged_retry_output,
+            )
+            assert json.loads(damaged_retry_output.getvalue())["blockers"] == ["primary_file_storage_unavailable"]
         assert damaged_status["primary_file_state"] == "unavailable"
         assert "primary_file_parity_not_verified" in damaged_status["handoff_blockers"]
         assert "primary_file_storage_unavailable" in damaged_status["handoff_blockers"]

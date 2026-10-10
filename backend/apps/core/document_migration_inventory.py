@@ -21,8 +21,6 @@ from .models import (
     Block,
     ContentNode,
     Document,
-    DocumentAttachment,
-    DocumentAttachmentPurpose,
     DocumentPlacement,
     DocumentPublication,
     Workspace,
@@ -90,12 +88,6 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
             portable_document_entity_references(document)
         except DocumentMigrationRelationshipError:
             reasons.append("relationship_mapping_required")
-        if DocumentAttachment.objects.filter(
-            document=document,
-            archived_at__isnull=True,
-            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
-        ).exists():
-            reasons.append("primary_file_parity_required")
         if DocumentPublication.objects.filter(document=document).exists():
             reasons.append("publication_parity_required")
         if Block.objects.filter(**owner, source_document=document).exclude(id__in=owned_block_ids).exists():

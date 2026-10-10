@@ -639,6 +639,10 @@ for that recovery path. The same supported rehearsal now publishes that Git
 document with its native file to the client portal, then verifies the released
 HTML, PDF and retained file after restore and refuses corrupted retained bytes.
 This proves native publication-file recovery, not legacy authority handoff.
+The same rehearsal now uses guarded shadow import for a legacy document with
+two primary-file versions and proves both historical byte strings, chain
+metadata, typed legacy ownership and the complete editable-bundle digest
+survive an independent restore. It does not transfer legacy file custody.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

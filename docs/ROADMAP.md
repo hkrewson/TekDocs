@@ -1899,6 +1899,10 @@ match the legacy export. The editable bundle and offline verifier now also
 cover retained Git-owned and copied legacy primary-file chains; database records, Git history and
 other unreferenced files
 remain outside that editing handoff, not outside the separate backup path.
+The supported network-isolated recovery rehearsal now imports a legacy
+document with a two-version primary-file chain and verifies exact historical
+bytes, order, typed owner and editable-bundle digest after independent restore.
+This is recovery evidence, not legacy file-owner transfer or authority handoff.
 Repository-native managed-file use is still incomplete: publication preflight
 requires a legacy `Document` row.
 [ADR 0114](adr/0114-stable-managed-file-content-ownership.md) is accepted,

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from django.http import HttpResponse
+from django.db import transaction
+from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied
 from rest_framework.parsers import MultiPartParser
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -22,11 +25,16 @@ from .content_authoring import (
     resolve_authored_path,
 )
 from .content_index import ContentIndexValidationError
+from .content_index_models import ContentNode
 from .content_read import repository_for_reader
-from .document_attachments import create_repository_document_attachment
+from .document_attachments import (
+    archive_document_attachment,
+    create_repository_document_attachment,
+    repository_attachment_archive_eligible,
+)
 from .document_file_serializers import DocumentAttachmentSerializer, DocumentAttachmentWriteSerializer
 from .document_views import _msp_workspace, _organization_workspace
-from .models import AuditEvent, WorkspaceRepository
+from .models import AuditEvent, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
 from .repository_editable_bundles import RepositoryEditableBundleError, export_repository_editable_bundle
 from .repository_service import (
     RepositoryFileNotFoundError,
@@ -36,6 +44,7 @@ from .repository_service import (
 )
 from .repository_source_exports import RepositorySourceExportError, export_repository_sources
 from .repository_storage import RepositoryStorageError
+from .workspaces import ResolvedWorkspace
 
 
 class ContentAuthoringMutationSerializer(serializers.Serializer):
@@ -80,6 +89,31 @@ class ContentPathQuerySerializer(serializers.Serializer):
 
 class ContentSourceExportQuerySerializer(serializers.Serializer):
     bundle = serializers.ChoiceField(choices=("editable",), required=False)
+
+
+class RepositoryAttachmentQuerySerializer(serializers.Serializer):
+    page = serializers.IntegerField(min_value=1, max_value=100_000, required=False, default=1)
+
+
+class RepositoryAttachmentStatusSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    filename = serializers.CharField()
+    size = serializers.IntegerField()
+    linked_current = serializers.BooleanField()
+    can_archive = serializers.BooleanField()
+
+
+class RepositoryAttachmentPageSerializer(serializers.Serializer):
+    results = RepositoryAttachmentStatusSerializer(many=True)
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
+class RepositoryAttachmentIndexPending(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Repository content is not fully indexed"
 
 
 def _workspace(request, organization_entity_id: UUID | None, permission: PermissionKey):  # type: ignore[no-untyped-def]
@@ -194,8 +228,96 @@ def _upload_file(request, content_id: UUID, organization_entity_id: UUID | None 
     return Response(DocumentAttachmentSerializer(attachment).data, status=status.HTTP_201_CREATED)
 
 
+def _locked_attachment_repository(workspace: ResolvedWorkspace, content_id: UUID) -> WorkspaceRepository:
+    try:
+        repository = repository_for_reader(workspace)
+    except WorkspaceRepository.DoesNotExist as exc:
+        raise Http404("Repository document is unavailable") from exc
+    locked = get_object_or_404(
+        WorkspaceRepository.objects.select_for_update().filter(
+            pk=repository.pk, tenant=workspace.member.tenant, workspace=repository.workspace
+        )
+    )
+    get_object_or_404(
+        ContentNode.objects.filter(
+            tenant=workspace.member.tenant,
+            organization=workspace.organization,
+            workspace=locked.workspace,
+            repository=locked,
+            kind="document",
+        ),
+        content_id=content_id,
+    )
+    if locked.accepted_commit_id is None or locked.accepted_commit_id != locked.indexed_commit_id:
+        raise RepositoryAttachmentIndexPending()
+    return locked
+
+
+def _native_attachments(repository: WorkspaceRepository, content_id: UUID):  # type: ignore[no-untyped-def]
+    return DocumentAttachment.objects.filter(
+        tenant=repository.tenant,
+        organization=repository.workspace.organization,
+        owner_workspace=repository.workspace,
+        owner_content_id=content_id,
+        document__isnull=True,
+        purpose=DocumentAttachmentPurpose.ATTACHMENT,
+        archived_at__isnull=True,
+    )
+
+
+def _list_native_attachments(request, content_id: UUID, organization_entity_id: UUID | None = None) -> Response:  # type: ignore[no-untyped-def]
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+    query = RepositoryAttachmentQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    page = query.validated_data["page"]
+    page_size = 25
+    with transaction.atomic():
+        repository = _locked_attachment_repository(workspace, content_id)
+        records = _native_attachments(repository, content_id).order_by("-created_at", "id")
+        count = records.count()
+        results = []
+        for attachment in records[(page - 1) * page_size:page * page_size]:
+            linked, can_archive = repository_attachment_archive_eligible(repository=repository, attachment=attachment)
+            results.append({
+                "id": attachment.entity_id,
+                "filename": attachment.original_filename,
+                "size": attachment.size,
+                "linked_current": linked,
+                "can_archive": can_archive,
+            })
+        return Response(RepositoryAttachmentPageSerializer({
+            "results": results,
+            "count": count,
+            "page": page,
+            "page_size": page_size,
+            "has_more": page * page_size < count,
+        }).data)
+
+
+def _archive_native_attachment(
+    request: Request, content_id: UUID, attachment_entity_id: UUID, organization_entity_id: UUID | None = None
+) -> Response:
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT)
+    with transaction.atomic():
+        repository = _locked_attachment_repository(workspace, content_id)
+        attachment = get_object_or_404(_native_attachments(repository, content_id), entity_id=attachment_entity_id)
+        _linked, can_archive = repository_attachment_archive_eligible(repository=repository, attachment=attachment)
+        if not can_archive:
+            return Response({"detail": "This file may be referenced by a saved Git revision"}, status=409)
+        archive_document_attachment(attachment=attachment, actor_id=request.user.id)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
 class MSPContentAuthoringAttachmentView(APIView):
     parser_classes = (MultiPartParser,)
+
+    @extend_schema(
+        operation_id="content_authoring_msp_attachment_list",
+        parameters=[RepositoryAttachmentQuerySerializer],
+        responses={200: RepositoryAttachmentPageSerializer},
+    )
+    def get(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _list_native_attachments(request, content_id)
 
     @extend_schema(
         operation_id="content_authoring_msp_attachment_create",
@@ -210,12 +332,32 @@ class OrganizationContentAuthoringAttachmentView(APIView):
     parser_classes = (MultiPartParser,)
 
     @extend_schema(
+        operation_id="content_authoring_organization_attachment_list",
+        parameters=[RepositoryAttachmentQuerySerializer],
+        responses={200: RepositoryAttachmentPageSerializer},
+    )
+    def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _list_native_attachments(request, content_id, organization_entity_id)
+
+    @extend_schema(
         operation_id="content_authoring_organization_attachment_create",
         request=DocumentAttachmentWriteSerializer,
         responses={201: DocumentAttachmentSerializer},
     )
     def post(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _upload_file(request, content_id, organization_entity_id)
+
+
+class MSPContentAuthoringAttachmentDetailView(APIView):
+    @extend_schema(operation_id="content_authoring_msp_attachment_archive", responses={204: None})
+    def delete(self, request, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _archive_native_attachment(request, content_id, attachment_entity_id)
+
+
+class OrganizationContentAuthoringAttachmentDetailView(APIView):
+    @extend_schema(operation_id="content_authoring_organization_attachment_archive", responses={204: None})
+    def delete(self, request, organization_entity_id, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
+        return _archive_native_attachment(request, content_id, attachment_entity_id, organization_entity_id)
 
 
 def _source_snapshot(request, organization_entity_id: UUID | None = None) -> HttpResponse | Response:  # type: ignore[no-untyped-def]

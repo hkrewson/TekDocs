@@ -27,6 +27,7 @@ from .models import (
     DocumentAttachmentPurpose,
     Entity,
     Organization,
+    RepositoryCommitAudit,
     Tenant,
     Workspace,
     WorkspaceRepository,
@@ -182,6 +183,7 @@ def _create_managed_attachment(
         raise ValidationError({"file": "Attachment scanning did not complete; the upload was discarded."}) from exc
 
     attachment: DocumentAttachment | None = None
+    upload_commit: str | None = None
     try:
         with transaction.atomic():
             if document is None:
@@ -199,6 +201,10 @@ def _create_managed_attachment(
                     ).exists()
                 ):
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
+                accepted_commit = repository.accepted_commit
+                if accepted_commit is None:
+                    raise ValidationError({"content_id": "An accepted, indexed document is required."})
+                upload_commit = accepted_commit.object_id
             entity = Entity.objects.create(
                 id=attachment_entity_id,
                 tenant=tenant,
@@ -242,6 +248,7 @@ def _create_managed_attachment(
                 entity_id=attachment.entity_id,
                 metadata={
                     **({"document_id": str(document.entity_id)} if document else {"content_id": str(content_id)}),
+                    **({"upload_commit": upload_commit} if upload_commit is not None else {}),
                     **({"version_number": version_number} if version_number is not None else {}),
                 },
             )
@@ -275,6 +282,49 @@ def archive_document_attachment(*, attachment: DocumentAttachment, actor_id: UUI
             else {"content_id": str(locked.owner_content_id)}
         ),
     )
+
+
+def repository_attachment_archive_eligible(
+    *, repository: WorkspaceRepository, attachment: DocumentAttachment
+) -> tuple[bool, bool]:
+    """Return (linked at indexed head, safely archivable) without trusting a client flag.
+
+    Only uploads recorded against the *current* accepted commit may be
+    archived. If Git has advanced, an older revision might refer to the file;
+    keep it until historical-reference reconciliation can prove otherwise.
+    """
+    if (
+        attachment.document_id is not None
+        or attachment.tenant_id != repository.tenant_id
+        or attachment.owner_workspace_id != repository.workspace_id
+        or attachment.organization_id != repository.workspace.organization_id
+        or repository.accepted_commit_id is None
+        or repository.accepted_commit_id != repository.indexed_commit_id
+    ):
+        return False, False
+    accepted_commit = repository.accepted_commit
+    if accepted_commit is None:
+        return False, False
+    linked = ContentNode.objects.filter(
+        tenant_id=repository.tenant_id,
+        organization=repository.workspace.organization,
+        workspace_id=repository.workspace_id,
+        repository=repository,
+        indexed_commit_id=repository.indexed_commit_id,
+        markdown__contains=str(attachment.entity_id),
+    ).exists()
+    creation = AuditEvent.objects.filter(
+        tenant_id=repository.tenant_id,
+        action="document.attachment.created",
+        entity_id=attachment.entity_id,
+    ).order_by("occurred_at").first()
+    upload_commit = creation.metadata.get("upload_commit") if creation is not None else None
+    later_accepted_commit = creation is None or RepositoryCommitAudit.objects.filter(
+        tenant_id=repository.tenant_id,
+        repository=repository,
+        created_at__gt=creation.occurred_at,
+    ).exists()
+    return linked, not linked and not later_accepted_commit and upload_commit == accepted_commit.object_id
 
 
 @transaction.atomic

@@ -4,7 +4,7 @@ import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
 import {
   browserRepositoryClient, RepositoryConflictError,
-  type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
+  type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
 } from './repositoryApi'
 
 type Draft = {
@@ -34,6 +34,11 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [attachments, setAttachments] = useState<RepositoryAttachmentStatus[]>([])
+  const [attachmentPage, setAttachmentPage] = useState(1)
+  const [attachmentMore, setAttachmentMore] = useState(false)
+  const [attachmentReload, setAttachmentReload] = useState(0)
+  const [attachmentError, setAttachmentError] = useState('')
   const [exporting, setExporting] = useState(false)
   const [bundleExporting, setBundleExporting] = useState(false)
   const [htmlExporting, setHtmlExporting] = useState(false)
@@ -64,8 +69,26 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [client, organizationId, query, reload])
 
+  useEffect(() => {
+    if (source?.kind !== 'document' || !source.accepted_commit || !canDownloadSaved) {
+      return
+    }
+    const controller = new AbortController()
+    const contentId = source.content_id
+    void client.listAttachments(contentId, organizationId, attachmentPage, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return
+        setAttachments((current) => attachmentPage === 1 ? result.results : [...current, ...result.results])
+        setAttachmentMore(result.has_more)
+        setAttachmentError('')
+      })
+      .catch(() => { if (!controller.signal.aborted) setAttachmentError(translate('repository.attachmentListFailed')) })
+    return () => controller.abort()
+  }, [client, organizationId, source, attachmentPage, attachmentReload, canDownloadSaved])
+
   function open(id: string) {
     attempt(() => {
+      setAttachmentPage(1); setAttachments([])
       setError(''); setMessage(''); setConflict(null); setBusy(true)
       void client.source(id, organizationId)
         .then((result) => { setSource(result); setDraft(draftFromSource(result)) })
@@ -76,6 +99,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
 
   function create() {
     attempt(() => {
+      setAttachmentPage(1); setAttachments([])
       setSource(null)
       setDraft({ id: crypto.randomUUID(), kind: 'document', title: '', markdown: '', path: '', metadataText: '{}' })
       setError(''); setMessage(''); setConflict(null)
@@ -128,9 +152,25 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
         ? { ...current, markdown: `${current.markdown}${current.markdown && !current.markdown.endsWith('\n') ? '\n\n' : ''}${link}\n` }
         : current)
       setMessage(translate('repository.attachmentLinked', { filename: attachment.filename }))
+      setAttachmentPage(1); setAttachmentReload((value) => value + 1)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : translate('repository.attachmentFailed'))
     } finally { setUploading(false); setBusy(false) }
+  }
+
+  async function archiveAttachment(attachment: RepositoryAttachmentStatus) {
+    if (!source || !attachment.can_archive || draft?.markdown.includes(attachment.id) || busy) return
+    const contentId = source.content_id
+    setBusy(true); setAttachmentError('')
+    try {
+      await client.archiveAttachment(contentId, attachment.id, organizationId)
+      if (sourceRef.current?.content_id !== contentId) return
+      setAttachments((current) => current.filter((item) => item.id !== attachment.id))
+      setAttachmentPage(1); setAttachmentReload((value) => value + 1)
+      setMessage(translate('repository.attachmentArchived', { filename: attachment.filename }))
+    } catch {
+      setAttachmentError(translate('repository.attachmentArchiveFailed'))
+    } finally { setBusy(false) }
   }
 
   async function rebase() {
@@ -286,7 +326,13 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
           <label>{translate('repository.title')}<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
           <label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label>
           <label>{translate('repository.markdown')}<textarea rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} /></label>
-          {source?.kind === 'document' && <><label>{translate('repository.attachFile')}<input type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadAttachment(file) }} /></label><p className="field-hint">{translate('repository.attachmentNotice')}</p>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}</>}
+          {source?.kind === 'document' && <><label>{translate('repository.attachFile')}<input type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadAttachment(file) }} /></label><p className="field-hint">{translate('repository.attachmentNotice')}</p>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}
+            {canDownloadSaved && <section aria-label={translate('repository.attachmentFiles')}><h3>{translate('repository.attachmentFiles')}</h3>{attachmentError && <p role="alert">{attachmentError}</p>}
+              {attachments.length === 0 && !attachmentError && <p>{translate('repository.attachmentEmpty')}</p>}
+              <ul>{attachments.map((attachment) => <li key={attachment.id}>{attachment.filename} · {attachment.size} B · {attachment.linked_current ? translate('repository.attachmentLinkedStatus') : translate('repository.attachmentRetainedStatus')}{attachment.can_archive && <button type="button" className="secondary-button" disabled={busy || !!draft?.markdown.includes(attachment.id)} onClick={() => { void archiveAttachment(attachment) }}>{translate('repository.attachmentArchive', { filename: attachment.filename })}</button>}</li>)}</ul>
+              {attachmentMore && <button type="button" className="secondary-button" onClick={() => setAttachmentPage((page) => page + 1)}>{translate('repository.attachmentMore')}</button>}
+            </section>}
+          </>}
           <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
         </div>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}

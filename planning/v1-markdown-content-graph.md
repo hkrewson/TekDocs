@@ -618,9 +618,15 @@ missing or changed bytes. The repository editor now lets staff upload to a
 saved, indexed Git document and inserts the returned private-file link into
 the unsaved Markdown draft for explicit saving; denied uploads do not change
 the draft. A successful upload whose draft link is later discarded leaves a
-retained but unlinked file; native cleanup/reconciliation remains a separate
-open gate. Editable-bundle, publication, recovery, and authority-handoff gates
-remain open.
+retained but unlinked file. The repository editor can now list scoped native
+files and archive an unlinked upload only while the accepted/indexed Git head
+is the same commit recorded at upload and no later accepted commit exists. The
+mutation rechecks exact ownership,
+current Markdown references, and commit identity under the repository lock;
+later commits and older uploads without a recorded commit fail closed. Archive
+removes the active link but deliberately retains bytes for recovery. Historical
+reference reconciliation and physical retention policy remain open, as do
+editable-bundle, publication, recovery, and authority-handoff gates.
 
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

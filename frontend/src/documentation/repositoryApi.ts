@@ -35,6 +35,22 @@ export type RepositoryAttachment = {
   scan_status: 'clean'
 }
 
+export type RepositoryAttachmentStatus = {
+  id: string
+  filename: string
+  size: number
+  linked_current: boolean
+  can_archive: boolean
+}
+
+export type RepositoryAttachmentPage = {
+  results: RepositoryAttachmentStatus[]
+  page: number
+  page_size: number
+  count: number
+  has_more: boolean
+}
+
 export type RepositoryEvidence = {
   id: string
   content_id: string
@@ -310,6 +326,21 @@ export const browserRepositoryClient = {
       || typeof attachment.size !== 'number' || !Number.isSafeInteger(attachment.size) || attachment.size < 0
       || attachment.scan_status !== 'clean') throw new Error(translate('repository.attachmentFailed'))
     return attachment as RepositoryAttachment
+  },
+  async listAttachments(contentId: string, organizationId?: string, page = 1, signal?: AbortSignal) {
+    const query = new URLSearchParams({ page: String(page) })
+    const response = await fetch(`${path(organizationId)}/authoring/${encodeURIComponent(contentId)}/attachments?${query}`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    return parse<RepositoryAttachmentPage>(response)
+  },
+  async archiveAttachment(contentId: string, attachmentId: string, organizationId?: string) {
+    const response = await fetch(`${path(organizationId)}/authoring/${encodeURIComponent(contentId)}/attachments/${encodeURIComponent(attachmentId)}`, {
+      method: 'DELETE', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'X-CSRFToken': await token() },
+    })
+    if (response.status === 204) return
+    await parse<unknown>(response)
   },
 }
 

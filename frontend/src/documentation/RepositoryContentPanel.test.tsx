@@ -25,6 +25,8 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     exportPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-saved'], { type: 'application/pdf' }), name: 'repository-document.pdf', commit }),
     exportDocx: vi.fn().mockResolvedValue({ content: new Blob(['PK\x03\x04saved']), name: 'repository-document.docx', commit }),
     uploadAttachment: vi.fn().mockResolvedValue({ id: '11111111-1111-4111-8111-111111111111', filename: 'setup [staff].txt', size: 5, scan_status: 'clean' }),
+    listAttachments: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
+    archiveAttachment: vi.fn().mockResolvedValue(undefined),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     staticPublication: vi.fn().mockResolvedValue(null),
     reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
@@ -39,6 +41,38 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
   render(<RouterProvider router={router} />)
   return { client, onClose, save }
 }
+
+it('archives only an unlinked file and leaves a denied archive retryable without changing the draft', async () => {
+  const user = userEvent.setup()
+  const attachment = { id: '11111111-1111-4111-8111-111111111111', filename: 'unused.txt', size: 5, linked_current: false, can_archive: true }
+  const listAttachments = vi.fn().mockResolvedValue({ results: [attachment], page: 1, page_size: 25, count: 1, has_more: false })
+  const archiveAttachment = vi.fn().mockRejectedValueOnce(new Error('Conflict')).mockResolvedValue(undefined)
+  setup({ listAttachments, archiveAttachment }, 'org-1')
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  const body = screen.getByLabelText('Markdown body')
+  const archive = await screen.findByRole('button', { name: 'Archive unused.txt' })
+  await user.type(body, ' Unsaved')
+  await user.click(archive)
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be archived')
+  expect(body).toHaveValue('First revision.\n Unsaved')
+  await user.click(archive)
+  await waitFor(() => expect(archiveAttachment).toHaveBeenCalledTimes(2))
+  expect(archiveAttachment).toHaveBeenCalledWith('content-1', attachment.id, 'org-1')
+  expect(body).toHaveValue('First revision.\n Unsaved')
+})
+
+it('does not offer archive for a saved link or when the unsaved draft references a file', async () => {
+  const user = userEvent.setup()
+  const linked = { id: '22222222-2222-4222-8222-222222222222', filename: 'linked.txt', size: 5, linked_current: true, can_archive: false }
+  const unused = { id: '11111111-1111-4111-8111-111111111111', filename: 'unused.txt', size: 5, linked_current: false, can_archive: true }
+  const { client } = setup({ listAttachments: vi.fn().mockResolvedValue({ results: [linked, unused], page: 1, page_size: 25, count: 2, has_more: false }) })
+  await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  expect(await screen.findByText(/linked.txt/)).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Archive linked.txt' })).not.toBeInTheDocument()
+  await user.type(screen.getByLabelText('Markdown body'), ` tekdocs://attachment/${unused.id}`)
+  expect(screen.getByRole('button', { name: 'Archive unused.txt' })).toBeDisabled()
+  expect(client.archiveAttachment).not.toHaveBeenCalled()
+})
 
 it('uploads to a saved indexed document and leaves its private-file link as an unsaved Markdown draft', async () => {
   const user = userEvent.setup()

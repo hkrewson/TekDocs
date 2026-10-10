@@ -15,6 +15,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
 from apps.core.content_authoring import (
     ContentAuthoringConflict,
@@ -27,7 +28,15 @@ from apps.core.content_authoring import (
 from apps.core.content_index import ContentIndexValidationError, index_repository_content
 from apps.core.document_attachments import create_document_attachment
 from apps.core.documents import create_document
-from apps.core.models import AuditEvent, ContentNode, DocumentAttachment, InstallationState, Workspace, WorkspaceKind
+from apps.core.models import (
+    AuditEvent,
+    ContentNode,
+    DocumentAttachment,
+    InstallationState,
+    Tenant,
+    Workspace,
+    WorkspaceKind,
+)
 from apps.core.organizations import create_organization
 from apps.core.repository_editable_bundle_validation import (
     RepositoryEditableBundleValidationError,
@@ -387,6 +396,51 @@ def test_native_attachment_upload_accepts_exact_organization_workspace(authoring
         assert attachment.owner_workspace_id == workspace.id
         assert attachment.organization_id == organization.id
         call_command("verify_recovery_managed_files", verbosity=0)
+        listed = browser.get(url)
+        assert listed.status_code == 200, listed.content
+        assert listed.json()["results"][0]["can_archive"] is True
+        archive_url = reverse(
+            "organization-content-authoring-attachment-archive",
+            kwargs={"organization_entity_id": organization.entity_id, "content_id": content_id,
+                    "attachment_entity_id": attachment.entity_id},
+        )
+        wrong_content = reverse(
+            "organization-content-authoring-attachment-archive",
+            kwargs={"organization_entity_id": organization.entity_id, "content_id": uuid.uuid4(),
+                    "attachment_entity_id": attachment.entity_id},
+        )
+        assert browser.delete(wrong_content).status_code == 404
+        sibling = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id, name="Other file owner",
+            legal_name="Other file owner", website="", classifications=["client"],
+        )
+        sibling_url = reverse(
+            "organization-content-authoring-attachment-archive",
+            kwargs={"organization_entity_id": sibling.entity_id, "content_id": content_id,
+                    "attachment_entity_id": attachment.entity_id},
+        )
+        assert browser.delete(sibling_url).status_code == 404
+        assert Client().get(url).status_code in {401, 403}
+        assert Client().delete(archive_url).status_code in {401, 403}
+        portal_user = User.objects.create_user(
+            email="native-archive-client@example.invalid", display_name="File client"
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=organization
+        )
+        browser.force_login(portal_user)
+        assert browser.get(url).status_code == 403
+        assert browser.delete(archive_url).status_code == 403
+        foreign_tenant = Tenant.objects.create(name="Foreign archive MSP", slug=f"foreign-archive-{uuid.uuid4()}")
+        foreign_user = User.objects.create_user(
+            email="foreign-archive@example.invalid", display_name="Foreign archive user"
+        )
+        TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.ADMINISTRATOR)
+        browser.force_login(foreign_user)
+        assert browser.get(url).status_code in {403, 404}
+        assert browser.delete(archive_url).status_code in {403, 404}
+        browser.force_login(installation.owner)
+        assert browser.delete(archive_url).status_code == 204
 
 
 def test_native_msp_attachment_download_uses_content_owner(authoring_context, tmp_path):
@@ -409,6 +463,83 @@ def test_native_msp_attachment_download_uses_content_owner(authoring_context, tm
         assert download.status_code == 200
         assert b"".join(download.streaming_content) == b"MSP only\n"
         assert Client().get(download_url).status_code in {401, 403}
+
+
+def test_native_attachment_archive_only_before_any_git_advance(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    collection = reverse("msp-content-authoring-attachment-create", args=[document.content_id])
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        uploaded = browser.post(collection, {"file": SimpleUploadedFile("unused.txt", b"Unused\n")})
+        assert uploaded.status_code == 201, uploaded.content
+        attachment_id = uploaded.json()["id"]
+        creation = AuditEvent.objects.get(action="document.attachment.created", entity_id=attachment_id)
+        assert creation.metadata["upload_commit"] == document.accepted_commit
+        listing = browser.get(collection)
+        assert listing.status_code == 200, listing.content
+        assert listing.json()["results"][0] == {
+            "id": attachment_id, "filename": "unused.txt", "size": 7,
+            "linked_current": False, "can_archive": True,
+        }
+        archive_url = reverse(
+            "msp-content-authoring-attachment-archive", args=[document.content_id, attachment_id]
+        )
+        assert Client().delete(archive_url).status_code in {401, 403}
+        assert browser.delete(archive_url).status_code == 204
+        attachment = DocumentAttachment.objects.get(entity_id=attachment_id)
+        assert attachment.archived_at is not None
+        assert attachment.file.storage.exists(attachment.file.name)
+        assert browser.get(collection).json()["count"] == 0
+        assert browser.delete(archive_url).status_code == 404
+
+        linked_upload = browser.post(collection, {"file": SimpleUploadedFile("linked.txt", b"Linked\n")})
+        assert linked_upload.status_code == 201, linked_upload.content
+        linked_id = linked_upload.json()["id"]
+        current = read_authored_content(repository=repository, content_id=document.content_id)
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=document.content_id,
+            base_commit=current.accepted_commit, base_blob=current.source_blob,
+            kind=None, path=None, title=None,
+            markdown=f"See [linked](tekdocs://attachment/{linked_id}).\n", metadata_patch={},
+        )
+        linked_archive = reverse(
+            "msp-content-authoring-attachment-archive", args=[document.content_id, linked_id]
+        )
+        assert browser.delete(linked_archive).status_code == 409
+        linked_status = browser.get(collection).json()["results"][0]
+        assert linked_status["linked_current"] is True
+        assert linked_status["can_archive"] is False
+
+        abandoned_upload = browser.post(collection, {"file": SimpleUploadedFile("later.txt", b"Later\n")})
+        assert abandoned_upload.status_code == 201, abandoned_upload.content
+        abandoned_id = abandoned_upload.json()["id"]
+        repository.refresh_from_db()
+        upload_commit_id = repository.accepted_commit_id
+        current = read_authored_content(repository=repository, content_id=document.content_id)
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=document.content_id,
+            base_commit=current.accepted_commit, base_blob=current.source_blob,
+            kind=None, path=None, title=None,
+            markdown=f"See [linked](tekdocs://attachment/{linked_id}).\nMore text.\n", metadata_patch={},
+        )
+        abandoned_archive = reverse(
+            "msp-content-authoring-attachment-archive", args=[document.content_id, abandoned_id]
+        )
+        assert browser.delete(abandoned_archive).status_code == 409
+        abandoned_status = next(
+            item for item in browser.get(collection).json()["results"] if item["id"] == abandoned_id
+        )
+        assert abandoned_status["linked_current"] is False
+        assert abandoned_status["can_archive"] is False
+        repository.refresh_from_db()
+        repository.accepted_commit_id = upload_commit_id
+        repository.indexed_commit_id = upload_commit_id
+        repository.save(update_fields=["accepted_commit", "indexed_commit", "updated_at"])
+        assert browser.delete(abandoned_archive).status_code == 409
 
 
 def test_accepted_index_marker_retries_without_rewriting_git(authoring_context):

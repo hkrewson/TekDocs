@@ -80,7 +80,11 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("msp-repository-publication-evidence-review-pdf", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
     route("msp-repository-publication-evidence-review-attachment", ("GET",), PermissionKey.DOCUMENTS_APPROVE),
     route("msp-content-authoring", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
-    route("msp-content-authoring-attachment-create", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
+    route(
+        "msp-content-authoring-attachment-create", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route("msp-content-authoring-attachment-archive", ("DELETE",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-content-authoring-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1445,9 +1449,14 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("organization-content-authoring-export", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route(
         "organization-content-authoring-attachment-create",
-        ("POST",),
+        ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
         organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-attachment-archive", ("DELETE",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
     ),
     route("organization-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route("organization-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),

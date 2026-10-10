@@ -31,6 +31,23 @@ it('reports upload denial and refuses an unscanned response', async () => {
   await expect(browserRepositoryClient.uploadAttachment('doc-1', file)).rejects.toThrow('could not be attached')
 })
 
+it.each([undefined, 'org/1'])('lists and archives only the selected repository document in workspace %s', async (organizationId) => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  const page = { results: [], page: 1, page_size: 25, count: 0, has_more: false }
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(new Response(JSON.stringify(page), { status: 200 }))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }))
+  vi.stubGlobal('fetch', fetch)
+  expect(await browserRepositoryClient.listAttachments('doc/1', organizationId)).toEqual(page)
+  await browserRepositoryClient.archiveAttachment('doc/1', 'file/1', organizationId)
+  const scope = organizationId ? '/api/v1/workspaces/organizations/org%2F1' : '/api/v1/workspaces/msp'
+  expect(fetch.mock.calls[0][0]).toBe(`${scope}/content-graph/authoring/doc%2F1/attachments?page=1`)
+  expect(fetch.mock.calls[1][0]).toBe(`${scope}/content-graph/authoring/doc%2F1/attachments/file%2F1`)
+  expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'DELETE', credentials: 'same-origin' })
+  const archiveRequest = fetch.mock.calls[1][1] as RequestInit
+  expect(new Headers(archiveRequest.headers).get('X-CSRFToken')).toBe('repository-csrf')
+})
+
 it('downloads an organization source ZIP without requesting an unsupported JSON renderer', async () => {
   const fetch = vi.fn().mockResolvedValue(new Response('zip', {
     status: 200,

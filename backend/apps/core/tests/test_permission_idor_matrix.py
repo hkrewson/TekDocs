@@ -98,6 +98,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-document-detail": ("document_entity_id",),
         "msp-content-authoring-source": ("content_id",),
         "msp-content-authoring-attachment-create": ("content_id",),
+        "msp-content-authoring-attachment-archive": ("content_id", "attachment_entity_id"),
         "msp-content-document-attachment-download": ("content_id", "attachment_entity_id"),
         "msp-content-document-detail": ("content_id",),
         "msp-content-document-html-export": ("content_id",),
@@ -468,6 +469,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-content-authoring": ("organization_entity_id",),
         "organization-content-authoring-source": ("organization_entity_id", "content_id"),
         "organization-content-authoring-attachment-create": ("organization_entity_id", "content_id"),
+        "organization-content-authoring-attachment-archive": (
+            "organization_entity_id", "content_id", "attachment_entity_id"
+        ),
         "organization-content-document-attachment-download": (
             "organization_entity_id", "content_id", "attachment_entity_id"
         ),

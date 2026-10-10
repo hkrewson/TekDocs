@@ -82,11 +82,13 @@ from apps.core.compliance_risk_views import (
     OrganizationComplianceRiskReviewView,
 )
 from apps.core.content_authoring_views import (
+    MSPContentAuthoringAttachmentDetailView,
     MSPContentAuthoringAttachmentView,
     MSPContentAuthoringExportView,
     MSPContentAuthoringSourceView,
     MSPContentAuthoringView,
     MSPContentPathResolveView,
+    OrganizationContentAuthoringAttachmentDetailView,
     OrganizationContentAuthoringAttachmentView,
     OrganizationContentAuthoringExportView,
     OrganizationContentAuthoringSourceView,
@@ -584,6 +586,11 @@ urlpatterns = [
         name="msp-content-authoring-attachment-create",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/attachments/<uuid:attachment_entity_id>",
+        MSPContentAuthoringAttachmentDetailView.as_view(),
+        name="msp-content-authoring-attachment-archive",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/resolve-path",
         MSPContentPathResolveView.as_view(),
         name="msp-content-resolve-path",
@@ -722,6 +729,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/attachments",
         OrganizationContentAuthoringAttachmentView.as_view(),
         name="organization-content-authoring-attachment-create",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/attachments/<uuid:attachment_entity_id>",
+        OrganizationContentAuthoringAttachmentDetailView.as_view(),
+        name="organization-content-authoring-attachment-archive",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/resolve-path",

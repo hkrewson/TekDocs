@@ -2796,10 +2796,26 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["content_authoring_msp_attachment_list"];
         readonly put?: never;
         readonly post: operations["content_authoring_msp_attachment_create"];
         readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}/attachments/{attachment_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["content_authoring_msp_attachment_archive"];
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -5439,10 +5455,26 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
-        readonly get?: never;
+        readonly get: operations["content_authoring_organization_attachment_list"];
         readonly put?: never;
         readonly post: operations["content_authoring_organization_attachment_create"];
         readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/attachments/{attachment_entity_id}": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete: operations["content_authoring_organization_attachment_archive"];
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -15734,6 +15766,21 @@ export interface components {
             /** @default 1440 */
             readonly check_interval_minutes: number;
         };
+        readonly RepositoryAttachmentPage: {
+            readonly results: readonly components["schemas"]["RepositoryAttachmentStatus"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+        };
+        readonly RepositoryAttachmentStatus: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly filename: string;
+            readonly size: number;
+            readonly linked_current: boolean;
+            readonly can_archive: boolean;
+        };
         readonly RepositoryDiagnostics: {
             /**
              * @description * `ready` - ready
@@ -24311,6 +24358,31 @@ export interface operations {
             };
         };
     };
+    readonly content_authoring_msp_attachment_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryAttachmentPage"];
+                };
+            };
+        };
+    };
     readonly content_authoring_msp_attachment_create: {
         readonly parameters: {
             readonly query?: never;
@@ -24335,6 +24407,29 @@ export interface operations {
                 content: {
                     readonly "application/json": components["schemas"]["DocumentAttachment"];
                 };
+            };
+        };
+    };
+    readonly content_authoring_msp_attachment_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly attachment_entity_id: string;
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -31386,6 +31481,32 @@ export interface operations {
             };
         };
     };
+    readonly content_authoring_organization_attachment_list: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryAttachmentPage"];
+                };
+            };
+        };
+    };
     readonly content_authoring_organization_attachment_create: {
         readonly parameters: {
             readonly query?: never;
@@ -31411,6 +31532,30 @@ export interface operations {
                 content: {
                     readonly "application/json": components["schemas"]["DocumentAttachment"];
                 };
+            };
+        };
+    };
+    readonly content_authoring_organization_attachment_archive: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly attachment_entity_id: string;
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description No response body */
+            readonly 204: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

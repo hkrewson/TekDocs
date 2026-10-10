@@ -619,6 +619,11 @@ for that recovery path. The same supported rehearsal now publishes that Git
 document with its native file to the client portal, then verifies the released
 HTML, PDF and retained file after restore and refuses corrupted retained bytes.
 This proves native publication-file recovery, not legacy authority handoff.
+The clean-install rehearsal now creates a Git-only document and managed file
+and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
+now checks that legacy file identity survives the owner migration and that an
+upgraded installation can create and read a Git-only file. These are install
+and upgrade custody proofs; they do not switch document authority.
 
 [ADR 0114](../docs/adr/0114-stable-managed-file-content-ownership.md) selects
 the existing attachment table for this transition because signed publication

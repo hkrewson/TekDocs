@@ -23,10 +23,15 @@ from apps.accounts.models import (
     User,
 )
 from apps.core import repository_service, repository_storage
+from apps.core.content_authoring import author_content
 from apps.core.content_index import index_repository_content
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
-from apps.core.document_attachments import create_document_attachment
+from apps.core.document_attachments import (
+    copy_attachment_content,
+    create_document_attachment,
+    create_repository_document_attachment,
+)
 from apps.core.documents import create_document
 from apps.core.invoicing import (
     configure_issue_settings,
@@ -61,6 +66,7 @@ from apps.core.models import (
     Tenant,
     TenantBillingProfile,
     Workspace,
+    WorkspaceKind,
     WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
@@ -385,6 +391,43 @@ def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_r
     assert upgraded.checksum == original_checksum
     assert upgraded.owner_workspace_id == document.entity.workspace_id
     assert upgraded.owner_content_id == document.id
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        assert copy_attachment_content(upgraded) == b"Retained guide bytes\n"
+
+    # The upgraded schema must also accept a Git-only owner without fabricating
+    # a legacy Document row, and retain its bytes in the same private store.
+    with override_settings(
+        MEDIA_ROOT=str(tmp_path / "media"),
+        TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"),
+    ):
+        workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+        repository = repository_storage.ensure_workspace_repository(workspace).repository
+        repository.refresh_from_db()
+        content_id = uuid.uuid4()
+        author_content(
+            repository=repository,
+            actor_id=installation.owner.id,
+            request_id=None,
+            operation="create",
+            content_id=content_id,
+            base_commit=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+            base_blob=None,
+            kind="document",
+            path=None,
+            title="Upgraded Git file owner",
+            markdown="# Upgraded Git file owner\n",
+            metadata_patch={},
+        )
+        native = create_repository_document_attachment(
+            repository=repository,
+            content_id=content_id,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("native.txt", b"Git-only bytes survive upgrade\n"),
+        )
+        assert native.document_id is None
+        assert native.owner_workspace_id == workspace.id
+        assert native.owner_content_id == content_id
+        assert copy_attachment_content(native) == b"Git-only bytes survive upgrade\n"
 
 
 @pytest.mark.django_db(transaction=True)

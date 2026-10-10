@@ -66,4 +66,51 @@ assert Organization._meta.get_field("access_mode").get_default() == Organization
 print("Fresh installation state verified")
 '
 
+clean_compose run --rm migrate python manage.py shell -c '
+import uuid
+from django.core.files.uploadedfile import SimpleUploadedFile
+from apps.accounts.bootstrap import bootstrap_owner
+from apps.core import repository_storage
+from apps.core.content_authoring import author_content
+from apps.core.document_attachments import copy_attachment_content, create_repository_document_attachment
+from apps.core.models import Document, Workspace, WorkspaceKind
+
+installation = bootstrap_owner(
+    tenant_name="Fresh Git file owner",
+    owner_email=f"fresh-file-{uuid.uuid4()}@example.invalid",
+    owner_display_name="Fresh File Owner",
+    password="FreshFileOwner-2026!",
+)
+workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+repository = repository_storage.ensure_workspace_repository(workspace).repository
+repository.refresh_from_db()
+content_id = uuid.uuid4()
+author_content(
+    repository=repository,
+    actor_id=installation.owner.id,
+    request_id=None,
+    operation="create",
+    content_id=content_id,
+    base_commit=repository.accepted_commit.object_id if repository.accepted_commit_id else None,
+    base_blob=None,
+    kind="document",
+    path=None,
+    title="Fresh Git file owner",
+    markdown="# Fresh Git file owner\n",
+    metadata_patch={},
+)
+attachment = create_repository_document_attachment(
+    repository=repository,
+    content_id=content_id,
+    actor_id=installation.owner.id,
+    upload=SimpleUploadedFile("fresh.txt", b"Fresh install file bytes\n"),
+)
+assert attachment.document_id is None
+assert attachment.owner_workspace_id == workspace.id
+assert attachment.owner_content_id == content_id
+assert not Document.objects.filter(id=content_id).exists()
+assert copy_attachment_content(attachment) == b"Fresh install file bytes\n"
+print("Fresh Git-only file owner verified")
+'
+
 echo "Clean-install rehearsal passed for TekDocs $release_version"

@@ -285,19 +285,23 @@ def _retain_pinned_evidence(
                 )
                 .first()
             )
-            if document is None:
+            if document is None and key_targets:
                 raise RepositoryPublicationEvidenceError(
-                    "Repository publication preflight blocked: "
-                    + ("repository.attachment.unavailable" if attachment_ids else "repository.key.unavailable")
+                    "Repository publication preflight blocked: repository.key.unavailable"
                 )
         if attachment_ids:
+            owner_filter = Q(document__isnull=True)
+            if document is not None:
+                owner_filter |= Q(document=document)
             attachments = (
                 DocumentAttachment.objects.select_for_update()
                 .filter(
                     Q(entity_id__in=attachment_ids) | Q(id__in=attachment_ids),
-                    document=document,
+                    owner_filter,
                     tenant_id=repository.tenant_id,
                     organization=repository.workspace.organization,
+                    owner_workspace_id=repository.workspace_id,
+                    owner_content_id=content_id,
                     archived_at__isnull=True,
                     purpose="attachment",
                     scan_status="clean",

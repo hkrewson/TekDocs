@@ -599,7 +599,12 @@ schema requirement is now optional for an indexed Git document. A scoped staff
 API can now upload an ordinary file for that owner through the existing scanner
 and private storage. The repository detail reader now resolves integrity-checked
 native file links for authorized staff, and its scoped private download repeats
-the byte check. Publication preflight still requires a matching legacy document.
+the byte check. Repository publication evidence can now retain a native file
+without a legacy document when its immutable owner matches the exact tenant,
+Workspace and Git document. Legacy file and field-key paths keep their
+existing owner checks; signed file evidence and client delivery use the same
+retained artifact IDs. This closes that native publication-file path, not all
+publication or authority parity.
 The editable bundle now verifies bytes of referenced, same-Workspace legacy
 and Git-owned files. Its v2 manifest identifies the legacy or repository
 document owner for each file, and the offline verifier still accepts v1
@@ -610,7 +615,10 @@ The supported backup/restore rehearsal now includes an indexed Git document
 with a native managed file alongside a legacy-owned file. It verifies both
 owner descriptors, exact bytes and the editable-bundle digest after an
 independent network-isolated restore. This proves retained native file custody
-for that recovery path, not native publication or legacy authority handoff.
+for that recovery path. The same supported rehearsal now publishes that Git
+document with its native file to the client portal, then verifies the released
+HTML, PDF and retained file after restore and refuses corrupted retained bytes.
+This proves native publication-file recovery, not legacy authority handoff.
 
 [ADR 0114](../docs/adr/0114-stable-managed-file-content-ownership.md) selects
 the existing attachment table for this transition because signed publication
@@ -683,10 +691,11 @@ does not approve publications or distribute artifacts. A separate approver-only
 read verifies the retained evidence before returning exact canonical Markdown;
 it does not expose frozen key values or downloadable files.
 Managed-file references in repository Markdown use the attachment's public
-Entity ID. Retention now resolves that ID to the exact legacy document and
-Workspace, freezes the verified bytes, and verifies the same ID on staff
-review. Earlier evidence that used the attachment record ID remains verifiable;
-neither spelling bypasses ownership, scanner, or checksum checks.
+Entity ID. Retention now resolves that ID to the exact legacy or Git document
+owner and Workspace, freezes the verified bytes, and verifies the same ID on
+staff review and client delivery. Earlier evidence that used the attachment
+record ID remains verifiable; neither spelling bypasses ownership, scanner,
+or checksum checks.
 The internal path now requires independent evidence review, package creation,
 authorization, and a signed repository STATIC record before an MFA-enabled
 approver can release it. Release and withdrawal are append-only exact-Workspace

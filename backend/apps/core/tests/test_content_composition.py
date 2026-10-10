@@ -33,7 +33,7 @@ from apps.core.content_publication_sources import (
     freeze_git_document_dependencies,
     pinned_git_document_dependencies,
 )
-from apps.core.document_attachments import create_document_attachment
+from apps.core.document_attachments import create_document_attachment, create_repository_document_attachment
 from apps.core.document_key_models import DocumentKeyBinding
 from apps.core.documents import create_document
 from apps.core.models import (
@@ -716,7 +716,7 @@ def test_repository_evidence_review_uses_retained_source_and_fails_closed(compos
     assert browser.get(review_pdf_url).status_code == 409
 
 
-@pytest.mark.parametrize("source_id_kind", ("record", "entity"))
+@pytest.mark.parametrize("source_id_kind", ("record", "entity", "native"))
 def test_repository_evidence_decision_is_separate_from_distribution(
     composition_repository, tmp_path, settings, monkeypatch, source_id_kind
 ):
@@ -732,20 +732,39 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     )
     workspace = Workspace.objects.get(organization=organization)
     repository = repository_storage.ensure_workspace_repository(workspace).repository
-    document = create_document(
-        tenant=installation.tenant,
-        organization=organization,
-        actor_id=installation.owner.id,
-        title="Decision",
-        markdown="Legacy source.\n",
-    )
-    attachment = create_document_attachment(
-        document=document,
-        actor_id=installation.owner.id,
-        upload=SimpleUploadedFile("decision-guide.txt", b"Client setup instructions"),
-    )
-    linked_attachment_id = attachment.entity_id if source_id_kind == "entity" else attachment.id
-    content_id = document.id
+    if source_id_kind == "native":
+        content_id = uuid.uuid4()
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={"documents/decision.md": _content(
+                content_id=content_id, title="Decision", body="Review me.\n",
+            )},
+            message="Add Git-owned review source",
+        )
+        index_repository_content(repository_id=repository.id)
+        attachment = create_repository_document_attachment(
+            repository=repository,
+            content_id=content_id,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("decision-guide.txt", b"Client setup instructions"),
+        )
+        linked_attachment_id = attachment.entity_id
+    else:
+        document = create_document(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            title="Decision",
+            markdown="Legacy source.\n",
+        )
+        attachment = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("decision-guide.txt", b"Client setup instructions"),
+        )
+        linked_attachment_id = attachment.entity_id if source_id_kind == "entity" else attachment.id
+        content_id = document.id
     repository_service.commit_repository_files(
         repository_id=repository.id,
         expected_base=_accepted(repository),
@@ -760,6 +779,23 @@ def test_repository_evidence_decision_is_separate_from_distribution(
         user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
     )
     browser = Client()
+    if source_id_kind == "native":
+        foreign_tenant = Tenant.objects.create(
+            name="Native evidence foreign MSP", slug=f"native-evidence-{uuid.uuid4()}"
+        )
+        foreign_actor = User.objects.create_user(
+            email="native-evidence-foreign@example.invalid", display_name="Foreign owner"
+        )
+        TenantMembership.objects.create(
+            tenant=foreign_tenant, user=foreign_actor, role=BuiltInRole.ADMINISTRATOR
+        )
+        browser.force_login(foreign_actor)
+        denied = browser.post(
+            reverse("organization-repository-publication-evidence", args=[organization.entity_id]),
+            data=json.dumps({"content_id": str(content_id), "audience": "client_visible"}),
+            content_type="application/json",
+        )
+        assert denied.status_code in {403, 404}
     browser.force_login(installation.owner)
     created = browser.post(
         reverse("organization-repository-publication-evidence", args=[organization.entity_id]),
@@ -2155,7 +2191,10 @@ def test_repository_evidence_rejects_attachment_without_exact_document(compositi
 
 
 @pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])
-def test_repository_evidence_rejects_sibling_client_attachment(composition_repository, tmp_path, link_id_kind):
+@pytest.mark.parametrize("owner_kind", ["legacy", "native"])
+def test_repository_evidence_rejects_sibling_client_attachment(
+    composition_repository, tmp_path, link_id_kind, owner_kind
+):
     installation, _workspace, _repository = composition_repository
     owner = create_organization(
         tenant=installation.tenant,
@@ -2174,18 +2213,39 @@ def test_repository_evidence_rejects_sibling_client_attachment(composition_repos
         classifications=["client"],
     )
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
-        foreign_document = create_document(
-            tenant=installation.tenant,
-            organization=owner,
-            actor_id=installation.owner.id,
-            title="Owner guide",
-            markdown="Private.\n",
-        )
-        foreign_attachment = create_document_attachment(
-            document=foreign_document,
-            actor_id=installation.owner.id,
-            upload=SimpleUploadedFile("guide.txt", b"Owner bytes"),
-        )
+        if owner_kind == "native":
+            foreign_document_id = uuid.uuid4()
+            owner_workspace = Workspace.objects.get(tenant=installation.tenant, organization=owner)
+            owner_repository = repository_storage.ensure_workspace_repository(owner_workspace).repository
+            repository_service.commit_repository_files(
+                repository_id=owner_repository.id,
+                expected_base=_accepted(owner_repository),
+                changes={"documents/owner.md": _content(
+                    content_id=foreign_document_id, title="Owner guide", body="Private.\n",
+                )},
+                message="Add native owner source",
+            )
+            index_repository_content(repository_id=owner_repository.id)
+            foreign_attachment = create_repository_document_attachment(
+                repository=owner_repository,
+                content_id=foreign_document_id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("guide.txt", b"Owner bytes"),
+            )
+        else:
+            foreign_document = create_document(
+                tenant=installation.tenant,
+                organization=owner,
+                actor_id=installation.owner.id,
+                title="Owner guide",
+                markdown="Private.\n",
+            )
+            foreign_document_id = foreign_document.id
+            foreign_attachment = create_document_attachment(
+                document=foreign_document,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("guide.txt", b"Owner bytes"),
+            )
         workspace = Workspace.objects.get(tenant=installation.tenant, organization=sibling)
         repository = repository_storage.ensure_workspace_repository(workspace).repository
         repository.refresh_from_db()
@@ -2194,7 +2254,7 @@ def test_repository_evidence_rejects_sibling_client_attachment(composition_repos
             expected_base=_accepted(repository),
             changes={
                 "documents/sibling.md": _content(
-                    content_id=foreign_document.id,
+                    content_id=foreign_document_id,
                     title="Sibling guide",
                     body=f"[File](tekdocs://attachment/{getattr(foreign_attachment, link_id_kind)})\n",
                 )
@@ -2210,7 +2270,7 @@ def test_repository_evidence_rejects_sibling_client_attachment(composition_repos
         with pytest.raises(RepositoryPublicationEvidenceError, match="repository.attachment.unavailable"):
             retain_repository_publication_evidence(
                 repository_id=repository.id,
-                content_id=foreign_document.id,
+                content_id=foreign_document_id,
                 audience="client_visible",
                 actor=installation.owner,
             )

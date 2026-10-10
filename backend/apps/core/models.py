@@ -5480,7 +5480,9 @@ class RepositoryEvidenceAttachment(models.Model):
         if self.source_attachment_id and (
             self.source_attachment.tenant_id != self.tenant_id
             or self.source_attachment.organization_id != self.organization_id
-            or self.source_attachment.document_id != self.evidence.content_id
+            or self.source_attachment.owner_workspace_id != self.workspace_id
+            or self.source_attachment.owner_content_id != self.evidence.content_id
+            or self.source_attachment.document_id not in {None, self.evidence.content_id}
         ):
             raise ValidationError("Retained attachment must belong to the evidence document")
 

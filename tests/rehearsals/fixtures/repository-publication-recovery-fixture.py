@@ -14,7 +14,8 @@ from django.urls import reverse
 
 from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
 from apps.core.models import (
-    Document, DocumentPublication, Organization, RepositoryEvidenceAttachment, RepositoryStaticPublication,
+    Document, DocumentAttachment, DocumentPublication, Organization, RepositoryEvidenceAttachment,
+    RepositoryStaticPublication, Workspace,
 )
 from apps.core.publications import read_publication_artifact, verify_retained_publication_custody
 from apps.core.repository_static_delivery import repository_static_delivery_ready
@@ -25,9 +26,11 @@ from apps.core.scoping import DataScope
 
 OWNER_EMAIL = "validation-recovery@example.invalid"
 ORGANIZATION_NAME = "Validation Recovery Client"
-DOCUMENT_TITLE = "Client setup guide"
-ATTACHMENT_NAME = "recovery-guide.txt"
-ATTACHMENT_BYTES = b"Client setup instructions retained for recovery.\n"
+LEGACY_DOCUMENT_TITLE = "Client setup guide"
+REPOSITORY_DOCUMENT_TITLE = "Client enrollment"
+REPOSITORY_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
+ATTACHMENT_NAME = "client-enrollment.txt"
+ATTACHMENT_BYTES = b"Client enrollment instructions retained for recovery.\n"
 REVIEWER_EMAIL = "publication-recovery-reviewer@example.invalid"
 AUTHORIZER_EMAIL = "publication-recovery-authorizer@example.invalid"
 CLIENT_EMAIL = "publication-recovery-client@example.invalid"
@@ -49,7 +52,7 @@ def _portal_snapshot(browser, publication_id, artifact_id):
     detail = browser.get(reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True)
     assert detail.status_code == 200
     assert detail["Cache-Control"] == "private, no-store"
-    assert "Client setup guide" in detail.json()["rendered_html"]
+    assert REPOSITORY_DOCUMENT_TITLE in detail.json()["rendered_html"]
     assert detail.json()["attachments"] == [{
         "id": str(artifact_id),
         "filename": ATTACHMENT_NAME,
@@ -90,8 +93,15 @@ with transaction.atomic():
         DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
         actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
     )
-    document = Document.objects.get(tenant=tenant, organization=organization, entity__display_name=DOCUMENT_TITLE)
-    source_attachment = document.attachments.get(original_filename=ATTACHMENT_NAME)
+    legacy_document = Document.objects.get(
+        tenant=tenant, organization=organization, entity__display_name=LEGACY_DOCUMENT_TITLE
+    )
+    workspace = Workspace.objects.get(tenant=tenant, organization=organization)
+    source_attachment = DocumentAttachment.objects.get(
+        tenant=tenant, organization=organization, document__isnull=True,
+        owner_workspace=workspace, owner_content_id=REPOSITORY_DOCUMENT_ID,
+        original_filename=ATTACHMENT_NAME,
+    )
     assert source_attachment.checksum == hashlib.sha256(ATTACHMENT_BYTES).hexdigest()
 mode = os.environ.get("TEKDOCS_RECOVERY_PUBLICATION_MODE")
 browser = Client(HTTP_HOST="localhost")
@@ -125,7 +135,10 @@ if mode == "create":
         browser,
         reverse(
             "organization-document-publication-list-create",
-            kwargs={"organization_entity_id": organization.entity_id, "document_entity_id": document.entity_id},
+            kwargs={
+                "organization_entity_id": organization.entity_id,
+                "document_entity_id": legacy_document.entity_id,
+            },
         ),
         {"reason": "Recovery fixture legacy publication", "audience": "msp_internal", "retention": "permanent"},
     )
@@ -139,7 +152,7 @@ if mode == "create":
         assert verify_retained_publication_custody(legacy_publication)
         legacy_pdf = read_publication_artifact(legacy_publication.artifacts.get(kind="pdf"))
     evidence = _post(
-        browser, evidence_url, {"content_id": str(document.id), "audience": "client_visible"}
+        browser, evidence_url, {"content_id": str(REPOSITORY_DOCUMENT_ID), "audience": "client_visible"}
     )
     evidence_id = evidence["id"]
     with transaction.atomic():

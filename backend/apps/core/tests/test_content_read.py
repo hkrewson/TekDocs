@@ -180,6 +180,9 @@ def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrit
         repository.indexed_commit = None
         repository.save(update_fields=["indexed_commit", "updated_at"])
         assert browser.get(download_url).status_code == 409
+        stale_detail = browser.get(detail_url)
+        assert stale_detail.status_code == 409
+        assert stale_detail.json()["error"]["code"] == "repository_content_not_indexed"
         assert browser.get(files_url).json()["count"] == 1
         repository.indexed_commit = repository.accepted_commit
         repository.save(update_fields=["indexed_commit", "updated_at"])

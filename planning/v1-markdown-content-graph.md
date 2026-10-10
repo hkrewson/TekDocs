@@ -783,6 +783,12 @@ and template rollouts when the target document is repository-authoritative.
 This is a fail-safe for a future transition, not yet the complete write
 retirement gate: read routing, metadata parity, transaction-level enforcement,
 promotion, and verified rollback remain open.
+The Git content detail/export reader now refuses repository-authoritative
+documents while the accepted Git head and indexed projection differ. Its
+attachment download already had the same freshness gate; migration parity
+reports treat this state as an unavailable read projection. This prevents a
+stale indexed copy from being presented as authoritative, but the main legacy
+document screen still needs to route its reads and render Git composition.
 
 The read-only legacy migration status names additional handoff blockers when a
 document retains a template or enrollment, primary-file history, or review

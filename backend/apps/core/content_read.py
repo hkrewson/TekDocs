@@ -8,8 +8,16 @@ from typing import Any
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import APIException
 
-from .content_index_models import ContentEntityLink, ContentFinding, ContentNode, ContentProperty
+from .content_index_models import (
+    ContentEntityLink,
+    ContentFinding,
+    ContentNode,
+    ContentProperty,
+    DocumentAuthority,
+    DocumentAuthorityMode,
+)
 from .document_attachments import resolve_rendered_attachments, resolve_repository_rendered_attachments
 from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
@@ -18,6 +26,14 @@ from .models import ClientAsset, Document, Entity, WorkspaceRepository, workspac
 from .relationships import entity_for_workspace, entity_projection, visible_entities_for_workspace
 from .rendering import RenderedEntityMention, render_markdown
 from .workspaces import ResolvedWorkspace
+
+
+class RepositoryContentNotIndexed(APIException):
+    """The current accepted Git head has not been projected for authoritative reads."""
+
+    status_code = 409
+    default_detail = "Repository content is not fully indexed; retry after indexing completes."
+    default_code = "repository_content_not_indexed"
 
 
 def repository_for_reader(workspace: ResolvedWorkspace) -> WorkspaceRepository:
@@ -39,7 +55,19 @@ def document_detail(
     *, workspace: ResolvedWorkspace, content_id: uuid.UUID, audience: str, include_render_context: bool = False
 ) -> dict[str, Any]:
     repository = repository_for_reader(workspace)
-    node = get_object_or_404(ContentNode.objects.filter(repository=repository), content_id=content_id)
+    node = get_object_or_404(
+        ContentNode.objects.filter(repository=repository).select_related("indexed_commit"), content_id=content_id
+    )
+    authority = DocumentAuthority.objects.filter(
+        workspace_id=repository.workspace_id,
+        content_id=content_id,
+    ).values_list("authority", flat=True).first()
+    if authority == DocumentAuthorityMode.REPOSITORY and (
+        repository.accepted_commit_id is None
+        or repository.accepted_commit_id != repository.indexed_commit_id
+        or node.indexed_commit_id != repository.accepted_commit_id
+    ):
+        raise RepositoryContentNotIndexed()
     links = list(node.entity_links.all())
     visible = _visible_entity_context(workspace, {link.target_entity_id for link in links})
     mentions: dict[str, RenderedEntityMention] = {

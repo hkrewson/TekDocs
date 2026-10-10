@@ -7,7 +7,7 @@ import hashlib
 from django.http import Http404
 
 from .content_profile import ContentProfileError, parse_content
-from .content_read import document_detail
+from .content_read import RepositoryContentNotIndexed, document_detail
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
@@ -99,7 +99,13 @@ def document_coexistence_status(
             legacy_html = _render_legacy_document(
                 document=document, reader_workspace=reader_workspace, markdown=legacy_markdown
             )
-        except (Http404, WorkspaceRepository.DoesNotExist, PlacementConflict, DocumentMigrationRelationshipError):
+        except (
+            Http404,
+            WorkspaceRepository.DoesNotExist,
+            PlacementConflict,
+            RepositoryContentNotIndexed,
+            DocumentMigrationRelationshipError,
+        ):
             response["read_projection_state"] = "unavailable"
         else:
             repository_references = {

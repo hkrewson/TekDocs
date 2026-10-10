@@ -664,7 +664,7 @@ editor and private download. This is file discovery, not an authority switch.
 - [x] Enforce exact tenant/Workspace/content ownership in database guards, RLS,
   upload, archive, read and download paths; prove sibling and cross-tenant
   denial and fail closed on missing or changed retained bytes.
-- [ ] Resolve authorized file links in repository reads and editable exports,
+- [x] Resolve authorized file links in repository reads and editable exports,
   and snapshot exact file identities and bytes into publication evidence and
   client delivery without requiring a legacy body row.
 - [x] Include the new ownership state and bytes in fresh-install, upgrade,
@@ -682,7 +682,13 @@ corrupted retained bytes. It does not establish the remaining authority gates.
 The checked ownership gate passed the content-authoring/read/RLS suite and
 database owner-guard tests. Its request cases include MFA-enabled cross-tenant
 and sibling denial; archive refuses missing or altered bytes without changing
-the file record. This does not establish publication or legacy-write parity.
+the file record. This alone does not establish whole-document publication or
+legacy-write parity.
+The checked file-parity gate passed repository read and editable-bundle tests
+plus the composition/publication suite. Its native case proves there is no
+legacy `Document` row, ties the signed artifact to the exact Git-owned file
+record and checksum, and verifies the retained file through client delivery.
+Template, review, key and whole-document authority parity remain separate.
 
 The read-only legacy migration status now names additional handoff blockers
 when a document retains a template or enrollment, primary-file history,

@@ -41,6 +41,7 @@ from apps.core.models import (
     ContentInclude,
     ContentNode,
     ContentTemplateSource,
+    Document,
     EntityVisibility,
     InstallationState,
     NotificationEmailDelivery,
@@ -804,6 +805,15 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     )
     assert created.status_code == 201
     evidence_id = created.json()["id"]
+    if source_id_kind == "native":
+        assert attachment.document_id is None
+        assert not Document.objects.filter(pk=content_id).exists()
+        native_artifact = RepositoryEvidenceAttachment.objects.get(evidence_id=evidence_id)
+        assert native_artifact.source_attachment_id == attachment.id
+        assert native_artifact.checksum == hashlib.sha256(b"Client setup instructions").hexdigest()
+        assert verify_repository_publication_evidence(
+            RepositoryPublicationEvidence.objects.get(pk=evidence_id)
+        )["attachments_valid"]
     url = reverse("organization-repository-publication-evidence-decision", args=[organization.entity_id, evidence_id])
     payload = json.dumps({"outcome": "accepted_for_packaging", "reason": "Exact source reviewed"})
     assert browser.post(url, data=payload, content_type="application/json").status_code == 409

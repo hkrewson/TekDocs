@@ -164,6 +164,25 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py verify_recovery_managed_files
+echo "Checking backup refusal when a superseded primary-file version is missing"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=break_historical_primary backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+missing_primary_backup="$work_directory/missing-primary-backup"
+if "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
+  --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$missing_primary_backup" \
+  > "$work_directory/missing-primary.log" 2>&1; then
+  echo "Backup accepted a missing historical primary-file version." >&2
+  exit 1
+fi
+grep -q 'Retained managed-file verification failed before backup' "$work_directory/missing-primary.log"
+[ ! -e "$missing_primary_backup" ]
+[ -z "$(find "$work_directory" -maxdepth 1 -name 'missing-primary-backup.partial.*' -print -quit)" ]
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=repair_historical_primary backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  backend python manage.py verify_recovery_managed_files
 echo "Checking database/Git accepted-head mismatch refusal and operational recovery"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_FAULT_MODE=break backend python manage.py shell --no-imports \
@@ -273,6 +292,21 @@ fi
 grep -q 'Retained managed-file integrity check failed' "$work_directory/corrupt-managed-file.log"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=repair_managed_file backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_managed_files
+echo "Checking restored historical primary-file corruption refusal"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=break_historical_primary backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+if compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_managed_files > "$work_directory/corrupt-historical-primary.log" 2>&1; then
+  echo "Managed-file recovery verification accepted a missing restored historical primary file." >&2
+  exit 1
+fi
+grep -q 'Retained managed-file integrity check failed' "$work_directory/corrupt-historical-primary.log"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_CONTENT_MODE=repair_historical_primary backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   backend python manage.py verify_recovery_managed_files

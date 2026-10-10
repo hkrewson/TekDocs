@@ -353,7 +353,12 @@ with transaction.atomic():
     elif mode == "verify":
         directory_entry = verify_fixture(owner)
         msp_snapshot_digest = _source_snapshot_digest(_repository(owner))
-    elif mode in {"break_managed_file", "repair_managed_file"}:
+    elif mode in {
+        "break_managed_file",
+        "repair_managed_file",
+        "break_historical_primary",
+        "repair_historical_primary",
+    }:
         pass
     else:
         raise RuntimeError("Unsupported TEKDOCS_RECOVERY_CONTENT_MODE")
@@ -380,6 +385,10 @@ with transaction.atomic():
             tenant=tenant, organization=organization, entity__display_name=PUBLICATION_DOCUMENT_TITLE
         )
         attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
+        historical_primary = legacy_document.attachments.get(
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            version_number=1,
+        )
         if mode == "break_managed_file":
             attachment.file.storage.delete(attachment.file.name)
             assert not attachment.file.storage.exists(attachment.file.name)
@@ -391,6 +400,17 @@ with transaction.atomic():
             ) == attachment.file.name
             assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
             print("Disposable managed-file custody repaired")
+        elif mode == "break_historical_primary":
+            historical_primary.file.storage.delete(historical_primary.file.name)
+            assert not historical_primary.file.storage.exists(historical_primary.file.name)
+            print("Disposable historical primary-file custody removed for recovery fault injection")
+        elif mode == "repair_historical_primary":
+            assert not historical_primary.file.storage.exists(historical_primary.file.name)
+            assert historical_primary.file.storage.save(
+                historical_primary.file.name, ContentFile(LEGACY_PRIMARY_V1_BYTES)
+            ) == historical_primary.file.name
+            assert copy_attachment_content(historical_primary) == LEGACY_PRIMARY_V1_BYTES
+            print("Disposable historical primary-file custody repaired")
         else:
             attachment, native_attachment, primary_versions = verify_organization_fixture(
                 owner, organization, directory_entry

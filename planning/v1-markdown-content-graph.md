@@ -642,7 +642,9 @@ This proves native publication-file recovery, not legacy authority handoff.
 The same rehearsal now uses guarded shadow import for a legacy document with
 two primary-file versions and proves both historical byte strings, chain
 metadata, typed legacy ownership and the complete editable-bundle digest
-survive an independent restore. It does not transfer legacy file custody.
+survive an independent restore. A missing superseded version now blocks both
+backup and post-restore integrity verification in the disposable stacks, and
+repair must restore a clean sweep. It does not transfer legacy file custody.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

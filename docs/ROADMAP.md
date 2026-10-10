@@ -1902,6 +1902,8 @@ remain outside that editing handoff, not outside the separate backup path.
 The supported network-isolated recovery rehearsal now imports a legacy
 document with a two-version primary-file chain and verifies exact historical
 bytes, order, typed owner and editable-bundle digest after independent restore.
+It also proves that a missing superseded version blocks backup and post-restore
+integrity verification until that version is repaired.
 This is recovery evidence, not legacy file-owner transfer or authority handoff.
 Repository-native managed-file use is still incomplete: publication preflight
 requires a legacy `Document` row.

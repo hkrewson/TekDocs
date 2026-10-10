@@ -664,6 +664,12 @@ publication, recovery, and authority-handoff gates.
   demonstrated rollback. The existing read-only migration status must not
   silently promote a document.
 
+The read-only legacy migration status now names additional handoff blockers
+when a document retains a template or enrollment, primary-file history,
+active field-key bindings, or review decisions. An in-sync Markdown copy can
+still have these blockers. They are diagnostics for the remaining parity work,
+not proof of parity or an authority transition.
+
 First foundation (implemented, not the exit condition): an internal source
 freezer re-reads the exact accepted Git snapshot, recomputes the audience
 composition, compares it with the indexed projection, and records root and

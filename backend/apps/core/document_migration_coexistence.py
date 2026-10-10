@@ -10,6 +10,7 @@ from .content_profile import ContentProfileError, parse_content
 from .content_read import document_detail
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
+from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
 from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
 from .document_migration_export import (
@@ -24,9 +25,18 @@ from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
 )
+from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
-from .models import ContentNode, Document, Workspace, WorkspaceRepository
+from .models import (
+    ContentNode,
+    Document,
+    DocumentAttachment,
+    DocumentAttachmentPurpose,
+    DocumentReviewState,
+    Workspace,
+    WorkspaceRepository,
+)
 from .relationships import visible_entities_for_workspace
 from .rendering import render_markdown
 from .repository_service import RepositoryServiceError, read_accepted_repository_file
@@ -99,6 +109,30 @@ def document_coexistence_status(
         blockers.append("content_copy_not_in_sync")
     if response["read_projection_state"] in ("different", "unavailable"):
         blockers.append("repository_read_projection_not_matched")
+    if (
+        document.is_template
+        or DocumentTemplateRevision.objects.filter(template=document).exists()
+        or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
+    ):
+        blockers.append("template_parity_not_verified")
+    if DocumentAttachment.objects.filter(
+        document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
+    ).exists():
+        blockers.append("primary_file_parity_not_verified")
+    if DocumentKeyBinding.objects.filter(document=document, archived_at__isnull=True).exists():
+        blockers.append("field_key_authority_not_transferred")
+    if (
+        document.review_state != DocumentReviewState.UNREVIEWED
+        or document.review_due_on is not None
+        or document.review_requested_by_id is not None
+        or document.review_requested_at is not None
+        or document.reviewer_id is not None
+        or document.review_decided_at is not None
+        or document.last_reviewed_by_id is not None
+        or document.last_reviewed_at is not None
+        or bool(document.review_note)
+    ):
+        blockers.append("review_workflow_parity_not_verified")
     blockers.extend(
         (
             "repository_document_reads_not_authoritative",

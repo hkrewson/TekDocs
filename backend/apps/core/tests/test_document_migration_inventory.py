@@ -35,6 +35,7 @@ from apps.core.models import (
     ContentProperty,
     DocumentAttachmentPurpose,
     DocumentKeyBinding,
+    DocumentReviewState,
     DocumentTopicType,
     Entity,
     EntityLink,
@@ -165,7 +166,9 @@ def test_field_key_bindings_are_portable_preview_bound_and_reader_scoped(tmp_pat
             "organization-document-migration-status",
             kwargs={"organization_entity_id": organization.entity_id, "document_entity_id": document.entity_id},
         )
-        assert browser.get(status_url).json()["read_projection_state"] == "matched"
+        matched_status = browser.get(status_url).json()
+        assert matched_status["read_projection_state"] == "matched"
+        assert "field_key_authority_not_transferred" in matched_status["handoff_blockers"]
         binding.archived_at = timezone.now()
         binding.save(update_fields=("archived_at", "updated_at"))
         assert "Unresolved key" in browser.get(detail_url).json()["sanitized_html"]
@@ -488,6 +491,10 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
             if item["document_id"] == str(primary.id)
         )
         assert row["reasons"] == ["primary_file_parity_required"]
+        browser = Client()
+        browser.force_login(installation.owner)
+        status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": primary.entity_id})
+        assert "primary_file_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
 
 
 def test_structured_topic_migration_checks_composed_sections_and_preserves_type(tmp_path):
@@ -685,7 +692,9 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
         template_status_url = reverse(
             "msp-document-migration-status", kwargs={"document_entity_id": template.entity_id}
         )
-        assert browser.get(template_status_url).json()["content_copy_state"] == "unsupported_legacy_shape"
+        template_status = browser.get(template_status_url).json()
+        assert template_status["content_copy_state"] == "unsupported_legacy_shape"
+        assert "template_parity_not_verified" in template_status["handoff_blockers"]
         assert browser.get(org_status_url).status_code == 404
         own_org_status_url = reverse(
             "organization-document-migration-status",
@@ -1046,6 +1055,21 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
             "repository_document_writes_not_authoritative",
             "publication_parity_not_verified",
         ]
+        document.review_state = DocumentReviewState.APPROVED
+        document.last_reviewed_at = timezone.now()
+        document.save(update_fields=("review_state", "last_reviewed_at", "updated_at"))
+        reviewed_status = browser.get(status_url).json()
+        assert reviewed_status["content_copy_state"] == "in_sync"
+        assert "review_workflow_parity_not_verified" in reviewed_status["handoff_blockers"]
+        assert reviewed_status["cutover_ready"] is False
+        document.review_state = DocumentReviewState.UNREVIEWED
+        document.last_reviewed_at = None
+        document.save(update_fields=("review_state", "last_reviewed_at", "updated_at"))
+        document.review_due_on = timezone.localdate()
+        document.save(update_fields=("review_due_on", "updated_at"))
+        assert "review_workflow_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
+        document.review_due_on = None
+        document.save(update_fields=("review_due_on", "updated_at"))
         ContentInclude.objects.get(
             source__repository=workspace.repository, source__content_id=document.id, ordinal=1
         ).delete()

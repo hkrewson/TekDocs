@@ -4290,6 +4290,7 @@ class Document(TimestampedModel):
         blank=True,
     )
     review_requested_at = models.DateTimeField(null=True, blank=True)
+    review_content_sha256 = models.CharField(max_length=64, null=True, blank=True)
     reviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

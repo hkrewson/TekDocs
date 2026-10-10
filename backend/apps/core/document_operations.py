@@ -108,6 +108,8 @@ def request_document_review(
     reviewer_id: UUID,
     note: str,
 ) -> Document:
+    from .documents import markdown_checksum, resolve_document
+
     locked = Document.objects.select_for_update().get(pk=document.pk)
     reviewer = _eligible_user(
         workspace=workspace,
@@ -123,6 +125,7 @@ def request_document_review(
     locked.review_state = DocumentReviewState.PENDING
     locked.review_requested_by_id = actor_id
     locked.review_requested_at = now
+    locked.review_content_sha256 = markdown_checksum(resolve_document(locked).markdown)
     locked.reviewer = reviewer
     locked.review_decided_at = None
     locked.review_note = cleaned_note
@@ -131,6 +134,7 @@ def request_document_review(
             "review_state",
             "review_requested_by",
             "review_requested_at",
+            "review_content_sha256",
             "reviewer",
             "review_decided_at",
             "review_note",
@@ -155,9 +159,15 @@ def decide_document_review(
     decision: str,
     note: str,
 ) -> Document:
+    from .documents import markdown_checksum, resolve_document
+
     locked = Document.objects.select_for_update().get(pk=document.pk)
     if locked.review_state != DocumentReviewState.PENDING:
         raise DocumentOperationsError("This document does not have a pending review.")
+    if locked.review_content_sha256 is None or locked.review_content_sha256 != markdown_checksum(
+        resolve_document(locked).markdown
+    ):
+        raise DocumentOperationsError("The reviewed content changed. Request a new review for the current revision.")
     if locked.reviewer_id != actor_id:
         raise DocumentOperationsError("This review is assigned to another person.")
     if decision not in {DocumentReviewState.APPROVED, DocumentReviewState.CHANGES_REQUESTED}:

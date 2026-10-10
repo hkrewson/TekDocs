@@ -666,6 +666,7 @@ def update_document(
     locked_document.review_state = DocumentReviewState.UNREVIEWED
     locked_document.review_requested_by = None
     locked_document.review_requested_at = None
+    locked_document.review_content_sha256 = None
     locked_document.reviewer = None
     locked_document.review_decided_at = None
     locked_document.review_note = ""
@@ -679,6 +680,7 @@ def update_document(
             "review_state",
             "review_requested_by",
             "review_requested_at",
+            "review_content_sha256",
             "reviewer",
             "review_decided_at",
             "review_note",

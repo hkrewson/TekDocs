@@ -158,7 +158,7 @@ def test_review_request_decision_and_later_edit_invalidation(owner_client, appro
     assert requested.json()["reviewer_name"] == "Documentation Approver"
     document_record = Document.objects.get(entity_id=document["id"])
     assert document_record.review_content_sha256 == hashlib.sha256(
-        b"Rotate the recovery key."
+        requested.json()["resolved_markdown"].encode("utf-8")
     ).hexdigest()
 
     decision_url = reverse("msp-document-review-decision", kwargs={"document_entity_id": document["id"]})

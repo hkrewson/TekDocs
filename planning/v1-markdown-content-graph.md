@@ -764,6 +764,12 @@ legacy `Document` row, ties the signed artifact to the exact Git-owned file
 record and checksum, and verifies the retained file through client delivery.
 Template, review, key and whole-document authority parity remain separate.
 
+Legacy review requests now retain a SHA-256 of their resolved Markdown, and a
+review decision refuses a different current digest. Ordinary edits clear that
+pin along with review state. This is a legacy-workflow foundation only: the
+future handoff must additionally bind review evidence to the accepted Git
+commit and relevant portable metadata before Git-authoritative review is safe.
+
 The read-only legacy migration status names additional handoff blockers when a
 document retains a template or enrollment, primary-file history, or review
 decisions. Field-key values and permissions remain PostgreSQL-authoritative;

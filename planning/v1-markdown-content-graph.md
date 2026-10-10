@@ -722,6 +722,11 @@ repository list, retained HTML, PDF and attachment links. It preserves direct
 URLs, paging, empty/retry states and server-side revocation. Legacy Documents
 stays on its existing path until the authority handoff is independently proven;
 notification, export and recovery parity were separate work at this point.
+The portal Documents page now also shows the independently paged repository
+publication list beside legacy documents, with separate loading and retry
+states. Selecting one still opens its existing repository publication route;
+this is a discovery improvement, not a merged publication authority or
+permission bypass.
 Repository delivery authorization now queues a value-minimized publication notice
 for the exact organization. Supersession and withdrawal queue a generic
 access-change notice only when the predecessor had client-delivery authorization.

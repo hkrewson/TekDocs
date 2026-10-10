@@ -183,7 +183,9 @@ test('client portal opens a repository publication and removes unavailable conte
       ? { ...publication, rendered_html: '<h2>Enrollment steps</h2><script>alert(1)</script>', attachments: [{ id: 'attachment-1', filename: 'setup.txt', media_type: 'text/plain', size: 123 }] }
       : { count: 1, has_more: false, next_cursor: null, results: [publication] } })
   })
-  await page.goto('/portal?section=publications')
+  await page.goto('/portal')
+  await expect(page.getByRole('button', { name: /Network access guide/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Laptop enrollment/ })).toBeVisible()
   await page.getByRole('button', { name: /Laptop enrollment/ }).click()
   await expect(page).toHaveURL(/section=publications&publication=repository-publication-1/)
   await expect(page.getByRole('heading', { name: 'Enrollment steps' })).toBeVisible()

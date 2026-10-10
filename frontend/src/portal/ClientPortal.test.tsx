@@ -50,18 +50,21 @@ describe('ClientPortal', () => {
     })).toBe(true)
   })
 
-  it('provides direct keyboard access to the portal content', () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
+  it('provides direct keyboard access to the portal content', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 })))
     renderPortal()
 
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#portal-main-content')
     expect(screen.getByRole('main')).toHaveAttribute('id', 'portal-main-content')
     expect(screen.getByRole('link', { name: 'New publications' })).toHaveAttribute('href', '/portal?section=publications')
+    expect(await screen.findByText('No documents have been shared with your organization.')).toBeInTheDocument()
+    expect(await screen.findByText('No new publications have been shared with your organization.')).toBeInTheDocument()
   })
 
   it('lists and opens a document without exposing publication internals', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/api/v1/portal/repository-publications')) return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [{ id: 'pub-1', title: 'Access guide', category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: 'abc', source_kind: 'organization_document', visibility: 'client_visible', artifacts: [] }] }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ id: 'pub-1', title: 'Access guide', category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: 'abc', source_kind: 'organization_document', visibility: 'client_visible', artifacts: [], sanitized_html: '<h1>Safe guide</h1><script>alert(1)</script>' }), { status: 200 }))
@@ -75,6 +78,42 @@ describe('ClientPortal', () => {
     expect(screen.queryByText(/STATIC|Client visible/)).not.toBeInTheDocument()
   })
 
+  it('shows released repository publications beside legacy documents on the documentation page', async () => {
+    const legacy = { id: 'legacy-1', title: 'Existing guide', category: 'guide', published_at: '2026-08-11T12:00:00Z' }
+    const repository = { id: 'repo-1', content_id: 'content-1', title: 'Enrollment guide', created_at: '2026-10-08T12:00:00Z' }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [legacy] }), { status: 200 }))
+      if (url.endsWith('/api/v1/portal/repository-publications')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [repository] }), { status: 200 }))
+      if (url.endsWith('/api/v1/portal/repository-publications/repo-1')) return Promise.resolve(new Response(JSON.stringify({ ...repository, rendered_html: '<p>Enrollment instructions</p>', attachments: [] }), { status: 200 }))
+      return Promise.resolve(new Response('', { status: 404 }))
+    })
+    renderPortal()
+
+    expect(await screen.findByRole('button', { name: /Existing guide/i })).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: /Enrollment guide/i }))
+    expect(await screen.findByText('Enrollment instructions')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      return url.includes('/portal/invoices')
+    })).toBe(false)
+  })
+
+  it('keeps legacy documents readable when the repository publication list is unavailable', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [{ id: 'legacy-1', title: 'Existing guide', category: 'guide', published_at: '2026-08-11T12:00:00Z' }] }), { status: 200 }))
+      if (url.endsWith('/api/v1/portal/repository-publications')) return Promise.resolve(new Response('', { status: 503 }))
+      return Promise.resolve(new Response('', { status: 404 }))
+    })
+    renderPortal()
+
+    expect(await screen.findByRole('button', { name: /Existing guide/i })).toBeInTheDocument()
+    const repositorySection = screen.getByRole('heading', { name: 'New publications' }).closest('section')
+    if (!repositorySection) throw new Error('Repository publication section was not rendered.')
+    expect(await within(repositorySection).findByRole('alert')).toHaveTextContent('Try again. If the problem continues, contact your MSP.')
+  })
+
   it('shows a clear empty state without exposing MSP navigation', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
     renderPortal()
@@ -86,6 +125,7 @@ describe('ClientPortal', () => {
     const document = (id: string, title: string) => ({ id, title, category: 'guide', reason: 'Approved', lifecycle_state: 'published', retention: 'permanent', retention_review_on: null, published_at: '2026-08-11T12:00:00Z', content_digest: id, source_kind: 'organization_document', visibility: 'client_visible', artifacts: [] })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/api/v1/portal/repository-publications')) return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
       if (url.includes('cursor=')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [document('pub-2', 'Older guide')] }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: true, next_cursor: 'signed-cursor', results: [document('pub-1', 'Current guide')] }), { status: 200 }))
@@ -125,6 +165,7 @@ describe('ClientPortal', () => {
     const publication = { id: 'pub-review', title: 'Password guide', category: 'guide', reason: 'Approved', lifecycle_state: 'review_due', retention: 'review_on', retention_review_on: '2026-08-01', published_at: '2026-07-01T12:00:00Z', content_digest: 'review', source_kind: 'organization_document', visibility: 'client_visible', artifacts: [{ id: 'file-1', kind: 'pdf', filename: 'password-guide.pdf', size: 2400, checksum: 'abc' }] }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/api/v1/portal/repository-publications')) return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 0, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ ...publication, sanitized_html: '<p>Use a password manager.</p>' }), { status: 200 }))
@@ -143,6 +184,7 @@ describe('ClientPortal', () => {
     const invoice = { id: 'invoice-old', state: 'issued', number: 'INV-OLD', currency: 'USD', invoice_date: '2026-08-29', due_date: '2026-09-28', reference: '', notes: '', subtotal: '25.00', tax_total: '0.00', total: '25.00', lines: [], created_at: '2026-08-29T12:00:00Z', updated_at: '2026-08-29T12:00:00Z', issued_at: '2026-08-29T12:00:00Z' }
     vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      if (url.includes('/api/v1/portal/repository-publications')) return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [document] }), { status: 200 }))
       if (url.endsWith('/api/v1/portal/invoices')) return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [invoice] }), { status: 200 }))
       return Promise.resolve(new Response('', { status: 404 }))

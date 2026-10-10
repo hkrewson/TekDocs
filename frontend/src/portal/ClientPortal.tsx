@@ -135,14 +135,14 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
 
   useEffect(() => {
     const shouldLoadDocuments = section === 'documents' && phase === 'idle' && !documentsStarted.current
-    const shouldLoadPublications = section === 'publications' && publicationPhase === 'idle' && !publicationsStarted.current
+    const shouldLoadPublications = (section === 'documents' || section === 'publications') && publicationPhase === 'idle' && !publicationsStarted.current
     const shouldLoadInvoices = section === 'invoices' && invoicePhase === 'idle' && !invoicesStarted.current
     if (shouldLoadDocuments) documentsStarted.current = true
     if (shouldLoadPublications) publicationsStarted.current = true
     if (shouldLoadInvoices) invoicesStarted.current = true
     void Promise.resolve().then(() => {
-      if (shouldLoadDocuments) return loadDocuments()
-      if (shouldLoadPublications) return loadPublications()
+      if (shouldLoadDocuments) void loadDocuments()
+      if (shouldLoadPublications) void loadPublications()
       if (shouldLoadInvoices) return loadInvoices()
     })
   }, [invoicePhase, loadDocuments, loadInvoices, loadPublications, phase, publicationPhase, section])
@@ -213,7 +213,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
     else if (target.kind === 'portal_repository_publication' && target.publication_id) showPublications(target.publication_id)
   }
 
-  const activePhase = section === 'documents' ? phase : section === 'publications' ? publicationPhase : invoicePhase
+  const activePhase = section === 'documents' && (phase === 'loading' || publicationPhase === 'loading')
+    ? 'loading' : section === 'documents' ? phase : section === 'publications' ? publicationPhase : invoicePhase
   return (
     <div className="client-portal-shell">
       <a className="skip-link" href="#portal-main-content">{translate('shell.skip')}</a>
@@ -238,7 +239,8 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
             : !detailLoading && section === 'publications' && selectedPublication?.id === publicationId ? <RepositoryPublicationDetail publication={selectedPublication} onBack={() => { showPublications(); void loadPublications() }} />
               : section === 'invoices' ? <InvoiceCollection phase={invoicePhase} invoices={invoices} cursor={invoiceCursor} loadingMore={loadingMoreInvoices} detailLoading={detailLoading} onOpen={(id) => showInvoices(id)} onRetry={() => { void loadInvoices() }} onMore={() => { if (invoiceCursor) void loadInvoices(invoiceCursor) }} />
                 : section === 'publications' ? <RepositoryPublicationCollection phase={publicationPhase} publications={publications} cursor={publicationCursor} loadingMore={loadingMorePublications} detailLoading={detailLoading} loadError={publicationListError} onOpen={(id) => showPublications(id)} onRetry={() => { void loadPublications() }} onMore={() => { if (publicationCursor) void loadPublications(publicationCursor) }} />
-                  : <DocumentCollection phase={phase} documents={documents} cursor={nextCursor} loadingMore={loadingMore} detailLoading={detailLoading} onOpen={(id) => showDocuments(id)} onRetry={() => { void loadDocuments() }} onMore={() => { if (nextCursor) void loadDocuments(nextCursor) }} />}
+                  : <><DocumentCollection phase={phase} documents={documents} cursor={nextCursor} loadingMore={loadingMore} detailLoading={detailLoading} onOpen={(id) => showDocuments(id)} onRetry={() => { void loadDocuments() }} onMore={() => { if (nextCursor) void loadDocuments(nextCursor) }} />
+                    <RepositoryPublicationCollection phase={publicationPhase} publications={publications} cursor={publicationCursor} loadingMore={loadingMorePublications} detailLoading={detailLoading} loadError={publicationListError} onOpen={(id) => showPublications(id)} onRetry={() => { void loadPublications() }} onMore={() => { if (publicationCursor) void loadPublications(publicationCursor) }} /></>}
       </main>
     </div>
   )

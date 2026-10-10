@@ -29,10 +29,13 @@ ORGANIZATION_NAME = "Validation Recovery Client"
 LEGACY_DOCUMENT_TITLE = "Client setup guide"
 REPOSITORY_DOCUMENT_TITLE = "Client enrollment"
 REPOSITORY_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
+NATIVE_PRIMARY_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.native.primary.document")
 ATTACHMENT_NAME = "client-enrollment.txt"
 ATTACHMENT_BYTES = b"Client enrollment instructions retained for recovery.\n"
 PRIMARY_V1_BYTES = b"Client setup primary file, original version.\n"
 PRIMARY_V2_BYTES = b"Client setup primary file, revised version.\n"
+NATIVE_PRIMARY_V1_BYTES = b"Native primary file, original version.\n"
+NATIVE_PRIMARY_V2_BYTES = b"Native primary file, revised version.\n"
 REVIEWER_EMAIL = "publication-recovery-reviewer@example.invalid"
 AUTHORIZER_EMAIL = "publication-recovery-authorizer@example.invalid"
 CLIENT_EMAIL = "publication-recovery-client@example.invalid"
@@ -82,7 +85,7 @@ def _portal_snapshot(browser, publication_id, artifact_id):
     )
 
 
-def _primary_portal_snapshot(browser, publication_id, version_ids, source_ids):
+def _primary_portal_snapshot(browser, publication_id, version_ids, source_ids, expected_contents):
     listing = browser.get(reverse("client-portal-repository-publication-list"), secure=True)
     assert listing.status_code == 200
     assert str(publication_id) in [item["id"] for item in listing.json()["results"]]
@@ -93,7 +96,7 @@ def _primary_portal_snapshot(browser, publication_id, version_ids, source_ids):
     assert [item["id"] for item in primary["versions"]] == [str(item) for item in version_ids]
     assert [item["version_number"] for item in primary["versions"]] == [1, 2]
     digests = []
-    for artifact_id, expected in zip(version_ids, (PRIMARY_V1_BYTES, PRIMARY_V2_BYTES), strict=True):
+    for artifact_id, expected in zip(version_ids, expected_contents, strict=True):
         response = browser.get(
             reverse("client-portal-repository-publication-attachment", args=[publication_id, artifact_id]),
             secure=True,
@@ -280,11 +283,65 @@ if mode == "create":
     primary_hashes = _primary_portal_snapshot(
         browser, primary_publication_id,
         [item.id for item in primary_artifacts], [item.entity_id for item in primary_sources],
+        (PRIMARY_V1_BYTES, PRIMARY_V2_BYTES),
     )
     print(f"PRIMARY_PUBLICATION_ID={primary_publication_id}")
     for number, (artifact_record, digest) in enumerate(zip(primary_artifacts, primary_hashes, strict=True), start=1):
         print(f"PRIMARY_PUBLICATION_VERSION_{number}_ID={artifact_record.id}")
         print(f"PRIMARY_PUBLICATION_VERSION_{number}_SHA256={digest}")
+    browser.force_login(owner)
+    native_evidence = _post(
+        browser, evidence_url, {"content_id": str(NATIVE_PRIMARY_DOCUMENT_ID), "audience": "client_visible"}
+    )
+    native_evidence_id = native_evidence["id"]
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        native_sources = list(DocumentAttachment.objects.filter(
+            tenant=tenant, organization=organization, document__isnull=True,
+            owner_workspace=workspace, owner_content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert len(native_sources) == 2
+        native_artifacts = [RepositoryEvidenceAttachment.objects.get(
+            evidence_id=native_evidence_id, source_attachment=source,
+        ) for source in native_sources]
+        assert all(source.document_id is None for source in native_sources)
+    native_routes = {
+        name: reverse(route, args=[organization.entity_id, native_evidence_id])
+        for name, route in (
+            ("decision", "organization-repository-publication-evidence-decision"),
+            ("package", "organization-repository-publication-evidence-package"),
+            ("authorization", "organization-repository-publication-evidence-package-authorization"),
+            ("static", "organization-repository-publication-evidence-static-publication"),
+            ("control", "organization-repository-publication-evidence-static-control"),
+            ("delivery", "organization-repository-publication-evidence-static-delivery"),
+        )
+    }
+    browser.force_login(reviewer)
+    _post(browser, native_routes["decision"], {"outcome": "accepted_for_packaging", "reason": "Native history reviewed"})
+    assert _post(browser, native_routes["package"])["verified"] is True
+    browser.force_login(authorizer)
+    _post(browser, native_routes["authorization"], {
+        "outcome": "authorized_for_publication", "reason": "Native history authorized",
+    })
+    browser.force_login(reviewer)
+    native_publication_id = uuid.UUID(_post(browser, native_routes["static"])["id"])
+    browser.force_login(authorizer)
+    _post(browser, native_routes["control"], {"action": "released", "reason": "Native history released"})
+    _post(browser, native_routes["delivery"], {"reason": "Native history delivered"})
+    browser.force_login(client)
+    native_hashes = _primary_portal_snapshot(
+        browser, native_publication_id,
+        [item.id for item in native_artifacts], [item.entity_id for item in native_sources],
+        (NATIVE_PRIMARY_V1_BYTES, NATIVE_PRIMARY_V2_BYTES),
+    )
+    print(f"NATIVE_PRIMARY_PUBLICATION_ID={native_publication_id}")
+    for number, (artifact_record, digest) in enumerate(zip(native_artifacts, native_hashes, strict=True), start=1):
+        print(f"NATIVE_PRIMARY_PUBLICATION_VERSION_{number}_ID={artifact_record.id}")
+        print(f"NATIVE_PRIMARY_PUBLICATION_VERSION_{number}_SHA256={digest}")
     print(f"REPOSITORY_PUBLICATION_ID={publication_id}")
     print(f"REPOSITORY_PUBLICATION_HTML_SHA256={html_sha}")
     print(f"REPOSITORY_PUBLICATION_PDF_SHA256={pdf_sha}")
@@ -357,10 +414,48 @@ elif mode == "verify":
             assert artifact.checksum == hashlib.sha256(expected).hexdigest()
     primary_hashes = _primary_portal_snapshot(
         browser, primary_publication_id, primary_version_ids, [item.entity_id for item in sources],
+        (PRIMARY_V1_BYTES, PRIMARY_V2_BYTES),
     )
     for number, digest in enumerate(primary_hashes, start=1):
         assert digest == os.environ[f"TEKDOCS_RECOVERY_PRIMARY_VERSION_{number}_SHA256"]
-    print("Signed legacy PDF and released v1/v2 repository publications restored with complete primary history")
+    native_publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID"])
+    native_version_ids = [
+        uuid.UUID(os.environ[f"TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_{number}_ID"])
+        for number in (1, 2)
+    ]
+    with transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
+        )
+        native_publication = RepositoryStaticPublication.objects.get(
+            pk=native_publication_id, tenant=tenant, organization=organization,
+        )
+        assert native_publication.manifest["format"] == "tekdocs-repository-static-publication/v2"
+        assert verify_repository_static_publication(native_publication)
+        assert repository_static_delivery_ready(native_publication)
+        native_sources = list(DocumentAttachment.objects.filter(
+            tenant=tenant, organization=organization, document__isnull=True,
+            owner_workspace=workspace, owner_content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert len(native_sources) == 2
+        for source, artifact_id, expected in zip(
+            native_sources, native_version_ids, (NATIVE_PRIMARY_V1_BYTES, NATIVE_PRIMARY_V2_BYTES), strict=True,
+        ):
+            artifact = RepositoryEvidenceAttachment.objects.get(
+                pk=artifact_id, evidence=native_publication.authorization.package.decision.evidence,
+                source_attachment=source, organization=organization,
+            )
+            assert artifact.checksum == hashlib.sha256(expected).hexdigest()
+            assert artifact.source_attachment.document_id is None
+    native_hashes = _primary_portal_snapshot(
+        browser, native_publication_id, native_version_ids, [item.entity_id for item in native_sources],
+        (NATIVE_PRIMARY_V1_BYTES, NATIVE_PRIMARY_V2_BYTES),
+    )
+    for number, digest in enumerate(native_hashes, start=1):
+        assert digest == os.environ[f"TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_{number}_SHA256"]
+    print("Signed legacy PDF and released v1/v2 repository publications restored with legacy and Git-only primary history")
 elif mode == "corrupt":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])
     artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ATTACHMENT_ID"])

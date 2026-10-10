@@ -115,6 +115,11 @@ primary_version_1_id=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_1_ID=//p' "$public
 primary_version_2_id=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_2_ID=//p' "$publication_log")
 primary_version_1_sha=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_1_SHA256=//p' "$publication_log")
 primary_version_2_sha=$(sed -n 's/^PRIMARY_PUBLICATION_VERSION_2_SHA256=//p' "$publication_log")
+native_primary_publication_id=$(sed -n 's/^NATIVE_PRIMARY_PUBLICATION_ID=//p' "$publication_log")
+native_primary_version_1_id=$(sed -n 's/^NATIVE_PRIMARY_PUBLICATION_VERSION_1_ID=//p' "$publication_log")
+native_primary_version_2_id=$(sed -n 's/^NATIVE_PRIMARY_PUBLICATION_VERSION_2_ID=//p' "$publication_log")
+native_primary_version_1_sha=$(sed -n 's/^NATIVE_PRIMARY_PUBLICATION_VERSION_1_SHA256=//p' "$publication_log")
+native_primary_version_2_sha=$(sed -n 's/^NATIVE_PRIMARY_PUBLICATION_VERSION_2_SHA256=//p' "$publication_log")
 legacy_publication_id=$(sed -n 's/^LEGACY_PUBLICATION_ID=//p' "$publication_log")
 legacy_publication_pdf_sha=$(sed -n 's/^LEGACY_PUBLICATION_PDF_SHA256=//p' "$publication_log")
 printf '%s\n' "$publication_id" | grep -Eq '^[0-9a-f-]{36}$'
@@ -122,10 +127,12 @@ printf '%s\n' "$publication_html_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$publication_pdf_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$publication_attachment_id" | grep -Eq '^[0-9a-f-]{36}$'
 printf '%s\n' "$publication_attachment_sha" | grep -Eq '^[0-9a-f]{64}$'
-for value in "$primary_publication_id" "$primary_version_1_id" "$primary_version_2_id"; do
+for value in "$primary_publication_id" "$primary_version_1_id" "$primary_version_2_id" \
+  "$native_primary_publication_id" "$native_primary_version_1_id" "$native_primary_version_2_id"; do
   printf '%s\n' "$value" | grep -Eq '^[0-9a-f-]{36}$'
 done
-for value in "$primary_version_1_sha" "$primary_version_2_sha"; do
+for value in "$primary_version_1_sha" "$primary_version_2_sha" \
+  "$native_primary_version_1_sha" "$native_primary_version_2_sha"; do
   printf '%s\n' "$value" | grep -Eq '^[0-9a-f]{64}$'
 done
 printf '%s\n' "$legacy_publication_id" | grep -Eq '^[0-9a-f-]{36}$'
@@ -319,6 +326,11 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_ID="$primary_version_2_id" \
   -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_SHA256="$primary_version_1_sha" \
   -e TEKDOCS_RECOVERY_PRIMARY_VERSION_2_SHA256="$primary_version_2_sha" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID="$native_primary_publication_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_ID="$native_primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_2_ID="$native_primary_version_2_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_SHA256="$native_primary_version_1_sha" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_2_SHA256="$native_primary_version_2_sha" \
   -e TEKDOCS_RECOVERY_LEGACY_PUBLICATION_ID="$legacy_publication_id" \
   -e TEKDOCS_RECOVERY_LEGACY_PDF_SHA256="$legacy_publication_pdf_sha" \
   backend python manage.py shell --no-imports \
@@ -415,4 +427,4 @@ grep -q 'Retained legacy publication integrity check failed' "$corrupt_legacy_lo
 for secret_file in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
   cmp "$source_secrets/$secret_file" "$restored_secrets/$secret_file"
 done
-echo "Supported repository-inclusive encrypted backup, Markdown history, exact managed-file editable bundle, legacy and released v1/v2 repository publications with primary-file history, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"
+echo "Supported repository-inclusive encrypted backup, Markdown history, exact managed-file editable bundle, legacy and released v1/v2 repository publications with legacy and Git-only primary-file history, independent restored-media corruption refusal, bounded-write and mismatch refusal, separate-key, destructive-guard, and network-isolated restore rehearsal passed"

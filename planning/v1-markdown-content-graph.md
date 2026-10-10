@@ -673,6 +673,12 @@ signed publication artifacts now runs before media capture: the rehearsal
 corrupts the older retained version in the source stack, confirms the backup
 is refused without a final or partial recovery set, repairs it, and verifies
 the publication sweep again. The final authority handoff remains open.
+The supported recovery fixture now also carries a separate Git-only document
+with two native primary-file versions. Its editable bundle verifies the
+repository-document owner and both exact retained bytes; an independently
+restored, released STATIC v2 publication exposes both versions through the
+authorized client portal with pre-backup hashes. This validates native primary
+history across recovery, not a legacy document authority transition.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

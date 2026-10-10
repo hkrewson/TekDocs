@@ -12,6 +12,7 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.document_attachments import (
+    append_repository_primary_document_file,
     copy_attachment_content,
     create_document_attachment,
     create_repository_document_attachment,
@@ -48,6 +49,7 @@ ORGANIZATION_NAME = "Validation Recovery Client"
 FRAGMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.fragment")
 DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.document")
 ORGANIZATION_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.organization.document")
+NATIVE_PRIMARY_DOCUMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.native.primary.document")
 INITIAL_FRAGMENT = "Confirm the device serial number.\n"
 UPDATED_FRAGMENT = "Confirm the device serial number and enrollment status.\n"
 DOCUMENT_MARKDOWN = "# Laptop setup\n\nFollow the retained prerequisite.\n"
@@ -61,6 +63,8 @@ NATIVE_ATTACHMENT_NAME = "client-enrollment.txt"
 NATIVE_ATTACHMENT_BYTES = b"Client enrollment instructions retained for recovery.\n"
 LEGACY_PRIMARY_V1_BYTES = b"Client setup primary file, original version.\n"
 LEGACY_PRIMARY_V2_BYTES = b"Client setup primary file, revised version.\n"
+NATIVE_PRIMARY_V1_BYTES = b"Native primary file, original version.\n"
+NATIVE_PRIMARY_V2_BYTES = b"Native primary file, revised version.\n"
 
 
 def _repository(owner):
@@ -92,7 +96,7 @@ def _source_snapshot_digest(repository):
     return hashlib.sha256(snapshot.content).hexdigest()
 
 
-def _editable_bundle_digest(repository, attachment, native_attachment, primary_versions):
+def _editable_bundle_digest(repository, attachment, native_attachment, primary_versions, native_primary_versions):
     bundle = export_repository_editable_bundle(repository)
     manifest = verify_repository_editable_bundle(bundle.content)
     assert manifest["workspace_id"] == str(repository.workspace_id)
@@ -108,22 +112,23 @@ def _editable_bundle_digest(repository, attachment, native_attachment, primary_v
     assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
     assert copy_attachment_content(native_attachment) == NATIVE_ATTACHMENT_BYTES
     primary_descriptors = manifest["primary_files"]
-    assert len(primary_descriptors) == len(primary_versions) == 2
-    for index, (descriptor, record, expected_bytes) in enumerate(
-        zip(
-            primary_descriptors,
-            primary_versions,
-            (LEGACY_PRIMARY_V1_BYTES, LEGACY_PRIMARY_V2_BYTES),
-            strict=True,
-        )
+    assert len(primary_descriptors) == len(primary_versions) + len(native_primary_versions) == 4
+    descriptors_by_id = {item["id"]: item for item in primary_descriptors}
+    for versions, owner, expected_contents in (
+        (primary_versions, {"type": "legacy_document", "id": str(attachment.document_id)},
+         (LEGACY_PRIMARY_V1_BYTES, LEGACY_PRIMARY_V2_BYTES)),
+        (native_primary_versions, {"type": "repository_document", "id": str(NATIVE_PRIMARY_DOCUMENT_ID)},
+         (NATIVE_PRIMARY_V1_BYTES, NATIVE_PRIMARY_V2_BYTES)),
     ):
-        assert descriptor["id"] == str(record.entity_id)
-        assert descriptor["owner"] == {"type": "legacy_document", "id": str(attachment.document_id)}
-        assert descriptor["version_number"] == index + 1
-        assert descriptor["replaces_id"] == (str(primary_versions[index - 1].entity_id) if index else None)
-        assert descriptor["sha256"] == hashlib.sha256(expected_bytes).hexdigest()
-        assert descriptor["size"] == len(expected_bytes)
-        assert copy_attachment_content(record) == expected_bytes
+        for index, (record, expected_bytes) in enumerate(zip(versions, expected_contents, strict=True)):
+            descriptor = descriptors_by_id.pop(str(record.entity_id))
+            assert descriptor["owner"] == owner
+            assert descriptor["version_number"] == index + 1
+            assert descriptor["replaces_id"] == (str(versions[index - 1].entity_id) if index else None)
+            assert descriptor["sha256"] == hashlib.sha256(expected_bytes).hexdigest()
+            assert descriptor["size"] == len(expected_bytes)
+            assert copy_attachment_content(record) == expected_bytes
+    assert not descriptors_by_id
     return hashlib.sha256(bundle.content).hexdigest()
 
 
@@ -221,6 +226,31 @@ def create_organization_fixture(owner, organization):
         metadata_patch={},
     )
     assert native_source.accepted_commit == native_source.indexed_commit
+    native_primary_document = author_content(
+        repository=repository,
+        actor_id=owner.id,
+        request_id=None,
+        operation="create",
+        content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+        base_commit=native_source.accepted_commit,
+        base_blob=None,
+        kind="document",
+        path=None,
+        title="Native primary recovery guide",
+        markdown="# Native primary recovery guide\n\nRetained version history.\n",
+        metadata_patch={},
+    )
+    assert native_primary_document.accepted_commit == native_primary_document.indexed_commit
+    native_primary_v1 = append_repository_primary_document_file(
+        repository=repository, content_id=NATIVE_PRIMARY_DOCUMENT_ID, actor_id=owner.id,
+        upload=SimpleUploadedFile("native-primary-v1.txt", NATIVE_PRIMARY_V1_BYTES),
+        expected_current_entity_id=None,
+    )
+    native_primary_v2 = append_repository_primary_document_file(
+        repository=repository, content_id=NATIVE_PRIMARY_DOCUMENT_ID, actor_id=owner.id,
+        upload=SimpleUploadedFile("native-primary-v2.txt", NATIVE_PRIMARY_V2_BYTES),
+        expected_current_entity_id=native_primary_v1.entity_id,
+    )
     legacy_document = create_document(
         tenant=repository.tenant,
         organization=organization,
@@ -255,7 +285,7 @@ def create_organization_fixture(owner, organization):
         actor_id=owner.id,
     )
     assert publication_import.status == "imported" and publication_import.indexed
-    return attachment, native_attachment, (primary_v1, primary_v2)
+    return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
 
 
 def verify_fixture(owner):
@@ -309,6 +339,9 @@ def verify_organization_fixture(owner, organization, directory_entry):
     assert ContentNode.objects.get(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID).markdown == (
         expected_markdown
     )
+    native_primary_document = read_authored_content(repository=repository, content_id=NATIVE_PRIMARY_DOCUMENT_ID)
+    assert native_primary_document.markdown == "# Native primary recovery guide\n\nRetained version history.\n"
+    assert not Document.objects.filter(id=NATIVE_PRIMARY_DOCUMENT_ID).exists()
     legacy_document = Document.objects.get(
         tenant=repository.tenant,
         organization=organization,
@@ -333,7 +366,13 @@ def verify_organization_fixture(owner, organization, directory_entry):
     assert primary_versions[0].replaces_id is None
     assert primary_versions[1].version_number == 2
     assert primary_versions[1].replaces_id == primary_versions[0].id
-    return attachment, native_attachment, primary_versions
+    native_primary_versions = tuple(DocumentAttachment.objects.filter(
+        tenant=repository.tenant, organization=organization, document__isnull=True,
+        owner_workspace=repository.workspace, owner_content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+    ).order_by("version_number"))
+    assert len(native_primary_versions) == 2
+    return attachment, native_attachment, primary_versions, native_primary_versions
 
 
 owner = User.objects.get(email=OWNER_EMAIL)
@@ -370,11 +409,13 @@ with transaction.atomic():
         principal_mode=RLSPrincipalMode.USER,
     )
     if mode == "create":
-        attachment, native_attachment, primary_versions = create_organization_fixture(owner, organization)
+        attachment, native_attachment, primary_versions, native_primary_versions = create_organization_fixture(
+            owner, organization
+        )
         organization_repository = _organization_repository(owner, organization)
         organization_snapshot_digest = _source_snapshot_digest(organization_repository)
         organization_editable_digest = _editable_bundle_digest(
-            organization_repository, attachment, native_attachment, primary_versions
+            organization_repository, attachment, native_attachment, primary_versions, native_primary_versions
         )
         print(f"MSP_SOURCE_SHA256={msp_snapshot_digest}")
         print(f"ORGANIZATION_SOURCE_SHA256={organization_snapshot_digest}")
@@ -412,13 +453,13 @@ with transaction.atomic():
             assert copy_attachment_content(historical_primary) == LEGACY_PRIMARY_V1_BYTES
             print("Disposable historical primary-file custody repaired")
         else:
-            attachment, native_attachment, primary_versions = verify_organization_fixture(
+            attachment, native_attachment, primary_versions, native_primary_versions = verify_organization_fixture(
                 owner, organization, directory_entry
             )
             organization_repository = _organization_repository(owner, organization)
             organization_snapshot_digest = _source_snapshot_digest(organization_repository)
             organization_editable_digest = _editable_bundle_digest(
-                organization_repository, attachment, native_attachment, primary_versions
+                organization_repository, attachment, native_attachment, primary_versions, native_primary_versions
             )
             assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
             assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]

@@ -679,6 +679,11 @@ repository-document owner and both exact retained bytes; an independently
 restored, released STATIC v2 publication exposes both versions through the
 authorized client portal with pre-backup hashes. This validates native primary
 history across recovery, not a legacy document authority transition.
+The backup and restore rehearsal now also corrupts an older retained version
+of the Git-only publication in each disposable stack. Backup refuses the
+damaged signed record without leaving a recovery set, and restored portal
+routes and the publication verifier deny it until repair. This establishes
+the native-owner failure path, not content-authority cutover.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an
@@ -733,6 +738,12 @@ editor and private download. This is file discovery, not an authority switch.
   write retirement, full review/template/key/file/publication parity, and
   demonstrated rollback. The existing read-only migration status must not
   silently promote a document.
+
+[Proposed ADR 0115](../docs/adr/0115-explicit-per-document-git-authority-handoff.md)
+records the reviewed handoff design: an explicit exact-Workspace authority
+state, centralized read/write routing, retained PostgreSQL workflow history,
+and a verified reverse projection before rollback. It is proposed, not an
+implemented transition or permission to clear this checklist item.
 
 The checked custody gate passed the isolated fresh-install rehearsal, the
 PostgreSQL owner-upgrade test, and the supported repository-inclusive,

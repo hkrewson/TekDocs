@@ -496,16 +496,25 @@ elif mode == "restore_repository_attachment":
         publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
         assert verify_repository_static_publication(publication)
     print("Restored repository attachment repaired in disposable recovery stack")
-elif mode == "corrupt_primary":
-    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID"])
-    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID"])
+elif mode in {"corrupt_primary", "corrupt_native_primary"}:
+    native = mode == "corrupt_native_primary"
+    prefix = "TEKDOCS_RECOVERY_NATIVE_PRIMARY" if native else "TEKDOCS_RECOVERY_PRIMARY"
+    publication_id = uuid.UUID(os.environ[f"{prefix}_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ[f"{prefix}_VERSION_1_ID"])
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
             actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
         )
-        first_source = legacy_document.attachments.get(
-            purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+        first_source = (
+            DocumentAttachment.objects.get(
+                tenant=tenant, organization=organization, document__isnull=True,
+                owner_workspace=workspace, owner_content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+            )
+            if native else legacy_document.attachments.get(
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+            )
         )
         artifact = RepositoryEvidenceAttachment.objects.get(
             pk=artifact_id, source_attachment=first_source, organization=organization,
@@ -523,32 +532,45 @@ elif mode == "corrupt_primary":
         reverse("client-portal-repository-publication-detail", args=[publication_id]), secure=True,
     ).status_code == 404
     for version_number in (1, 2):
-        version_id = uuid.UUID(os.environ[f"TEKDOCS_RECOVERY_PRIMARY_VERSION_{version_number}_ID"])
+        version_id = uuid.UUID(os.environ[f"{prefix}_VERSION_{version_number}_ID"])
         assert browser.get(
             reverse("client-portal-repository-publication-attachment", args=[publication_id, version_id]),
             secure=True,
         ).status_code == 404
-    print("Restored historical primary corruption refused by all client routes")
-elif mode == "restore_primary":
-    publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID"])
-    artifact_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID"])
+    print("Retained Git-only historical primary corruption refused by all client routes" if native else
+          "Restored historical primary corruption refused by all client routes")
+elif mode in {"restore_primary", "restore_native_primary"}:
+    native = mode == "restore_native_primary"
+    prefix = "TEKDOCS_RECOVERY_NATIVE_PRIMARY" if native else "TEKDOCS_RECOVERY_PRIMARY"
+    publication_id = uuid.UUID(os.environ[f"{prefix}_PUBLICATION_ID"])
+    artifact_id = uuid.UUID(os.environ[f"{prefix}_VERSION_1_ID"])
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.organization(tenant, organization), organization_mode=OrganizationRLSMode.ORGANIZATION,
             actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER,
         )
-        first_source = legacy_document.attachments.get(
-            purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+        first_source = (
+            DocumentAttachment.objects.get(
+                tenant=tenant, organization=organization, document__isnull=True,
+                owner_workspace=workspace, owner_content_id=NATIVE_PRIMARY_DOCUMENT_ID,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+            )
+            if native else legacy_document.attachments.get(
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+            )
         )
         artifact = RepositoryEvidenceAttachment.objects.get(
             pk=artifact_id, source_attachment=first_source, organization=organization,
         )
         path = artifact.file.name
         artifact.file.storage.delete(path)
-        assert artifact.file.storage.save(path, ContentFile(PRIMARY_V1_BYTES)) == path
+        assert artifact.file.storage.save(
+            path, ContentFile(NATIVE_PRIMARY_V1_BYTES if native else PRIMARY_V1_BYTES)
+        ) == path
         publication = RepositoryStaticPublication.objects.get(pk=publication_id, organization=organization)
         assert verify_repository_static_publication(publication)
-    print("Restored historical primary artifact repaired in disposable recovery stack")
+    print("Retained Git-only historical primary artifact repaired in disposable recovery stack" if native else
+          "Restored historical primary artifact repaired in disposable recovery stack")
 elif mode == "corrupt_legacy":
     with transaction.atomic():
         bind_local_rls_scope(
@@ -568,5 +590,6 @@ elif mode == "corrupt_legacy":
 else:
     raise RuntimeError(
         "TEKDOCS_RECOVERY_PUBLICATION_MODE must be create, verify, corrupt, "
-        "restore_repository_attachment, corrupt_primary, restore_primary, or corrupt_legacy"
+        "restore_repository_attachment, corrupt_primary, restore_primary, "
+        "corrupt_native_primary, restore_native_primary, or corrupt_legacy"
     )

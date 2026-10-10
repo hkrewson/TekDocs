@@ -190,6 +190,33 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py verify_recovery_publications
+echo "Checking backup refusal when a Git-only historical publication artifact is corrupt"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_native_primary \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID="$native_primary_publication_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_ID="$native_primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_2_ID="$native_primary_version_2_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_native_primary_backup="$work_directory/corrupt-native-primary-backup"
+if "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
+  --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$corrupt_native_primary_backup" \
+  > "$work_directory/corrupt-native-primary-backup.log" 2>&1; then
+  echo "Backup accepted a corrupt Git-only historical publication artifact." >&2
+  exit 1
+fi
+grep -q 'Retained publication verification failed before backup' \
+  "$work_directory/corrupt-native-primary-backup.log"
+[ ! -e "$corrupt_native_primary_backup" ]
+[ -z "$(find "$work_directory" -maxdepth 1 -name 'corrupt-native-primary-backup.partial.*' -print -quit)" ]
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_native_primary \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID="$native_primary_publication_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_ID="$native_primary_version_1_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  backend python manage.py verify_recovery_publications
 echo "Checking backup refusal when a retained managed file is missing"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=break_managed_file backend python manage.py shell --no-imports \
@@ -407,6 +434,29 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_primary \
   -e TEKDOCS_RECOVERY_PRIMARY_PUBLICATION_ID="$primary_publication_id" \
   -e TEKDOCS_RECOVERY_PRIMARY_VERSION_1_ID="$primary_version_1_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications
+echo "Checking restored Git-only historical primary-publication corruption refusal"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=corrupt_native_primary \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID="$native_primary_publication_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_ID="$native_primary_version_1_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_2_ID="$native_primary_version_2_id" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
+corrupt_native_primary_publication_log="$work_directory/corrupt-native-primary-publication.log"
+if compose_for "$restore_environment" "$restored_secrets" exec -T \
+  backend python manage.py verify_recovery_publications > "$corrupt_native_primary_publication_log" 2>&1; then
+  echo "Retained publication verification accepted corrupt restored Git-only historical primary media" >&2
+  exit 1
+fi
+grep -q 'Retained repository publication integrity check failed' "$corrupt_native_primary_publication_log"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_RECOVERY_PUBLICATION_MODE=restore_native_primary \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_PUBLICATION_ID="$native_primary_publication_id" \
+  -e TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_1_ID="$native_primary_version_1_id" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-publication-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \

@@ -742,8 +742,11 @@ editor and private download. This is file discovery, not an authority switch.
 [Proposed ADR 0115](../docs/adr/0115-explicit-per-document-git-authority-handoff.md)
 records the reviewed handoff design: an explicit exact-Workspace authority
 state, centralized read/write routing, retained PostgreSQL workflow history,
-and a verified reverse projection before rollback. It is proposed, not an
-implemented transition or permission to clear this checklist item.
+and a verified reverse projection before rollback. Promotion and recovery
+instructions stay in internal operator guidance for this single-operator
+deployment; no end-user authority controls or public migration procedure are
+required. It is proposed, not an implemented transition or permission to clear
+this checklist item.
 
 The checked custody gate passed the isolated fresh-install rehearsal, the
 PostgreSQL owner-upgrade test, and the supported repository-inclusive,

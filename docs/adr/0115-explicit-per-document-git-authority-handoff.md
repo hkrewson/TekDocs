@@ -37,6 +37,11 @@ supports a document's shape, promotion must be refused or repository
 authoring limited to the reversible shape. Failed promotion or rollback
 leaves the prior authority unchanged.
 
+Migration eligibility, promotion, rollback, and recovery instructions are
+operator guidance. For the current single-operator deployment, keep them in
+internal planning and runbook material; do not add end-user workflow or
+public-facing migration guidance.
+
 ## Alternatives considered
 
 - **Infer authority from an in-sync Git copy:** rejected because a copy can
@@ -53,4 +58,6 @@ and retained evidence survive promotion. The cost is an explicit PostgreSQL
 state, centralized guards across read/write routes, a reversible projection
 for supported document shapes, and fresh-install, upgrade, isolation,
 publication, and independent recovery tests before activation. Unsupported
-shapes remain legacy-authoritative with named blockers.
+shapes remain legacy-authoritative with named blockers. Operators need a
+local procedure for reviewing eligibility and recovery; end users need no new
+authority-management interface.

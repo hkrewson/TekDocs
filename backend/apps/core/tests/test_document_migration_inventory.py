@@ -625,6 +625,7 @@ def test_migration_status_identifies_retained_legacy_publication_history(tmp_pat
         )
         assert status.status_code == 200, status.content
         assert "legacy_publication_history_present" in status.json()["handoff_blockers"]
+        assert status.json()["authority_state"] == "legacy"
         assert status.json()["legacy_authoritative"] is True
         assert status.json()["cutover_ready"] is False
 

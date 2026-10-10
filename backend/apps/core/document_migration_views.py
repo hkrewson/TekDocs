@@ -22,6 +22,7 @@ from .workspaces import ResolvedWorkspace
 class DocumentMigrationStatusSerializer(serializers.Serializer):
     document_id = serializers.UUIDField()
     legacy_authoritative = serializers.BooleanField()
+    authority_state = serializers.ChoiceField(choices=("legacy", "repository", "unavailable"))
     cutover_ready = serializers.BooleanField()
     handoff_blockers = serializers.ListField(child=serializers.CharField())
     read_projection_state = serializers.ChoiceField(choices=("not_checked", "matched", "different", "unavailable"))

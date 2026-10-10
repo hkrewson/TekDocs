@@ -770,6 +770,14 @@ pin along with review state. This is a legacy-workflow foundation only: the
 future handoff must additionally bind review evidence to the accepted Git
 commit and relevant portable metadata before Git-authoritative review is safe.
 
+Authority now has a durable exact-Workspace/content-UUID record separate from
+the rebuildable content index. Existing legacy documents are backfilled as
+legacy-authoritative; repository-only documents are recorded as
+repository-authoritative when indexed; reindexing preserves either state. The
+database rejects identity changes, deletion, scope mismatches, and authority
+changes outside the future transition service. This records current ownership
+but does not implement promotion, legacy-write retirement, or rollback.
+
 The read-only legacy migration status names additional handoff blockers when a
 document retains a template or enrollment, primary-file history, or review
 decisions. Field-key values and permissions remain PostgreSQL-authoritative;

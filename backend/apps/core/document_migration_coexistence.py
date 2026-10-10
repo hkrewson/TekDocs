@@ -36,6 +36,8 @@ from .models import (
     Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentPublication,
     DocumentReviewState,
     Workspace,
@@ -81,6 +83,11 @@ def document_coexistence_status(
     """Report copy parity and the still-unmet authority handoff gates."""
 
     response = _document_copy_status(workspace=workspace, document=document)
+    authority_state = DocumentAuthority.objects.filter(workspace=workspace, content_id=document.id).first()
+    response["authority_state"] = authority_state.authority if authority_state is not None else "unavailable"
+    response["legacy_authoritative"] = (
+        authority_state is not None and authority_state.authority == DocumentAuthorityMode.LEGACY
+    )
     response["read_projection_state"] = "not_checked"
     if response["content_copy_state"] == "in_sync":
         try:
@@ -109,6 +116,8 @@ def document_coexistence_status(
                 else "different"
             )
     blockers = []
+    if authority_state is None:
+        blockers.append("document_authority_state_unavailable")
     if response["content_copy_state"] != "in_sync":
         blockers.append("content_copy_not_in_sync")
     if response["read_projection_state"] in ("different", "unavailable"):

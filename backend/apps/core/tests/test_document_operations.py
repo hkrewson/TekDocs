@@ -169,6 +169,7 @@ def test_review_request_decision_and_later_edit_invalidation(owner_client, appro
     assert requested.status_code == 200
     assert requested.json()["review_state"] == "pending"
     assert requested.json()["reviewer_name"] == "Documentation Approver"
+    document_record.refresh_from_db()
     assert document_record.review_content_sha256 == hashlib.sha256(
         requested.json()["resolved_markdown"].encode("utf-8")
     ).hexdigest()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from .model_support import TimestampedModel
@@ -13,6 +14,47 @@ from .scoping import OrganizationScopedManager
 class ContentNodeKind(models.TextChoices):
     DOCUMENT = "document", "Document"
     FRAGMENT = "fragment", "Fragment"
+
+
+class DocumentAuthorityMode(models.TextChoices):
+    LEGACY = "legacy", "Legacy document"
+    REPOSITORY = "repository", "Git repository"
+
+
+class DocumentAuthority(TimestampedModel):
+    """Durable per-Workspace authority; unlike ContentNode, this survives reindexing."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="document_authority_states")
+    organization = models.ForeignKey(
+        "core.Organization",
+        on_delete=models.PROTECT,
+        related_name="document_authority_states",
+        null=True,
+        blank=True,
+    )
+    workspace = models.ForeignKey("core.Workspace", on_delete=models.PROTECT, related_name="document_authority_states")
+    content_id = models.UUIDField()
+    authority = models.CharField(max_length=16, choices=DocumentAuthorityMode.choices)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("workspace", "content_id"), name="document_authority_identity_unique"),
+            models.CheckConstraint(
+                condition=models.Q(authority__in=DocumentAuthorityMode.values), name="document_authority_mode_valid"
+            ),
+        ]
+        indexes = [models.Index(fields=("workspace", "authority"), name="core_docauthority_scope_idx")]
+
+    def clean(self) -> None:
+        if self.workspace_id and (
+            self.workspace.tenant_id != self.tenant_id
+            or self.workspace.organization_id != self.organization_id
+        ):
+            raise ValidationError("Document authority must use its exact Workspace scope")
 
 
 class ContentIndexStatus(models.TextChoices):

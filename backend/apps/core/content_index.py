@@ -26,7 +26,15 @@ from .content_index_models import (
     ContentTemplateSourceState,
 )
 from .content_profile import ContentProfileError, ParsedContent, parse_content
-from .models import OrganizationTaxonomyTerm, Taxonomy, TaxonomyTerm, WorkspaceRepository
+from .models import (
+    Document,
+    DocumentAuthority,
+    DocumentAuthorityMode,
+    OrganizationTaxonomyTerm,
+    Taxonomy,
+    TaxonomyTerm,
+    WorkspaceRepository,
+)
 from .repository_service import (
     RepositoryServiceError,
     read_accepted_repository_markdown_files,
@@ -544,6 +552,23 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                 derived_from_object_id=(parsed.derived_from.object_id if parsed.derived_from is not None else ""),
             )
             nodes[parsed.content_id] = node
+            if parsed.kind == "document":
+                legacy_owner = Document.objects.filter(
+                    id=parsed.content_id,
+                    tenant_id=locked.tenant_id,
+                    organization_id=locked.workspace.organization_id,
+                ).exists()
+                DocumentAuthority.objects.get_or_create(
+                    workspace_id=locked.workspace_id,
+                    content_id=parsed.content_id,
+                    defaults={
+                        "tenant_id": locked.tenant_id,
+                        "organization_id": locked.workspace.organization_id,
+                        "authority": (
+                            DocumentAuthorityMode.LEGACY if legacy_owner else DocumentAuthorityMode.REPOSITORY
+                        ),
+                    },
+                )
             ContentProperty.objects.bulk_create(
                 [ContentProperty(**scope, node=node, key=key, value=value) for key, value in parsed.properties.items()]
             )

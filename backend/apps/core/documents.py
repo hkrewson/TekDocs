@@ -20,6 +20,8 @@ from .models import (
     Document,
     DocumentationListingReference,
     DocumentAttachment,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentCategory,
     DocumentPlacement,
     DocumentPublication,
@@ -580,6 +582,13 @@ def create_document(
         library_visible=library_visible,
         topic_type=topic_type,
         topic_schema_version=1,
+    )
+    DocumentAuthority.objects.create(
+        tenant=tenant,
+        organization=organization,
+        workspace_id=document_entity.workspace_id,
+        content_id=document.id,
+        authority=DocumentAuthorityMode.LEGACY,
     )
     block_entity = Entity.objects.create(
         tenant=tenant,

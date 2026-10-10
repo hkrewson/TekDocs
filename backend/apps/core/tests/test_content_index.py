@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from django.db import transaction
+from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
 
@@ -119,6 +119,10 @@ def test_document_authority_survives_rebuilding_the_content_index(indexed_reposi
     index_repository_content(repository_id=repository.id, force=True)
     authority.refresh_from_db()
     assert authority.authority == DocumentAuthorityMode.REPOSITORY
+
+    with pytest.raises(DatabaseError, match="authority changes require the transition service"):
+        with transaction.atomic():
+            DocumentAuthority.objects.filter(pk=authority.pk).update(authority=DocumentAuthorityMode.LEGACY)
 
 
 def test_invalid_commit_retains_last_known_good_projection_and_sanitizes_diagnostics(indexed_repository):

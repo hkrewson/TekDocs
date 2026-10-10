@@ -11,7 +11,17 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.core.models import AuditEvent, Document, DocumentReviewState, Entity, InstallationState, Organization, Tenant
+from apps.core.models import (
+    AuditEvent,
+    Document,
+    DocumentAuthority,
+    DocumentAuthorityMode,
+    DocumentReviewState,
+    Entity,
+    InstallationState,
+    Organization,
+    Tenant,
+)
 
 
 @pytest.fixture
@@ -147,6 +157,9 @@ def test_document_search_supports_attention_queue_and_destination_exclusion(owne
 @pytest.mark.django_db
 def test_review_request_decision_and_later_edit_invalidation(owner_client, approver_client, approver):
     document = create_document(owner_client)
+    document_record = Document.objects.get(entity_id=document["id"])
+    authority = DocumentAuthority.objects.get(workspace=document_record.entity.workspace, content_id=document_record.id)
+    assert authority.authority == DocumentAuthorityMode.LEGACY
     request_url = reverse("msp-document-review-request", kwargs={"document_entity_id": document["id"]})
     requested = owner_client.post(
         request_url,
@@ -156,7 +169,6 @@ def test_review_request_decision_and_later_edit_invalidation(owner_client, appro
     assert requested.status_code == 200
     assert requested.json()["review_state"] == "pending"
     assert requested.json()["reviewer_name"] == "Documentation Approver"
-    document_record = Document.objects.get(entity_id=document["id"])
     assert document_record.review_content_sha256 == hashlib.sha256(
         requested.json()["resolved_markdown"].encode("utf-8")
     ).hexdigest()

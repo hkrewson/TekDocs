@@ -30,6 +30,7 @@ from apps.core.content_index import index_repository_content
 from apps.core.custom_fields import create_definition
 from apps.core.data_flows import DataFlowInput, create_data_flow, create_data_flow_snapshot
 from apps.core.document_attachments import (
+    append_repository_primary_document_file,
     copy_attachment_content,
     create_document_attachment,
     create_repository_document_attachment,
@@ -432,6 +433,24 @@ def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_r
         assert native.owner_workspace_id == workspace.id
         assert native.owner_content_id == content_id
         assert copy_attachment_content(native) == b"Git-only bytes survive upgrade\n"
+        first_primary = append_repository_primary_document_file(
+            repository=repository,
+            content_id=content_id,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("first-primary.txt", b"First upgraded primary\n"),
+            expected_current_entity_id=None,
+        )
+        second_primary = append_repository_primary_document_file(
+            repository=repository,
+            content_id=content_id,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("second-primary.txt", b"Second upgraded primary\n"),
+            expected_current_entity_id=first_primary.entity_id,
+        )
+        assert second_primary.replaces_id == first_primary.id
+        assert (first_primary.version_number, second_primary.version_number) == (1, 2)
+        assert copy_attachment_content(first_primary) == b"First upgraded primary\n"
+        assert copy_attachment_content(second_primary) == b"Second upgraded primary\n"
 
         copied = build_simple_document_export(document)
         repository.refresh_from_db()
@@ -451,6 +470,14 @@ def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_r
                 content_id=document.id,
                 actor_id=installation.owner.id,
                 upload=SimpleUploadedFile("wrong-owner.txt", b"Wrong owner\n"),
+            )
+        with pytest.raises(ValidationError, match="Legacy content remains authoritative"):
+            append_repository_primary_document_file(
+                repository=repository,
+                content_id=document.id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("wrong-primary.txt", b"Wrong primary\n"),
+                expected_current_entity_id=None,
             )
 
 

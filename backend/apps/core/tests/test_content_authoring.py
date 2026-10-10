@@ -12,8 +12,10 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
@@ -33,6 +35,8 @@ from apps.core.models import (
     AuditEvent,
     ContentNode,
     DocumentAttachment,
+    DocumentAttachmentPurpose,
+    Entity,
     InstallationState,
     Tenant,
     Workspace,
@@ -89,6 +93,143 @@ def test_authoring_legacy_identity_guard_is_workspace_scoped(authoring_context):
     )
     authored = _create(installation, repository, content_id=foreign.id)
     assert authored.content_id == foreign.id
+
+
+def test_git_only_primary_file_versions_are_retained_and_compare_and_swap(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository, title="Primary file runbook")
+    browser = Client()
+    browser.force_login(installation.owner)
+    primary_url = reverse("msp-content-authoring-primary-file", kwargs={"content_id": document.content_id})
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        first = browser.post(primary_url, {"file": SimpleUploadedFile("first.txt", b"First retained version\n")})
+        assert first.status_code == 201, first.content
+        first_id = first.json()["id"]
+        assert first.json()["version_number"] == 1
+        assert first.json()["replaces_id"] is None
+        assert first.json()["is_current"] is True
+        stale = browser.post(primary_url, {"file": SimpleUploadedFile("stale.txt", b"Stale version\n")})
+        assert stale.status_code == 409
+        assert DocumentAttachment.objects.filter(
+            owner_content_id=document.content_id, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
+        ).count() == 1
+        second = browser.post(primary_url, {
+            "file": SimpleUploadedFile("second.txt", b"Second retained version\n"),
+            "expected_current_id": first_id,
+        })
+        assert second.status_code == 201, second.content
+        assert second.json()["version_number"] == 2
+        assert second.json()["replaces_id"] == first_id
+        history = browser.get(primary_url)
+        assert history.status_code == 200, history.content
+        assert [row["version_number"] for row in history.json()["results"]] == [2, 1]
+        assert [row["is_current"] for row in history.json()["results"]] == [True, False]
+        file_register = browser.get(reverse("msp-document-file-list") + "?kind=primary")
+        assert file_register.status_code == 200, file_register.content
+        assert {row["id"] for row in file_register.json()["results"]} == {first_id, second.json()["id"]}
+        recovery_output = io.StringIO()
+        call_command("verify_recovery_managed_files", stdout=recovery_output)
+        assert "2 files" in recovery_output.getvalue()
+        retained_versions = (
+            (first_id, b"First retained version\n"),
+            (second.json()["id"], b"Second retained version\n"),
+        )
+        for entity_id, expected in retained_versions:
+            download = browser.get(reverse("msp-content-document-attachment-download", kwargs={
+                "content_id": document.content_id, "attachment_entity_id": entity_id,
+            }))
+            assert download.status_code == 200
+            assert b"".join(download.streaming_content) == expected
+        first_record = DocumentAttachment.objects.get(entity_id=first_id)
+        with pytest.raises(DatabaseError), transaction.atomic():
+            DocumentAttachment.objects.filter(pk=first_record.pk).update(version_number=4)
+        with pytest.raises(DatabaseError), transaction.atomic():
+            DocumentAttachment.objects.filter(pk=first_record.pk).update(archived_at=timezone.now())
+        other = _create(installation, repository, title="Unrelated primary owner")
+        for owner_content_id, version_number, replaces in (
+            (document.content_id, 1, None),
+            (other.content_id, 2, first_record),
+        ):
+            entity = Entity.objects.create(
+                tenant=installation.tenant,
+                workspace=repository.workspace,
+                organization=None,
+                entity_type="document_attachment",
+                display_name="invalid-primary.txt",
+            )
+            with pytest.raises(DatabaseError), transaction.atomic():
+                DocumentAttachment.objects.create(
+                    tenant=installation.tenant,
+                    organization=None,
+                    document=None,
+                    owner_workspace=repository.workspace,
+                    owner_content_id=owner_content_id,
+                    entity=entity,
+                    file=f"document-attachments/invalid/{entity.id}",
+                    original_filename="invalid-primary.txt",
+                    media_type="text/plain",
+                    size=first_record.size,
+                    checksum=first_record.checksum,
+                    storage_provider=first_record.storage_provider,
+                    scan_status="clean",
+                    scan_engine=first_record.scan_engine,
+                    scanned_at=timezone.now(),
+                    purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                    version_number=version_number,
+                    replaces=replaces,
+                )
+        assert Client().get(primary_url).status_code in {401, 403}
+
+
+def test_git_only_primary_file_route_is_exact_organization_scoped(authoring_context, tmp_path):
+    installation, _repository = authoring_context
+    selected = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="Primary client",
+        legal_name="Primary client", website="", classifications=["client"],
+    )
+    sibling = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="Other primary client",
+        legal_name="Other primary client", website="", classifications=["client"],
+    )
+    selected_workspace = Workspace.objects.get(tenant=installation.tenant, organization=selected)
+    selected_repository = repository_storage.ensure_workspace_repository(selected_workspace).repository
+    document = _create(installation, selected_repository, title="Client primary file")
+    browser = Client()
+    browser.force_login(installation.owner)
+    selected_url = reverse("organization-content-authoring-primary-file", kwargs={
+        "organization_entity_id": selected.entity_id, "content_id": document.content_id,
+    })
+    sibling_url = reverse("organization-content-authoring-primary-file", kwargs={
+        "organization_entity_id": sibling.entity_id, "content_id": document.content_id,
+    })
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        selected_upload = browser.post(selected_url, {"file": SimpleUploadedFile("client.txt", b"Client bytes\n")})
+        assert selected_upload.status_code == 201
+        assert browser.get(selected_url).json()["count"] == 1
+        assert browser.get(sibling_url).status_code == 404
+        assert browser.post(sibling_url, {"file": SimpleUploadedFile("wrong.txt", b"Wrong bytes\n")}).status_code == 400
+        anonymous_upload = Client().post(selected_url, {"file": SimpleUploadedFile("anon.txt", b"Anonymous\n")})
+        assert anonymous_upload.status_code in {401, 403}
+        portal_user = User.objects.create_user(
+            email=f"primary-client-{uuid.uuid4()}@example.invalid", display_name="Primary client reader"
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=portal_user, role=BuiltInRole.CLIENT_USER, organization=selected
+        )
+        browser.force_login(portal_user)
+        assert browser.get(selected_url).status_code == 403
+        assert browser.post(selected_url, {"file": SimpleUploadedFile("portal.txt", b"Portal\n")}).status_code == 403
+        foreign_tenant = Tenant.objects.create(name="Foreign primary MSP", slug=f"foreign-primary-{uuid.uuid4()}")
+        foreign_user = User.objects.create_user(
+            email=f"foreign-primary-{uuid.uuid4()}@example.invalid", display_name="Foreign primary owner"
+        )
+        TenantMembership.objects.create(tenant=foreign_tenant, user=foreign_user, role=BuiltInRole.ADMINISTRATOR)
+        TOTP.activate(foreign_user, generate_totp_secret())
+        browser.force_login(foreign_user)
+        assert browser.get(selected_url).status_code in {403, 404}
+        foreign_upload = browser.post(selected_url, {"file": SimpleUploadedFile("foreign.txt", b"Foreign\n")})
+        assert foreign_upload.status_code in {403, 404}
+        assert DocumentAttachment.objects.filter(owner_content_id=document.content_id).count() == 1
 
 
 @pytest.fixture

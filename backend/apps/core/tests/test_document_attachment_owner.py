@@ -21,6 +21,7 @@ from apps.core import repository_storage
 from apps.core.content_authoring import author_content
 from apps.core.content_index import index_repository_content
 from apps.core.document_attachments import (
+    append_repository_primary_document_file,
     archive_document_attachment,
     create_document_attachment,
     create_repository_document_attachment,
@@ -284,6 +285,14 @@ def test_copied_legacy_document_cannot_acquire_native_file_owner(tmp_path):
                 content_id=legacy.id,
                 actor_id=installation.owner.id,
                 upload=SimpleUploadedFile("native.txt", b"native file bytes\n"),
+            )
+        with pytest.raises(ValidationError, match="Legacy content remains authoritative"):
+            append_repository_primary_document_file(
+                repository=repository,
+                content_id=legacy.id,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("primary.txt", b"native primary bytes\n"),
+                expected_current_entity_id=None,
             )
 
         content = b"native file bytes\n"

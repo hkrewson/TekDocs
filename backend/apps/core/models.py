@@ -4678,15 +4678,15 @@ class DocumentAttachment(TimestampedModel):
                 ),
                 name="document_attachment_purpose_version",
             ),
-            models.CheckConstraint(
-                condition=models.Q(document__isnull=False)
-                | models.Q(purpose=DocumentAttachmentPurpose.ATTACHMENT),
-                name="native_attachment_not_primary_file",
-            ),
             models.UniqueConstraint(
                 fields=("document", "version_number"),
                 condition=models.Q(purpose=DocumentAttachmentPurpose.PRIMARY_FILE),
                 name="unique_document_primary_file_version",
+            ),
+            models.UniqueConstraint(
+                fields=("owner_workspace", "owner_content_id", "version_number"),
+                condition=models.Q(purpose=DocumentAttachmentPurpose.PRIMARY_FILE),
+                name="unique_content_primary_file_version",
             ),
         ]
         indexes = [
@@ -4722,10 +4722,9 @@ class DocumentAttachment(TimestampedModel):
         if self.document_id is None and (
             self.owner_workspace_id is None
             or self.owner_content_id is None
-            or self.purpose != DocumentAttachmentPurpose.ATTACHMENT
         ):
             raise ValidationError(
-                "Repository-owned attachments require a Workspace, content ID, and ordinary file role"
+                "Repository-owned attachments require a Workspace and content ID"
             )
         document = self.document if self.document_id else None
         if document is not None and (
@@ -4759,6 +4758,8 @@ class DocumentAttachment(TimestampedModel):
             replaced = self.replaces if self.replaces_id else None
             if replaced is not None and (
                 replaced.document_id != self.document_id
+                or replaced.owner_workspace_id != self.owner_workspace_id
+                or replaced.owner_content_id != self.owner_content_id
                 or replaced.tenant_id != self.tenant_id
                 or replaced.organization_id != self.organization_id
                 or replaced.purpose != DocumentAttachmentPurpose.PRIMARY_FILE

@@ -142,6 +142,45 @@ def create_repository_document_attachment(
     )
 
 
+class RepositoryPrimaryFileConflict(Exception):
+    """The requested primary-file predecessor is no longer current."""
+
+
+@transaction.atomic
+def append_repository_primary_document_file(
+    *, repository: WorkspaceRepository, content_id: UUID, actor_id: UUID,
+    upload: UploadedFile, expected_current_entity_id: UUID | None,
+) -> DocumentAttachment:
+    """Append a scanned version for one accepted Git-only document."""
+    locked_repository = WorkspaceRepository.objects.select_for_update().get(pk=repository.pk)
+    versions = DocumentAttachment.objects.select_for_update().filter(
+        tenant=locked_repository.tenant,
+        organization=locked_repository.workspace.organization,
+        owner_workspace=locked_repository.workspace,
+        owner_content_id=content_id,
+        document__isnull=True,
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        archived_at__isnull=True,
+    )
+    current = versions.order_by("-version_number", "-created_at").first()
+    if (current.entity_id if current else None) != expected_current_entity_id:
+        raise RepositoryPrimaryFileConflict("The current primary-file version changed.")
+    if current is not None:
+        copy_attachment_content(current)
+    return _create_managed_attachment(
+        tenant=locked_repository.tenant,
+        organization=locked_repository.workspace.organization,
+        workspace=locked_repository.workspace,
+        content_id=content_id,
+        document=None,
+        actor_id=actor_id,
+        upload=upload,
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        version_number=(current.version_number or 0) + 1 if current else 1,
+        replaces=current,
+    )
+
+
 def _create_managed_attachment(
     *, tenant: Tenant, organization: Organization | None, workspace: Workspace, content_id: UUID,
     document: Document | None,
@@ -149,8 +188,6 @@ def _create_managed_attachment(
     purpose: str = DocumentAttachmentPurpose.ATTACHMENT,
     version_number: int | None = None, replaces: DocumentAttachment | None = None,
 ) -> DocumentAttachment:
-    if document is None and purpose != DocumentAttachmentPurpose.ATTACHMENT:
-        raise ValidationError("Repository documents support ordinary attachments only.")
     validated = validate_attachment_upload(upload)
     attachment_id = uuid4()
     attachment_entity_id = entity_id or uuid4()
@@ -302,6 +339,7 @@ def repository_attachment_archive_eligible(
     """
     if (
         attachment.document_id is not None
+        or attachment.purpose != DocumentAttachmentPurpose.ATTACHMENT
         or attachment.tenant_id != repository.tenant_id
         or attachment.owner_workspace_id != repository.workspace_id
         or attachment.organization_id != repository.workspace.organization_id

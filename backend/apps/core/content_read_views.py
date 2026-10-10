@@ -20,7 +20,7 @@ from .content_index_models import ContentNode
 from .content_read import document_collection, document_detail, entity_documentation, repository_for_reader
 from .document_exports import export_docx, export_html
 from .document_views import _msp_workspace, _organization_workspace, attachment_download_response
-from .models import AuditEvent, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
+from .models import AuditEvent, DocumentAttachment, WorkspaceRepository
 from .rendering import render_pdf
 from .workspaces import ResolvedWorkspace
 
@@ -202,7 +202,6 @@ def _download_document_attachment(
                 document__isnull=True,
                 archived_at__isnull=True,
                 scan_status="clean",
-                purpose=DocumentAttachmentPurpose.ATTACHMENT,
             ),
             entity_id=attachment_entity_id,
         )

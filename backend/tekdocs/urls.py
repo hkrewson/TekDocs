@@ -85,12 +85,14 @@ from apps.core.content_authoring_views import (
     MSPContentAuthoringAttachmentDetailView,
     MSPContentAuthoringAttachmentView,
     MSPContentAuthoringExportView,
+    MSPContentAuthoringPrimaryFileView,
     MSPContentAuthoringSourceView,
     MSPContentAuthoringView,
     MSPContentPathResolveView,
     OrganizationContentAuthoringAttachmentDetailView,
     OrganizationContentAuthoringAttachmentView,
     OrganizationContentAuthoringExportView,
+    OrganizationContentAuthoringPrimaryFileView,
     OrganizationContentAuthoringSourceView,
     OrganizationContentAuthoringView,
     OrganizationContentPathResolveView,
@@ -591,6 +593,11 @@ urlpatterns = [
         name="msp-content-authoring-attachment-archive",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/primary-file",
+        MSPContentAuthoringPrimaryFileView.as_view(),
+        name="msp-content-authoring-primary-file",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/resolve-path",
         MSPContentPathResolveView.as_view(),
         name="msp-content-resolve-path",
@@ -734,6 +741,11 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/attachments/<uuid:attachment_entity_id>",
         OrganizationContentAuthoringAttachmentDetailView.as_view(),
         name="organization-content-authoring-attachment-archive",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/primary-file",
+        OrganizationContentAuthoringPrimaryFileView.as_view(),
+        name="organization-content-authoring-primary-file",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/resolve-path",

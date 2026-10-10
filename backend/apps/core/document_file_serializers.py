@@ -12,6 +12,10 @@ class DocumentAttachmentWriteSerializer(serializers.Serializer):
     file = serializers.FileField()
 
 
+class RepositoryPrimaryFileWriteSerializer(DocumentAttachmentWriteSerializer):
+    expected_current_id = serializers.UUIDField(required=False, allow_null=True, default=None)
+
+
 class DocumentAttachmentSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
     filename = serializers.CharField(source="original_filename")

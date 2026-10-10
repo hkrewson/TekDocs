@@ -28,12 +28,19 @@ from .content_index import ContentIndexValidationError
 from .content_index_models import ContentNode
 from .content_read import repository_for_reader
 from .document_attachments import (
+    RepositoryPrimaryFileConflict,
+    append_repository_primary_document_file,
     archive_document_attachment,
     copy_attachment_content,
     create_repository_document_attachment,
     repository_attachment_archive_eligible,
 )
-from .document_file_serializers import DocumentAttachmentSerializer, DocumentAttachmentWriteSerializer
+from .document_file_serializers import (
+    DocumentAttachmentSerializer,
+    DocumentAttachmentWriteSerializer,
+    DocumentPrimaryFileSerializer,
+    RepositoryPrimaryFileWriteSerializer,
+)
 from .document_views import _msp_workspace, _organization_workspace
 from .models import AuditEvent, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
 from .repository_editable_bundles import RepositoryEditableBundleError, export_repository_editable_bundle
@@ -106,6 +113,14 @@ class RepositoryAttachmentStatusSerializer(serializers.Serializer):
 
 class RepositoryAttachmentPageSerializer(serializers.Serializer):
     results = RepositoryAttachmentStatusSerializer(many=True)
+    count = serializers.IntegerField()
+    page = serializers.IntegerField()
+    page_size = serializers.IntegerField()
+    has_more = serializers.BooleanField()
+
+
+class RepositoryPrimaryFilePageSerializer(serializers.Serializer):
+    results = DocumentPrimaryFileSerializer(many=True)
     count = serializers.IntegerField()
     page = serializers.IntegerField()
     page_size = serializers.IntegerField()
@@ -239,7 +254,7 @@ def _locked_attachment_repository(workspace: ResolvedWorkspace, content_id: UUID
             pk=repository.pk, tenant=workspace.member.tenant, workspace=repository.workspace
         )
     )
-    get_object_or_404(
+    node = get_object_or_404(
         ContentNode.objects.filter(
             tenant=workspace.member.tenant,
             organization=workspace.organization,
@@ -249,7 +264,11 @@ def _locked_attachment_repository(workspace: ResolvedWorkspace, content_id: UUID
         ),
         content_id=content_id,
     )
-    if locked.accepted_commit_id is None or locked.accepted_commit_id != locked.indexed_commit_id:
+    if (
+        locked.accepted_commit_id is None
+        or locked.accepted_commit_id != locked.indexed_commit_id
+        or node.indexed_commit_id != locked.indexed_commit_id
+    ):
         raise RepositoryAttachmentIndexPending()
     return locked
 
@@ -366,6 +385,100 @@ class OrganizationContentAuthoringAttachmentDetailView(APIView):
     )
     def delete(self, request, organization_entity_id, content_id, attachment_entity_id):  # type: ignore[no-untyped-def]
         return _archive_native_attachment(request, content_id, attachment_entity_id, organization_entity_id)
+
+
+def _primary_versions(request, content_id: UUID, organization_entity_id: UUID | None = None) -> Response:  # type: ignore[no-untyped-def]
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+    query = RepositoryAttachmentQuerySerializer(data=request.query_params)
+    query.is_valid(raise_exception=True)
+    page = query.validated_data["page"]
+    page_size = 25
+    with transaction.atomic():
+        repository = _locked_attachment_repository(workspace, content_id)
+        records = DocumentAttachment.objects.filter(
+            tenant=repository.tenant,
+            organization=repository.workspace.organization,
+            owner_workspace=repository.workspace,
+            owner_content_id=content_id,
+            document__isnull=True,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            archived_at__isnull=True,
+        ).select_related("replaces", "replaces__entity").order_by("-version_number", "id")
+        count = records.count()
+        selected = list(records[(page - 1) * page_size:page * page_size])
+        for version in selected:
+            version.is_current = version.version_number == count  # type: ignore[attr-defined]
+        return Response(RepositoryPrimaryFilePageSerializer({
+            "results": selected,
+            "count": count,
+            "page": page,
+            "page_size": page_size,
+            "has_more": page * page_size < count,
+        }).data)
+
+
+def _append_primary_version(
+    request: Request, content_id: UUID, organization_entity_id: UUID | None = None
+) -> Response:
+    workspace = _workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT)
+    serializer = RepositoryPrimaryFileWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    try:
+        repository = repository_for_reader(workspace)
+    except WorkspaceRepository.DoesNotExist:
+        return Response({"detail": "Repository document is unavailable"}, status=404)
+    try:
+        version = append_repository_primary_document_file(
+            repository=repository,
+            content_id=content_id,
+            actor_id=request.user.id,
+            upload=serializer.validated_data["file"],
+            expected_current_entity_id=serializer.validated_data["expected_current_id"],
+        )
+    except RepositoryPrimaryFileConflict as exc:
+        return Response({"detail": str(exc)}, status=409)
+    version.is_current = True  # type: ignore[attr-defined]
+    return Response(DocumentPrimaryFileSerializer(version).data, status=201)
+
+
+class MSPContentAuthoringPrimaryFileView(APIView):
+    parser_classes = (MultiPartParser,)
+
+    @extend_schema(
+        operation_id="content_authoring_msp_primary_file_versions",
+        parameters=[RepositoryAttachmentQuerySerializer],
+        responses={200: RepositoryPrimaryFilePageSerializer},
+    )
+    def get(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _primary_versions(request, content_id)
+
+    @extend_schema(
+        operation_id="content_authoring_msp_primary_file_append",
+        request=RepositoryPrimaryFileWriteSerializer,
+        responses={201: DocumentPrimaryFileSerializer, 409: OpenApiResponse(description="Current version changed")},
+    )
+    def post(self, request, content_id):  # type: ignore[no-untyped-def]
+        return _append_primary_version(request, content_id)
+
+
+class OrganizationContentAuthoringPrimaryFileView(APIView):
+    parser_classes = (MultiPartParser,)
+
+    @extend_schema(
+        operation_id="content_authoring_organization_primary_file_versions",
+        parameters=[RepositoryAttachmentQuerySerializer],
+        responses={200: RepositoryPrimaryFilePageSerializer},
+    )
+    def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _primary_versions(request, content_id, organization_entity_id)
+
+    @extend_schema(
+        operation_id="content_authoring_organization_primary_file_append",
+        request=RepositoryPrimaryFileWriteSerializer,
+        responses={201: DocumentPrimaryFileSerializer, 409: OpenApiResponse(description="Current version changed")},
+    )
+    def post(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
+        return _append_primary_version(request, content_id, organization_entity_id)
 
 
 def _source_snapshot(request, organization_entity_id: UUID | None = None) -> HttpResponse | Response:  # type: ignore[no-untyped-def]

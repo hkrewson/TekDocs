@@ -27,6 +27,13 @@ storage and publication-evidence identity remain in use. While a legacy
 the file owner too: a copied Git node cannot receive a second,
 repository-native attachment record. Both the upload service and a database
 insert guard enforce this coexistence boundary.
+Git-only documents may also retain append-only primary-file versions. Each
+version is keyed by the same Workspace/content UUID, has a unique version
+number, and names its exact predecessor; a client-supplied predecessor ID is
+checked against the current version before appending. The legacy-document
+overlap guard still applies.
+Once native primary versions exist, downgrading to the earlier ordinary-file
+schema must fail instead of discarding or recasting retained history.
 
 ## Alternatives considered
 

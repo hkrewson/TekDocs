@@ -606,6 +606,11 @@ document owner for each file, and the offline verifier still accepts v1
 bundles. Native owners must exist in the exported Markdown snapshot. This
 closes referenced-file custody in this export, not publication or authority
 parity.
+The supported backup/restore rehearsal now includes an indexed Git document
+with a native managed file alongside a legacy-owned file. It verifies both
+owner descriptors, exact bytes and the editable-bundle digest after an
+independent network-isolated restore. This proves retained native file custody
+for that recovery path, not native publication or legacy authority handoff.
 
 [ADR 0114](../docs/adr/0114-stable-managed-file-content-ownership.md) selects
 the existing attachment table for this transition because signed publication

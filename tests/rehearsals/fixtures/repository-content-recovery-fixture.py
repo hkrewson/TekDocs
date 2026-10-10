@@ -11,9 +11,13 @@ from django.db import transaction
 
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
-from apps.core.document_attachments import copy_attachment_content, create_document_attachment
+from apps.core.document_attachments import (
+    copy_attachment_content,
+    create_document_attachment,
+    create_repository_document_attachment,
+)
 from apps.core.documents import create_document
-from apps.core.models import ContentNode, Document, Organization, WorkspaceKind, WorkspaceRepository
+from apps.core.models import ContentNode, Document, DocumentAttachment, Organization, WorkspaceKind, WorkspaceRepository
 from apps.core.repository_editable_bundle_validation import verify_repository_editable_bundle
 from apps.core.repository_editable_bundles import export_repository_editable_bundle
 from apps.core.repository_manifests import ORGANIZATION_DIRECTORY_PATH
@@ -41,6 +45,8 @@ ORGANIZATION_MARKDOWN = "# Client enrollment\n\nUse this client's device policy.
 PUBLICATION_DOCUMENT_TITLE = "Client setup guide"
 PUBLICATION_ATTACHMENT_NAME = "recovery-guide.txt"
 PUBLICATION_ATTACHMENT_BYTES = b"Client setup instructions retained for recovery.\n"
+NATIVE_ATTACHMENT_NAME = "client-enrollment.txt"
+NATIVE_ATTACHMENT_BYTES = b"Client enrollment instructions retained for recovery.\n"
 
 
 def _repository(owner):
@@ -72,17 +78,21 @@ def _source_snapshot_digest(repository):
     return hashlib.sha256(snapshot.content).hexdigest()
 
 
-def _editable_bundle_digest(repository, attachment):
+def _editable_bundle_digest(repository, attachment, native_attachment):
     bundle = export_repository_editable_bundle(repository)
     manifest = verify_repository_editable_bundle(bundle.content)
     assert manifest["workspace_id"] == str(repository.workspace_id)
     assert manifest["accepted_commit"] == repository.accepted_commit.object_id
-    assert len(manifest["attachments"]) == 1
-    descriptor = manifest["attachments"][0]
-    assert descriptor["id"] == str(attachment.entity_id)
-    assert descriptor["owner"] == {"type": "legacy_document", "id": str(attachment.document_id)}
-    assert descriptor["sha256"] == hashlib.sha256(PUBLICATION_ATTACHMENT_BYTES).hexdigest()
+    descriptors = {descriptor["id"]: descriptor for descriptor in manifest["attachments"]}
+    assert set(descriptors) == {str(attachment.entity_id), str(native_attachment.entity_id)}
+    legacy_descriptor = descriptors[str(attachment.entity_id)]
+    assert legacy_descriptor["owner"] == {"type": "legacy_document", "id": str(attachment.document_id)}
+    assert legacy_descriptor["sha256"] == hashlib.sha256(PUBLICATION_ATTACHMENT_BYTES).hexdigest()
+    native_descriptor = descriptors[str(native_attachment.entity_id)]
+    assert native_descriptor["owner"] == {"type": "repository_document", "id": str(ORGANIZATION_DOCUMENT_ID)}
+    assert native_descriptor["sha256"] == hashlib.sha256(NATIVE_ATTACHMENT_BYTES).hexdigest()
     assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
+    assert copy_attachment_content(native_attachment) == NATIVE_ATTACHMENT_BYTES
     return hashlib.sha256(bundle.content).hexdigest()
 
 
@@ -159,6 +169,27 @@ def create_organization_fixture(owner, organization):
         metadata_patch={},
     )
     assert document.accepted_commit == document.indexed_commit
+    native_attachment = create_repository_document_attachment(
+        repository=repository,
+        content_id=ORGANIZATION_DOCUMENT_ID,
+        actor_id=owner.id,
+        upload=SimpleUploadedFile(NATIVE_ATTACHMENT_NAME, NATIVE_ATTACHMENT_BYTES),
+    )
+    native_source = author_content(
+        repository=repository,
+        actor_id=owner.id,
+        request_id=None,
+        operation="update",
+        content_id=ORGANIZATION_DOCUMENT_ID,
+        base_commit=document.accepted_commit,
+        base_blob=document.source_blob,
+        kind=None,
+        path=None,
+        title=None,
+        markdown=f"{ORGANIZATION_MARKDOWN}\n[Enrollment](tekdocs://attachment/{native_attachment.entity_id})\n",
+        metadata_patch={},
+    )
+    assert native_source.accepted_commit == native_source.indexed_commit
     legacy_document = create_document(
         tenant=repository.tenant,
         organization=organization,
@@ -177,7 +208,7 @@ def create_organization_fixture(owner, organization):
         request_id=None,
         operation="create",
         content_id=legacy_document.id,
-        base_commit=document.accepted_commit,
+        base_commit=native_source.accepted_commit,
         base_blob=None,
         kind="document",
         path=None,
@@ -186,7 +217,7 @@ def create_organization_fixture(owner, organization):
         metadata_patch={},
     )
     assert publication_source.accepted_commit == publication_source.indexed_commit
-    return attachment
+    return attachment, native_attachment
 
 
 def verify_fixture(owner):
@@ -226,10 +257,19 @@ def verify_fixture(owner):
 def verify_organization_fixture(owner, organization, directory_entry):
     repository = _organization_repository(owner, organization)
     document = read_authored_content(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID)
-    assert document.markdown == ORGANIZATION_MARKDOWN
+    native_attachment = DocumentAttachment.objects.get(
+        tenant=repository.tenant,
+        organization=organization,
+        document__isnull=True,
+        owner_workspace=repository.workspace,
+        owner_content_id=ORGANIZATION_DOCUMENT_ID,
+        original_filename=NATIVE_ATTACHMENT_NAME,
+    )
+    expected_markdown = f"{ORGANIZATION_MARKDOWN}\n[Enrollment](tekdocs://attachment/{native_attachment.entity_id})\n"
+    assert document.markdown == expected_markdown
     assert document.accepted_commit == document.indexed_commit
     assert ContentNode.objects.get(repository=repository, content_id=ORGANIZATION_DOCUMENT_ID).markdown == (
-        ORGANIZATION_MARKDOWN
+        expected_markdown
     )
     legacy_document = Document.objects.get(
         tenant=repository.tenant,
@@ -244,7 +284,7 @@ def verify_organization_fixture(owner, organization, directory_entry):
     assert directory_entry["repository_id"] == str(repository.id)
     assert directory_entry["workspace_id"] == str(repository.workspace_id)
     _assert_absent(repository=repository, content_id=DOCUMENT_ID)
-    return attachment
+    return attachment, native_attachment
 
 
 owner = User.objects.get(email=OWNER_EMAIL)
@@ -276,10 +316,10 @@ with transaction.atomic():
         principal_mode=RLSPrincipalMode.USER,
     )
     if mode == "create":
-        attachment = create_organization_fixture(owner, organization)
+        attachment, native_attachment = create_organization_fixture(owner, organization)
         organization_repository = _organization_repository(owner, organization)
         organization_snapshot_digest = _source_snapshot_digest(organization_repository)
-        organization_editable_digest = _editable_bundle_digest(organization_repository, attachment)
+        organization_editable_digest = _editable_bundle_digest(organization_repository, attachment, native_attachment)
         print(f"MSP_SOURCE_SHA256={msp_snapshot_digest}")
         print(f"ORGANIZATION_SOURCE_SHA256={organization_snapshot_digest}")
         print(f"ORGANIZATION_EDITABLE_SHA256={organization_editable_digest}")
@@ -301,10 +341,12 @@ with transaction.atomic():
             assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
             print("Disposable managed-file custody repaired")
         else:
-            attachment = verify_organization_fixture(owner, organization, directory_entry)
+            attachment, native_attachment = verify_organization_fixture(owner, organization, directory_entry)
             organization_repository = _organization_repository(owner, organization)
             organization_snapshot_digest = _source_snapshot_digest(organization_repository)
-            organization_editable_digest = _editable_bundle_digest(organization_repository, attachment)
+            organization_editable_digest = _editable_bundle_digest(
+                organization_repository, attachment, native_attachment
+            )
             assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
             assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]
             assert organization_editable_digest == os.environ["TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256"]

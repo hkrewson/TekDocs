@@ -9619,6 +9619,8 @@ paths:
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
+      description: The editable option returns a v3 bundle with referenced managed
+        files and retained Git-owned primary-file versions. It is not a complete backup.
       parameters:
       - in: query
         name: bundle
@@ -19961,6 +19963,8 @@ paths:
   /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export:
     get:
       operationId: content_authoring_organization_export
+      description: The editable option returns a v3 bundle with referenced managed
+        files and retained Git-owned primary-file versions. It is not a complete backup.
       parameters:
       - in: query
         name: bundle

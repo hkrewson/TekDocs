@@ -1890,8 +1890,9 @@ missing or altered bytes report divergence. This diagnostic guard does not
 switch document authority or close the remaining file parity gates.
 It also re-reads the copied Markdown from the accepted Git revision, so a
 missing or altered Git source cannot pass merely because indexed rows still
-match the legacy export. The referenced-file editable bundle and offline
-verifier are implemented; database records, Git history and unreferenced files
+match the legacy export. The editable bundle and offline verifier now also
+cover retained Git-owned primary-file chains; database records, Git history and
+other unreferenced files
 remain outside that editing handoff, not outside the separate backup path.
 Repository-native managed-file use is still incomplete: publication preflight
 requires a legacy `Document` row.

@@ -496,6 +496,7 @@ def _source_snapshot(request, organization_entity_id: UUID | None = None) -> Htt
                 "accepted_commit": accepted_commit,
                 "file_count": bundle.source_file_count,
                 "attachment_count": bundle.attachment_count,
+                "primary_file_count": bundle.primary_file_count,
             }
         else:
             snapshot = export_repository_sources(repository)
@@ -527,6 +528,8 @@ def _source_snapshot(request, organization_entity_id: UUID | None = None) -> Htt
 class MSPContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_msp_export",
+        description=("The editable option returns a v3 bundle with referenced managed files and retained "
+                     "Git-owned primary-file versions. It is not a complete backup."),
         parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,
@@ -542,6 +545,8 @@ class MSPContentAuthoringExportView(APIView):
 class OrganizationContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_organization_export",
+        description=("The editable option returns a v3 bundle with referenced managed files and retained "
+                     "Git-owned primary-file versions. It is not a complete backup."),
         parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,

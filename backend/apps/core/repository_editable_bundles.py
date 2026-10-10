@@ -23,7 +23,8 @@ from .repository_source_validation import RepositorySourceValidationError, verif
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 MAX_EDITABLE_BUNDLE_BYTES = 75 * 1024 * 1024
-BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v2"
+BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v3"
+OWNER_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v2"
 LEGACY_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v1"
 
 
@@ -37,6 +38,7 @@ class RepositoryEditableBundle:
     accepted_commit: str
     source_file_count: int
     attachment_count: int
+    primary_file_count: int
 
 
 def referenced_source_attachments(source_content: bytes) -> tuple[dict[str, object], set[UUID], set[UUID]]:
@@ -76,7 +78,19 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
         source_manifest, referenced, source_document_ids = referenced_source_attachments(source.content)
     except (RepositorySourceExportError, RepositorySourceValidationError) as exc:
         raise RepositoryEditableBundleError("The repository source snapshot is unavailable.") from exc
-    if len(referenced) > MAX_BUNDLE_ATTACHMENTS:
+    primary_versions = list(
+        DocumentAttachment.objects.filter(
+            tenant_id=repository.tenant_id,
+            organization=repository.workspace.organization,
+            owner_workspace_id=repository.workspace_id,
+            owner_content_id__in=source_document_ids,
+            document__isnull=True,
+            archived_at__isnull=True,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            scan_status="clean",
+        ).order_by("owner_content_id", "version_number")
+    )
+    if len(referenced) + len(primary_versions) > MAX_BUNDLE_ATTACHMENTS:
         raise RepositoryEditableBundleError("The editable bundle exceeds its managed-file limit.")
     attachments = list(
         DocumentAttachment.objects.select_related("document")
@@ -139,6 +153,39 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
                 "sha256": hashlib.sha256(content).hexdigest(),
             }
         )
+    primary_descriptors: list[dict[str, object]] = []
+    previous_by_owner: dict[UUID, DocumentAttachment] = {}
+    for record in primary_versions:
+        owner_id = record.owner_content_id
+        if owner_id is None or owner_id not in source_document_ids:
+            raise RepositoryEditableBundleError("A primary file has an invalid repository owner.")
+        previous = previous_by_owner.get(owner_id)
+        expected_version = (previous.version_number or 0) + 1 if previous else 1
+        if record.version_number != expected_version:
+            raise RepositoryEditableBundleError("A primary-file version chain is incomplete.")
+        if record.replaces_id != (previous.id if previous else None):
+            raise RepositoryEditableBundleError("A primary-file version chain is invalid.")
+        if not record.file.name or record.size > MAX_BUNDLE_ATTACHMENT_BYTES - total:
+            raise RepositoryEditableBundleError("The editable bundle exceeds its managed-file limit.")
+        try:
+            content = copy_attachment_content(record)
+        except (AttachmentSecurityError, ValidationError) as exc:
+            raise RepositoryEditableBundleError("A primary file failed its integrity check.") from exc
+        total += len(content)
+        path = f"primary-files/{record.entity_id}"
+        files[path] = content
+        primary_descriptors.append({
+            "id": str(record.entity_id),
+            "owner_content_id": str(owner_id),
+            "version_number": record.version_number,
+            "replaces_id": str(previous.entity_id) if previous else None,
+            "path": path,
+            "filename": record.original_filename,
+            "media_type": record.media_type,
+            "size": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+        })
+        previous_by_owner[owner_id] = record
     repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
     accepted_commit = repository.accepted_commit
     if (
@@ -152,18 +199,20 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
         "workspace_id": str(repository.workspace_id),
         "accepted_commit": source.accepted_commit,
         "source_sha256": hashlib.sha256(source.content).hexdigest(),
-        "scope": "current-and-reachable-historical-markdown-with-referenced-files",
-        "exclusions": ["database_records", "git_history", "unreferenced_managed_files"],
+        "scope": "current-and-reachable-historical-markdown-with-referenced-and-primary-files",
+        "exclusions": ["database_records", "git_history", "other_unreferenced_managed_files"],
         "attachments": descriptors,
+        "primary_files": primary_descriptors,
     }
     if manifest["workspace_id"] != source_manifest["workspace_id"]:
         raise RepositoryEditableBundleError("The source Workspace changed during export.")
     files["tekdocs-bundle.json"] = (json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n").encode()
     files["README.md"] = (
         b"# TekDocs editable repository bundle\n\n"
-        b"Contains an exact Markdown source snapshot and every managed file referenced by its current "
-        b"or reachable historical Markdown. This is unsanitized and is not a backup: database records, "
-        b"Git history, and unreferenced managed files are excluded. Review before sharing.\n"
+        b"Contains an exact Markdown source snapshot, managed files referenced by its current or reachable "
+        b"historical Markdown, and retained Git-owned primary-file versions. This is unsanitized and is not a backup: "
+        b"database records, Git history, and other unreferenced managed files are excluded. "
+        b"Review before sharing.\n"
     )
     content = _archive(files)
     if len(content) > MAX_EDITABLE_BUNDLE_BYTES:
@@ -173,4 +222,5 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
         accepted_commit=source.accepted_commit,
         source_file_count=source.file_count,
         attachment_count=len(attachments),
+        primary_file_count=len(primary_versions),
     )

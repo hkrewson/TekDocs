@@ -832,7 +832,19 @@ def test_editable_bundle_includes_exact_referenced_file_and_verifies_offline(aut
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             assert archive.read(f"attachments/{attachment.entity_id}") == b"Exact managed bytes"
             entries = {name: archive.read(name) for name in archive.namelist()}
-        legacy_manifest = {**manifest, "format": "tekdocs-repository-editable-bundle/v1"}
+        owner_manifest = {key: value for key, value in manifest.items() if key != "primary_files"}
+        owner_manifest["format"] = "tekdocs-repository-editable-bundle/v2"
+        owner_manifest["scope"] = "current-and-reachable-historical-markdown-with-referenced-files"
+        owner_manifest["exclusions"] = ["database_records", "git_history", "unreferenced_managed_files"]
+        owner_entries = dict(entries)
+        owner_entries["tekdocs-bundle.json"] = (
+            json.dumps(owner_manifest, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        assert verify_repository_editable_bundle(_archive(owner_entries))["format"] == owner_manifest["format"]
+        legacy_manifest = {key: value for key, value in manifest.items() if key != "primary_files"}
+        legacy_manifest["format"] = "tekdocs-repository-editable-bundle/v1"
+        legacy_manifest["scope"] = owner_manifest["scope"]
+        legacy_manifest["exclusions"] = owner_manifest["exclusions"]
         legacy_manifest["attachments"] = [
             {**{key: value for key, value in item.items() if key != "owner"}, "document_id": item["owner"]["id"]}
             for item in manifest["attachments"]
@@ -885,7 +897,7 @@ def test_editable_bundle_includes_native_file_from_current_git_source(authoring_
         response = browser.get(url)
         assert response.status_code == 200, response.content
         manifest = verify_repository_editable_bundle(response.content)
-        assert manifest["format"] == "tekdocs-repository-editable-bundle/v2"
+        assert manifest["format"] == "tekdocs-repository-editable-bundle/v3"
         assert manifest["attachments"][0]["owner"] == {
             "type": "repository_document", "id": str(document.content_id),
         }
@@ -904,6 +916,66 @@ def test_editable_bundle_includes_native_file_from_current_git_source(authoring_
         attachment.file.storage.delete(attachment.file.name)
         assert browser.get(url).status_code == 409
         assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
+
+
+def test_editable_bundle_retains_git_primary_file_chain_and_rejects_tampering(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository, title="File-backed runbook")
+    browser = Client()
+    browser.force_login(installation.owner)
+    primary_url = reverse("msp-content-authoring-primary-file", args=[document.content_id])
+    export_url = reverse("msp-content-authoring-export") + "?bundle=editable"
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        first = browser.post(primary_url, {"file": SimpleUploadedFile("first.txt", b"Original version\n")})
+        assert first.status_code == 201, first.content
+        first_id = first.json()["id"]
+        second = browser.post(primary_url, {
+            "file": SimpleUploadedFile("second.txt", b"Replacement version\n"),
+            "expected_current_id": first_id,
+        })
+        assert second.status_code == 201, second.content
+        second_id = second.json()["id"]
+        response = browser.get(export_url)
+        assert response.status_code == 200, response.content
+        manifest = verify_repository_editable_bundle(response.content)
+        assert manifest["attachments"] == []
+        assert [(item["id"], item["version_number"], item["replaces_id"]) for item in manifest["primary_files"]] == [
+            (first_id, 1, None), (second_id, 2, first_id),
+        ]
+        assert {item["owner_content_id"] for item in manifest["primary_files"]} == {str(document.content_id)}
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            assert archive.read(f"primary-files/{first_id}") == b"Original version\n"
+            assert archive.read(f"primary-files/{second_id}") == b"Replacement version\n"
+            entries = {name: archive.read(name) for name in archive.namelist()}
+
+        def forged_bundle(change):
+            changed = dict(entries)
+            altered_manifest = json.loads(changed["tekdocs-bundle.json"])
+            change(changed, altered_manifest)
+            changed["tekdocs-bundle.json"] = (
+                json.dumps(altered_manifest, sort_keys=True, separators=(",", ":")) + "\n"
+            ).encode()
+            return _archive(changed)
+
+        with pytest.raises(RepositoryEditableBundleValidationError, match="version chain"):
+            verify_repository_editable_bundle(forged_bundle(
+                lambda _entries, value: value["primary_files"][1].update({"replaces_id": None})
+            ))
+        with pytest.raises(RepositoryEditableBundleValidationError, match="version chain"):
+            verify_repository_editable_bundle(forged_bundle(
+                lambda _entries, value: value["primary_files"][0].update({"owner_content_id": str(uuid.uuid4())})
+            ))
+        with pytest.raises(RepositoryEditableBundleValidationError, match="checksum"):
+            verify_repository_editable_bundle(forged_bundle(
+                lambda changed, _value: changed.update({f"primary-files/{first_id}": b"Xriginal version\n"})
+            ))
+        with pytest.raises(RepositoryEditableBundleValidationError, match="unlisted"):
+            verify_repository_editable_bundle(forged_bundle(
+                lambda _entries, value: value["primary_files"].pop()
+            ))
+        first_record = DocumentAttachment.objects.get(entity_id=first_id)
+        first_record.file.storage.delete(first_record.file.name)
+        assert browser.get(export_url).status_code == 409
 
 
 def test_editable_bundle_rejects_extra_file_bytes(authoring_context):

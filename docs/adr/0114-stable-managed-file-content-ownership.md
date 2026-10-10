@@ -34,6 +34,9 @@ checked against the current version before appending. The legacy-document
 overlap guard still applies.
 Once native primary versions exist, downgrading to the earlier ordinary-file
 schema must fail instead of discarding or recasting retained history.
+The editable repository bundle includes retained native primary-file history
+in a versioned manifest with exact owner, predecessor and checksum checks.
+It remains an editing handoff, not a replacement for database-and-Git backups.
 
 ## Alternatives considered
 

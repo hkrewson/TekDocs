@@ -16,6 +16,7 @@ from .repository_editable_bundles import (
     MAX_BUNDLE_ATTACHMENT_BYTES,
     MAX_BUNDLE_ATTACHMENTS,
     MAX_EDITABLE_BUNDLE_BYTES,
+    OWNER_BUNDLE_FORMAT,
     referenced_source_attachments,
 )
 from .repository_source_exports import MAX_SOURCE_ZIP_BYTES
@@ -68,14 +69,25 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
             ):
                 raise RepositoryEditableBundleValidationError("The bundle has an oversized or missing entry.")
             manifest = json.loads(archive.read("tekdocs-bundle.json"))
-            if not isinstance(manifest, dict) or set(manifest) != {
+            common_manifest_fields = {
                 "format", "workspace_id", "accepted_commit", "source_sha256", "scope", "exclusions", "attachments"
-            }:
+            }
+            if not isinstance(manifest, dict) or set(manifest) != (
+                common_manifest_fields | ({"primary_files"} if manifest.get("format") == BUNDLE_FORMAT else set())
+            ):
                 raise RepositoryEditableBundleValidationError("The bundle manifest has an invalid shape.")
             if (
-                manifest["format"] not in {BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT}
-                or manifest["scope"] != "current-and-reachable-historical-markdown-with-referenced-files"
-                or manifest["exclusions"] != ["database_records", "git_history", "unreferenced_managed_files"]
+                manifest["format"] not in {BUNDLE_FORMAT, OWNER_BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT}
+                or manifest["scope"] != (
+                    "current-and-reachable-historical-markdown-with-referenced-and-primary-files"
+                    if manifest["format"] == BUNDLE_FORMAT
+                    else "current-and-reachable-historical-markdown-with-referenced-files"
+                )
+                or manifest["exclusions"] != [
+                    "database_records", "git_history",
+                    "other_unreferenced_managed_files" if manifest["format"] == BUNDLE_FORMAT
+                    else "unreferenced_managed_files",
+                ]
                 or not isinstance(manifest["source_sha256"], str)
                 or _SHA256.fullmatch(manifest["source_sha256"]) is None
             ):
@@ -144,6 +156,59 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
                     raise RepositoryEditableBundleValidationError("A managed-file checksum differs.")
             if declared_ids != sorted(set(referenced), key=str):
                 raise RepositoryEditableBundleValidationError("The bundle managed-file closure differs from Markdown.")
+            primary_descriptors = manifest.get("primary_files", [])
+            if (
+                not isinstance(primary_descriptors, list)
+                or len(primary_descriptors) + len(descriptors) > MAX_BUNDLE_ATTACHMENTS
+            ):
+                raise RepositoryEditableBundleValidationError("The bundle primary-file inventory is invalid.")
+            previous_by_owner: dict[UUID, tuple[int, UUID]] = {}
+            primary_order: list[tuple[UUID, int]] = []
+            primary_ids: set[UUID] = set()
+            for descriptor in primary_descriptors:
+                if not isinstance(descriptor, dict) or set(descriptor) != {
+                    "id", "owner_content_id", "version_number", "replaces_id", "path",
+                    "filename", "media_type", "size", "sha256",
+                }:
+                    raise RepositoryEditableBundleValidationError("The bundle has an invalid primary-file descriptor.")
+                owner_id = _uuid(descriptor["owner_content_id"])
+                file_id = _uuid(descriptor["id"])
+                previous = previous_by_owner.get(owner_id)
+                version = descriptor["version_number"]
+                if (
+                    owner_id not in source_document_ids
+                    or file_id in primary_ids
+                    or type(version) is not int
+                    or version != (previous[0] + 1 if previous else 1)
+                    or descriptor["replaces_id"] != (str(previous[1]) if previous else None)
+                ):
+                    raise RepositoryEditableBundleValidationError("The bundle primary-file version chain is invalid.")
+                path = f"primary-files/{file_id}"
+                if (
+                    descriptor["path"] != path
+                    or path in expected
+                    or not isinstance(descriptor["filename"], str)
+                    or not 0 < len(descriptor["filename"]) <= 240
+                    or not isinstance(descriptor["media_type"], str)
+                    or not 0 < len(descriptor["media_type"]) <= 120
+                    or type(descriptor["size"]) is not int
+                    or descriptor["size"] < 0
+                    or not isinstance(descriptor["sha256"], str)
+                    or _SHA256.fullmatch(descriptor["sha256"]) is None
+                    or sizes.get(path) != descriptor["size"]
+                ):
+                    raise RepositoryEditableBundleValidationError("The bundle has an invalid primary-file descriptor.")
+                total += descriptor["size"]
+                if total > MAX_BUNDLE_ATTACHMENT_BYTES:
+                    raise RepositoryEditableBundleValidationError("The bundle exceeds its managed-file limit.")
+                if hashlib.sha256(archive.read(path)).hexdigest() != descriptor["sha256"]:
+                    raise RepositoryEditableBundleValidationError("A primary-file checksum differs.")
+                expected.add(path)
+                primary_ids.add(file_id)
+                primary_order.append((owner_id, version))
+                previous_by_owner[owner_id] = (version, file_id)
+            if primary_order != sorted(primary_order):
+                raise RepositoryEditableBundleValidationError("The bundle primary-file inventory is unordered.")
             if set(names) != expected:
                 raise RepositoryEditableBundleValidationError("The bundle has an unlisted or missing entry.")
             archive.read("README.md")

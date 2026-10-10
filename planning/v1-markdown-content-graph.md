@@ -443,8 +443,9 @@ gates after file, template, review, key, publication and recovery parity.
 - Update editable exports, sanitized Git exports, templates, monitored sources,
   client listings and portal reads for the content graph.
 - The repository editable bundle now carries referenced legacy and Git-owned
-  managed files in a v2 typed-owner manifest. Offline validation checks the
-  exact file closure and accepts older v1 bundles; this remains an unsanitized
+  managed files plus retained Git-owned primary-file versions in a v3 manifest.
+  Offline validation checks the exact referenced-file closure and primary-file
+  chain, while accepting older v1/v2 bundles; this remains an unsanitized
   editing handoff, not a backup or authority transition.
 - Sanitized Git export now accepts an optional complete, exact accepted and
   indexed repository Markdown snapshot for one Workspace. It removes known
@@ -619,11 +620,12 @@ existing owner checks; signed file evidence and client delivery use the same
 retained artifact IDs. This closes that native publication-file path, not all
 publication or authority parity.
 The editable bundle now verifies bytes of referenced, same-Workspace legacy
-and Git-owned files. Its v2 manifest identifies the legacy or repository
-document owner for each file, and the offline verifier still accepts v1
-bundles. Native owners must exist in the exported Markdown snapshot. This
-closes referenced-file custody in this export, not publication or authority
-parity.
+and Git-owned files. Its v3 manifest identifies the legacy or repository
+document owner for each referenced file and includes the complete retained
+primary-file chain of each Git-owned document in the source snapshot. The
+offline verifier still accepts v1/v2 bundles. Native owners must exist in the
+exported Markdown snapshot. This closes native file custody in this export,
+not publication, legacy-chain transfer, backup or authority parity.
 The supported backup/restore rehearsal now includes an indexed Git document
 with a native managed file alongside a legacy-owned file. It verifies both
 owner descriptors, exact bytes and the editable-bundle digest after an

@@ -47,10 +47,12 @@ from apps.core.models import (
     WorkspaceKind,
 )
 from apps.core.organizations import create_organization
+from apps.core.publications import publish_document
 from apps.core.repository_service import RepositoryServiceError
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.topic_schemas import inspect_markdown
+from apps.core.workspaces import resolve_msp_workspace
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -495,6 +497,54 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         browser.force_login(installation.owner)
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": primary.entity_id})
         assert "primary_file_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
+
+
+def test_migration_status_identifies_retained_legacy_publication_history(tmp_path):
+    with override_settings(
+        TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"),
+        MEDIA_ROOT=str(tmp_path / "media"),
+    ):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Published migration MSP",
+            owner_email=f"published-migration-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Published Migration Owner",
+            password="MigrationPassword-2026!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+        repository_storage.ensure_workspace_repository(workspace)
+        index_repository_content(repository_id=workspace.repository.id)
+        document = create_document(
+            tenant=installation.tenant,
+            organization=None,
+            actor_id=installation.owner.id,
+            title="Published notes",
+            markdown="Retained published notes.\n",
+        )
+        publish_document(
+            workspace=resolve_msp_workspace(installation.owner),
+            document=document,
+            actor_id=installation.owner.id,
+            reason="Retain existing publication history",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+        inventory_row = next(
+            item
+            for item in inventory_legacy_documents(workspace)["documents"]
+            if item["document_id"] == str(document.id)
+        )
+        assert "publication_parity_required" in inventory_row["reasons"]
+        browser = Client()
+        browser.force_login(installation.owner)
+        status = browser.get(
+            reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id})
+        )
+        assert status.status_code == 200, status.content
+        assert "legacy_publication_history_present" in status.json()["handoff_blockers"]
+        assert status.json()["legacy_authoritative"] is True
+        assert status.json()["cutover_ready"] is False
 
 
 def test_structured_topic_migration_checks_composed_sections_and_preserves_type(tmp_path):

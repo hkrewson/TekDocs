@@ -33,6 +33,7 @@ from .models import (
     Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
+    DocumentPublication,
     DocumentReviewState,
     Workspace,
     WorkspaceRepository,
@@ -119,6 +120,8 @@ def document_coexistence_status(
         document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
     ).exists():
         blockers.append("primary_file_parity_not_verified")
+    if DocumentPublication.objects.filter(document=document).exists():
+        blockers.append("legacy_publication_history_present")
     if DocumentKeyBinding.objects.filter(document=document, archived_at__isnull=True).exists():
         blockers.append("field_key_authority_not_transferred")
     if (

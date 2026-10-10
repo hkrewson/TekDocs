@@ -583,6 +583,9 @@ gates after file, template, review, key, publication and recovery parity.
   attachment bytes for an otherwise in-sync copy. Changed or missing bytes
   report divergence and suppress the shadow read match until repaired; this
   is not an authority transition or complete file-backed-document parity.
+- Read-only migration status separately identifies existing legacy publication
+  history while retaining the general publication-parity blocker; this does
+  not promote document authority.
 - The same preflight now re-reads each copied Markdown source from the accepted
   Git revision and compares exact bytes with the legacy export. Missing or
   changed Git objects report divergence even when indexed rows still match;

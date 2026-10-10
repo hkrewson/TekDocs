@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -48,7 +49,7 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.publications import publish_document
-from apps.core.repository_service import RepositoryServiceError
+from apps.core.repository_service import RepositoryAuditAttribution, RepositoryServiceError, commit_repository_files
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.topic_schemas import inspect_markdown
@@ -1092,6 +1093,7 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
             == "First section\n\nSecond section\n"
         )
         browser = Client()
+        TOTP.activate(installation.owner, generate_totp_secret())
         browser.force_login(installation.owner)
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id})
         status = browser.get(status_url).json()
@@ -1105,6 +1107,46 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
             "repository_document_writes_not_authoritative",
             "publication_parity_not_verified",
         ]
+        copied_source = read_authored_content(repository=workspace.repository, content_id=document.id)
+        authoring_url = reverse("msp-content-authoring")
+        for operation, changes in (
+            ("create", {"kind": "document", "title": "Replacement", "markdown": "Replacement.\n"}),
+            ("update", {"markdown": "Git-only edit.\n"}),
+            ("move", {"path": "docs/legacy-moved.md"}),
+        ):
+            response = browser.post(
+                authoring_url,
+                data={
+                    "operation": operation,
+                    "content_id": str(document.id),
+                    "base_commit": copied_source.accepted_commit,
+                    "base_blob": copied_source.source_blob if operation != "create" else None,
+                    **changes,
+                },
+                content_type="application/json",
+            )
+            assert response.status_code == 400, response.content
+            assert "Legacy content remains authoritative" in response.json()["detail"]
+            assert read_authored_content(repository=workspace.repository, content_id=document.id) == copied_source
+        copied_fragment = read_authored_content(repository=workspace.repository, content_id=export.blocks[0][0])
+        fragment_response = browser.post(
+            authoring_url,
+            data={
+                "operation": "update",
+                "content_id": str(copied_fragment.content_id),
+                "base_commit": copied_fragment.accepted_commit,
+                "base_blob": copied_fragment.source_blob,
+                "markdown": "Git-only fragment edit.\n",
+            },
+            content_type="application/json",
+        )
+        assert fragment_response.status_code == 400, fragment_response.content
+        assert "Legacy content remains authoritative" in fragment_response.json()["detail"]
+        assert (
+            read_authored_content(repository=workspace.repository, content_id=copied_fragment.content_id)
+            == copied_fragment
+        )
+        assert browser.get(status_url).json()["content_copy_state"] == "in_sync"
         document.review_state = DocumentReviewState.APPROVED
         document.last_reviewed_at = timezone.now()
         document.save(update_fields=("review_state", "last_reviewed_at", "updated_at"))
@@ -1505,20 +1547,20 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
         target_status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": target.entity_id})
         assert browser.get(target_status_url).json()["content_copy_state"] == "in_sync"
         source_authored = read_authored_content(repository=workspace.repository, content_id=source_placement.block_id)
-        author_content(
-            repository=workspace.repository,
-            actor_id=installation.owner.id,
-            request_id=None,
-            operation="update",
-            content_id=source_placement.block_id,
-            base_commit=source_authored.accepted_commit,
-            base_blob=source_authored.source_blob,
-            kind=None,
-            path=None,
-            title=None,
-            markdown="New repository source\n",
-            metadata_patch={},
+        commit_repository_files(
+            repository_id=workspace.repository.id,
+            expected_base=source_authored.accepted_commit,
+            changes={
+                source_authored.path: source_authored.source.replace(
+                    "Original source\n", "New repository source\n"
+                ).encode()
+            },
+            message="Simulate operator edit to copied fragment",
+            attribution=RepositoryAuditAttribution(
+                actor_id=installation.owner.id, action="content.migration_test_operator_edit"
+            ),
         )
+        index_repository_content(repository_id=workspace.repository.id)
         update_document(
             document=source,
             actor_id=installation.owner.id,

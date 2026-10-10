@@ -18,7 +18,7 @@ from .content_index import (
     validate_candidate_snapshot,
 )
 from .content_profile import ALLOWED_FIELDS, CONTENT_SCHEMA, parse_content
-from .models import RepositoryObjectFormat, WorkspaceRepository
+from .models import Block, Document, RepositoryObjectFormat, WorkspaceRepository
 from .repository_service import (
     RepositoryAuditAttribution,
     RepositoryConflictError,
@@ -242,6 +242,13 @@ def author_content(
     if operation not in {"create", "update", "move"}:
         raise ContentAuthoringError("Authoring operation is unsupported")
     _validate_patch(metadata_patch)
+    owner = {
+        "id": content_id,
+        "tenant_id": repository.tenant_id,
+        "organization_id": repository.workspace.organization_id,
+    }
+    if Document.objects.filter(**owner).exists() or Block.objects.filter(**owner).exists():
+        raise ContentAuthoringError("Legacy content remains authoritative; edit it in the legacy editor")
     if title is not None and "title" in metadata_patch:
         raise ContentAuthoringError("Title may be supplied only once")
     current_commit, files = _snapshot(repository)

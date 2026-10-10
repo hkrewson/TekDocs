@@ -586,6 +586,11 @@ gates after file, template, review, key, publication and recovery parity.
 - Read-only migration status separately identifies existing legacy publication
   history while retaining the general publication-parity blocker; this does
   not promote document authority.
+- Managed repository authoring now refuses create, update, and move of an ID
+  still owned by a same-Workspace legacy `Document` or `Block`. Copied document
+  roots and fragments therefore cannot gain a second application writer while
+  legacy writes remain authoritative. Native Git content is unchanged;
+  operator-level repository writes and later authority handoff remain separate.
 - The same preflight now re-reads each copied Markdown source from the accepted
   Git revision and compares exact bytes with the legacy export. Missing or
   changed Git objects report divergence even when indexed rows still match;

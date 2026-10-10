@@ -56,6 +56,41 @@ def test_managed_authoring_does_not_change_legacy_key_bindings():
         _validate_patch({"key_bindings": {"subject": str(uuid.uuid4())}})
 
 
+def test_authoring_legacy_identity_guard_is_workspace_scoped(authoring_context):
+    installation, repository = authoring_context
+    owned = create_document(
+        tenant=installation.tenant,
+        organization=None,
+        actor_id=installation.owner.id,
+        title="Legacy MSP document",
+        markdown="Legacy text.\n",
+    )
+    repository.refresh_from_db()
+    accepted = repository.accepted_commit.object_id if repository.accepted_commit else None
+    with pytest.raises(ContentAuthoringError, match="Legacy content remains authoritative"):
+        _create(installation, repository, content_id=owned.id)
+    repository.refresh_from_db()
+    assert (repository.accepted_commit.object_id if repository.accepted_commit else None) == accepted
+
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Other owner",
+        legal_name="Other owner",
+        website="",
+        classifications=["client"],
+    )
+    foreign = create_document(
+        tenant=installation.tenant,
+        organization=organization,
+        actor_id=installation.owner.id,
+        title="Client legacy document",
+        markdown="Client text.\n",
+    )
+    authored = _create(installation, repository, content_id=foreign.id)
+    assert authored.content_id == foreign.id
+
+
 @pytest.fixture
 def authoring_context(tmp_path):
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
@@ -624,13 +659,23 @@ def test_editable_bundle_includes_exact_referenced_file_and_verifies_offline(aut
             document=document, actor_id=installation.owner.id,
             upload=SimpleUploadedFile("guide.txt", b"Exact managed bytes"),
         )
-        authored = _create(installation, repository, content_id=document.id, title="Bundle guide")
-        source = authored.source.replace(
-            "Initial instructions.\n", f"[Guide](tekdocs://attachment/{attachment.entity_id})\n"
+        # A copied legacy identity cannot be created by normal Git authoring.
+        # Model the operator-level source copy used by this bundle fixture.
+        repository.refresh_from_db()
+        source = (
+            "---\n"
+            "schema: tekdocs.content/v1\n"
+            f"id: {document.id}\n"
+            "kind: document\n"
+            "title: Bundle guide\n"
+            "---\n"
+            f"[Guide](tekdocs://attachment/{attachment.entity_id})\n"
         )
         repository_service.commit_repository_files(
-            repository_id=repository.id, expected_base=authored.accepted_commit,
-            changes={authored.path: source.encode()}, message="Link managed file",
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+            changes={f"docs/{document.id}.md": source.encode()},
+            message="Copy legacy file fixture",
         )
         index_repository_content(repository_id=repository.id)
         browser = Client()

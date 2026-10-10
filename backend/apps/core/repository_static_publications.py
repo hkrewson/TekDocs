@@ -19,7 +19,7 @@ from apps.accounts.policy import PermissionKey, require_permission
 
 from .models import AuditEvent, RepositoryPackageAuthorization, RepositoryStaticPublication
 from .publications import canonical_json, publication_signing_key, publication_trusted_key_fingerprints
-from .repository_publication_packages import verify_repository_publication_package
+from .repository_publication_packages import PRIMARY_PACKAGE_FORMAT, verify_repository_publication_package
 
 STATIC_FORMAT = "tekdocs-repository-static-publication/v1"
 _DOMAIN = b"TEKDOCS-REPOSITORY-STATIC-PUBLICATION\x00v1\x00"
@@ -70,6 +70,7 @@ def verify_repository_static_publication(publication: RepositoryStaticPublicatio
             != (authorization.tenant_id, authorization.organization_id, authorization.workspace_id)
             or (publication.tenant_id, publication.organization_id, publication.workspace_id)
             != (package.tenant_id, package.organization_id, package.workspace_id)
+            or package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT
             or not verify_repository_publication_package(package)
         ):
             return False
@@ -113,6 +114,8 @@ def create_repository_static_publication(
         or not verify_repository_publication_package(package)
     ):
         raise RepositoryStaticPublicationError("Authorized, intact retained package is required")
+    if package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT:
+        raise RepositoryStaticPublicationError("Primary-file STATIC delivery parity is pending")
     publication_id = uuid.uuid4()
     created_at = timezone.now()
     manifest = _manifest(

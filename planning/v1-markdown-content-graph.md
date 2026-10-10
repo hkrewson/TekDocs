@@ -653,9 +653,13 @@ retention. Stale selections, broken history and missing bytes fail closed.
 Signed repository evidence now retains the complete selected primary-file
 version chain and independently copied bytes under a v2 manifest. Reviewers
 can inspect each version and missing or altered retained bytes invalidate the
-whole evidence record. Earlier v1 evidence remains verifiable. Primary-file
-evidence cannot yet be accepted for packaging or distributed: package and
-STATIC delivery parity, plus independent restore verification, remain open.
+whole evidence record. Earlier v1 evidence remains verifiable. Accepted
+primary-file evidence now produces a v2 internal package containing the exact
+selected version and complete retained chain. Package verification rechecks
+the evidence bytes; a missing historical artifact invalidates the package.
+Neither a v2 package nor its authorization can create a STATIC publication:
+STATIC format and delivery parity, plus independent restore verification,
+remain open.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

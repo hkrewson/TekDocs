@@ -69,6 +69,7 @@ from apps.core.notification_email import dispatch_due_notification_emails
 from apps.core.organizations import create_organization
 from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events
 from apps.core.publications import publication_signing_key
+from apps.core.repository_package_authorization import decide_repository_package
 from apps.core.repository_primary_publication import (
     RepositoryPrimaryPublicationError,
     prepare_repository_primary_publication,
@@ -80,14 +81,20 @@ from apps.core.repository_publication_evidence import (
     verify_repository_publication_evidence,
 )
 from apps.core.repository_publication_packages import (
-    RepositoryPublicationPackageError,
     create_repository_publication_package,
     verify_repository_publication_package,
 )
 from apps.core.repository_publication_preflight import repository_publication_preflight
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.repository_static_delivery import _client_reference_projection_safe
-from apps.core.repository_static_publications import verify_repository_static_publication
+from apps.core.repository_static_publications import (
+    RepositoryStaticPublicationError,
+    create_repository_static_publication,
+    verify_repository_static_publication,
+)
+from apps.core.repository_static_publications import (
+    _manifest as static_publication_manifest,
+)
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -2316,7 +2323,7 @@ def test_repository_evidence_retains_primary_file_history(composition_repository
         assert verify_repository_publication_evidence(prior_evidence)["valid"]
 
 
-def test_primary_file_evidence_cannot_be_accepted_or_packaged(composition_repository, tmp_path):
+def test_primary_file_package_retains_chain_but_static_stays_blocked(composition_repository, tmp_path):
     installation, _workspace, _repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         organization = create_organization(
@@ -2335,10 +2342,15 @@ def test_primary_file_evidence_cannot_be_accepted_or_packaged(composition_reposi
             message="Add client primary evidence source",
         )
         index_repository_content(repository_id=repository.id)
-        append_repository_primary_document_file(
+        first = append_repository_primary_document_file(
             repository=repository, content_id=content_id, actor_id=installation.owner.id,
-            upload=SimpleUploadedFile("primary.txt", b"Client primary bytes.\n"),
+            upload=SimpleUploadedFile("primary-v1.txt", b"Client primary version one.\n"),
             expected_current_entity_id=None,
+        )
+        current = append_repository_primary_document_file(
+            repository=repository, content_id=content_id, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("primary-v2.txt", b"Client primary version two.\n"),
+            expected_current_entity_id=first.entity_id,
         )
         Authenticator.objects.create(
             user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
@@ -2354,7 +2366,7 @@ def test_primary_file_evidence_cannot_be_accepted_or_packaged(composition_reposi
         )
         browser = Client()
         browser.force_login(installation.owner)
-        artifact = evidence.attachments.get()
+        artifact = evidence.attachments.get(source_attachment=first)
         assert browser.get(reverse(
             "organization-repository-publication-evidence-review-attachment",
             args=[sibling.entity_id, evidence.id, artifact.id],
@@ -2380,18 +2392,44 @@ def test_primary_file_evidence_cannot_be_accepted_or_packaged(composition_reposi
             url, data=json.dumps({"outcome": "accepted_for_packaging", "reason": "Reviewed"}),
             content_type="application/json",
         )
-        assert response.status_code == 409
-        assert "not yet available" in response.json()["detail"]
-        assert not RepositoryEvidenceReviewDecision.objects.filter(evidence=evidence).exists()
-        decision = RepositoryEvidenceReviewDecision.objects.create(
-            tenant=evidence.tenant, organization=evidence.organization, workspace=evidence.workspace,
-            evidence=evidence,
-            outcome=RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING,
-            reason="Defense-in-depth package check", actor=reviewer,
+        assert response.status_code == 201
+        decision = RepositoryEvidenceReviewDecision.objects.get(evidence=evidence)
+        package = create_repository_publication_package(decision_id=decision.id, actor=installation.owner)
+        assert package.manifest["format"] == "tekdocs-repository-publication-package/v2"
+        assert package.manifest["primary_file"] == evidence.manifest["primary_file"]
+        assert package.manifest["primary_file"]["selected_source_id"] == str(current.entity_id)
+        assert len(package.manifest["primary_file"]["versions"]) == 2
+        assert verify_repository_publication_package(package)
+        authorization = decide_repository_package(
+            package_id=package.id,
+            outcome=RepositoryPackageAuthorization.Outcome.AUTHORIZED_FOR_PUBLICATION,
+            reason="Review package completeness", actor=reviewer,
         )
-        with pytest.raises(RepositoryPublicationPackageError, match="Accepted, intact client evidence"):
-            create_repository_publication_package(decision_id=decision.id, actor=installation.owner)
-        assert RepositoryPublicationPackage.objects.count() == 0
+        with pytest.raises(RepositoryStaticPublicationError, match="Primary-file STATIC delivery parity is pending"):
+            create_repository_static_publication(authorization_id=authorization.id, actor=installation.owner)
+        assert RepositoryStaticPublication.objects.count() == 0
+        publication_id = uuid.uuid4()
+        with pytest.raises(DatabaseError), transaction.atomic():
+            RepositoryStaticPublication.objects.create(
+                id=publication_id,
+                tenant=package.tenant,
+                organization=package.organization,
+                workspace=package.workspace,
+                authorization=authorization,
+                manifest=static_publication_manifest(
+                    publication_id=publication_id, authorization=authorization,
+                    actor=installation.owner, created_at=authorization.occurred_at,
+                ),
+                content_digest="0" * 64,
+                signature="blocked",
+                public_key="blocked",
+                key_fingerprint="0" * 64,
+                created_by=installation.owner,
+                created_at=authorization.occurred_at,
+            )
+        assert RepositoryStaticPublication.objects.count() == 0
+        artifact.file.storage.delete(artifact.file.name)
+        assert not verify_repository_publication_package(package)
 
 
 @pytest.mark.parametrize("owner_kind", ["legacy", "native"])
@@ -2982,6 +3020,32 @@ def test_primary_evidence_upgrade_keeps_existing_guards_and_adds_v2():
             cursor.execute(
                 "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
                 "WHERE relname = 'core_repositoryevidenceattachment'"
+            )
+            assert cursor.fetchone() == (True, True)
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
+def test_primary_package_upgrade_adds_v2_and_keeps_static_v1_only():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0188_repository_primary_publication_evidence")])
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_repository_package()'::regprocedure)")
+            assert "tekdocs-repository-publication-package/v2" not in cursor.fetchone()[0]
+        MigrationExecutor(connection).migrate(head)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_repository_package()'::regprocedure)")
+            assert "tekdocs-repository-publication-package/v2" in cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_static_publication()'::regprocedure)"
+            )
+            assert "tekdocs-repository-publication-package/v1" in cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE relname = 'core_repositorypublicationpackage'"
             )
             assert cursor.fetchone() == (True, True)
     finally:

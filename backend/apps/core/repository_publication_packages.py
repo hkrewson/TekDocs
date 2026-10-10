@@ -26,6 +26,7 @@ from .publications import canonical_json
 from .repository_publication_evidence import verify_repository_publication_evidence
 
 PACKAGE_FORMAT = "tekdocs-repository-publication-package/v1"
+PRIMARY_PACKAGE_FORMAT = "tekdocs-repository-publication-package/v2"
 
 
 class RepositoryPublicationPackageError(RuntimeError):
@@ -38,8 +39,8 @@ def _manifest(
 ) -> dict[str, object]:
     evidence = decision.evidence
     source = evidence.manifest
-    return {
-        "format": PACKAGE_FORMAT,
+    manifest: dict[str, object] = {
+        "format": PRIMARY_PACKAGE_FORMAT if "primary_file" in source else PACKAGE_FORMAT,
         "package_id": str(package_id),
         "decision_id": str(decision.id),
         "evidence_id": str(evidence.id),
@@ -55,6 +56,9 @@ def _manifest(
         "created_by": str(actor.id),
         "created_at": created_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z"),
     }
+    if "primary_file" in source:
+        manifest["primary_file"] = source["primary_file"]
+    return manifest
 
 
 def verify_repository_publication_package(package: RepositoryPublicationPackage) -> bool:
@@ -67,7 +71,6 @@ def verify_repository_publication_package(package: RepositoryPublicationPackage)
         or evidence.audience != PublicationAudience.CLIENT_VISIBLE
         or organization_id is None
         or evidence.signed_by_id == decision.actor_id
-        or "primary_file" in evidence.manifest
         or (package.tenant_id, package.organization_id, package.workspace_id)
         != (decision.tenant_id, decision.organization_id, decision.workspace_id)
         or (package.tenant_id, package.organization_id, package.workspace_id)
@@ -111,7 +114,6 @@ def create_repository_publication_package(
         or evidence.audience != PublicationAudience.CLIENT_VISIBLE
         or organization_id is None
         or evidence.signed_by_id == decision.actor_id
-        or "primary_file" in evidence.manifest
         or not verify_repository_publication_evidence(evidence)["valid"]
     ):
         raise RepositoryPublicationPackageError("Accepted, intact client evidence is required")

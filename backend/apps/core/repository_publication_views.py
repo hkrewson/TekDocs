@@ -456,13 +456,6 @@ def _decision(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respo
         return Response(
             {"detail": "The evidence signer cannot accept their own snapshot"}, status=status.HTTP_409_CONFLICT
         )
-    if (
-        serializer.validated_data["outcome"] == RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING
-        and "primary_file" in evidence.manifest
-    ):
-        return Response(
-            {"detail": "Primary-file publication packaging is not yet available"}, status=status.HTTP_409_CONFLICT
-        )
     if not verify_repository_publication_evidence(evidence)["valid"]:
         return Response(
             {"detail": "Retained publication evidence failed verification"}, status=status.HTTP_409_CONFLICT

@@ -58,6 +58,19 @@ class PlacementConflict(Exception):
     pass
 
 
+def _ensure_legacy_content_authority(document: Document) -> None:
+    """Prevent legacy content services from mutating a repository-owned document."""
+
+    if DocumentAuthority.objects.filter(
+        tenant_id=document.tenant_id,
+        organization_id=document.organization_id,
+        workspace_id=document.entity.workspace_id,
+        content_id=document.id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists():
+        raise PlacementConflict("This document's content is Git-authoritative and cannot be changed here.")
+
+
 @dataclass(frozen=True)
 class ResolvedPlacement:
     placement: DocumentPlacement
@@ -442,6 +455,7 @@ def restructure_document(*, document: Document, actor_id: UUID, base_revision_id
     """Convert one legacy content region into ordered semantic blocks atomically."""
 
     locked = Document.objects.select_for_update().select_related("entity", "tenant").get(pk=document.pk)
+    _ensure_legacy_content_authority(locked)
     prior_event = AuditEvent.objects.filter(
         tenant=locked.tenant,
         action="document.semantic_sections_created",
@@ -642,6 +656,7 @@ def update_document(
     topic_type: str | None = None,
 ) -> BlockRevision:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
+    _ensure_legacy_content_authority(locked_document)
     resulting_topic_type = topic_type or locked_document.topic_type
     placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
     block = Block.objects.select_for_update().get(pk=placement.block_id)
@@ -976,9 +991,10 @@ def apply_template_rollout(
 ) -> dict[str, object]:
     locked = (
         DocumentTemplateEnrollment.objects.select_for_update(of=("self",))
-        .select_related("source_template", "destination_document", "applied_revision")
+        .select_related("source_template", "destination_document", "destination_document__entity", "applied_revision")
         .get(pk=enrollment.pk)
     )
+    _ensure_legacy_content_authority(locked.destination_document)
     if locked.applied_revision_id != expected_applied_revision_id:
         raise PlacementConflict("The client template enrollment changed after this preview loaded.")
     latest, preview = template_rollout_preview(enrollment=locked, actor_id=actor_id)
@@ -1070,7 +1086,13 @@ def apply_template_rollout(
 def update_shared_block(
     *, placement: DocumentPlacement, actor_id: UUID, markdown: str, base_revision_id: UUID
 ) -> BlockRevision:
-    locked = DocumentPlacement.objects.select_for_update().select_related("block").get(pk=placement.pk)
+    locked = (
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .select_related("block", "block__source_document", "block__source_document__entity")
+        .get(pk=placement.pk)
+    )
+    if locked.block.source_document_id is not None:
+        _ensure_legacy_content_authority(locked.block.source_document)
     block = Block.objects.select_for_update().get(pk=locked.block_id)
     revision = _append_block_revision(
         block=block,
@@ -1097,6 +1119,7 @@ def detach_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -
         )
         .get(pk=placement.pk)
     )
+    _ensure_legacy_content_authority(locked.document)
     if locked.parent_id is None and locked.position == 0:
         raise PlacementConflict("The primary document block cannot be detached.")
     revision = (
@@ -1206,6 +1229,7 @@ def create_document_block(
     audience_profile: str = PlacementAudienceProfile.SHARED,
 ) -> DocumentPlacement:
     locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
+    _ensure_legacy_content_authority(locked_document)
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
     if kind not in BlockKind.values:
@@ -1304,7 +1328,8 @@ def add_block_placement(
     position: int | None = None,
     audience_profile: str = PlacementAudienceProfile.SHARED,
 ) -> DocumentPlacement:
-    locked_document = Document.objects.select_for_update().get(pk=document.pk)
+    locked_document = Document.objects.select_for_update().select_related("entity").get(pk=document.pk)
+    _ensure_legacy_content_authority(locked_document)
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
     block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
@@ -1372,8 +1397,11 @@ def update_document_placement(
     audience_profile: str | None = None,
 ) -> DocumentPlacement:
     locked = (
-        DocumentPlacement.objects.select_for_update(of=("self",)).select_related("block", "parent").get(pk=placement.pk)
+        DocumentPlacement.objects.select_for_update(of=("self",))
+        .select_related("document", "document__entity", "block", "parent")
+        .get(pk=placement.pk)
     )
+    _ensure_legacy_content_authority(locked.document)
     if resolution_mode is None:
         resolution_mode = locked.resolution_mode
         if pinned_revision_id is None:
@@ -1413,7 +1441,12 @@ def update_document_placement(
 
 @transaction.atomic
 def remove_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -> None:
-    locked = DocumentPlacement.objects.select_for_update().select_related("block", "block__entity").get(pk=placement.pk)
+    locked = (
+        DocumentPlacement.objects.select_for_update()
+        .select_related("document", "document__entity", "block", "block__entity")
+        .get(pk=placement.pk)
+    )
+    _ensure_legacy_content_authority(locked.document)
     if locked.parent_id is None and locked.position == 0:
         raise PlacementConflict("The primary document block cannot be removed.")
     if locked.children.exists():

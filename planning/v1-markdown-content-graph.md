@@ -777,6 +777,12 @@ repository-authoritative when indexed; reindexing preserves either state. The
 database rejects identity changes, deletion, scope mismatches, and authority
 changes outside the future transition service. This records current ownership
 but does not implement promotion, legacy-write retirement, or rollback.
+Legacy content mutation services now consult this durable state and reject
+body edits, semantic restructuring, shared-source edits, placement changes,
+and template rollouts when the target document is repository-authoritative.
+This is a fail-safe for a future transition, not yet the complete write
+retirement gate: read routing, metadata parity, transaction-level enforcement,
+promotion, and verified rollback remain open.
 
 The read-only legacy migration status names additional handoff blockers when a
 document retains a template or enrollment, primary-file history, or review

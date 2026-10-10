@@ -7,6 +7,7 @@ import uuid
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from zipfile import ZipFile
 
@@ -51,6 +52,7 @@ from apps.core.models import (
     Document,
     DocumentationListingReference,
     DocumentAttachment,
+    DocumentAuthority,
     DocumentPlacement,
     DocumentPublication,
     DocumentPublicationArtifact,
@@ -184,6 +186,39 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
     assert [item.markdown for item in revisions] == ["# Firewall\n\nUse **MFA**.", "Updated from the browser."]
     assert revisions[1].parent == revisions[0]
     assert revisions[1].checksum == sha256(b"Updated from the browser.").hexdigest()
+
+
+@pytest.mark.django_db
+def test_git_authoritative_document_rejects_legacy_content_edits(owner_client, monkeypatch):
+    created = owner_client.post(
+        reverse("msp-document-list-create"),
+        {"title": "Recovery guide", "markdown": "Original content"},
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    detail = reverse("msp-document-detail", kwargs={"document_entity_id": created.json()["id"]})
+
+    monkeypatch.setattr(
+        DocumentAuthority.objects,
+        "filter",
+        lambda **_kwargs: SimpleNamespace(exists=lambda: True),
+    )
+    rejected = owner_client.put(
+        detail,
+        {
+            "title": "Changed title",
+            "markdown": "Changed content",
+            "base_revision_id": created.json()["current_revision_id"],
+        },
+        content_type="application/json",
+    )
+
+    assert rejected.status_code == 409
+    assert rejected.json()["code"] == "placement_conflict"
+    unchanged = owner_client.get(detail)
+    assert unchanged.status_code == 200
+    assert unchanged.json()["title"] == "Recovery guide"
+    assert unchanged.json()["markdown"] == "Original content"
 
 
 @pytest.mark.django_db

@@ -9,6 +9,7 @@ import zipfile
 from dataclasses import dataclass
 from uuid import UUID
 
+from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
 from .attachment_security import AttachmentSecurityError
@@ -22,7 +23,8 @@ from .repository_source_validation import RepositorySourceValidationError, verif
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 MAX_EDITABLE_BUNDLE_BYTES = 75 * 1024 * 1024
-BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v1"
+BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v2"
+LEGACY_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v1"
 
 
 class RepositoryEditableBundleError(ValueError):
@@ -37,18 +39,21 @@ class RepositoryEditableBundle:
     attachment_count: int
 
 
-def referenced_source_attachments(source_content: bytes) -> tuple[dict[str, object], set[UUID]]:
+def referenced_source_attachments(source_content: bytes) -> tuple[dict[str, object], set[UUID], set[UUID]]:
     """Read only the already validated v3 source archive, including pinned Markdown."""
 
     manifest = verify_repository_source_snapshot(source_content)
     referenced: set[UUID] = set()
+    document_ids: set[UUID] = set()
     with zipfile.ZipFile(io.BytesIO(source_content)) as archive:
         for item in manifest["files"] + manifest["historical_files"]:  # type: ignore[operator]
             if not isinstance(item, dict):  # pragma: no cover - verifier enforces shape
                 raise RepositoryEditableBundleError("The source inventory is invalid.")
             parsed = parse_content(archive.read(item["path"]))
             referenced.update(attachment_ids_in_markdown(parsed.markdown))
-    return manifest, referenced
+            if parsed.kind == "document":
+                document_ids.add(parsed.content_id)
+    return manifest, referenced, document_ids
 
 
 def _archive(files: dict[str, bytes]) -> bytes:
@@ -68,7 +73,7 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
 
     try:
         source = export_repository_sources(repository)
-        source_manifest, referenced = referenced_source_attachments(source.content)
+        source_manifest, referenced, source_document_ids = referenced_source_attachments(source.content)
     except (RepositorySourceExportError, RepositorySourceValidationError) as exc:
         raise RepositoryEditableBundleError("The repository source snapshot is unavailable.") from exc
     if len(referenced) > MAX_BUNDLE_ATTACHMENTS:
@@ -79,13 +84,22 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
             entity_id__in=referenced,
             tenant_id=repository.tenant_id,
             organization=repository.workspace.organization,
-            document__tenant_id=repository.tenant_id,
-            document__organization=repository.workspace.organization,
-            document__entity__workspace_id=repository.workspace_id,
-            document__archived_at__isnull=True,
             archived_at__isnull=True,
             purpose=DocumentAttachmentPurpose.ATTACHMENT,
             scan_status="clean",
+        )
+        .filter(
+            Q(
+                document__tenant_id=repository.tenant_id,
+                document__organization=repository.workspace.organization,
+                document__entity__workspace_id=repository.workspace_id,
+                document__archived_at__isnull=True,
+            )
+            | Q(
+                document__isnull=True,
+                owner_workspace_id=repository.workspace_id,
+                owner_content_id__in=source_document_ids,
+            )
         )
         .order_by("entity_id")
     )
@@ -96,6 +110,15 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
     descriptors: list[dict[str, object]] = []
     total = 0
     for record in attachments:
+        if record.document_id is None:
+            if (
+                record.owner_workspace_id != repository.workspace_id
+                or record.owner_content_id not in source_document_ids
+            ):
+                raise RepositoryEditableBundleError("A referenced managed file has an invalid repository owner.")
+            owner = {"type": "repository_document", "id": str(record.owner_content_id)}
+        else:
+            owner = {"type": "legacy_document", "id": str(record.document_id)}
         if not record.file.name or record.size > MAX_BUNDLE_ATTACHMENT_BYTES - total:
             raise RepositoryEditableBundleError("The editable bundle exceeds its managed-file limit.")
         try:
@@ -108,7 +131,7 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
         descriptors.append(
             {
                 "id": str(record.entity_id),
-                "document_id": str(record.document_id),
+                "owner": owner,
                 "path": path,
                 "filename": record.original_filename,
                 "media_type": record.media_type,

@@ -437,6 +437,10 @@ gates after file, template, review, key, publication and recovery parity.
 - Retain attachment custody outside Git while resolving Markdown references.
 - Update editable exports, sanitized Git exports, templates, monitored sources,
   client listings and portal reads for the content graph.
+- The repository editable bundle now carries referenced legacy and Git-owned
+  managed files in a v2 typed-owner manifest. Offline validation checks the
+  exact file closure and accepts older v1 bundles; this remains an unsanitized
+  editing handoff, not a backup or authority transition.
 - Sanitized Git export now accepts an optional complete, exact accepted and
   indexed repository Markdown snapshot for one Workspace. It removes known
   credential references, key bindings and managed attachment links, bounds
@@ -596,9 +600,12 @@ API can now upload an ordinary file for that owner through the existing scanner
 and private storage. The repository detail reader now resolves integrity-checked
 native file links for authorized staff, and its scoped private download repeats
 the byte check. Publication preflight still requires a matching legacy document.
-The editable bundle can verify bytes of referenced, same-Workspace legacy
-files, but that is not repository-native file ownership. This is a verified
-implementation gap, not an assumption that the bundle closes file parity.
+The editable bundle now verifies bytes of referenced, same-Workspace legacy
+and Git-owned files. Its v2 manifest identifies the legacy or repository
+document owner for each file, and the offline verifier still accepts v1
+bundles. Native owners must exist in the exported Markdown snapshot. This
+closes referenced-file custody in this export, not publication or authority
+parity.
 
 [ADR 0114](../docs/adr/0114-stable-managed-file-content-ownership.md) selects
 the existing attachment table for this transition because signed publication
@@ -626,7 +633,7 @@ current Markdown references, and commit identity under the repository lock;
 later commits and older uploads without a recorded commit fail closed. Archive
 removes the active link but deliberately retains bytes for recovery. Historical
 reference reconciliation and physical retention policy remain open, as do
-editable-bundle, publication, recovery, and authority-handoff gates.
+publication, recovery, and authority-handoff gates.
 
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

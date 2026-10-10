@@ -80,7 +80,7 @@ def _editable_bundle_digest(repository, attachment):
     assert len(manifest["attachments"]) == 1
     descriptor = manifest["attachments"][0]
     assert descriptor["id"] == str(attachment.entity_id)
-    assert descriptor["document_id"] == str(attachment.document_id)
+    assert descriptor["owner"] == {"type": "legacy_document", "id": str(attachment.document_id)}
     assert descriptor["sha256"] == hashlib.sha256(PUBLICATION_ATTACHMENT_BYTES).hexdigest()
     assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
     return hashlib.sha256(bundle.content).hexdigest()

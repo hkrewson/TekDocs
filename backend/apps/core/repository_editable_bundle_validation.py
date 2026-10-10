@@ -12,6 +12,7 @@ from uuid import UUID
 
 from .repository_editable_bundles import (
     BUNDLE_FORMAT,
+    LEGACY_BUNDLE_FORMAT,
     MAX_BUNDLE_ATTACHMENT_BYTES,
     MAX_BUNDLE_ATTACHMENTS,
     MAX_EDITABLE_BUNDLE_BYTES,
@@ -72,7 +73,7 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
             }:
                 raise RepositoryEditableBundleValidationError("The bundle manifest has an invalid shape.")
             if (
-                manifest["format"] != BUNDLE_FORMAT
+                manifest["format"] not in {BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT}
                 or manifest["scope"] != "current-and-reachable-historical-markdown-with-referenced-files"
                 or manifest["exclusions"] != ["database_records", "git_history", "unreferenced_managed_files"]
                 or not isinstance(manifest["source_sha256"], str)
@@ -83,7 +84,7 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
             source_content = archive.read("source-snapshot.zip")
             if hashlib.sha256(source_content).hexdigest() != manifest["source_sha256"]:
                 raise RepositoryEditableBundleValidationError("The source snapshot checksum differs.")
-            source_manifest, referenced = referenced_source_attachments(source_content)
+            source_manifest, referenced, source_document_ids = referenced_source_attachments(source_content)
             if (
                 manifest["workspace_id"] != source_manifest["workspace_id"]
                 or manifest["accepted_commit"] != source_manifest["accepted_commit"]
@@ -96,12 +97,29 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
             declared_ids: list[UUID] = []
             total = 0
             for descriptor in descriptors:
-                if not isinstance(descriptor, dict) or set(descriptor) != {
-                    "id", "document_id", "path", "filename", "media_type", "size", "sha256"
-                }:
+                if not isinstance(descriptor, dict):
                     raise RepositoryEditableBundleValidationError("The bundle has an invalid attachment descriptor.")
+                common_fields = {"id", "path", "filename", "media_type", "size", "sha256"}
+                if manifest["format"] == LEGACY_BUNDLE_FORMAT:
+                    if set(descriptor) != common_fields | {"document_id"}:
+                        raise RepositoryEditableBundleValidationError(
+                            "The bundle has an invalid attachment descriptor."
+                        )
+                    _uuid(descriptor["document_id"])
+                else:
+                    if set(descriptor) != common_fields | {"owner"}:
+                        raise RepositoryEditableBundleValidationError(
+                            "The bundle has an invalid attachment descriptor."
+                        )
+                    owner = descriptor["owner"]
+                    if not isinstance(owner, dict) or set(owner) != {"type", "id"}:
+                        raise RepositoryEditableBundleValidationError("The bundle has an invalid attachment owner.")
+                    if owner["type"] not in {"legacy_document", "repository_document"}:
+                        raise RepositoryEditableBundleValidationError("The bundle has an invalid attachment owner.")
+                    owner_id = _uuid(owner["id"])
+                    if owner["type"] == "repository_document" and owner_id not in source_document_ids:
+                        raise RepositoryEditableBundleValidationError("The bundle has an unknown repository owner.")
                 attachment_id = _uuid(descriptor["id"])
-                _uuid(descriptor["document_id"])
                 path = f"attachments/{attachment_id}"
                 if (
                     descriptor["path"] != path

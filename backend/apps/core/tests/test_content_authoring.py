@@ -623,10 +623,20 @@ def test_editable_bundle_includes_exact_referenced_file_and_verifies_offline(aut
         assert "tekdocs-repository-editable-" in response["Content-Disposition"]
         manifest = verify_repository_editable_bundle(response.content)
         assert manifest["attachments"][0]["id"] == str(attachment.entity_id)
-        assert manifest["attachments"][0]["document_id"] == str(document.id)
+        assert manifest["attachments"][0]["owner"] == {"type": "legacy_document", "id": str(document.id)}
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             assert archive.read(f"attachments/{attachment.entity_id}") == b"Exact managed bytes"
             entries = {name: archive.read(name) for name in archive.namelist()}
+        legacy_manifest = {**manifest, "format": "tekdocs-repository-editable-bundle/v1"}
+        legacy_manifest["attachments"] = [
+            {**{key: value for key, value in item.items() if key != "owner"}, "document_id": item["owner"]["id"]}
+            for item in manifest["attachments"]
+        ]
+        legacy_entries = dict(entries)
+        legacy_entries["tekdocs-bundle.json"] = (
+            json.dumps(legacy_manifest, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        assert verify_repository_editable_bundle(_archive(legacy_entries))["format"] == legacy_manifest["format"]
         changed = dict(entries)
         changed[f"attachments/{attachment.entity_id}"] = b"Alter managed bytes"
         with pytest.raises(RepositoryEditableBundleValidationError, match="checksum"):
@@ -641,6 +651,51 @@ def test_editable_bundle_includes_exact_referenced_file_and_verifies_offline(aut
         assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
         assert Client().get(url).status_code in {401, 403}
 
+        attachment.file.storage.delete(attachment.file.name)
+        assert browser.get(url).status_code == 409
+        assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
+
+
+def test_editable_bundle_includes_native_file_from_current_git_source(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        upload = browser.post(
+            reverse("msp-content-authoring-attachment-create", args=[document.content_id]),
+            {"file": SimpleUploadedFile("native.txt", b"Native file bytes\n")},
+        )
+        assert upload.status_code == 201, upload.content
+        attachment_id = upload.json()["id"]
+        current = read_authored_content(repository=repository, content_id=document.content_id)
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=document.content_id,
+            base_commit=current.accepted_commit, base_blob=current.source_blob,
+            kind=None, path=None, title=None,
+            markdown=f"[Native](tekdocs://attachment/{attachment_id})\n", metadata_patch={},
+        )
+        url = reverse("msp-content-authoring-export") + "?bundle=editable"
+        response = browser.get(url)
+        assert response.status_code == 200, response.content
+        manifest = verify_repository_editable_bundle(response.content)
+        assert manifest["format"] == "tekdocs-repository-editable-bundle/v2"
+        assert manifest["attachments"][0]["owner"] == {
+            "type": "repository_document", "id": str(document.content_id),
+        }
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            assert archive.read(f"attachments/{attachment_id}") == b"Native file bytes\n"
+            entries = {name: archive.read(name) for name in archive.namelist()}
+        forged = dict(entries)
+        forged_manifest = json.loads(forged["tekdocs-bundle.json"])
+        forged_manifest["attachments"][0]["owner"]["id"] = str(uuid.uuid4())
+        forged["tekdocs-bundle.json"] = (
+            json.dumps(forged_manifest, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        with pytest.raises(RepositoryEditableBundleValidationError, match="unknown repository owner"):
+            verify_repository_editable_bundle(_archive(forged))
+        attachment = DocumentAttachment.objects.get(entity_id=attachment_id)
         attachment.file.storage.delete(attachment.file.name)
         assert browser.get(url).status_code == 409
         assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 1
@@ -690,6 +745,62 @@ def test_editable_bundle_rejects_foreign_workspace_file(authoring_context, tmp_p
         browser.force_login(installation.owner)
         assert browser.get(reverse("msp-content-authoring-export") + "?bundle=editable").status_code == 409
         assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 0
+
+
+def test_editable_bundle_rejects_foreign_native_file(authoring_context, tmp_path):
+    installation, repository = authoring_context
+    organization = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id,
+        name="Native file owner", legal_name="Native file owner", website="", classifications=["client"],
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=organization)
+    foreign_repository = repository_storage.ensure_workspace_repository(workspace).repository
+    foreign_repository.refresh_from_db()
+    foreign_id = uuid.uuid4()
+    author_content(
+        repository=foreign_repository, actor_id=installation.owner.id, request_id=None,
+        operation="create", content_id=foreign_id,
+        base_commit=foreign_repository.accepted_commit.object_id, base_blob=None,
+        kind="document", path=None, title="Client-only file", markdown="Private.\n", metadata_patch={},
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        upload = browser.post(
+            reverse("organization-content-authoring-attachment-create", kwargs={
+                "organization_entity_id": organization.entity_id, "content_id": foreign_id,
+            }),
+            {"file": SimpleUploadedFile("private.txt", b"Client-only bytes\n")},
+        )
+        assert upload.status_code == 201, upload.content
+        authored = _create(installation, repository)
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=authored.content_id,
+            base_commit=authored.accepted_commit, base_blob=authored.source_blob,
+            kind=None, path=None, title=None,
+            markdown=f"[Foreign](tekdocs://attachment/{upload.json()['id']})\n", metadata_patch={},
+        )
+        assert browser.get(reverse("msp-content-authoring-export") + "?bundle=editable").status_code == 409
+        assert AuditEvent.objects.filter(action="repository_editable_bundle.downloaded").count() == 0
+        current = read_authored_content(repository=foreign_repository, content_id=foreign_id)
+        author_content(
+            repository=foreign_repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=foreign_id,
+            base_commit=current.accepted_commit, base_blob=current.source_blob,
+            kind=None, path=None, title=None,
+            markdown=f"[Own file](tekdocs://attachment/{upload.json()['id']})\n", metadata_patch={},
+        )
+        organization_export = reverse(
+            "organization-content-authoring-export", kwargs={"organization_entity_id": organization.entity_id}
+        ) + "?bundle=editable"
+        own_bundle = browser.get(organization_export)
+        assert own_bundle.status_code == 200, own_bundle.content
+        own_manifest = verify_repository_editable_bundle(own_bundle.content)
+        assert own_manifest["workspace_id"] == str(workspace.id)
+        assert own_manifest["attachments"][0]["owner"] == {
+            "type": "repository_document", "id": str(foreign_id),
+        }
 
 
 def test_editable_bundle_includes_file_referenced_only_by_pinned_fragment(authoring_context, tmp_path):

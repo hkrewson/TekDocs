@@ -650,6 +650,14 @@ document role, signing a repository document with any retained primary-file
 version fails with an explicit parity-pending conflict. Ordinary-file
 publication and historical evidence verification remain available; this is a
 fail-closed guard, not publication parity.
+The next publication slice has an internal primary-file snapshot preparation
+step. It locks the exact repository/document owner, requires an explicit
+current-version selection, verifies the complete retained chain and every
+version's private bytes, and produces typed-owner descriptors for later signed
+retention. Stale selections, broken history and missing bytes fail closed.
+No evidence or publication is created by preparation; the parity-pending
+signing guard remains until signed retention, review, package delivery and
+restore verification consume the snapshot end to end.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

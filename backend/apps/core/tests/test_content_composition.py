@@ -69,6 +69,10 @@ from apps.core.notification_email import dispatch_due_notification_emails
 from apps.core.organizations import create_organization
 from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events
 from apps.core.publications import publication_signing_key
+from apps.core.repository_primary_publication import (
+    RepositoryPrimaryPublicationError,
+    prepare_repository_primary_publication,
+)
 from apps.core.repository_publication_evidence import (
     RepositoryPublicationEvidenceError,
     evidence_payload,
@@ -2279,6 +2283,82 @@ def test_repository_evidence_refuses_unfrozen_primary_file_history(composition_r
         assert response.json()["detail"].endswith("repository.primary_file.parity_pending")
         assert RepositoryPublicationEvidence.objects.count() == 1
         assert verify_repository_publication_evidence(prior_evidence)["valid"]
+
+
+@pytest.mark.parametrize("owner_kind", ["legacy", "native"])
+def test_primary_publication_preparation_freezes_full_chain_and_current_selection(
+    composition_repository, tmp_path, owner_kind
+):
+    installation, _workspace, repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = (
+            create_document(
+                tenant=installation.tenant,
+                organization=None,
+                actor_id=installation.owner.id,
+                title="Prepared primary file",
+                markdown="Notes.\n",
+            )
+            if owner_kind == "legacy"
+            else None
+        )
+        content_id = document.id if document else uuid.uuid4()
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={
+                "documents/prepared-primary.md": _content(
+                    content_id=content_id, title="Prepared primary file", body="Notes.\n"
+                )
+            },
+            message="Add primary-file preparation candidate",
+        )
+        index_repository_content(repository_id=repository.id)
+        if document:
+            first = create_document_attachment(
+                document=document, actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("first.txt", b"First primary version.\n"),
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+            )
+            second = create_document_attachment(
+                document=document, actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("second.txt", b"Second primary version.\n"),
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=2, replaces=first,
+            )
+        else:
+            first = append_repository_primary_document_file(
+                repository=repository, content_id=content_id, actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("first.txt", b"First primary version.\n"),
+                expected_current_entity_id=None,
+            )
+            second = append_repository_primary_document_file(
+                repository=repository, content_id=content_id, actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("second.txt", b"Second primary version.\n"),
+                expected_current_entity_id=first.entity_id,
+            )
+        snapshot = prepare_repository_primary_publication(
+            repository=repository, content_id=content_id, expected_current_entity_id=second.entity_id
+        )
+        assert snapshot.selected_entity_id == second.entity_id
+        assert [version.content for version in snapshot.versions] == [
+            b"First primary version.\n", b"Second primary version.\n"
+        ]
+        assert [version.descriptor["id"] for version in snapshot.versions] == [
+            str(first.entity_id), str(second.entity_id)
+        ]
+        assert snapshot.versions[1].descriptor["replaces_id"] == str(first.entity_id)
+        expected_owner = "legacy_document" if document else "repository_document"
+        assert all(version.descriptor["owner"]["type"] == expected_owner for version in snapshot.versions)
+        with pytest.raises(RepositoryPrimaryPublicationError, match="selection_changed"):
+            prepare_repository_primary_publication(
+                repository=repository, content_id=content_id, expected_current_entity_id=first.entity_id
+            )
+        first.file.storage.delete(first.file.name)
+        with pytest.raises(RepositoryPrimaryPublicationError, match="storage_unavailable"):
+            prepare_repository_primary_publication(
+                repository=repository, content_id=content_id, expected_current_entity_id=second.entity_id
+            )
+        assert RepositoryPublicationEvidence.objects.count() == 0
 
 
 def test_repository_evidence_serializes_legacy_primary_upload(composition_repository, tmp_path):

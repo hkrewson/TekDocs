@@ -324,7 +324,7 @@ security:
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-backend-security
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend-security
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-diagram-renderer-security
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(CURDIR)/.trivyignore.yaml:/.trivyignore.yaml:ro" aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --ignorefile /.trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:d71104a14f018dadfb097d39eba737f012f29baf30d0602916b7c4fb061939b3
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(CURDIR)/.trivyignore.yaml:/.trivyignore.yaml:ro" aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --ignorefile /.trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a
 
 dast:
 	TEKDOCS_RUN_DAST=true sh ./tests/rehearsals/rehearse-production-image.sh

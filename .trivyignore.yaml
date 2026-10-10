@@ -9,16 +9,19 @@
 # specific scan it was reasoned about, never to every scan, so an exception cannot
 # drift onto an image it was never argued for.
 #
-# Before renewing an entry, re-check the current pinned Mailpit image first and
-# confirm whether its Alpine packages include OpenSSL 3.5.8-r0 or later.
+# Before renewing an entry, re-scan the current pinned Mailpit image and check
+# the upstream module and Go toolchain versions.
 
 vulnerabilities:
-  - id: CVE-2026-14456
-    expired_at: 2026-09-10
+  - id: CVE-2026-78669
+    purls:
+      - pkg:golang/golang.org/x/net@v0.59.0
+    expired_at: 2026-10-24
     statement: >-
-      The current Mailpit edge digest fixes its previously excepted Go module
-      findings but still contains Alpine's libcrypto3 and libssl3 3.5.7-r0. Mailpit
-      is a statically linked Go binary (ldd reports it is not a dynamic program), so
-      it does not load either library; TekDocs exposes no OpenSSL QUIC server, the
-      vulnerable path. Mailpit's UI is bound to localhost and SMTP remains on the
-      internal Compose network. Re-evaluate on expiry; see TD-RISK-062.
+      The pinned Mailpit edge image uses Go 1.27.2 and x/net v0.59.0. On Go
+      1.27, x/net/http2 uses the net/http wrapping implementation rather than
+      its legacy HTTP/2 implementation; Go 1.27.2 fixes this SETTINGS-frame
+      denial-of-service issue. The Mailpit Dockerfile does not set the
+      http2legacy build tag. This exception applies only to the x/net package
+      finding in the Mailpit scan, not the Go standard library or TekDocs images.
+      Re-scan and remove it when Mailpit ships x/net v0.60.0; see TD-RISK-062.

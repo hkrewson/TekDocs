@@ -67,6 +67,29 @@ This register turns known limitations into release obligations. A risk remains o
 | `TD-RISK-061` | Data-flow diagrams can imply facts, controls, or evidence that were inferred from prose or silently rewritten. | A visually plausible arrow can be mistaken for observed behavior or compliance evidence. Mutable endpoints/classification, foreign Workspace links, hidden related records, or an export assembled from mixed revisions can create misleading or disclosing documentation. | Store explicit exact-Workspace, versioned data-flow records with typed provenance and review state. Reauthorize every endpoint and relationship, distinguish recorded fact/imported observation/unverified draft, retain immutable revisions, and freeze exact revisions plus authorized table/graphic projections for STATIC/export. Never infer persisted flows from prose. | Records `0.8.33`; authoring/views `0.8.34`; publication/evidence `0.8.35`; stabilization `0.8.36` |
 | `TD-RISK-062` | A vulnerability found in a third-party image TekDocs ships but does not build can block the release gate indefinitely. | `axllent/mailpit` is an unprofiled service in `compose.yml`, and `setup-production.sh` writes it as the default `EMAIL_HOST`, so it ships rather than being test-only. Trivy `0.73` reported CVE-2026-56864 and CVE-2026-56865 (HIGH) against `golang.org/x/mod` v0.38.0 inside the mailpit Go binary. The dependency is indirect and upstream still required v0.38.0 on 2026-08-19, so no newer digest clears the finding. The affected symbols are in `golang.org/x/mod/sumdb` and are reachable only when a Go toolchain resolves modules against an untrusted `GOPROXY` or `GOSUMDB`; mailpit fetches no modules at runtime, and its SMTP port is not published outside the internal network. Trivy matches Go binaries at module-version granularity with no symbol reachability, so the scanner cannot distinguish this from a reachable finding. | Record the exception in `.trivyignore.yaml` scoped by `purls` to `golang.org/x/mod`, with `expired_at` set so it cannot become permanent, and pass it with `--ignorefile` to the mailpit scan only rather than to every scan. Re-read the upstream `go.mod` before renewing; take the newer digest as soon as upstream bumps and delete the entry. Any future exception must follow the same shape: scoped, dated, stated, and attached to one scan. A shipped mail catcher as the production default remains a separate product question from this finding. | Exception recorded `0.8.37`; expires 2026-10-18; permanent removal when upstream ships `golang.org/x/mod` v0.40.0 |
 
+### TD-RISK-062 — 2026-10-10 Mailpit scan follow-up
+
+The pinned Mailpit edge image `sha256:d71104a...` failed the production-image
+gate on four HIGH Go findings. The stable `v1.31.4` image has the same four.
+The newer immutable edge image `sha256:0b58ee82...` removes the three Go
+standard-library findings and leaves only CVE-2026-78669 against
+`golang.org/x/net` v0.59.0. That image uses Go 1.27.2. In Go 1.27, the
+[`x/net/http2` API](https://pkg.go.dev/golang.org/x/net/http2) wraps the
+standard-library HTTP/2 implementation by default; the upstream
+[Mailpit Dockerfile](https://github.com/axllent/mailpit/blob/develop/Dockerfile)
+does not enable the `http2legacy` build tag. The [Go advisory](https://pkg.go.dev/vuln/GO-2026-6611)
+describes the affected HTTP/2 path and fixed versions.
+The vulnerable legacy implementation is therefore not the Mailpit runtime
+path, while the standard-library path has the fix.
+
+The remaining package-level finding has a PURL-scoped exception in
+`.trivyignore.yaml` that is applied only to the Mailpit scan and expires on
+2026-10-24. It does not exempt a vulnerable Go runtime, other packages, or any
+TekDocs-built image. Remove the exception as soon as a tested Mailpit digest
+contains `x/net` v0.60.0 or later; if that does not happen by expiry, reassess
+the actual image and runtime path rather than silently extending it. Shipping
+Mailpit as the production default remains a separate open product decision.
+
 ## 0.5.0 network validation disposition
 
 `TD-RISK-031` through `TD-RISK-038` are **mitigated with recurring owners** at the `0.5.0` boundary. None is marked resolved: exact-Workspace policy, forced RLS, database guards, bounded projections, concurrency coverage, upgrade/restore evidence, and the named network validation gate remain required. NetBox connector authority and any destructive Interface/VRF compatibility removal remain assigned to later, separately reviewed work.

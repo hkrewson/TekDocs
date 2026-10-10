@@ -37,7 +37,7 @@ class ContentPublicationSourceError(RuntimeError):
 def _blob_id(source: bytes, object_format: str) -> str:
     header = f"blob {len(source)}\0".encode("ascii")
     if object_format == RepositoryObjectFormat.SHA1:
-        return hashlib.sha1(header + source).hexdigest()  # noqa: S324  # Git SHA-1 object identity
+        return hashlib.sha1(header + source, usedforsecurity=False).hexdigest()  # noqa: S324 -- Git blob identity
     if object_format == RepositoryObjectFormat.SHA256:
         return hashlib.sha256(header + source).hexdigest()
     raise ContentPublicationSourceError("Repository object format is unsupported")

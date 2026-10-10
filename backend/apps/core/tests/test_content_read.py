@@ -16,7 +16,8 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
-from apps.core.document_attachments import archive_document_attachment
+from apps.core.document_attachments import archive_document_attachment, create_document_attachment
+from apps.core.documents import create_document
 from apps.core.models import (
     AuditEvent,
     ContentEntityLink,
@@ -74,6 +75,52 @@ def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrit
             "organization-content-document-attachment-download",
             kwargs={**scope, "attachment_entity_id": attachment.entity_id},
         )
+        files_url = reverse(
+            "organization-document-file-list", kwargs={"organization_entity_id": organization.entity_id}
+        )
+        files = browser.get(files_url, {"q": "Native file", "ordering": "document"})
+        assert files.status_code == 200, files.content
+        assert files.json()["count"] == 1
+        assert {key: value for key, value in files.json()["results"][0].items() if key != "created_at"} == {
+            "id": str(attachment.entity_id),
+            "document_id": str(content_id),
+            "document_title": "Native file",
+            "source": "repository",
+            "download_url": download_url,
+            "filename": "steps.txt",
+            "kind": "attachment",
+            "version": None,
+            "media_type": attachment.media_type,
+            "size": attachment.size,
+            "checksum": attachment.checksum,
+        }
+        legacy = create_document(
+            tenant=installation.tenant,
+            organization=organization,
+            actor_id=installation.owner.id,
+            title="Legacy file guide",
+            markdown="Legacy notes.\n",
+        )
+        legacy_attachment = create_document_attachment(
+            document=legacy,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("legacy-steps.txt", b"Legacy steps\n"),
+        )
+        mixed = browser.get(files_url, {"ordering": "document", "page_size": 25})
+        assert mixed.status_code == 200, mixed.content
+        assert mixed.json()["count"] == 2
+        assert [(row["document_title"], row["source"]) for row in mixed.json()["results"]] == [
+            ("Legacy file guide", "legacy"), ("Native file", "repository")
+        ]
+        assert mixed.json()["results"][0]["download_url"] == reverse(
+            "organization-document-attachment-download",
+            kwargs={
+                "organization_entity_id": organization.entity_id,
+                "document_entity_id": legacy.entity_id,
+                "attachment_entity_id": legacy_attachment.entity_id,
+            },
+        )
+        assert browser.get(files_url, {"kind": "primary"}).json()["count"] == 0
         detail = browser.get(detail_url)
         assert detail.status_code == 200, detail.content
         assert f'href="{download_url}"' in detail.json()["sanitized_html"]
@@ -101,6 +148,9 @@ def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrit
                     "attachment_entity_id": attachment.entity_id},
         )).status_code == 404
         assert browser.get(reverse(
+            "organization-document-file-list", kwargs={"organization_entity_id": sibling.entity_id}
+        )).json()["count"] == 0
+        assert browser.get(reverse(
             "organization-content-document-attachment-download",
             kwargs={**scope, "content_id": uuid.uuid4(), "attachment_entity_id": attachment.entity_id},
         )).status_code == 404
@@ -110,12 +160,14 @@ def test_git_only_attachment_renders_and_downloads_with_exact_scope_and_integrit
         )
         browser.force_login(portal_user)
         assert browser.get(download_url).status_code == 403
+        assert browser.get(files_url).status_code == 403
         browser.force_login(installation.owner)
 
         repository.refresh_from_db()
         repository.indexed_commit = None
         repository.save(update_fields=["indexed_commit", "updated_at"])
         assert browser.get(download_url).status_code == 409
+        assert browser.get(files_url).json()["count"] == 1
         repository.indexed_commit = repository.accepted_commit
         repository.save(update_fields=["indexed_commit", "updated_at"])
 

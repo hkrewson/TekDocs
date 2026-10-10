@@ -126,7 +126,7 @@
   "files.heading": "Files",
   "files.intro": "Files attached to documents in this workspace.",
   "files.managed": "Document files",
-  "files.scope": "Open the document to add, replace, or remove a file.",
+  "files.scope": "Open the owning document to manage its files.",
   "files.search": "Search files",
   "files.loading": "Loading files…",
   "files.empty": "No files have been added to documents in this workspace.",

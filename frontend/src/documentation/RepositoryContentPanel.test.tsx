@@ -14,7 +14,7 @@ const initial: RepositorySource = {
   source_blob: blob, accepted_commit: commit, indexed_commit: commit,
 }
 
-function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string) {
+function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string, initialContentId?: string) {
   const save = vi.fn().mockResolvedValue({ ...initial, markdown: 'Changed revision.\n', accepted_commit: 'c'.repeat(40), indexed_commit: 'c'.repeat(40) })
   const client = {
     list: vi.fn().mockResolvedValue({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false }),
@@ -36,11 +36,17 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
   }
   const onClose = vi.fn()
   const router = createMemoryRouter([{
-    path: '*', element: <NavigationGuardProvider><RepositoryContentPanel client={client} organizationId={organizationId} onClose={onClose} /></NavigationGuardProvider>,
+    path: '*', element: <NavigationGuardProvider><RepositoryContentPanel client={client} organizationId={organizationId} initialContentId={initialContentId} onClose={onClose} /></NavigationGuardProvider>,
   }])
   render(<RouterProvider router={router} />)
   return { client, onClose, save }
 }
+
+it('opens an exact repository document directly from the Files register', async () => {
+  const { client } = setup({}, 'org-1', 'content-1')
+  expect(await screen.findByLabelText('Markdown body')).toHaveValue('First revision.\n')
+  expect(client.source).toHaveBeenCalledWith('content-1', 'org-1', expect.any(AbortSignal))
+})
 
 it('archives only an unlinked file and leaves a denied archive retryable without changing the draft', async () => {
   const user = userEvent.setup()

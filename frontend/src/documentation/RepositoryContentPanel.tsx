@@ -20,8 +20,9 @@ function draftFromSource(source: RepositorySource): Draft {
   return { id: source.content_id, kind: source.kind, title: source.title, markdown: source.markdown, path: source.path, metadataText: '{}' }
 }
 
-export function RepositoryContentPanel({ organizationId, onClose, client = browserRepositoryClient }: {
+export function RepositoryContentPanel({ organizationId, initialContentId, onClose, client = browserRepositoryClient }: {
   organizationId?: string
+  initialContentId?: string
   onClose: () => void
   client?: RepositoryClient
 }) {
@@ -32,7 +33,7 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
   const [source, setSource] = useState<RepositorySource | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState(Boolean(initialContentId))
   const [uploading, setUploading] = useState(false)
   const [attachments, setAttachments] = useState<RepositoryAttachmentStatus[]>([])
   const [attachmentPage, setAttachmentPage] = useState(1)
@@ -58,6 +59,16 @@ export function RepositoryContentPanel({ organizationId, onClose, client = brows
 
   useEffect(() => { headingRef.current?.focus() }, [])
   useEffect(() => { sourceRef.current = source }, [source])
+
+  useEffect(() => {
+    if (!initialContentId) return
+    const controller = new AbortController()
+    void client.source(initialContentId, organizationId, controller.signal)
+      .then((result) => { if (!controller.signal.aborted) { setSource(result); setDraft(draftFromSource(result)) } })
+      .catch(() => { if (!controller.signal.aborted) setError(translate('repository.sourceFailed')) })
+      .finally(() => { if (!controller.signal.aborted) setBusy(false) })
+    return () => controller.abort()
+  }, [client, initialContentId, organizationId])
 
   useEffect(() => {
     const controller = new AbortController()

@@ -5,7 +5,8 @@ from uuid import UUID
 
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
@@ -112,12 +113,14 @@ from .documents import (
 )
 from .models import (
     AuditEvent,
+    ContentNode,
     Document,
     DocumentationListingReference,
     DocumentAttachment,
     DocumentAttachmentPurpose,
     DocumentPublication,
     DocumentPublicationArtifact,
+    workspace_for_owner,
 )
 from .preflight import catalog as preflight_catalog
 from .preflight import run_document_preflight
@@ -206,14 +209,32 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = DocumentFileQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
     values = serializer.validated_data
-    queryset = DocumentAttachment.objects.filter(
-        document_id__in=documents_for_scope(workspace.data_scope).values("id"),
-        archived_at__isnull=True,
-    ).select_related("entity", "document__entity")
+    owner = workspace_for_owner(tenant=workspace.member.tenant, organization=workspace.organization)
+    native_document = ContentNode.objects.filter(
+        tenant=workspace.member.tenant,
+        organization=workspace.organization,
+        workspace=owner,
+        repository__workspace=owner,
+        repository__accepted_commit_id=F("repository__indexed_commit_id"),
+        content_id=OuterRef("owner_content_id"),
+        kind="document",
+    )
+    queryset = (
+        DocumentAttachment.objects.filter(
+            Q(document_id__in=documents_for_scope(workspace.data_scope).values("id"))
+            | Q(document__isnull=True, owner_workspace=owner, owner_content_id__isnull=False),
+            archived_at__isnull=True,
+            tenant=workspace.member.tenant,
+        )
+        .annotate(native_document_title=Subquery(native_document.values("title")[:1]))
+        .filter(Q(document__isnull=False) | Q(native_document_title__isnull=False))
+        .annotate(file_document_title=Coalesce("document__entity__display_name", "native_document_title"))
+        .select_related("entity", "document__entity")
+    )
     if values["q"]:
         queryset = queryset.filter(
             Q(original_filename__icontains=values["q"])
-            | Q(document__entity__display_name__icontains=values["q"])
+            | Q(file_document_title__icontains=values["q"])
             | Q(media_type__icontains=values["q"])
         )
     if values["kind"]:
@@ -228,7 +249,7 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
     field = ordering.removeprefix("-")
     ordering_fields = {
         "filename": "original_filename",
-        "document": "document__entity__display_name",
+        "document": "file_document_title",
         "kind": "purpose",
         "type": "media_type",
         "size": "size",
@@ -250,7 +271,8 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
                 "page": page,
                 "page_size": page_size,
                 "has_more": start + page_size < count,
-            }
+            },
+            context={"workspace": workspace},
         ).data
     )
 

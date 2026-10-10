@@ -1,5 +1,6 @@
 """API serializers for managed document files and attachment versions."""
 
+from django.urls import reverse
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -48,8 +49,10 @@ class DocumentFileQuerySerializer(StrictQuerySerializer):
 
 class DocumentFileSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
-    document_id = serializers.UUIDField(source="document.entity_id")
-    document_title = serializers.CharField(source="document.entity.display_name")
+    document_id = serializers.SerializerMethodField()
+    document_title = serializers.CharField(source="file_document_title")
+    source = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
     filename = serializers.CharField(source="original_filename")
     kind = serializers.SerializerMethodField()
     version = serializers.IntegerField(source="version_number", allow_null=True)
@@ -61,6 +64,35 @@ class DocumentFileSerializer(serializers.Serializer):
     @extend_schema_field(serializers.CharField())
     def get_kind(self, obj):  # type: ignore[no-untyped-def]
         return "primary" if obj.purpose == DocumentAttachmentPurpose.PRIMARY_FILE else "attachment"
+
+    @extend_schema_field(serializers.UUIDField())
+    def get_document_id(self, obj):  # type: ignore[no-untyped-def]
+        return obj.document.entity_id if obj.document_id else obj.owner_content_id
+
+    @extend_schema_field(serializers.ChoiceField(choices=("legacy", "repository")))
+    def get_source(self, obj):  # type: ignore[no-untyped-def]
+        return "legacy" if obj.document_id else "repository"
+
+    @extend_schema_field(serializers.CharField())
+    def get_download_url(self, obj):  # type: ignore[no-untyped-def]
+        workspace = self.context["workspace"]
+        if obj.document_id:
+            route = (
+                "organization-document-attachment-download"
+                if workspace.organization
+                else "msp-document-attachment-download"
+            )
+            kwargs = {"document_entity_id": obj.document.entity_id, "attachment_entity_id": obj.entity_id}
+        else:
+            route = (
+                "organization-content-document-attachment-download"
+                if workspace.organization
+                else "msp-content-document-attachment-download"
+            )
+            kwargs = {"content_id": obj.owner_content_id, "attachment_entity_id": obj.entity_id}
+        if workspace.organization:
+            kwargs["organization_entity_id"] = workspace.organization.entity_id
+        return reverse(route, kwargs=kwargs)
 
 
 class DocumentFileResultSerializer(serializers.Serializer):

@@ -19,6 +19,7 @@ const document: DocumentRecord = {
 
 const file: DocumentFile = {
   id: 'file-1', document_id: document.id, document_title: document.title, filename: 'firewall-runbook.pdf',
+  source: 'legacy', download_url: '/api/files/file-1/download',
   kind: 'attachment', version: null, media_type: 'application/pdf', size: 2048, checksum: 'b'.repeat(64),
   created_at: '2026-08-28T12:00:00Z',
 }
@@ -27,7 +28,6 @@ describe('Files', () => {
   it('lists authorized document files with download and owning-document links', async () => {
     const client = {
       listFiles: vi.fn().mockResolvedValue({ results: [file], count: 1, page: 1, page_size: 25, has_more: false }),
-      attachmentDownloadUrl: vi.fn().mockReturnValue('/api/files/file-1/download'),
     } as unknown as DocumentsClient
     const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Files workspace={null} client={client} /></NavigationGuardProvider> }], { initialEntries: ['/files?q=firewall'] })
     render(<RouterProvider router={router} />)
@@ -36,6 +36,17 @@ describe('Files', () => {
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
     expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/files/file-1/download')
     expect(screen.getByRole('table', { name: 'Document files' })).toBeInTheDocument()
+  })
+
+  it('links a repository-owned file to its Git document and private download', async () => {
+    const native: DocumentFile = { ...file, id: 'native-file', document_id: 'native-document', document_title: 'Device setup',
+      filename: 'device-steps.txt', source: 'repository', download_url: '/api/native-file/download' }
+    const client = { listFiles: vi.fn().mockResolvedValue({ results: [native], count: 1, page: 1, page_size: 25, has_more: false }) } as unknown as DocumentsClient
+    const router = createMemoryRouter([{ path: '*', element: <NavigationGuardProvider><Files workspace={null} client={client} /></NavigationGuardProvider> }], { initialEntries: ['/files'] })
+    render(<RouterProvider router={router} />)
+    expect(await screen.findByText('device-steps.txt')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Device setup' })).toHaveAttribute('href', '/documentation?repository=native-document')
+    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/native-file/download')
   })
 
   it('shows a truthful empty state when documents have no files', async () => {

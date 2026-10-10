@@ -647,6 +647,9 @@ later commits and older uploads without a recorded commit fail closed. Archive
 removes the active link but deliberately retains bytes for recovery. Historical
 reference reconciliation and physical retention policy remain open, as do
 publication, recovery, and authority-handoff gates.
+The staff Files register now also discovers active Git-owned ordinary files
+at an exact, current Workspace/document index and links to their repository
+editor and private download. This is file discovery, not an authority switch.
 
 - [x] Give a repository-native document a stable managed-file owner independent
   of the rebuildable content index, while preserving existing legacy file IDs,

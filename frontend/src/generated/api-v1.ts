@@ -10967,6 +10967,13 @@ export interface components {
             /** Format: uuid */
             readonly document_id: string;
             readonly document_title: string;
+            /**
+             * @description * `legacy` - legacy
+             *     * `repository` - repository
+             * @enum {string}
+             */
+            readonly source: "legacy" | "repository";
+            readonly download_url: string;
             readonly filename: string;
             readonly kind: string;
             readonly version: number | null;

@@ -39617,8 +39617,22 @@ components:
         document_id:
           type: string
           format: uuid
+          readOnly: true
         document_title:
           type: string
+        source:
+          enum:
+          - legacy
+          - repository
+          type: string
+          description: |-
+            * `legacy` - legacy
+            * `repository` - repository
+          x-spec-enum-id: 99330a295a08255a
+          readOnly: true
+        download_url:
+          type: string
+          readOnly: true
         filename:
           type: string
         kind:
@@ -39641,11 +39655,13 @@ components:
       - created_at
       - document_id
       - document_title
+      - download_url
       - filename
       - id
       - kind
       - media_type
       - size
+      - source
       - version
     DocumentFileResult:
       type: object

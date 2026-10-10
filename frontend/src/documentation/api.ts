@@ -106,6 +106,8 @@ export type DocumentFile = {
   id: string
   document_id: string
   document_title: string
+  source: 'legacy' | 'repository'
+  download_url: string
   filename: string
   kind: 'primary' | 'attachment'
   version: number | null

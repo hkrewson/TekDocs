@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import uuid
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 
@@ -54,6 +55,8 @@ from apps.core.models import (
 )
 from apps.core.organizations import create_organization
 from apps.core.publications import publish_document
+from apps.core.repository_editable_bundle_validation import verify_repository_editable_bundle
+from apps.core.repository_editable_bundles import export_repository_editable_bundle
 from apps.core.repository_service import RepositoryAuditAttribution, RepositoryServiceError, commit_repository_files
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -536,6 +539,15 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         assert json.loads(output.getvalue())["status"] == "imported"
         assert second_primary.replaces_id == first_primary.id
         assert third_primary.replaces_id == second_primary.id
+        bundle = export_repository_editable_bundle(workspace.repository)
+        bundle_manifest = verify_repository_editable_bundle(bundle.content)
+        assert [(item["version_number"], item["owner"]) for item in bundle_manifest["primary_files"]] == [
+            (number, {"type": "legacy_document", "id": str(primary.id)}) for number in (1, 2, 3)
+        ]
+        with zipfile.ZipFile(io.BytesIO(bundle.content)) as archive:
+            assert archive.read(f"primary-files/{first_primary.entity_id}") == b"primary\n"
+            assert archive.read(f"primary-files/{second_primary.entity_id}") == b"replacement\n"
+            assert archive.read(f"primary-files/{third_primary.entity_id}") == b"third retained version\n"
         browser = Client()
         browser.force_login(installation.owner)
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": primary.entity_id})

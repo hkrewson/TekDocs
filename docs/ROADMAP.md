@@ -1891,11 +1891,12 @@ switch document authority or close the remaining file parity gates.
 Guarded shadow-copy preview and apply now accept a legacy primary-file chain
 only after checking every retained version and binding its metadata to the
 plan. This preserves legacy custody and the primary-file handoff blocker;
-copied-chain editable export and custody transition remain open.
+copied-chain editable export now verifies exact retained bytes and typed owners,
+while custody transition remains open.
 It also re-reads the copied Markdown from the accepted Git revision, so a
 missing or altered Git source cannot pass merely because indexed rows still
 match the legacy export. The editable bundle and offline verifier now also
-cover retained Git-owned primary-file chains; database records, Git history and
+cover retained Git-owned and copied legacy primary-file chains; database records, Git history and
 other unreferenced files
 remain outside that editing handoff, not outside the separate backup path.
 Repository-native managed-file use is still incomplete: publication preflight

@@ -23,7 +23,8 @@ from .repository_source_validation import RepositorySourceValidationError, verif
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 MAX_EDITABLE_BUNDLE_BYTES = 75 * 1024 * 1024
-BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v3"
+BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v4"
+PRIMARY_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v3"
 OWNER_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v2"
 LEGACY_BUNDLE_FORMAT = "tekdocs-repository-editable-bundle/v1"
 
@@ -79,15 +80,22 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
     except (RepositorySourceExportError, RepositorySourceValidationError) as exc:
         raise RepositoryEditableBundleError("The repository source snapshot is unavailable.") from exc
     primary_versions = list(
-        DocumentAttachment.objects.filter(
+        DocumentAttachment.objects.select_related("document__entity").filter(
             tenant_id=repository.tenant_id,
             organization=repository.workspace.organization,
             owner_workspace_id=repository.workspace_id,
             owner_content_id__in=source_document_ids,
-            document__isnull=True,
             archived_at__isnull=True,
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             scan_status="clean",
+        ).filter(
+            Q(document__isnull=True)
+            | Q(
+                document__tenant_id=repository.tenant_id,
+                document__organization=repository.workspace.organization,
+                document__entity__workspace_id=repository.workspace_id,
+                document__archived_at__isnull=True,
+            )
         ).order_by("owner_content_id", "version_number")
     )
     if len(referenced) + len(primary_versions) > MAX_BUNDLE_ATTACHMENTS:
@@ -157,9 +165,19 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
     previous_by_owner: dict[UUID, DocumentAttachment] = {}
     for record in primary_versions:
         owner_id = record.owner_content_id
-        if owner_id is None or owner_id not in source_document_ids:
+        if (
+            owner_id is None
+            or owner_id not in source_document_ids
+            or (record.document_id is not None and record.document_id != owner_id)
+        ):
             raise RepositoryEditableBundleError("A primary file has an invalid repository owner.")
+        owner = {
+            "type": "legacy_document" if record.document_id else "repository_document",
+            "id": str(owner_id),
+        }
         previous = previous_by_owner.get(owner_id)
+        if previous is not None and bool(previous.document_id) != bool(record.document_id):
+            raise RepositoryEditableBundleError("A primary-file version chain has mixed custody.")
         expected_version = (previous.version_number or 0) + 1 if previous else 1
         if record.version_number != expected_version:
             raise RepositoryEditableBundleError("A primary-file version chain is incomplete.")
@@ -176,7 +194,7 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
         files[path] = content
         primary_descriptors.append({
             "id": str(record.entity_id),
-            "owner_content_id": str(owner_id),
+            "owner": owner,
             "version_number": record.version_number,
             "replaces_id": str(previous.entity_id) if previous else None,
             "path": path,
@@ -210,7 +228,8 @@ def export_repository_editable_bundle(repository: WorkspaceRepository) -> Reposi
     files["README.md"] = (
         b"# TekDocs editable repository bundle\n\n"
         b"Contains an exact Markdown source snapshot, managed files referenced by its current or reachable "
-        b"historical Markdown, and retained Git-owned primary-file versions. This is unsanitized and is not a backup: "
+        b"historical Markdown, and retained primary-file versions for Git-owned and copied legacy documents. "
+        b"This is unsanitized and is not a backup: "
         b"database records, Git history, and other unreferenced managed files are excluded. "
         b"Review before sharing.\n"
     )

@@ -528,8 +528,8 @@ def _source_snapshot(request, organization_entity_id: UUID | None = None) -> Htt
 class MSPContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_msp_export",
-        description=("The editable option returns a v3 bundle with referenced managed files and retained "
-                     "Git-owned primary-file versions. It is not a complete backup."),
+        description=("The editable option returns a v4 bundle with referenced managed files and retained "
+                     "Git-owned or copied legacy primary-file versions. It is not a complete backup."),
         parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,
@@ -545,8 +545,8 @@ class MSPContentAuthoringExportView(APIView):
 class OrganizationContentAuthoringExportView(APIView):
     @extend_schema(
         operation_id="content_authoring_organization_export",
-        description=("The editable option returns a v3 bundle with referenced managed files and retained "
-                     "Git-owned primary-file versions. It is not a complete backup."),
+        description=("The editable option returns a v4 bundle with referenced managed files and retained "
+                     "Git-owned or copied legacy primary-file versions. It is not a complete backup."),
         parameters=[ContentSourceExportQuerySerializer],
         responses={
             (200, "application/zip"): bytes,

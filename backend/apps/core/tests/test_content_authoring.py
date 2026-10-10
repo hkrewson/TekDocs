@@ -897,7 +897,7 @@ def test_editable_bundle_includes_native_file_from_current_git_source(authoring_
         response = browser.get(url)
         assert response.status_code == 200, response.content
         manifest = verify_repository_editable_bundle(response.content)
-        assert manifest["format"] == "tekdocs-repository-editable-bundle/v3"
+        assert manifest["format"] == "tekdocs-repository-editable-bundle/v4"
         assert manifest["attachments"][0]["owner"] == {
             "type": "repository_document", "id": str(document.content_id),
         }
@@ -942,11 +942,23 @@ def test_editable_bundle_retains_git_primary_file_chain_and_rejects_tampering(au
         assert [(item["id"], item["version_number"], item["replaces_id"]) for item in manifest["primary_files"]] == [
             (first_id, 1, None), (second_id, 2, first_id),
         ]
-        assert {item["owner_content_id"] for item in manifest["primary_files"]} == {str(document.content_id)}
+        assert {item["owner"]["id"] for item in manifest["primary_files"]} == {str(document.content_id)}
+        assert {item["owner"]["type"] for item in manifest["primary_files"]} == {"repository_document"}
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             assert archive.read(f"primary-files/{first_id}") == b"Original version\n"
             assert archive.read(f"primary-files/{second_id}") == b"Replacement version\n"
             entries = {name: archive.read(name) for name in archive.namelist()}
+        v3_manifest = json.loads(entries["tekdocs-bundle.json"])
+        v3_manifest["format"] = "tekdocs-repository-editable-bundle/v3"
+        v3_manifest["primary_files"] = [
+            {**{key: value for key, value in item.items() if key != "owner"}, "owner_content_id": item["owner"]["id"]}
+            for item in v3_manifest["primary_files"]
+        ]
+        v3_entries = dict(entries)
+        v3_entries["tekdocs-bundle.json"] = (
+            json.dumps(v3_manifest, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        assert verify_repository_editable_bundle(_archive(v3_entries))["format"] == v3_manifest["format"]
 
         def forged_bundle(change):
             changed = dict(entries)
@@ -963,7 +975,7 @@ def test_editable_bundle_retains_git_primary_file_chain_and_rejects_tampering(au
             ))
         with pytest.raises(RepositoryEditableBundleValidationError, match="version chain"):
             verify_repository_editable_bundle(forged_bundle(
-                lambda _entries, value: value["primary_files"][0].update({"owner_content_id": str(uuid.uuid4())})
+                lambda _entries, value: value["primary_files"][0]["owner"].update({"id": str(uuid.uuid4())})
             ))
         with pytest.raises(RepositoryEditableBundleValidationError, match="checksum"):
             verify_repository_editable_bundle(forged_bundle(

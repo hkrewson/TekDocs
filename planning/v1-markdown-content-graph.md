@@ -446,9 +446,10 @@ gates after file, template, review, key, publication and recovery parity.
 - Update editable exports, sanitized Git exports, templates, monitored sources,
   client listings and portal reads for the content graph.
 - The repository editable bundle now carries referenced legacy and Git-owned
-  managed files plus retained Git-owned primary-file versions in a v3 manifest.
+  managed files plus retained primary-file versions of Git-owned and copied
+  legacy documents in a v4 typed-owner manifest.
   Offline validation checks the exact referenced-file closure and primary-file
-  chain, while accepting older v1/v2 bundles; this remains an unsanitized
+  chain, while accepting older v1/v2/v3 bundles; this remains an unsanitized
   editing handoff, not a backup or authority transition.
 - Sanitized Git export now accepts an optional complete, exact accepted and
   indexed repository Markdown snapshot for one Workspace. It removes known
@@ -623,12 +624,13 @@ existing owner checks; signed file evidence and client delivery use the same
 retained artifact IDs. This closes that native publication-file path, not all
 publication or authority parity.
 The editable bundle now verifies bytes of referenced, same-Workspace legacy
-and Git-owned files. Its v3 manifest identifies the legacy or repository
-document owner for each referenced file and includes the complete retained
-primary-file chain of each Git-owned document in the source snapshot. The
-offline verifier still accepts v1/v2 bundles. Native owners must exist in the
-exported Markdown snapshot. This closes native file custody in this export,
-not publication, legacy-chain transfer, backup or authority parity.
+and Git-owned files. Its v4 manifest identifies the legacy or repository
+document owner for each referenced and primary file and includes the complete
+retained primary-file chain of each Git-owned or copied legacy document in the
+source snapshot. The offline verifier still accepts v1/v2/v3 bundles. Owners
+must exist in the exported Markdown snapshot. This closes retained primary-file
+bytes in this export, not publication, file-owner transfer, backup or authority
+parity.
 The supported backup/restore rehearsal now includes an indexed Git document
 with a native managed file alongside a legacy-owned file. It verifies both
 owner descriptors, exact bytes and the editable-bundle digest after an

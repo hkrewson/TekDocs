@@ -17,6 +17,7 @@ from .repository_editable_bundles import (
     MAX_BUNDLE_ATTACHMENTS,
     MAX_EDITABLE_BUNDLE_BYTES,
     OWNER_BUNDLE_FORMAT,
+    PRIMARY_BUNDLE_FORMAT,
     referenced_source_attachments,
 )
 from .repository_source_exports import MAX_SOURCE_ZIP_BYTES
@@ -73,19 +74,24 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
                 "format", "workspace_id", "accepted_commit", "source_sha256", "scope", "exclusions", "attachments"
             }
             if not isinstance(manifest, dict) or set(manifest) != (
-                common_manifest_fields | ({"primary_files"} if manifest.get("format") == BUNDLE_FORMAT else set())
+                common_manifest_fields | (
+                    {"primary_files"} if manifest.get("format") in {BUNDLE_FORMAT, PRIMARY_BUNDLE_FORMAT} else set()
+                )
             ):
                 raise RepositoryEditableBundleValidationError("The bundle manifest has an invalid shape.")
             if (
-                manifest["format"] not in {BUNDLE_FORMAT, OWNER_BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT}
+                manifest["format"] not in {
+                    BUNDLE_FORMAT, PRIMARY_BUNDLE_FORMAT, OWNER_BUNDLE_FORMAT, LEGACY_BUNDLE_FORMAT,
+                }
                 or manifest["scope"] != (
                     "current-and-reachable-historical-markdown-with-referenced-and-primary-files"
-                    if manifest["format"] == BUNDLE_FORMAT
+                    if manifest["format"] in {BUNDLE_FORMAT, PRIMARY_BUNDLE_FORMAT}
                     else "current-and-reachable-historical-markdown-with-referenced-files"
                 )
                 or manifest["exclusions"] != [
                     "database_records", "git_history",
-                    "other_unreferenced_managed_files" if manifest["format"] == BUNDLE_FORMAT
+                    "other_unreferenced_managed_files"
+                    if manifest["format"] in {BUNDLE_FORMAT, PRIMARY_BUNDLE_FORMAT}
                     else "unreferenced_managed_files",
                 ]
                 or not isinstance(manifest["source_sha256"], str)
@@ -162,22 +168,35 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
                 or len(primary_descriptors) + len(descriptors) > MAX_BUNDLE_ATTACHMENTS
             ):
                 raise RepositoryEditableBundleValidationError("The bundle primary-file inventory is invalid.")
-            previous_by_owner: dict[UUID, tuple[int, UUID]] = {}
+            previous_by_owner: dict[UUID, tuple[int, UUID, str | None]] = {}
             primary_order: list[tuple[UUID, int]] = []
             primary_ids: set[UUID] = set()
             for descriptor in primary_descriptors:
-                if not isinstance(descriptor, dict) or set(descriptor) != {
-                    "id", "owner_content_id", "version_number", "replaces_id", "path",
-                    "filename", "media_type", "size", "sha256",
+                common_primary_fields = {
+                    "id", "version_number", "replaces_id", "path", "filename", "media_type", "size", "sha256",
+                }
+                if not isinstance(descriptor, dict) or set(descriptor) != common_primary_fields | {
+                    "owner" if manifest["format"] == BUNDLE_FORMAT else "owner_content_id"
                 }:
                     raise RepositoryEditableBundleValidationError("The bundle has an invalid primary-file descriptor.")
-                owner_id = _uuid(descriptor["owner_content_id"])
+                owner_type: str | None = None
+                if manifest["format"] == BUNDLE_FORMAT:
+                    owner = descriptor["owner"]
+                    if not isinstance(owner, dict) or set(owner) != {"type", "id"}:
+                        raise RepositoryEditableBundleValidationError("The bundle has an invalid primary-file owner.")
+                    if owner["type"] not in {"legacy_document", "repository_document"}:
+                        raise RepositoryEditableBundleValidationError("The bundle has an invalid primary-file owner.")
+                    owner_type = owner["type"]
+                    owner_id = _uuid(owner["id"])
+                else:
+                    owner_id = _uuid(descriptor["owner_content_id"])
                 file_id = _uuid(descriptor["id"])
                 previous = previous_by_owner.get(owner_id)
                 version = descriptor["version_number"]
                 if (
                     owner_id not in source_document_ids
                     or file_id in primary_ids
+                    or (previous is not None and previous[2] != owner_type)
                     or type(version) is not int
                     or version != (previous[0] + 1 if previous else 1)
                     or descriptor["replaces_id"] != (str(previous[1]) if previous else None)
@@ -206,7 +225,7 @@ def verify_repository_editable_bundle(content: bytes) -> dict[str, object]:
                 expected.add(path)
                 primary_ids.add(file_id)
                 primary_order.append((owner_id, version))
-                previous_by_owner[owner_id] = (version, file_id)
+                previous_by_owner[owner_id] = (version, file_id, owner_type)
             if primary_order != sorted(primary_order):
                 raise RepositoryEditableBundleValidationError("The bundle primary-file inventory is unordered.")
             if set(names) != expected:

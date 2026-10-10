@@ -645,6 +645,11 @@ metadata, typed legacy ownership and the complete editable-bundle digest
 survive an independent restore. A missing superseded version now blocks both
 backup and post-restore integrity verification in the disposable stacks, and
 repair must restore a clean sweep. It does not transfer legacy file custody.
+Until publication evidence can freeze a primary-file chain and its selected
+document role, signing a repository document with any retained primary-file
+version fails with an explicit parity-pending conflict. Ordinary-file
+publication and historical evidence verification remain available; this is a
+fail-closed guard, not publication parity.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

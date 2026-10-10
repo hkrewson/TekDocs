@@ -33,7 +33,11 @@ from apps.core.content_publication_sources import (
     freeze_git_document_dependencies,
     pinned_git_document_dependencies,
 )
-from apps.core.document_attachments import create_document_attachment, create_repository_document_attachment
+from apps.core.document_attachments import (
+    append_repository_primary_document_file,
+    create_document_attachment,
+    create_repository_document_attachment,
+)
 from apps.core.document_key_models import DocumentKeyBinding
 from apps.core.documents import create_document
 from apps.core.models import (
@@ -42,6 +46,7 @@ from apps.core.models import (
     ContentNode,
     ContentTemplateSource,
     Document,
+    DocumentAttachmentPurpose,
     EntityVisibility,
     InstallationState,
     NotificationEmailDelivery,
@@ -2198,6 +2203,143 @@ def test_repository_evidence_rejects_attachment_without_exact_document(compositi
             actor=installation.owner,
         )
     assert RepositoryPublicationEvidence.objects.count() == 0
+
+
+@pytest.mark.parametrize("owner_kind", ["legacy", "native"])
+def test_repository_evidence_refuses_unfrozen_primary_file_history(composition_repository, tmp_path, owner_kind):
+    installation, _workspace, repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = (
+            create_document(
+                tenant=installation.tenant,
+                organization=None,
+                actor_id=installation.owner.id,
+                title="Primary file guide",
+                markdown="Legacy notes.\n",
+            )
+            if owner_kind == "legacy"
+            else None
+        )
+        content_id = document.id if document is not None else uuid.uuid4()
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={
+                "documents/primary-file-guide.md": _content(
+                    content_id=content_id,
+                    title="Primary file guide",
+                    body="Published notes without a primary-file link.\n",
+                )
+            },
+            message="Add primary-file publication candidate",
+        )
+        index_repository_content(repository_id=repository.id)
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        prior_evidence = retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=content_id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        upload = SimpleUploadedFile("source-v1.txt", b"Retained primary source, version one.\n")
+        if document is not None:
+            primary = create_document_attachment(
+                document=document,
+                actor_id=installation.owner.id,
+                upload=upload,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                version_number=1,
+            )
+        else:
+            primary = append_repository_primary_document_file(
+                repository=repository,
+                content_id=content_id,
+                actor_id=installation.owner.id,
+                upload=upload,
+                expected_current_entity_id=None,
+            )
+        assert primary.owner_content_id == content_id
+        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.primary_file.parity_pending"):
+            retain_repository_publication_evidence(
+                repository_id=repository.id,
+                content_id=content_id,
+                audience="msp_internal",
+                actor=installation.owner,
+            )
+        browser = Client()
+        browser.force_login(installation.owner)
+        response = browser.post(
+            reverse("msp-repository-publication-evidence"),
+            data=json.dumps({"content_id": str(content_id), "audience": "msp_internal"}),
+            content_type="application/json",
+        )
+        assert response.status_code == 409
+        assert response.json()["detail"].endswith("repository.primary_file.parity_pending")
+        assert RepositoryPublicationEvidence.objects.count() == 1
+        assert verify_repository_publication_evidence(prior_evidence)["valid"]
+
+
+def test_repository_evidence_serializes_legacy_primary_upload(composition_repository, tmp_path):
+    installation, _workspace, repository = composition_repository
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        document = create_document(
+            tenant=installation.tenant,
+            organization=None,
+            actor_id=installation.owner.id,
+            title="Serialized primary",
+            markdown="Legacy notes.\n",
+        )
+        repository_service.commit_repository_files(
+            repository_id=repository.id,
+            expected_base=_accepted(repository),
+            changes={
+                "documents/serialized-primary.md": _content(
+                    content_id=document.id,
+                    title="Serialized primary",
+                    body="Repository notes.\n",
+                )
+            },
+            message="Add legacy primary publication candidate",
+        )
+        index_repository_content(repository_id=repository.id)
+        Authenticator.objects.create(
+            user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+        )
+        started = Event()
+
+        def upload_primary():
+            started.set()
+            return create_document_attachment(
+                document=document,
+                actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("primary.txt", b"Concurrent primary bytes.\n"),
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                version_number=1,
+            )
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                evidence = retain_repository_publication_evidence(
+                    repository_id=repository.id,
+                    content_id=document.id,
+                    audience="msp_internal",
+                    actor=installation.owner,
+                )
+                future = pool.submit(upload_primary)
+                assert started.wait(5)
+                with pytest.raises(TimeoutError):
+                    future.result(timeout=0.2)
+            assert future.result(timeout=10).document_id == document.id
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        with pytest.raises(RepositoryPublicationEvidenceError, match="repository.primary_file.parity_pending"):
+            retain_repository_publication_evidence(
+                repository_id=repository.id,
+                content_id=document.id,
+                audience="msp_internal",
+                actor=installation.owner,
+            )
 
 
 @pytest.mark.parametrize("link_id_kind", ["entity_id", "id"])

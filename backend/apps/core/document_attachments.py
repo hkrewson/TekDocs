@@ -249,6 +249,10 @@ def _create_managed_attachment(
                 if accepted_commit is None:
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
                 upload_commit = accepted_commit.object_id
+            elif purpose == DocumentAttachmentPurpose.PRIMARY_FILE:
+                # Publication evidence locks this same row before checking for
+                # primary versions, including when the chain is still empty.
+                Document.objects.select_for_update().get(pk=document.pk)
             entity = Entity.objects.create(
                 id=attachment_entity_id,
                 tenant=tenant,

@@ -44,6 +44,7 @@ from .models import (
     AuditEvent,
     Document,
     DocumentAttachment,
+    DocumentAttachmentPurpose,
     Entity,
     PublicationAudience,
     RepositoryEvidenceAttachment,
@@ -252,6 +253,30 @@ def _retain_pinned_evidence(
         ).first()
         if node is None:
             raise RepositoryPublicationEvidenceError("Indexed repository document is unavailable")
+        document = (
+            Document.objects.select_for_update()
+            .filter(
+                id=content_id,
+                tenant_id=repository.tenant_id,
+                organization=repository.workspace.organization,
+                entity__workspace_id=repository.workspace_id,
+                archived_at__isnull=True,
+            )
+            .first()
+        )
+        # Primary files are document-owned content, not Markdown attachment links.
+        # Until evidence freezes their complete version chain and selected role,
+        # signing only the Markdown would silently omit part of the document.
+        if DocumentAttachment.objects.select_for_update().filter(
+            tenant_id=repository.tenant_id,
+            organization=repository.workspace.organization,
+            owner_workspace_id=repository.workspace_id,
+            owner_content_id=content_id,
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).exists():
+            raise RepositoryPublicationEvidenceError(
+                "Repository publication preflight blocked: repository.primary_file.parity_pending"
+            )
         variant = node.composition_variants.get(audience)
         if not isinstance(variant, dict) or not isinstance(variant.get("markdown"), str):
             raise RepositoryPublicationEvidenceError("Indexed repository composition is unavailable")
@@ -272,23 +297,10 @@ def _retain_pinned_evidence(
             )
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
         source_ids_by_attachment_id: dict[uuid.UUID, uuid.UUID] = {}
-        document: Document | None = None
-        if attachment_ids or key_targets:
-            document = (
-                Document.objects.select_for_update()
-                .filter(
-                    id=content_id,
-                    tenant_id=repository.tenant_id,
-                    organization=repository.workspace.organization,
-                    entity__workspace_id=repository.workspace_id,
-                    archived_at__isnull=True,
-                )
-                .first()
+        if document is None and key_targets:
+            raise RepositoryPublicationEvidenceError(
+                "Repository publication preflight blocked: repository.key.unavailable"
             )
-            if document is None and key_targets:
-                raise RepositoryPublicationEvidenceError(
-                    "Repository publication preflight blocked: repository.key.unavailable"
-                )
         if attachment_ids:
             owner_filter = Q(document__isnull=True)
             if document is not None:

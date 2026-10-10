@@ -37,6 +37,13 @@ schema must fail instead of discarding or recasting retained history.
 The editable repository bundle includes retained native and copied legacy
 primary-file history in a versioned manifest with typed owner, predecessor and checksum checks.
 It remains an editing handoff, not a replacement for database-and-Git backups.
+Repository publication evidence currently freezes Markdown attachment links,
+not document-owned primary-file roles. A legacy-owned or Git-owned primary
+chain therefore blocks new evidence signing until a versioned evidence format
+can retain the complete chain and explicitly select the published file role.
+Previously signed evidence remains immutable and verifiable. Evidence retention
+and legacy primary-file creation serialize on the legacy document row; native
+primary-file creation already serializes on the accepted repository row.
 
 ## Alternatives considered
 

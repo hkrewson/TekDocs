@@ -1905,6 +1905,10 @@ bytes, order, typed owner and editable-bundle digest after independent restore.
 It also proves that a missing superseded version blocks backup and post-restore
 integrity verification until that version is repaired.
 This is recovery evidence, not legacy file-owner transfer or authority handoff.
+Repository publication signing now fails closed for either legacy-owned or
+Git-owned primary-file history instead of signing an incomplete Markdown-only
+snapshot. The explicit conflict does not establish primary-file publication
+parity or permit file-authority transfer.
 Repository-native managed-file use is still incomplete: publication preflight
 requires a legacy `Document` row.
 [ADR 0114](adr/0114-stable-managed-file-content-ownership.md) is accepted,

@@ -310,6 +310,7 @@ function RepositoryPublicationDetail({ publication, onBack }: { publication: Por
     <section aria-labelledby="portal-publication-downloads"><h3 id="portal-publication-downloads">{translate('portal.files')}</h3><ul className="portal-download-list">
       <li><a href={portalClient.repositoryPublicationPdfUrl(publication.id)}><Download size={15} aria-hidden="true" />{translate('portal.downloadPublicationPdf')}</a></li>
       {publication.attachments.map((attachment) => <li key={attachment.id}><a href={portalClient.repositoryPublicationAttachmentUrl(publication.id, attachment.id)}><Download size={15} aria-hidden="true" />{attachment.filename}</a><span>{Math.max(1, Math.ceil(attachment.size / 1024))} KB</span></li>)}
+      {publication.primary_file?.versions.map((version) => <li key={version.id}><a href={portalClient.repositoryPublicationAttachmentUrl(publication.id, version.id)}><Download size={15} aria-hidden="true" />{translate('portal.primaryFileVersion', { filename: version.filename, version: version.version_number })}</a><span>{version.source_id === publication.primary_file?.selected_source_id ? translate('portal.primaryFileCurrent') : ''}</span></li>)}
     </ul></section>
   </article>
 }

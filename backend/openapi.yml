@@ -49312,6 +49312,43 @@ components:
       - id
       - media_type
       - size
+    PortalRepositoryPrimaryFile:
+      type: object
+      properties:
+        selected_source_id:
+          type: string
+          format: uuid
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalRepositoryPrimaryVersion'
+      required:
+      - selected_source_id
+      - versions
+    PortalRepositoryPrimaryVersion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        media_type:
+          type: string
+        size:
+          type: integer
+        source_id:
+          type: string
+          format: uuid
+        version_number:
+          type: integer
+      required:
+      - filename
+      - id
+      - media_type
+      - size
+      - source_id
+      - version_number
     PortalRepositoryPublication:
       type: object
       properties:
@@ -49351,11 +49388,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PortalRepositoryAttachment'
+        primary_file:
+          allOf:
+          - $ref: '#/components/schemas/PortalRepositoryPrimaryFile'
+          nullable: true
       required:
       - attachments
       - content_id
       - created_at
       - id
+      - primary_file
       - rendered_html
       - title
     PortalRepositoryPublicationResult:

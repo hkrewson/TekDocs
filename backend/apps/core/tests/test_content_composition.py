@@ -88,12 +88,11 @@ from apps.core.repository_publication_preflight import repository_publication_pr
 from apps.core.repository_service import RepositoryFileNotFoundError
 from apps.core.repository_static_delivery import _client_reference_projection_safe
 from apps.core.repository_static_publications import (
-    RepositoryStaticPublicationError,
-    create_repository_static_publication,
-    verify_repository_static_publication,
+    _manifest as static_publication_manifest,
 )
 from apps.core.repository_static_publications import (
-    _manifest as static_publication_manifest,
+    create_repository_static_publication,
+    verify_repository_static_publication,
 )
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
@@ -2323,7 +2322,7 @@ def test_repository_evidence_retains_primary_file_history(composition_repository
         assert verify_repository_publication_evidence(prior_evidence)["valid"]
 
 
-def test_primary_file_package_retains_chain_but_static_stays_blocked(composition_repository, tmp_path):
+def test_primary_file_package_static_and_portal_retain_complete_chain(composition_repository, tmp_path):
     installation, _workspace, _repository = composition_repository
     with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
         organization = create_organization(
@@ -2405,9 +2404,6 @@ def test_primary_file_package_retains_chain_but_static_stays_blocked(composition
             outcome=RepositoryPackageAuthorization.Outcome.AUTHORIZED_FOR_PUBLICATION,
             reason="Review package completeness", actor=reviewer,
         )
-        with pytest.raises(RepositoryStaticPublicationError, match="Primary-file STATIC delivery parity is pending"):
-            create_repository_static_publication(authorization_id=authorization.id, actor=installation.owner)
-        assert RepositoryStaticPublication.objects.count() == 0
         publication_id = uuid.uuid4()
         with pytest.raises(DatabaseError), transaction.atomic():
             RepositoryStaticPublication.objects.create(
@@ -2416,10 +2412,10 @@ def test_primary_file_package_retains_chain_but_static_stays_blocked(composition
                 organization=package.organization,
                 workspace=package.workspace,
                 authorization=authorization,
-                manifest=static_publication_manifest(
+                manifest={**static_publication_manifest(
                     publication_id=publication_id, authorization=authorization,
                     actor=installation.owner, created_at=authorization.occurred_at,
-                ),
+                ), "primary_file": {"selected_source_id": str(current.entity_id), "versions": []}},
                 content_digest="0" * 64,
                 signature="blocked",
                 public_key="blocked",
@@ -2428,8 +2424,81 @@ def test_primary_file_package_retains_chain_but_static_stays_blocked(composition
                 created_at=authorization.occurred_at,
             )
         assert RepositoryStaticPublication.objects.count() == 0
+        publication = create_repository_static_publication(
+            authorization_id=authorization.id, actor=installation.owner
+        )
+        assert publication.manifest["format"] == "tekdocs-repository-static-publication/v2"
+        assert publication.manifest["primary_file"] == package.manifest["primary_file"]
+        assert verify_repository_static_publication(publication)
+        portal_user = User.objects.create_user(
+            email="primary-evidence-client@example.invalid", display_name="Primary client"
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=portal_user,
+            role=BuiltInRole.CLIENT_USER, organization=organization,
+        )
+        portal_list_url = reverse("client-portal-repository-publication-list")
+        portal_detail_url = reverse("client-portal-repository-publication-detail", args=[publication.id])
+        old_url = reverse("client-portal-repository-publication-attachment", args=[publication.id, artifact.id])
+        current_artifact = evidence.attachments.get(source_attachment=current)
+        current_url = reverse(
+            "client-portal-repository-publication-attachment", args=[publication.id, current_artifact.id]
+        )
+        browser.force_login(portal_user)
+        assert browser.get(portal_list_url).json()["results"] == []
+        assert browser.get(old_url).status_code == 404
+        browser.force_login(reviewer)
+        control_url = reverse(
+            "organization-repository-publication-evidence-static-control", args=[organization.entity_id, evidence.id]
+        )
+        delivery_url = reverse(
+            "organization-repository-publication-evidence-static-delivery", args=[organization.entity_id, evidence.id]
+        )
+        released = browser.post(
+            control_url, data=json.dumps({"action": "released", "reason": "Exact chain reviewed"}),
+            content_type="application/json",
+        )
+        assert released.status_code == 201, released.content
+        delivered = browser.post(
+            delivery_url, data=json.dumps({"reason": "Client delivery approved"}),
+            content_type="application/json",
+        )
+        assert delivered.status_code == 201, delivered.content
+        browser.force_login(portal_user)
+        assert [row["id"] for row in browser.get(portal_list_url).json()["results"]] == [str(publication.id)]
+        detail = browser.get(portal_detail_url)
+        assert detail.status_code == 200
+        assert detail.json()["primary_file"]["selected_source_id"] == str(current.entity_id)
+        assert [row["id"] for row in detail.json()["primary_file"]["versions"]] == [
+            str(artifact.id), str(current_artifact.id)
+        ]
+        assert browser.get(old_url).content == b"Client primary version one.\n"
+        assert browser.get(current_url).content == b"Client primary version two.\n"
+        call_command("verify_recovery_publications")
+        sibling_user = User.objects.create_user(
+            email="primary-evidence-sibling@example.invalid", display_name="Sibling client"
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=sibling_user,
+            role=BuiltInRole.CLIENT_USER, organization=sibling,
+        )
+        browser.force_login(sibling_user)
+        assert browser.get(portal_list_url).json()["results"] == []
+        assert browser.get(portal_detail_url).status_code == 404
+        assert browser.get(old_url).status_code == 404
+        browser.force_login(portal_user)
+        assert browser.get(reverse(
+            "client-portal-repository-publication-detail", args=[uuid.uuid4()]
+        )).status_code == 404
         artifact.file.storage.delete(artifact.file.name)
         assert not verify_repository_publication_package(package)
+        assert not verify_repository_static_publication(publication)
+        with pytest.raises(CommandError, match="Retained repository publication integrity check failed"):
+            call_command("verify_recovery_publications")
+        assert browser.get(portal_list_url).json()["results"] == []
+        assert browser.get(portal_detail_url).status_code == 404
+        assert browser.get(old_url).status_code == 404
+        assert browser.get(current_url).status_code == 404
 
 
 @pytest.mark.parametrize("owner_kind", ["legacy", "native"])

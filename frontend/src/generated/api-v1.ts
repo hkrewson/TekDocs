@@ -2821,6 +2821,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}/primary-file": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_msp_primary_file_versions"];
+        readonly put?: never;
+        readonly post: operations["content_authoring_msp_primary_file_append"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/content-graph/authoring/export": {
         readonly parameters: {
             readonly query?: never;
@@ -2828,6 +2844,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description The editable option returns a v4 bundle with referenced managed files and retained Git-owned or copied legacy primary-file versions. It is not a complete backup. */
         readonly get: operations["content_authoring_msp_export"];
         readonly put?: never;
         readonly post?: never;
@@ -5480,6 +5497,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/primary-file": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_organization_primary_file_versions"];
+        readonly put?: never;
+        readonly post: operations["content_authoring_organization_primary_file_append"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export": {
         readonly parameters: {
             readonly query?: never;
@@ -5487,6 +5520,7 @@ export interface paths {
             readonly path?: never;
             readonly cookie?: never;
         };
+        /** @description The editable option returns a v4 bundle with referenced managed files and retained Git-owned or copied legacy primary-file versions. It is not a complete backup. */
         readonly get: operations["content_authoring_organization_export"];
         readonly put?: never;
         readonly post?: never;
@@ -11016,6 +11050,13 @@ export interface components {
              */
             readonly read_projection_state: "not_checked" | "matched" | "different" | "unavailable";
             /**
+             * @description * `absent` - absent
+             *     * `retained_bytes_verified` - retained_bytes_verified
+             *     * `unavailable` - unavailable
+             * @enum {string}
+             */
+            readonly primary_file_state: "absent" | "retained_bytes_verified" | "unavailable";
+            /**
              * @description * `legacy_only` - legacy_only
              *     * `repository_missing` - repository_missing
              *     * `index_pending` - index_pending
@@ -15140,6 +15181,21 @@ export interface components {
             readonly media_type: string;
             readonly size: number;
         };
+        readonly PortalRepositoryPrimaryFile: {
+            /** Format: uuid */
+            readonly selected_source_id: string;
+            readonly versions: readonly components["schemas"]["PortalRepositoryPrimaryVersion"][];
+        };
+        readonly PortalRepositoryPrimaryVersion: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly filename: string;
+            readonly media_type: string;
+            readonly size: number;
+            /** Format: uuid */
+            readonly source_id: string;
+            readonly version_number: number;
+        };
         readonly PortalRepositoryPublication: {
             /** Format: uuid */
             readonly id: string;
@@ -15159,6 +15215,7 @@ export interface components {
             readonly created_at: string;
             readonly rendered_html: string;
             readonly attachments: readonly components["schemas"]["PortalRepositoryAttachment"][];
+            readonly primary_file: components["schemas"]["PortalRepositoryPrimaryFile"] | null;
         };
         readonly PortalRepositoryPublicationResult: {
             readonly results: readonly components["schemas"]["PortalRepositoryPublication"][];
@@ -15862,6 +15919,7 @@ export interface components {
             readonly signed_at: string;
             readonly canonical_markdown: string;
             readonly attachments: readonly components["schemas"]["RepositoryEvidenceReviewAttachment"][];
+            readonly primary_file: components["schemas"]["RepositoryEvidenceReviewPrimaryFile"] | null;
             readonly verified: boolean;
         };
         readonly RepositoryEvidenceReviewAttachment: {
@@ -15872,6 +15930,29 @@ export interface components {
             readonly filename: string;
             readonly media_type: string;
             readonly size: number;
+        };
+        readonly RepositoryEvidenceReviewPrimaryFile: {
+            /** Format: uuid */
+            readonly selected_source_id: string;
+            readonly versions: readonly components["schemas"]["RepositoryEvidenceReviewPrimaryVersion"][];
+        };
+        readonly RepositoryEvidenceReviewPrimaryVersion: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly source_id: string;
+            readonly filename: string;
+            readonly media_type: string;
+            readonly size: number;
+            readonly version_number: number;
+            /** Format: uuid */
+            readonly replaces_id: string | null;
+            /**
+             * @description * `legacy_document` - legacy_document
+             *     * `repository_document` - repository_document
+             * @enum {string}
+             */
+            readonly owner_type: "legacy_document" | "repository_document";
         };
         readonly RepositoryEvidenceSummary: {
             /** Format: uuid */
@@ -15944,6 +16025,19 @@ export interface components {
              */
             readonly outcome: "authorized_for_publication" | "rejected";
             readonly reason: string;
+        };
+        readonly RepositoryPrimaryFilePage: {
+            readonly results: readonly components["schemas"]["DocumentPrimaryFile"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+        };
+        readonly RepositoryPrimaryFileWrite: {
+            /** Format: uri */
+            readonly file: string;
+            /** Format: uuid */
+            readonly expected_current_id?: string | null;
         };
         readonly RepositoryStateCounts: {
             readonly never: number;
@@ -24451,6 +24545,69 @@ export interface operations {
             };
         };
     };
+    readonly content_authoring_msp_primary_file_versions: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryPrimaryFilePage"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_msp_primary_file_append: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "multipart/form-data": components["schemas"]["RepositoryPrimaryFileWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentPrimaryFile"];
+                };
+            };
+            /** @description Current version changed */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     readonly content_authoring_msp_export: {
         readonly parameters: {
             readonly query?: {
@@ -31577,6 +31734,71 @@ export interface operations {
             };
             /** @description Retained file is missing or has changed */
             readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_primary_file_versions: {
+        readonly parameters: {
+            readonly query?: {
+                readonly page?: number;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryPrimaryFilePage"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_primary_file_append: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "multipart/form-data": components["schemas"]["RepositoryPrimaryFileWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DocumentPrimaryFile"];
+                };
+            };
+            /** @description Current version changed */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

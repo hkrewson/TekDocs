@@ -22,7 +22,12 @@ from .publications import canonical_json, publication_signing_key, publication_t
 from .repository_publication_packages import PRIMARY_PACKAGE_FORMAT, verify_repository_publication_package
 
 STATIC_FORMAT = "tekdocs-repository-static-publication/v1"
-_DOMAIN = b"TEKDOCS-REPOSITORY-STATIC-PUBLICATION\x00v1\x00"
+PRIMARY_STATIC_FORMAT = "tekdocs-repository-static-publication/v2"
+
+
+def _domain(format_name: str) -> bytes:
+    version = "v2" if format_name == PRIMARY_STATIC_FORMAT else "v1"
+    return b"TEKDOCS-REPOSITORY-STATIC-PUBLICATION\x00" + version.encode("ascii") + b"\x00"
 
 
 class RepositoryStaticPublicationError(RuntimeError):
@@ -39,8 +44,8 @@ def _manifest(
 ) -> dict[str, object]:
     package = authorization.package
     evidence = package.decision.evidence
-    return {
-        "format": STATIC_FORMAT,
+    manifest: dict[str, object] = {
+        "format": PRIMARY_STATIC_FORMAT if package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT else STATIC_FORMAT,
         "publication_id": str(publication_id),
         "workspace_id": str(package.workspace_id),
         "organization_id": str(package.organization_id),
@@ -57,6 +62,9 @@ def _manifest(
         "created_by": str(actor.id),
         "created_at": _timestamp(created_at),
     }
+    if package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT:
+        manifest["primary_file"] = package.manifest["primary_file"]
+    return manifest
 
 
 def verify_repository_static_publication(publication: RepositoryStaticPublication) -> bool:
@@ -70,7 +78,6 @@ def verify_repository_static_publication(publication: RepositoryStaticPublicatio
             != (authorization.tenant_id, authorization.organization_id, authorization.workspace_id)
             or (publication.tenant_id, publication.organization_id, publication.workspace_id)
             != (package.tenant_id, package.organization_id, package.workspace_id)
-            or package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT
             or not verify_repository_publication_package(package)
         ):
             return False
@@ -78,7 +85,7 @@ def verify_repository_static_publication(publication: RepositoryStaticPublicatio
             publication_id=publication.id, authorization=authorization,
             actor=publication.created_by, created_at=publication.created_at,
         )
-        digest = hashlib.sha256(_DOMAIN + canonical_json(expected)).digest()
+        digest = hashlib.sha256(_domain(str(expected["format"])) + canonical_json(expected)).digest()
         raw_key = base64.b64decode(publication.public_key.encode("ascii"), altchars=b"-_", validate=True)
         signature = base64.b64decode(publication.signature.encode("ascii"), altchars=b"-_", validate=True)
         _current, trusted = publication_trusted_key_fingerprints()
@@ -114,14 +121,12 @@ def create_repository_static_publication(
         or not verify_repository_publication_package(package)
     ):
         raise RepositoryStaticPublicationError("Authorized, intact retained package is required")
-    if package.manifest.get("format") == PRIMARY_PACKAGE_FORMAT:
-        raise RepositoryStaticPublicationError("Primary-file STATIC delivery parity is pending")
     publication_id = uuid.uuid4()
     created_at = timezone.now()
     manifest = _manifest(
         publication_id=publication_id, authorization=authorization, actor=actor, created_at=created_at,
     )
-    digest = hashlib.sha256(_DOMAIN + canonical_json(manifest)).digest()
+    digest = hashlib.sha256(_domain(str(manifest["format"])) + canonical_json(manifest)).digest()
     key = publication_signing_key()
     raw_key = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     publication = RepositoryStaticPublication.objects.create(

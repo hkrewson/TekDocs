@@ -45,9 +45,20 @@ class PortalRepositoryAttachmentSerializer(serializers.Serializer):
     size = serializers.IntegerField()
 
 
+class PortalRepositoryPrimaryVersionSerializer(PortalRepositoryAttachmentSerializer):
+    source_id = serializers.UUIDField()
+    version_number = serializers.IntegerField()
+
+
+class PortalRepositoryPrimaryFileSerializer(serializers.Serializer):
+    selected_source_id = serializers.UUIDField()
+    versions = PortalRepositoryPrimaryVersionSerializer(many=True)
+
+
 class PortalRepositoryPublicationDetailSerializer(PortalRepositoryPublicationSerializer):
     rendered_html = serializers.CharField()
     attachments = PortalRepositoryAttachmentSerializer(many=True)
+    primary_file = PortalRepositoryPrimaryFileSerializer(allow_null=True)
 
 
 class PortalRepositoryPublicationResultSerializer(serializers.Serializer):
@@ -199,6 +210,19 @@ class ClientPortalRepositoryPublicationDetailView(APIView):
                         {key: item[key] for key in ("id", "filename", "media_type", "size")}
                         for item in evidence.manifest.get("attachments", [])
                     ],
+                    "primary_file": (
+                        {
+                            "selected_source_id": evidence.manifest["primary_file"]["selected_source_id"],
+                            "versions": [
+                                {
+                                    key: item[key]
+                                    for key in ("id", "source_id", "version_number", "filename", "media_type", "size")
+                                }
+                                for item in evidence.manifest["primary_file"]["versions"]
+                            ],
+                        }
+                        if "primary_file" in evidence.manifest else None
+                    ),
                 }
             ).data
         )
@@ -247,11 +271,12 @@ class ClientPortalRepositoryPublicationAttachmentView(APIView):
             organization_id=publication.organization_id,
             workspace_id=publication.workspace_id,
         )
+        descriptors = [
+            *evidence.manifest.get("attachments", []),
+            *evidence.manifest.get("primary_file", {}).get("versions", []),
+        ]
         descriptor = next(
-            (
-                item for item in evidence.manifest.get("attachments", [])
-                if isinstance(item, dict) and item.get("id") == str(artifact.id)
-            ),
+            (item for item in descriptors if isinstance(item, dict) and item.get("id") == str(artifact.id)),
             None,
         )
         if descriptor is None or artifact.size > MAX_RETAINED_ATTACHMENT_BYTES:

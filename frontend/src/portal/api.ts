@@ -47,6 +47,10 @@ export type PortalRepositoryAttachment = {
 export type PortalRepositoryPublicationDetail = PortalRepositoryPublication & {
   rendered_html: string
   attachments: PortalRepositoryAttachment[]
+  primary_file?: {
+    selected_source_id: string
+    versions: (PortalRepositoryAttachment & { source_id: string; version_number: number })[]
+  } | null
 }
 
 export type PortalRepositoryPublicationResult = {

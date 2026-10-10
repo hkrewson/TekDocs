@@ -1478,6 +1478,8 @@
   "portal.loadMorePublications": "Load more publications",
   "portal.loadingMorePublications": "Loading more publications…",
   "portal.allPublications": "All new publications",
+  "portal.primaryFileVersion": "{filename} · version {version}",
+  "portal.primaryFileCurrent": "Current",
   "portal.downloadPublicationPdf": "Download PDF",
   "compliance.addControl": "Add control",
   "compliance.newVersion": "New version",

@@ -353,6 +353,25 @@ def migration_head_restored(transactional_db):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_primary_static_validator_upgrade_and_reverse(migration_head_restored):
+    if connection.vendor != "postgresql":
+        pytest.skip("STATIC validator migration requires PostgreSQL")
+
+    def validator_sql():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_get_functiondef('tekdocs_validate_repository_static_publication()'::regprocedure)"
+            )
+            return cursor.fetchone()[0]
+
+    assert "tekdocs-repository-static-publication/v2" in validator_sql()
+    call_command("migrate", "core", "0189_primary_repository_package", verbosity=0, interactive=False)
+    assert "tekdocs-repository-static-publication/v2" not in validator_sql()
+    call_command("migrate", "core", verbosity=0, interactive=False)
+    assert "tekdocs-repository-static-publication/v2" in validator_sql()
+
+
+@pytest.mark.django_db(transaction=True)
 def test_attachment_content_owner_upgrade_backfills_legacy_rows(migration_head_restored, tmp_path, monkeypatch):
     if connection.vendor != "postgresql":
         pytest.skip("Attachment owner upgrade validation requires PostgreSQL")

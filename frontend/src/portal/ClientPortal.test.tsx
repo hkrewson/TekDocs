@@ -245,6 +245,10 @@ describe('ClientPortal', () => {
         ...publication,
         rendered_html: '<h3>Setup steps</h3><script>alert(1)</script>',
         attachments: [{ id: 'artifact-1', filename: 'enrollment.txt', media_type: 'text/plain', size: 128 }],
+        primary_file: { selected_source_id: 'file-v2', versions: [
+          { id: 'primary-1', source_id: 'file-v1', version_number: 1, filename: 'setup-v1.txt', media_type: 'text/plain', size: 64 },
+          { id: 'primary-2', source_id: 'file-v2', version_number: 2, filename: 'setup-v2.txt', media_type: 'text/plain', size: 96 },
+        ] },
       }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
     })
@@ -254,6 +258,9 @@ describe('ClientPortal', () => {
     expect(container.querySelector('script')).toBeNull()
     expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/pdf')
     expect(screen.getByRole('link', { name: 'enrollment.txt' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/attachments/artifact-1')
+    expect(screen.getByRole('link', { name: 'setup-v1.txt · version 1' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/attachments/primary-1')
+    expect(screen.getByRole('link', { name: 'setup-v2.txt · version 2' })).toHaveAttribute('href', '/api/v1/portal/repository-publications/repo-1/attachments/primary-2')
+    expect(screen.getByText('Current')).toBeInTheDocument()
     expect(fetchMock.mock.calls.every(([input]) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       return url.includes('/portal/repository-publications')

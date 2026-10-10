@@ -657,9 +657,15 @@ whole evidence record. Earlier v1 evidence remains verifiable. Accepted
 primary-file evidence now produces a v2 internal package containing the exact
 selected version and complete retained chain. Package verification rechecks
 the evidence bytes; a missing historical artifact invalidates the package.
-Neither a v2 package nor its authorization can create a STATIC publication:
-STATIC format and delivery parity, plus independent restore verification,
-remain open.
+An authorized v2 package can now create a signed STATIC v2 publication whose
+manifest binds the exact selected primary file and complete version chain.
+Independent release and client-delivery approval recheck every retained byte;
+the client portal lists the selected file and all historical versions and
+serves each through the exact-organization artifact route. Missing historical
+bytes invalidate the publication and close all portal reads. v1 STATIC
+publications retain their existing signature domain and behavior. Independent
+restore verification for this new delivery path and the final authority
+handoff remain open.
 The clean-install rehearsal now creates a Git-only document and managed file
 and checks exact owner fields and retained bytes. The PostgreSQL upgrade test
 now checks that legacy file identity survives the owner migration and that an

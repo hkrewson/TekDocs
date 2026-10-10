@@ -158,6 +158,12 @@ routes read the current workspace's index; raw repository content remains
 unavailable to client portal users. The legacy editor and publication flow
 remain unchanged until later checkpoints.
 
+The in-progress `0.9.7` repository publication path retains complete primary-file
+history in signed STATIC v2 records. A client-visible record still requires
+independent release and delivery approval; portal access fails closed if any
+retained version is missing or altered. This does not complete the document
+authority handoff.
+
 ### Managed repository authoring
 
 The `0.9.5` checkpoint adds a separate **Repository content** editor under

@@ -9,10 +9,13 @@ from datetime import UTC, datetime
 from html import escape
 from io import BytesIO
 from pathlib import PurePath
+from typing import cast
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from django.db import transaction
+from django.db.models import Q
+from django.http import Http404
 from django.utils.text import slugify
 from docx import Document as create_word_document
 from docx.document import Document as WordDocument
@@ -24,6 +27,8 @@ from docx.shared import Inches, Pt
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from .content_index_models import ContentNode, DocumentAuthority, DocumentAuthorityMode
+from .content_read import RepositoryContentNotIndexed, document_detail, repository_for_reader
 from .diagram_exports import (
     DiagramExportArtifact,
     diagram_manifest,
@@ -33,9 +38,10 @@ from .diagram_exports import (
 from .document_attachments import copy_attachment_content
 from .document_key_freeze import KeyFreezeConflict, freeze_document_keys
 from .document_key_resolution import audience_for
+from .document_migration_attachments import DocumentMigrationAttachmentError, portable_primary_file_versions
 from .documents import lock_document_composition
 from .entity_mentions import resolve_entity_mentions
-from .models import Document, DocumentAttachment
+from .models import Document, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
 from .rendering import (
     RenderedAttachment,
     RenderedEntityMention,
@@ -45,6 +51,10 @@ from .rendering import (
     parse_markdown_for_reader,
     render_markdown,
     render_pdf,
+)
+from .repository_primary_publication import (
+    RepositoryPrimaryPublicationError,
+    prepare_repository_primary_publication,
 )
 from .taxonomies import document_taxonomy_manifest
 from .workspaces import ResolvedWorkspace
@@ -108,9 +118,106 @@ def _file_descriptor(path: str, media_type: str, content: bytes) -> dict[str, ob
     }
 
 
+def _export_primary_files(
+    *, document: Document, repository_owned: bool, repository: WorkspaceRepository | None
+) -> tuple[list[ExportedAttachment], dict[str, object]]:
+    """Retain the verified, immutable primary-file chain with its current version."""
+    versions: list[tuple[DocumentAttachment, bytes, dict[str, object]]]
+    selected_current_id: UUID | None
+    if repository_owned:
+        if repository is None:
+            raise ExportConflict("The repository for this document is unavailable.")
+        records = list(
+            DocumentAttachment.objects.select_for_update()
+            .filter(
+                owner_workspace=repository.workspace,
+                owner_content_id=document.id,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            )
+            .order_by("version_number", "id")
+        )
+        if not records:
+            return [], {"selected_current_id": None, "versions": []}
+        try:
+            snapshot = prepare_repository_primary_publication(
+                repository=repository,
+                content_id=document.id,
+                expected_current_entity_id=records[-1].entity_id,
+            )
+        except RepositoryPrimaryPublicationError as exc:
+            raise ExportConflict("The primary-file version history is unavailable or changed.") from exc
+        versions = [(item.source, item.content, item.descriptor) for item in snapshot.versions]
+        selected_current_id = snapshot.selected_entity_id
+    else:
+        records = list(
+            DocumentAttachment.objects.select_for_update()
+            .filter(document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE)
+            .order_by("version_number", "id")
+        )
+        if (
+            len(records) > MAX_BUNDLE_ATTACHMENTS
+            or sum(record.size for record in records) > MAX_BUNDLE_ATTACHMENT_BYTES
+        ):
+            raise ExportConflict("The primary-file history exceeds portable export limits.")
+        try:
+            portable_primary_file_versions(document, verify_content=True)
+        except DocumentMigrationAttachmentError as exc:
+            raise ExportConflict("The primary-file version history is unavailable or failed integrity checks.") from exc
+        versions = []
+        previous: DocumentAttachment | None = None
+        for record in records:
+            try:
+                content = copy_attachment_content(record)
+            except Exception as exc:
+                raise ExportConflict("A primary file failed its retained-content integrity check.") from exc
+            descriptor: dict[str, object] = {
+                "id": str(record.entity_id),
+                "owner": {"type": "legacy_document", "id": str(document.id)},
+                "version_number": record.version_number,
+                "replaces_id": str(previous.entity_id) if previous else None,
+                "filename": record.original_filename,
+                "media_type": record.media_type,
+                "size": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+            versions.append((record, content, descriptor))
+            previous = record
+        selected_current_id = records[-1].entity_id if records else None
+
+    exported: list[ExportedAttachment] = []
+    manifest_versions: list[dict[str, object]] = []
+    for record, content, descriptor in versions:
+        suffix = PurePath(record.original_filename).suffix.lower()
+        extension = suffix if _SAFE_EXTENSION.fullmatch(suffix) else ""
+        safe_stem = slugify(PurePath(record.original_filename).stem)[:60] or "file"
+        path = f"primary-files/{document.id}/{record.version_number:03d}-{safe_stem}{extension}"
+        exported.append(
+            ExportedAttachment(
+                id=record.entity_id,
+                filename=record.original_filename,
+                media_type=record.media_type,
+                size=len(content),
+                checksum=str(descriptor["sha256"]),
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+                version_number=record.version_number,
+                path=path,
+                content=content,
+            )
+        )
+        manifest_versions.append({**descriptor, "path": path})
+    return exported, {
+        "selected_current_id": str(selected_current_id) if selected_current_id else None,
+        "versions": manifest_versions,
+    }
+
+
 @transaction.atomic
 def resolve_export_snapshot(
-    *, workspace: ResolvedWorkspace, document: Document, attachment_ids: tuple[UUID, ...] = ()
+    *,
+    workspace: ResolvedWorkspace,
+    document: Document,
+    attachment_ids: tuple[UUID, ...] = (),
+    include_primary_files: bool = False,
 ) -> DocumentExportSnapshot:
     """Freeze one authorized live composition and its requested managed files."""
 
@@ -119,12 +226,61 @@ def resolve_export_snapshot(
     if len(set(attachment_ids)) != len(attachment_ids):
         raise ExportConflict("Each selected file may appear only once.")
 
-    locked_document, resolved = lock_document_composition(document)
+    locked_document = (
+        Document.objects.select_for_update(of=("self",))
+        .select_related("entity", "organization")
+        .get(pk=document.pk)
+    )
+    repository_owned = DocumentAuthority.objects.filter(
+        workspace_id=locked_document.entity.workspace_id,
+        content_id=locked_document.id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists()
+    repository_source: dict[str, object] | None = None
+    repository_node: ContentNode | None = None
+    render_context: dict[str, object] = {}
+    resolved = None
+    if repository_owned:
+        repository = repository_for_reader(workspace)
+        # Pin the accepted/indexed head while the content read, metadata, links,
+        # and retained attachments are assembled into one export snapshot.
+        repository = WorkspaceRepository.objects.select_for_update(of=("self",)).get(pk=repository.pk)
+        try:
+            detail = document_detail(
+                workspace=workspace,
+                content_id=locked_document.id,
+                audience="msp_internal",
+                include_render_context=True,
+            )
+            repository_node = ContentNode.objects.select_related("indexed_commit").get(
+                repository=repository, content_id=locked_document.id
+            )
+        except (ContentNode.DoesNotExist, Http404, RepositoryContentNotIndexed) as exc:
+            raise ExportConflict("The accepted repository content is not available for export.") from exc
+        canonical_markdown = str(detail["markdown"])
+        render_context = detail.get("_render_context", {})
+        repository_source = {
+            "source_path": repository_node.source_path,
+            "accepted_commit": repository_node.indexed_commit.object_id,
+            "content_digest": repository_node.content_digest,
+        }
+    else:
+        locked_document, resolved = lock_document_composition(locked_document)
+        canonical_markdown = resolved.markdown
+    primary_files, primary_file_manifest = (
+        _export_primary_files(
+            document=locked_document,
+            repository_owned=repository_owned,
+            repository=repository if repository_owned else None,
+        )
+        if include_primary_files
+        else ([], {"selected_current_id": None, "versions": []})
+    )
     try:
         frozen_keys = freeze_document_keys(
             workspace=workspace,
             document=locked_document,
-            markdown=resolved.markdown,
+            markdown=canonical_markdown,
             audience=audience_for(workspace.member),
             # Use the newest retained input-state timestamp. Unlike wall-clock export
             # time, it changes with resolved state and keeps an unchanged portable
@@ -146,10 +302,16 @@ def resolve_export_snapshot(
         DocumentAttachment.objects.select_for_update()
         .select_related("entity")
         .filter(
-            document=locked_document,
+            Q(document=locked_document)
+            | Q(
+                document__isnull=True,
+                owner_workspace_id=locked_document.entity.workspace_id,
+                owner_content_id=locked_document.id,
+            ),
             entity_id__in=needed_attachment_ids,
             archived_at__isnull=True,
             scan_status="clean",
+            purpose=DocumentAttachmentPurpose.ATTACHMENT,
         )
         .order_by("entity_id")
     )
@@ -189,16 +351,31 @@ def resolve_export_snapshot(
             )
         )
 
+    retained_bytes += sum(item.size for item in primary_files)
+    if len(exported_attachments) + len(primary_files) > MAX_BUNDLE_ATTACHMENTS:
+        raise ExportConflict(f"A portable export may include at most {MAX_BUNDLE_ATTACHMENTS} files.")
+    if retained_bytes > MAX_BUNDLE_ATTACHMENT_BYTES:
+        raise ExportConflict("Portable export file content may not exceed 50 MiB.")
+    exported_attachments.extend(primary_files)
+
     diagrams = render_diagram_exports(frozen_markdown)
+    rendered_entity_mentions = entity_mentions
+    key_resolutions = None
+    if repository_owned:
+        rendered_entity_mentions = cast(
+            dict[str, RenderedEntityMention], render_context.get("entity_mentions", {})
+        )
+        key_resolutions = cast(dict[str, RenderedKey], render_context.get("key_resolutions", {}))
     sanitized_html = render_markdown(
         frozen_markdown,
-        entity_mentions=entity_mentions,
+        entity_mentions=rendered_entity_mentions,
         attachments=rendered_attachments,
+        key_resolutions=key_resolutions,
     )
     sanitized_html = embed_diagrams_in_html(sanitized_html, diagrams)
     markdown_bytes = frozen_markdown.encode("utf-8")
     html_bytes = export_html(
-        title=locked_document.entity.display_name,
+        title=repository_node.title if repository_node else locked_document.entity.display_name,
         markdown=frozen_markdown,
         retained_html=sanitized_html,
     )
@@ -215,6 +392,7 @@ def resolve_export_snapshot(
             "path": item.path,
         }
         for item in exported_attachments
+        if item.purpose == DocumentAttachmentPurpose.ATTACHMENT
     ]
     files = [
         _file_descriptor("document/document.md", "text/markdown; charset=utf-8", markdown_bytes),
@@ -244,11 +422,13 @@ def resolve_export_snapshot(
             "kind": "organization" if organization is not None else "msp",
             "id": str(organization.entity_id) if organization is not None else None,
         },
-        "title": locked_document.entity.display_name,
-        "category": locked_document.category,
-        "topic_type": locked_document.topic_type,
-        "topic_schema_version": locked_document.topic_schema_version,
-        "taxonomies": document_taxonomy_manifest(locked_document),
+        "title": repository_node.title if repository_node else locked_document.entity.display_name,
+        "category": repository_node.frontmatter.get("category", "") if repository_node else locked_document.category,
+        "topic_type": repository_node.topic_type if repository_node else locked_document.topic_type,
+        "topic_schema_version": (
+            repository_node.topic_schema_version if repository_node else locked_document.topic_schema_version
+        ),
+        "taxonomies": repository_node.taxonomy_keys if repository_node else document_taxonomy_manifest(locked_document),
         "key_resolutions": list(frozen_keys.manifest_records),
         "placements": [
             {
@@ -264,16 +444,20 @@ def resolve_export_snapshot(
                 "checksum": item.revision.checksum,
             }
             for item in resolved.placements
-        ],
+        ] if resolved is not None else [],
         "entities": [entity_mentions[entity_id] for entity_id in sorted(entity_mentions)],
         "attachments": attachment_manifest,
         "diagrams": diagram_manifest(diagrams),
         "files": files,
     }
+    if include_primary_files:
+        manifest["primary_file"] = primary_file_manifest
+    if repository_source is not None:
+        manifest["repository_source"] = repository_source
     digest = hashlib.sha256(b"TEKDOCS-PORTABLE-EXPORT\x00v1\x00" + canonical_json(manifest)).hexdigest()
     manifest["content_digest"] = digest
     return DocumentExportSnapshot(
-        title=locked_document.entity.display_name,
+        title=repository_node.title if repository_node else locked_document.entity.display_name,
         markdown=frozen_markdown,
         sanitized_html=sanitized_html,
         manifest=manifest,

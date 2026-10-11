@@ -19,7 +19,7 @@ from .attachment_security import (
     attachment_scanner,
     attachment_storage_provider,
 )
-from .content_index_models import ContentNode
+from .content_index_models import ContentNode, DocumentAuthority, DocumentAuthorityMode
 from .models import (
     AuditEvent,
     Document,
@@ -148,8 +148,12 @@ class RepositoryPrimaryFileConflict(Exception):
 
 @transaction.atomic
 def append_repository_primary_document_file(
-    *, repository: WorkspaceRepository, content_id: UUID, actor_id: UUID,
-    upload: UploadedFile, expected_current_entity_id: UUID | None,
+    *,
+    repository: WorkspaceRepository,
+    content_id: UUID,
+    actor_id: UUID,
+    upload: UploadedFile,
+    expected_current_entity_id: UUID | None,
 ) -> DocumentAttachment:
     """Append a scanned version for one accepted Git-only document."""
     locked_repository = WorkspaceRepository.objects.select_for_update().get(pk=repository.pk)
@@ -158,7 +162,6 @@ def append_repository_primary_document_file(
         organization=locked_repository.workspace.organization,
         owner_workspace=locked_repository.workspace,
         owner_content_id=content_id,
-        document__isnull=True,
         purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
         archived_at__isnull=True,
     )
@@ -167,12 +170,13 @@ def append_repository_primary_document_file(
         raise RepositoryPrimaryFileConflict("The current primary-file version changed.")
     if current is not None:
         copy_attachment_content(current)
+    document = current.document if current is not None else None
     return _create_managed_attachment(
         tenant=locked_repository.tenant,
         organization=locked_repository.workspace.organization,
         workspace=locked_repository.workspace,
         content_id=content_id,
-        document=None,
+        document=document,
         actor_id=actor_id,
         upload=upload,
         purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
@@ -182,11 +186,18 @@ def append_repository_primary_document_file(
 
 
 def _create_managed_attachment(
-    *, tenant: Tenant, organization: Organization | None, workspace: Workspace, content_id: UUID,
+    *,
+    tenant: Tenant,
+    organization: Organization | None,
+    workspace: Workspace,
+    content_id: UUID,
     document: Document | None,
-    actor_id: UUID, upload: UploadedFile, entity_id: UUID | None = None,
+    actor_id: UUID,
+    upload: UploadedFile,
+    entity_id: UUID | None = None,
     purpose: str = DocumentAttachmentPurpose.ATTACHMENT,
-    version_number: int | None = None, replaces: DocumentAttachment | None = None,
+    version_number: int | None = None,
+    replaces: DocumentAttachment | None = None,
 ) -> DocumentAttachment:
     validated = validate_attachment_upload(upload)
     attachment_id = uuid4()
@@ -201,9 +212,7 @@ def _create_managed_attachment(
             media_type=validated.media_type,
             content=validated.content,
         )
-        clean_key = "/".join(
-            ("document-attachments", str(tenant.id), str(content_id), str(attachment_id))
-        )
+        clean_key = "/".join(("document-attachments", str(tenant.id), str(content_id), str(attachment_id)))
         stored_name = provider.promote(
             quarantine_key=quarantine_key,
             clean_key=clean_key,
@@ -224,26 +233,36 @@ def _create_managed_attachment(
     try:
         with transaction.atomic():
             if document is None:
-                repository = WorkspaceRepository.objects.select_for_update().filter(
-                    workspace=workspace, tenant=tenant
-                ).first()
+                repository = (
+                    WorkspaceRepository.objects.select_for_update().filter(workspace=workspace, tenant=tenant).first()
+                )
                 if (
                     repository is None
                     or repository.accepted_commit_id is None
                     or repository.accepted_commit_id != repository.indexed_commit_id
                     or not ContentNode.objects.filter(
-                        repository=repository, workspace=workspace, tenant=tenant,
-                        organization=organization, indexed_commit_id=repository.indexed_commit_id,
-                        content_id=content_id, kind="document",
+                        repository=repository,
+                        workspace=workspace,
+                        tenant=tenant,
+                        organization=organization,
+                        indexed_commit_id=repository.indexed_commit_id,
+                        content_id=content_id,
+                        kind="document",
                     ).exists()
                 ):
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
-                if Document.objects.filter(
+                legacy_document_exists = Document.objects.filter(
                     id=content_id,
                     tenant=tenant,
                     organization=organization,
                     entity__workspace=workspace,
-                ).exists():
+                ).exists()
+                authority = (
+                    DocumentAuthority.objects.filter(workspace=workspace, content_id=content_id)
+                    .values_list("authority", flat=True)
+                    .first()
+                )
+                if legacy_document_exists and authority != DocumentAuthorityMode.REPOSITORY:
                     raise ValidationError({"content_id": "Legacy content remains authoritative for this document."})
                 accepted_commit = repository.accepted_commit
                 if accepted_commit is None:
@@ -362,24 +381,29 @@ def repository_attachment_archive_eligible(
         indexed_commit_id=repository.indexed_commit_id,
         markdown__contains=str(attachment.entity_id),
     ).exists()
-    creation = AuditEvent.objects.filter(
-        tenant_id=repository.tenant_id,
-        action="document.attachment.created",
-        entity_id=attachment.entity_id,
-    ).order_by("occurred_at").first()
+    creation = (
+        AuditEvent.objects.filter(
+            tenant_id=repository.tenant_id,
+            action="document.attachment.created",
+            entity_id=attachment.entity_id,
+        )
+        .order_by("occurred_at")
+        .first()
+    )
     upload_commit = creation.metadata.get("upload_commit") if creation is not None else None
-    later_accepted_commit = creation is None or RepositoryCommitAudit.objects.filter(
-        tenant_id=repository.tenant_id,
-        repository=repository,
-        created_at__gt=creation.occurred_at,
-    ).exists()
+    later_accepted_commit = (
+        creation is None
+        or RepositoryCommitAudit.objects.filter(
+            tenant_id=repository.tenant_id,
+            repository=repository,
+            created_at__gt=creation.occurred_at,
+        ).exists()
+    )
     return linked, not linked and not later_accepted_commit and upload_commit == accepted_commit.object_id
 
 
 @transaction.atomic
-def replace_primary_document_file(
-    *, document: Document, actor_id: UUID, upload: UploadedFile
-) -> DocumentAttachment:
+def replace_primary_document_file(*, document: Document, actor_id: UUID, upload: UploadedFile) -> DocumentAttachment:
     """Append one scanned primary-file version under a document lock."""
 
     locked_document = Document.objects.select_for_update().get(pk=document.pk)

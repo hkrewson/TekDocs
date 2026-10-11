@@ -11,6 +11,7 @@ from django.db import transaction
 
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
+from apps.core.content_read import document_detail
 from apps.core.document_attachments import (
     append_repository_primary_document_file,
     copy_attachment_content,
@@ -18,6 +19,7 @@ from apps.core.document_attachments import (
     create_repository_document_attachment,
     replace_primary_document_file,
 )
+from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
 from apps.core.documents import create_document
 from apps.core.models import (
@@ -25,6 +27,8 @@ from apps.core.models import (
     Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     Organization,
     WorkspaceKind,
     WorkspaceRepository,
@@ -42,7 +46,7 @@ from apps.core.repository_source_git_validation import verify_repository_source_
 from apps.core.repository_source_validation import verify_repository_source_snapshot
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
-
+from apps.core.workspaces import resolve_organization_workspace
 
 OWNER_EMAIL = "validation-recovery@example.invalid"
 ORGANIZATION_NAME = "Validation Recovery Client"
@@ -285,6 +289,34 @@ def create_organization_fixture(owner, organization):
         actor_id=owner.id,
     )
     assert publication_import.status == "imported" and publication_import.indexed
+    authority_document = create_document(
+        tenant=repository.tenant,
+        organization=organization,
+        actor_id=owner.id,
+        title="Git-authoritative recovery guide",
+        markdown="# Git-authoritative recovery guide\n\nRestore the canonical revision.\n",
+    )
+    authority_preview = prepare_document_import(workspace=repository.workspace, document_id=authority_document.id)
+    authority_import = apply_document_import(
+        workspace=repository.workspace,
+        document_id=authority_document.id,
+        expected_base=authority_preview.base_commit,
+        plan_sha256=authority_preview.plan_sha256,
+        actor_id=owner.id,
+    )
+    assert authority_import.status == "imported" and authority_import.indexed
+    reader_workspace = resolve_organization_workspace(owner, entity_id=organization.entity_id)
+    assert transition_document_authority(
+        workspace=repository.workspace,
+        document_id=authority_document.id,
+        actor_id=owner.id,
+        target=DocumentAuthorityMode.REPOSITORY,
+        reader_workspace=reader_workspace,
+    ) == "transitioned"
+    assert (
+        DocumentAuthority.objects.get(workspace=repository.workspace, content_id=authority_document.id).authority
+        == DocumentAuthorityMode.REPOSITORY
+    )
     return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
 
 
@@ -347,6 +379,20 @@ def verify_organization_fixture(owner, organization, directory_entry):
         organization=organization,
         entity__display_name=PUBLICATION_DOCUMENT_TITLE,
     )
+    authority_document = Document.objects.get(
+        tenant=repository.tenant,
+        organization=organization,
+        entity__display_name="Git-authoritative recovery guide",
+    )
+    assert (
+        DocumentAuthority.objects.get(workspace=repository.workspace, content_id=authority_document.id).authority
+        == DocumentAuthorityMode.REPOSITORY
+    )
+    reader_workspace = resolve_organization_workspace(owner, entity_id=organization.entity_id)
+    authority_read = document_detail(
+        workspace=reader_workspace, content_id=authority_document.id, audience="msp_internal"
+    )
+    assert authority_read["markdown"] == "# Git-authoritative recovery guide\n\nRestore the canonical revision.\n"
     attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
     publication_source = read_authored_content(repository=repository, content_id=legacy_document.id)
     assert publication_source.markdown == ""
@@ -464,4 +510,7 @@ with transaction.atomic():
             assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
             assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]
             assert organization_editable_digest == os.environ["TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256"]
-            print("MSP directory, client isolation, Markdown, Git history, and managed-file bundle restored")
+            print(
+                "MSP directory, client isolation, Markdown, Git history, managed-file bundle, and "
+                "Git-authoritative document read restored"
+            )

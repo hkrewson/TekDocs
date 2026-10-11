@@ -1766,6 +1766,7 @@
   "documentation.writeDocument": "Write document",
   "documentation.uploadFile": "Upload file",
   "documentation.publishStatic": "Publish document",
+  "documentation.openRepositoryEditor": "Open repository editor",
   "documentation.history": "History",
   "documentation.historyHeading": "Revision history",
   "documentation.historySummary": "{count} retained revisions · page {page}",

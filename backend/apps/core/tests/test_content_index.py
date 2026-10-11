@@ -109,16 +109,20 @@ def test_rebuild_is_deterministic_and_restores_links_backlinks_and_properties(in
     assert after == before
 
 
-def test_document_authority_survives_rebuilding_the_content_index(indexed_repository):
-    _installation, workspace, repository, _commit, document_id, _fragment_id = indexed_repository
+def test_document_and_fragment_authority_survive_rebuilding_the_content_index(indexed_repository):
+    _installation, workspace, repository, _commit, document_id, fragment_id = indexed_repository
 
     index_repository_content(repository_id=repository.id)
     authority = DocumentAuthority.objects.get(workspace=workspace, content_id=document_id)
     assert authority.authority == DocumentAuthorityMode.REPOSITORY
+    fragment_authority = DocumentAuthority.objects.get(workspace=workspace, content_id=fragment_id)
+    assert fragment_authority.authority == DocumentAuthorityMode.REPOSITORY
 
     index_repository_content(repository_id=repository.id, force=True)
     authority.refresh_from_db()
     assert authority.authority == DocumentAuthorityMode.REPOSITORY
+    fragment_authority.refresh_from_db()
+    assert fragment_authority.authority == DocumentAuthorityMode.REPOSITORY
 
     with pytest.raises(DatabaseError, match="authority changes require the transition service"):
         with transaction.atomic():

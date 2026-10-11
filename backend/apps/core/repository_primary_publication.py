@@ -14,7 +14,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from .attachment_security import AttachmentSecurityError
-from .content_index_models import ContentNode, ContentNodeKind
+from .content_index_models import ContentNode, ContentNodeKind, DocumentAuthority, DocumentAuthorityMode
 from .document_attachments import copy_attachment_content
 from .models import Document, DocumentAttachment, DocumentAttachmentPurpose, WorkspaceRepository
 from .publications import MAX_RETAINED_ATTACHMENT_BYTES, MAX_RETAINED_ATTACHMENTS
@@ -59,17 +59,11 @@ def prepare_repository_primary_publication(
         ).exists()
     ):
         raise RepositoryPrimaryPublicationError("repository.primary_file.source_unavailable")
-    document = (
-        Document.objects.select_for_update()
-        .filter(
-            id=content_id,
-            tenant_id=repository.tenant_id,
-            organization=repository.workspace.organization,
-            entity__workspace_id=repository.workspace_id,
-            archived_at__isnull=True,
-        )
-        .first()
-    )
+    repository_authoritative = DocumentAuthority.objects.filter(
+        workspace=repository.workspace,
+        content_id=content_id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists()
     records = list(
         DocumentAttachment.objects.select_for_update()
         .filter(
@@ -81,6 +75,37 @@ def prepare_repository_primary_publication(
         )
         .order_by("version_number", "id")
     )
+    linked_document_ids = {record.document_id for record in records}
+    if len(linked_document_ids) > 1:
+        raise RepositoryPrimaryPublicationError("repository.primary_file.history_unavailable")
+    linked_document_id = next(iter(linked_document_ids), None)
+    document = None
+    if linked_document_id is not None:
+        document = (
+            Document.objects.select_for_update()
+            .filter(
+                id=content_id,
+                tenant_id=repository.tenant_id,
+                organization=repository.workspace.organization,
+                entity__workspace_id=repository.workspace_id,
+                archived_at__isnull=True,
+            )
+            .first()
+        )
+        if document is None or document.id != linked_document_id:
+            raise RepositoryPrimaryPublicationError("repository.primary_file.history_unavailable")
+    elif not repository_authoritative:
+        document = (
+            Document.objects.select_for_update()
+            .filter(
+                id=content_id,
+                tenant_id=repository.tenant_id,
+                organization=repository.workspace.organization,
+                entity__workspace_id=repository.workspace_id,
+                archived_at__isnull=True,
+            )
+            .first()
+        )
     if not records or len(records) > MAX_RETAINED_ATTACHMENTS:
         raise RepositoryPrimaryPublicationError("repository.primary_file.history_unavailable")
     prepared: list[PreparedPrimaryVersion] = []
@@ -88,7 +113,7 @@ def prepare_repository_primary_publication(
     total = 0
     for record in records:
         if (
-            record.document_id != (document.id if document else None)
+            record.document_id != linked_document_id
             or record.archived_at is not None
             or record.scan_status != "clean"
             or not record.file.name

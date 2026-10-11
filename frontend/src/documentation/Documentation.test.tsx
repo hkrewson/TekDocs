@@ -105,6 +105,7 @@ function clients() {
     list: vi.fn().mockResolvedValue({ results: [document, sourceDocument], count: 2 }),
     listFiles: vi.fn().mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false }),
     get: getDocument,
+    getRepositoryContent: vi.fn().mockResolvedValue({ id: 'doc-1', title: 'Git firewall', kind: 'document', indexed_commit: 'a'.repeat(40), sanitized_html: '<h1>Canonical Git content</h1>', entity_context: [] }),
     create: createDocument,
     createFileBacked,
     update: updateDocument,
@@ -227,6 +228,38 @@ it('paginates the library and gives an opened document a focused workspace', asy
   await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
     {}, expect.any(AbortSignal), expect.objectContaining({ page: 2, page_size: 25 }),
   ))
+})
+
+it('reads repository-owned documents from Git and hides legacy content controls', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+
+  expect(await screen.findByRole('heading', { name: 'Canonical Git content' })).toBeVisible()
+  expect(screen.getByText(/Git repository · read only/)).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Open repository editor' })).toBeVisible()
+  expect(screen.queryByRole('heading', { name: 'Firewall' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Legacy database copy')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Document settings' })).not.toBeInTheDocument()
+  expect(Reflect.get(documents, 'getRepositoryContent')).toHaveBeenCalledWith({}, 'doc-1', expect.any(AbortSignal))
+})
+
+it('fails closed when repository content cannot be read', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
+  vi.spyOn(documents, 'getRepositoryContent').mockRejectedValue(new Error('index is behind'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('Git-backed content is unavailable or its index is not current')
+  expect(screen.queryByRole('heading', { name: 'Firewall' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Legacy database copy')).not.toBeInTheDocument()
 })
 
 it('exposes document settings and opens them before the document content', async () => {

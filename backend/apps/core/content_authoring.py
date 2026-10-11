@@ -8,7 +8,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -18,7 +18,14 @@ from .content_index import (
     validate_candidate_snapshot,
 )
 from .content_profile import ALLOWED_FIELDS, CONTENT_SCHEMA, parse_content
-from .models import Block, Document, RepositoryObjectFormat, WorkspaceRepository
+from .models import (
+    Block,
+    Document,
+    DocumentAuthority,
+    DocumentAuthorityMode,
+    RepositoryObjectFormat,
+    WorkspaceRepository,
+)
 from .repository_service import (
     RepositoryAuditAttribution,
     RepositoryConflictError,
@@ -245,10 +252,28 @@ def author_content(
     owner = {
         "id": content_id,
         "tenant_id": repository.tenant_id,
-        "organization_id": repository.workspace.organization_id,
+        "organization_id": cast(uuid.UUID, repository.workspace.organization_id),
     }
-    if Document.objects.filter(**owner).exists() or Block.objects.filter(**owner).exists():
-        raise ContentAuthoringError("Legacy content remains authoritative; edit it in the legacy editor")
+    legacy_document = Document.objects.filter(**owner).exists()
+    if legacy_document:
+        authority = DocumentAuthority.objects.filter(
+            workspace_id=repository.workspace_id,
+            content_id=content_id,
+        ).values_list("authority", flat=True).first()
+        if authority != DocumentAuthorityMode.REPOSITORY:
+            raise ContentAuthoringError("Legacy content remains authoritative; edit it in the legacy editor")
+    legacy_block = Block.objects.filter(
+        id=content_id,
+        tenant_id=repository.tenant_id,
+        organization_id=cast(uuid.UUID, repository.workspace.organization_id),
+    ).exists()
+    if legacy_block:
+        authority = DocumentAuthority.objects.filter(
+            workspace_id=repository.workspace_id,
+            content_id=content_id,
+        ).values_list("authority", flat=True).first()
+        if authority != DocumentAuthorityMode.REPOSITORY:
+            raise ContentAuthoringError("Legacy content remains authoritative; edit it in the legacy editor")
     if title is not None and "title" in metadata_patch:
         raise ContentAuthoringError("Title may be supplied only once")
     current_commit, files = _snapshot(repository)

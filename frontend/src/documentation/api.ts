@@ -52,6 +52,7 @@ export type DocumentPlacement = {
 export type DocumentRecord = {
   id: string
   title: string
+  content_authority?: 'legacy' | 'repository'
   owner_kind: 'msp' | 'organization'
   owner_organization_id: string | null
   owner_organization_name: string | null
@@ -100,6 +101,7 @@ export type DocumentRecord = {
   created_at: string
   updated_at: string
 }
+export type RepositoryDocumentRead = { id: string; title: string; kind: 'document' | 'fragment'; indexed_commit: string; sanitized_html: string; entity_context: Array<{ id: string; relationship: string; origin: string; display_name: string; entity_type: string }> }
 export type DocumentAttachment = { id: string; filename: string; media_type: string; size: number; checksum: string; scan_status: 'clean'; scan_engine: string; scanned_at: string; created_at: string }
 export type DocumentPrimaryFile = DocumentAttachment & { version_number: number; replaces_id: string | null; is_current: boolean }
 export type DocumentFile = {
@@ -350,6 +352,7 @@ export interface DocumentsClient {
   list(scope: DocumentScope, signal?: AbortSignal, filters?: DocumentFilters): Promise<DocumentResult>
   listFiles(scope: DocumentScope, query: DocumentFileQuery, signal?: AbortSignal): Promise<DocumentFileResult>
   get(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<DocumentRecord>
+  getRepositoryContent?(scope: DocumentScope, id: string, signal?: AbortSignal): Promise<RepositoryDocumentRead>
   create(scope: DocumentScope, input: DocumentInput): Promise<DocumentRecord>
   createFileBacked(scope: DocumentScope, input: { title: string; notes: string; category: DocumentCategory; file: File }): Promise<DocumentRecord>
   update(scope: DocumentScope, id: string, input: DocumentUpdateInput): Promise<DocumentRecord>
@@ -548,6 +551,12 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   async get(scope, id, signal) {
     return parse<DocumentRecord>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async getRepositoryContent(scope, id, signal) {
+    const base = scope.organizationId
+      ? `/api/v1/workspaces/organizations/${encodeURIComponent(scope.organizationId)}`
+      : '/api/v1/workspaces/msp'
+    return parse<RepositoryDocumentRead>(await fetch(`${base}/content-graph/documents/${encodeURIComponent(id)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
   create: (scope, input) => mutate<DocumentRecord>(collectionPath(scope), 'POST', input),
   async createFileBacked(scope, input) {

@@ -58,6 +58,58 @@ unavailable or changed Git file likewise reports `diverged`. Repairing the
 exact retained bytes can restore the shadow match, but does not promote
 repository authority.
 
+If a reviewed document is blocked by
+`review_workflow_parity_not_verified`, do not edit its digest or review fields
+directly. In Documentation, request a fresh review from the current document's
+Ownership and review panel, have the assigned reviewer inspect the read-only
+Git-backed content and record an approval, then recheck migration status and
+the handoff preview. A new review pins the indexed Git composition's digest;
+the prior decision remains in the audit history. If a current review cannot be
+completed, leave the document PostgreSQL-authoritative.
+
+## Explicit authority handoff
+
+The operator handoff is a separate, per-document step. The migration-status
+response sets `cutover_ready` only when the indexed copy and rendered read
+projection match and no unsupported template, review-content digest,
+publication, attachment-storage or other parity blocker is present. PostgreSQL
+review schedules and workflow records remain operational authority; retained
+review decisions must still match the canonical composed-content digest.
+Retained primary-file
+chains remain PostgreSQL-owned and are eligible when every version passes
+ownership, chain, scan and byte-integrity checks; portable bundles include the
+complete verified chain. A matching copy by itself is not sufficient.
+
+Preview first, then use the exact Workspace, Document and active installation
+member UUIDs shown by the operator inventory. The command does not write Git; it
+changes PostgreSQL's durable authority state and appends an audit event. Owned
+fragments transition with the document, and a fragment shared with a remaining
+legacy-owned document prevents the handoff.
+
+```sh
+docker compose run --rm migrate python manage.py transition_document_authority --workspace <workspace-uuid> --document <document-uuid> --actor <operator-uuid> --authority repository
+docker compose run --rm migrate python manage.py transition_document_authority --workspace <workspace-uuid> --document <document-uuid> --actor <operator-uuid> --authority repository --apply
+```
+
+The first command is a read-only readiness preview. For rollback, request
+`--authority legacy` and review its blockers before adding `--apply`. Rollback
+is refused if Git content no longer matches the PostgreSQL projection; reconcile
+the content explicitly rather than discarding either side. Authority changes
+are atomic and do not rewrite repository history.
+
+While the first-wave handoff is active, PostgreSQL review workflow records stay
+available and their content digest is computed from the indexed Git composition.
+Portable document exports now render the accepted, indexed Git composition and
+record its source path, commit, and content digest in the bundle manifest.
+Selected and Markdown-referenced managed files are still verified against their
+retained, scanned PostgreSQL attachment records. Portable bundle exports also
+include the complete validated primary-file version chain and its selected
+current version; other export formats do not duplicate those private files.
+The legacy document STATIC publication endpoint, preflight and topic conversion remain deliberately
+rejected for Git-authoritative documents; repository publication has a separate
+evidence/review/package workflow and must be used instead of signing stale
+PostgreSQL placements.
+
 ## Roll back an unchanged copy
 
 ```sh
@@ -80,13 +132,13 @@ mentions, ordinary attachment references and reader-scoped field-key
 bindings. The importer preserves stable document and block IDs. It never
 copies managed-file bytes or sensitive key values into Git.
 
-Templates, template enrollments, publication-bearing documents, primary-file
-chains, cross-workspace reuse, pinned owned sections, non-leaf reuse,
+Templates, template enrollments, publication-bearing documents,
+cross-workspace reuse, pinned owned sections, non-leaf reuse,
 content-expanding keys, ambiguous or unsupported relationships, and invalid
 or archived records remain explicitly deferred. File/publication parity and
 repository-inclusive recovery are 0.9.7 work. Retiring legacy writes or
 promoting a document requires a separate, explicit authority transition after
-read, write, review, template, key, attachment and publication parity; 0.9.6
+read, write, review-content digest, template, key, attachment and publication parity; 0.9.6
 does not provide that transition.
 
 ## Release rehearsal

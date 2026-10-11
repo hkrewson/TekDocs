@@ -28,6 +28,7 @@ from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
 )
+from .document_operations import DocumentOperationsError, _reviewed_markdown
 from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
@@ -141,7 +142,6 @@ def document_coexistence_status(
     )
     response["primary_file_state"] = "absent"
     if primary_versions:
-        blockers.append("primary_file_parity_not_verified")
         try:
             portable_primary_file_versions(document, verify_content=True)
         except DocumentMigrationAttachmentError:
@@ -151,9 +151,8 @@ def document_coexistence_status(
             response["primary_file_state"] = "retained_bytes_verified"
     if DocumentPublication.objects.filter(document=document).exists():
         blockers.append("legacy_publication_history_present")
-    if (
+    review_record_present = (
         document.review_state != DocumentReviewState.UNREVIEWED
-        or document.review_due_on is not None
         or document.review_requested_by_id is not None
         or document.review_requested_at is not None
         or document.reviewer_id is not None
@@ -161,15 +160,15 @@ def document_coexistence_status(
         or document.last_reviewed_by_id is not None
         or document.last_reviewed_at is not None
         or bool(document.review_note)
-    ):
-        blockers.append("review_workflow_parity_not_verified")
-    blockers.extend(
-        (
-            "repository_document_reads_not_authoritative",
-            "repository_document_writes_not_authoritative",
-            "publication_parity_not_verified",
-        )
     )
+    if review_record_present:
+        try:
+            reviewed_digest = hashlib.sha256(_reviewed_markdown(document).encode("utf-8")).hexdigest()
+        except DocumentOperationsError:
+            reviewed_digest = None
+        if document.review_content_sha256 != reviewed_digest or reviewed_digest is None:
+            blockers.append("review_workflow_parity_not_verified")
+    response["cutover_ready"] = bool(response["legacy_authoritative"] and not blockers)
     response["handoff_blockers"] = blockers
     return response
 

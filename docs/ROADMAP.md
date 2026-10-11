@@ -1688,7 +1688,7 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.4` | Authorized operational-entity context, asset documentation backlinks, content-graph reads, search, health and views. |
 | `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. Implemented; release acceptance in `docs/releases/0.9.5.md`. |
 | `0.9.6` | Complete as a local development checkpoint: dry-run inventory, deterministic first-wave copy, explicit deferrals, mixed-store read-only parity, and guarded rollback. Legacy reads and writes remain authoritative. The aggregate local gate passed and [public migration guidance](https://github.com/hkrewson/TekDocs/wiki/Imports-and-migration) was published; no deployment or authority handoff is claimed. |
-| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity and repository-inclusive encrypted recovery; make authority transition and legacy-write retirement available only after all dependent read/write paths pass. |
+| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity, per-document authority transition and repository-inclusive encrypted recovery. The local document-migration release gate now passes; remaining closure is candidate CI/release acceptance, with host-filesystem exhaustion still untested and historical review-digest mismatches remaining per-document handoff blockers. |
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
@@ -1717,8 +1717,10 @@ inbox and email boundary. Exports, migration authority handoff, and recovery
 acceptance remain open `0.9.7` work.
 Recovery fault evidence now includes a production-shaped refusal of a
 database/Git accepted-head mismatch without a partial backup, followed by
-maintenance repair and a healthy network-isolated restore. Storage-exhaustion
-and full authority-handoff recovery acceptance remain open.
+maintenance repair and a healthy network-isolated restore. The rehearsal also
+transitions a migrated document to Git authority and verifies its authority
+marker and Git-backed read after restore. Bounded-write failures are covered;
+actual host-filesystem exhaustion remains untested.
 The local Valkey outage exposed a readiness blind spot. Backend readiness and
 the authorized System status page now check the configured broker with a
 bounded, pooled connection and report only coarse availability or persistence

@@ -156,6 +156,8 @@ def test_document_persists_from_msp_and_client_browser_routes(owner_client, inst
 
     assert msp_created.status_code == 201
     assert org_created.status_code == 201
+    assert msp_created.json()["content_authority"] == "legacy"
+    assert org_created.json()["content_authority"] == "legacy"
     assert msp_created.json()["block_id"]
     assert msp_created.json()["placements"][0]["block_kind"] == BlockKind.RICH_TEXT
     assert msp_created.json()["placements"][0]["resolved_markdown"] == "# Firewall\n\nUse **MFA**."
@@ -198,11 +200,14 @@ def test_git_authoritative_document_rejects_legacy_content_edits(owner_client, m
     assert created.status_code == 201
     detail = reverse("msp-document-detail", kwargs={"document_entity_id": created.json()["id"]})
 
-    monkeypatch.setattr(
-        DocumentAuthority.objects,
-        "filter",
-        lambda **_kwargs: SimpleNamespace(exists=lambda: True),
-    )
+    original_authority_filter = DocumentAuthority.objects.filter
+
+    def repository_authority_filter(*args, **kwargs):
+        if kwargs.get("authority") == "repository":
+            return SimpleNamespace(exists=lambda: True)
+        return original_authority_filter(*args, **kwargs)
+
+    monkeypatch.setattr(DocumentAuthority.objects, "filter", repository_authority_filter)
     rejected = owner_client.put(
         detail,
         {
@@ -1378,6 +1383,19 @@ def test_file_backed_document_creation_and_primary_file_replacement_are_versione
         assert refreshed["primary_file"]["filename"] == "firewall-v2.pdf"
         assert [item["version_number"] for item in refreshed["primary_file_versions"]] == [2, 1]
         assert [item["is_current"] for item in refreshed["primary_file_versions"]] == [True, False]
+
+        from apps.core.document_exports import resolve_export_snapshot
+        from apps.core.workspaces import resolve_organization_workspace
+
+        exported = resolve_export_snapshot(
+            workspace=resolve_organization_workspace(installation.owner, entity_id=acme.entity_id),
+            document=Document.objects.get(entity_id=payload["id"]),
+            include_primary_files=True,
+        )
+        assert exported.manifest["primary_file"]["selected_current_id"] == refreshed["primary_file"]["id"]
+        assert [item["version_number"] for item in exported.manifest["primary_file"]["versions"]] == [1, 2]
+        assert exported.manifest["attachments"] == []
+        assert [item.purpose for item in exported.attachments] == ["primary_file", "primary_file"]
 
         current = DocumentAttachment.objects.get(entity_id=refreshed["primary_file"]["id"])
         current.original_filename = "mutated.pdf"

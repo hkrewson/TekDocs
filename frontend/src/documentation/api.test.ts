@@ -33,6 +33,16 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org/documents/doc/revisions?page=3&page_size=50')
   })
 
+  it('reads canonical document content from the workspace content index', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
+    await browserDocumentsClient.getRepositoryContent?.({ organizationId: 'org/id' }, 'doc/id', new AbortController().signal)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/org%2Fid/content-graph/documents/doc%2Fid')
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin', headers: { Accept: 'application/json' } })
+
+    await browserDocumentsClient.getRepositoryContent?.({}, 'doc/id')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/v1/workspaces/msp/content-graph/documents/doc%2Fid')
+  })
+
   it('requests the bounded workspace file register without loading document records', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ results: [], count: 0, page: 2, page_size: 25, has_more: false }), { status: 200 }))
     await browserDocumentsClient.listFiles(

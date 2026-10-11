@@ -63,12 +63,25 @@ def _ensure_legacy_content_authority(document: Document) -> None:
 
     if DocumentAuthority.objects.filter(
         tenant_id=document.tenant_id,
-        organization_id=document.organization_id,
+        organization_id=cast(UUID, document.organization_id),
         workspace_id=document.entity.workspace_id,
         content_id=document.id,
         authority=DocumentAuthorityMode.REPOSITORY,
     ).exists():
         raise PlacementConflict("This document's content is Git-authoritative and cannot be changed here.")
+
+
+def _ensure_legacy_block_authority(block: Block) -> None:
+    """Prevent legacy placement and revision services from changing a Git-owned fragment."""
+
+    if DocumentAuthority.objects.filter(
+        tenant_id=block.tenant_id,
+        organization_id=cast(UUID, block.organization_id),
+        workspace_id=block.entity.workspace_id,
+        content_id=block.id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists():
+        raise PlacementConflict("This fragment is Git-authoritative and cannot be changed here.")
 
 
 @dataclass(frozen=True)
@@ -480,6 +493,7 @@ def restructure_document(*, document: Document, actor_id: UUID, base_revision_id
         .select_related("entity", "current_revision")
         .get(pk=primary.block_id)
     )
+    _ensure_legacy_block_authority(primary_block)
     preview = document_restructure_preview(locked)
     current_revision = primary_block.current_revision
     if current_revision is None:
@@ -660,6 +674,7 @@ def update_document(
     resulting_topic_type = topic_type or locked_document.topic_type
     placement = locked_document.placements.select_related("block", "block__entity").get(parent__isnull=True, position=0)
     block = Block.objects.select_for_update().get(pk=placement.block_id)
+    _ensure_legacy_block_authority(block)
     if (
         locked_document.organization_id is None
         and locked_document.library_visible
@@ -1091,9 +1106,11 @@ def update_shared_block(
         .select_related("block", "block__source_document", "block__source_document__entity")
         .get(pk=placement.pk)
     )
-    if locked.block.source_document_id is not None:
-        _ensure_legacy_content_authority(locked.block.source_document)
+    source_document = locked.block.source_document
+    if source_document is not None:
+        _ensure_legacy_content_authority(source_document)
     block = Block.objects.select_for_update().get(pk=locked.block_id)
+    _ensure_legacy_block_authority(block)
     revision = _append_block_revision(
         block=block,
         actor_id=actor_id,
@@ -1333,6 +1350,7 @@ def add_block_placement(
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
     block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
+    _ensure_legacy_block_authority(block)
     if block.tenant_id != locked_document.tenant_id or block.archived_at is not None:
         raise PlacementConflict("The selected block is unavailable in this installation.")
     if block.source_document_id == locked_document.id:

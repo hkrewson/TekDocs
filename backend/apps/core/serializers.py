@@ -8,6 +8,8 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .collection_pagination import StrictQuerySerializer
+from .content_index_models import ContentNode
+from .content_read import RepositoryContentNotIndexed
 from .document_attachments import resolve_rendered_attachments
 from .document_authoring_serializers import (
     DocumentCreateSerializer as DocumentCreateSerializer,
@@ -119,6 +121,8 @@ from .models import (
     Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentCategory,
     DocumentPlacement,
     DocumentReviewState,
@@ -127,8 +131,13 @@ from .models import (
     Organization,
     OrganizationAccessMode,
     OrganizationKind,
+    OrganizationTaxonomyTerm,
     PersonAssociationKind,
     Site,
+    Taxonomy,
+    TaxonomyTerm,
+    TaxonomyTermStatus,
+    WorkspaceRepository,
 )
 from .relationships import SEARCHABLE_ENTITY_TYPES
 from .taxonomies import document_tag_labels, document_term_records
@@ -514,12 +523,12 @@ class DocumentSerializer(serializers.Serializer):
     owner_organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)
     owner_organization_name = serializers.CharField(source="organization.entity.display_name", allow_null=True)
     is_reference = serializers.SerializerMethodField()
-    category = serializers.ChoiceField(choices=DocumentCategory.choices)
-    topic_type = serializers.ChoiceField(choices=DocumentTopicType.choices)
-    topic_schema_version = serializers.IntegerField()
+    category = serializers.SerializerMethodField()
+    topic_type = serializers.SerializerMethodField()
+    topic_schema_version = serializers.SerializerMethodField()
     is_template = serializers.BooleanField()
     library_visible = serializers.BooleanField()
-    collection = serializers.CharField(allow_blank=True)
+    collection = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     taxonomy_terms = serializers.SerializerMethodField()
     owner_id = serializers.UUIDField(allow_null=True)
@@ -547,6 +556,7 @@ class DocumentSerializer(serializers.Serializer):
     publications = serializers.SerializerMethodField()
     publication_count = serializers.SerializerMethodField()
     markdown = serializers.SerializerMethodField()
+    content_authority = serializers.SerializerMethodField()
     block_id = serializers.SerializerMethodField()
     current_revision_id = serializers.SerializerMethodField()
     revision_number = serializers.SerializerMethodField()
@@ -564,12 +574,97 @@ class DocumentSerializer(serializers.Serializer):
         workspace_organization_id = self.context.get("workspace_organization_id")
         return workspace_organization_id is not None and obj.organization_id is None
 
+    def _authority_by_content_id(self, obj: Document) -> dict[UUID, str]:
+        authority_by_content_id = self.context.get("_document_authority_by_content_id")
+        if authority_by_content_id is None:
+            parent = self.parent
+            root_instance = self.root.instance
+            if isinstance(parent, serializers.ListSerializer) and isinstance(root_instance, dict):
+                records = root_instance.get("results", ())
+                content_ids = [record.id for record in records]
+            elif isinstance(parent, serializers.ListSerializer) and parent.instance is not None:
+                content_ids = [record.id for record in parent.instance]
+            else:
+                content_ids = [obj.id]
+            authority_by_content_id = dict(
+                DocumentAuthority.objects.filter(content_id__in=content_ids).values_list(
+                    "content_id", "authority"
+                )
+            )
+            self.context["_document_authority_by_content_id"] = authority_by_content_id
+        return cast(dict[UUID, str], authority_by_content_id)
+
+    def _is_repository_owned(self, obj: Document) -> bool:
+        return self._authority_by_content_id(obj).get(obj.id) == DocumentAuthorityMode.REPOSITORY
+
+    def _repository_node(self, obj: Document) -> ContentNode | None:
+        if not self._is_repository_owned(obj):
+            return None
+        cached = cast(dict[UUID, ContentNode], self.context.setdefault("_document_repository_nodes", {}))
+        if obj.id in cached:
+            return cached[obj.id]
+        repository = WorkspaceRepository.objects.filter(workspace_id=obj.entity.workspace_id).first()
+        if (
+            repository is None
+            or repository.accepted_commit_id is None
+            or repository.accepted_commit_id != repository.indexed_commit_id
+        ):
+            raise RepositoryContentNotIndexed()
+        node = ContentNode.objects.filter(
+            repository=repository,
+            content_id=obj.id,
+            indexed_commit_id=repository.accepted_commit_id,
+        ).first()
+        if node is None:
+            raise RepositoryContentNotIndexed()
+        cached[obj.id] = node
+        return node
+
+    def _repository_properties(self, obj: Document) -> dict[str, object] | None:
+        node = self._repository_node(obj)
+        if node is None:
+            return None
+        properties = node.frontmatter.get("properties", {})
+        return properties if isinstance(properties, dict) else {}
+
+    @extend_schema_field(serializers.ChoiceField(choices=DocumentCategory.choices))
+    def get_category(self, obj: Document) -> str:
+        properties = self._repository_properties(obj)
+        return str(properties.get("category", "general")) if properties is not None else obj.category
+
+    @extend_schema_field(serializers.ChoiceField(choices=DocumentTopicType.choices))
+    def get_topic_type(self, obj: Document) -> str:
+        node = self._repository_node(obj)
+        return node.topic_type if node is not None else obj.topic_type
+
+    @extend_schema_field(serializers.IntegerField())
+    def get_topic_schema_version(self, obj: Document) -> int:
+        node = self._repository_node(obj)
+        return node.topic_schema_version or 1 if node is not None else obj.topic_schema_version
+
+    @extend_schema_field(serializers.CharField(allow_blank=True))
+    def get_collection(self, obj: Document) -> str:
+        properties = self._repository_properties(obj)
+        return str(properties.get("collection", obj.collection)) if properties is not None else obj.collection
+
+    @extend_schema_field(serializers.ChoiceField(choices=DocumentAuthorityMode.choices))
+    def get_content_authority(self, obj: Document) -> str:
+        # Legacy PostgreSQL authority is the default for documents without an explicit handoff row.
+        return str(self._authority_by_content_id(obj).get(obj.id) or DocumentAuthorityMode.LEGACY)
+
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_tags(self, obj: Document) -> list[str]:
+        properties = self._repository_properties(obj)
+        if properties is not None:
+            tags = properties.get("tags", [])
+            return [str(item) for item in tags] if isinstance(tags, list) else []
         return document_tag_labels(obj)
 
     @extend_schema_field(serializers.ListField(child=serializers.DictField()))
     def get_taxonomy_terms(self, obj: Document) -> list[dict[str, object]]:
+        node = self._repository_node(obj)
+        if node is not None:
+            return self._repository_taxonomy_terms(obj, node)
         result = []
         for assignment in document_term_records(obj):
             selected = assignment.term or assignment.local_term
@@ -593,6 +688,58 @@ class DocumentSerializer(serializers.Serializer):
                     "local": assignment.local_term_id is not None,
                 }
             )
+        return result
+
+    def _repository_taxonomy_terms(self, obj: Document, node: ContentNode) -> list[dict[str, object]]:
+        result: list[dict[str, object]] = []
+        taxonomy_keys = node.taxonomy_keys
+        if not isinstance(taxonomy_keys, dict):
+            return result
+        taxonomies = {
+            taxonomy.key: taxonomy
+            for taxonomy in Taxonomy.objects.filter(
+                tenant_id=obj.tenant_id,
+                key__in=taxonomy_keys,
+                archived_at__isnull=True,
+            ).select_related("current_version")
+        }
+        for key, stable_keys in taxonomy_keys.items():
+            taxonomy = taxonomies.get(key)
+            if taxonomy is None or taxonomy.current_version_id is None or not isinstance(stable_keys, list):
+                continue
+            for stable_key in stable_keys:
+                term = TaxonomyTerm.objects.filter(
+                    taxonomy=taxonomy,
+                    version_id=taxonomy.current_version_id,
+                    stable_key=stable_key,
+                    status=TaxonomyTermStatus.ACTIVE,
+                ).first()
+                local_term = None
+                if term is None and obj.organization_id is not None:
+                    local_term = OrganizationTaxonomyTerm.objects.filter(
+                        organization_id=obj.organization_id,
+                        taxonomy=taxonomy,
+                        taxonomy_version_id=taxonomy.current_version_id,
+                        stable_key=stable_key,
+                        archived_at__isnull=True,
+                    ).first()
+                selected = term or local_term
+                if selected is None:
+                    continue
+                if taxonomy.current_version is None:
+                    continue
+                result.append(
+                    {
+                        "id": selected.id,
+                        "taxonomy_id": taxonomy.id,
+                        "taxonomy_key": taxonomy.key,
+                        "taxonomy_version": taxonomy.current_version.version,
+                        "stable_key": selected.stable_key,
+                        "label": selected.label,
+                        "description": selected.description,
+                        "local": local_term is not None,
+                    }
+                )
         return result
 
     def _template_enrollment(self, obj: Document):  # type: ignore[no-untyped-def]
@@ -712,33 +859,47 @@ class DocumentSerializer(serializers.Serializer):
         return resolved
 
     def get_markdown(self, obj: Document) -> str:
+        if self._is_repository_owned(obj):
+            return ""
         placement = self._placement(obj)
         revision = placement.block.current_revision if placement is not None else None
         return revision.markdown if revision is not None else ""
 
     def get_block_id(self, obj: Document) -> UUID | None:
+        if self._is_repository_owned(obj):
+            return None
         placement = self._placement(obj)
         return placement.block.entity_id if placement is not None else None
 
     def get_current_revision_id(self, obj: Document) -> UUID | None:
+        if self._is_repository_owned(obj):
+            return None
         placement = self._placement(obj)
         return placement.block.current_revision_id if placement is not None else None
 
     def get_revision_number(self, obj: Document) -> int | None:
+        if self._is_repository_owned(obj):
+            return None
         placement = self._placement(obj)
         revision = placement.block.current_revision if placement is not None else None
         return revision.revision_number if revision is not None else None
 
     def get_checksum(self, obj: Document) -> str:
+        if self._is_repository_owned(obj):
+            return ""
         placement = self._placement(obj)
         revision = placement.block.current_revision if placement is not None else None
         return revision.checksum if revision is not None else ""
 
     def get_resolved_markdown(self, obj: Document) -> str:
+        if self._is_repository_owned(obj):
+            return ""
         return self._resolved(obj).markdown
 
     @extend_schema_field(DocumentPlacementSerializer(many=True))
     def get_placements(self, obj: Document) -> list[dict[str, object]]:
+        if self._is_repository_owned(obj):
+            return []
         context: dict[str, object] = {}
         workspace = self.context.get("workspace")
         if workspace is not None:
@@ -766,6 +927,8 @@ class DocumentSerializer(serializers.Serializer):
         )
 
     def get_placement_count(self, obj: Document) -> int:
+        if self._is_repository_owned(obj):
+            return 0
         return len(self._resolved(obj).placements)
 
 
@@ -856,7 +1019,10 @@ class DocumentOperationsChoiceSerializer(serializers.Serializer):
 
 
 class DocumentSearchHitSerializer(DocumentSerializer):
-    matching_excerpt = serializers.CharField(allow_blank=True)
+    matching_excerpt = serializers.SerializerMethodField()
+
+    def get_matching_excerpt(self, obj: Document) -> str:
+        return str(getattr(obj, "matching_excerpt", ""))
 
 
 class DocumentFacetSerializer(serializers.Serializer):

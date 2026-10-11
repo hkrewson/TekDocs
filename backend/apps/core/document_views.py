@@ -21,6 +21,7 @@ from rest_framework.views import APIView
 from apps.accounts.models import TenantMembership
 from apps.accounts.policy import PermissionKey, context_has_permission, require_installation_member, require_permission
 
+from .content_read import RepositoryContentNotIndexed
 from .diagram_exports import DiagramExportArtifact
 from .document_attachments import (
     MAX_MARKDOWN_IMPORT_BYTES,
@@ -118,8 +119,11 @@ from .models import (
     DocumentationListingReference,
     DocumentAttachment,
     DocumentAttachmentPurpose,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentPublication,
     DocumentPublicationArtifact,
+    WorkspaceRepository,
     workspace_for_owner,
 )
 from .preflight import catalog as preflight_catalog
@@ -277,8 +281,12 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
     )
 
 
-def _filtered_documents(workspace: ResolvedWorkspace, values: dict[str, Any]) -> list[Document]:
+def _filtered_documents(
+    workspace: ResolvedWorkspace, values: dict[str, Any], *, content_ids: set[UUID] | None = None
+) -> list[Document]:
     queryset = documents_for_scope(workspace.data_scope)
+    if content_ids is not None:
+        queryset = queryset.filter(id__in=content_ids)
     if values["q"]:
         terms = re.findall(r"\w+", cast(str, values["q"]).casefold())[:12]
         for term in terms or [cast(str, values["q"])]:
@@ -344,15 +352,123 @@ def _matching_excerpt(markdown: str, query: str) -> str:
     return f"{'…' if start else ''}{excerpt}{'…' if end < len(collapsed) else ''}"
 
 
+def _search_document_records(
+    workspace: ResolvedWorkspace, values: dict[str, Any]
+) -> tuple[list[Document], dict[UUID, str]]:
+    """Search legacy documents in PostgreSQL and Git-owned documents in their canonical source."""
+
+    owner = workspace_for_owner(tenant=workspace.member.tenant, organization=workspace.organization)
+    repository_ids = set(
+        DocumentAuthority.objects.filter(
+            workspace=owner,
+            authority=DocumentAuthorityMode.REPOSITORY,
+        ).values_list("content_id", flat=True)
+    )
+    if not repository_ids:
+        return _filtered_documents(workspace, values), {}
+
+    base_values = {**values, "q": "", "category": "", "collection": "", "tag": ""}
+    base_records = _filtered_documents(workspace, base_values, content_ids=repository_ids)
+    repository_ids = {record.id for record in base_records}
+    if not repository_ids:
+        return _filtered_documents(workspace, values), {}
+
+    repository = WorkspaceRepository.objects.filter(workspace=owner).first()
+    if (
+        repository is None
+        or repository.accepted_commit_id is None
+        or repository.accepted_commit_id != repository.indexed_commit_id
+    ):
+        raise RepositoryContentNotIndexed()
+    nodes = {
+        node.content_id: node
+        for node in ContentNode.objects.filter(
+            repository=repository,
+            content_id__in=repository_ids,
+            kind="document",
+        )
+    }
+    if set(nodes) != repository_ids or any(
+        node.indexed_commit_id != repository.accepted_commit_id for node in nodes.values()
+    ):
+        raise RepositoryContentNotIndexed()
+
+    canonical_records = []
+    for record in base_records:
+        node = nodes[record.id]
+        properties = node.frontmatter.get("properties", {})
+        properties = properties if isinstance(properties, dict) else {}
+        category = str(properties.get("category", "general"))
+        collection = str(properties.get("collection", ""))
+        tags_value = properties.get("tags", [])
+        tags = [str(item) for item in tags_value] if isinstance(tags_value, list) else []
+        taxonomy_keys = node.taxonomy_keys if isinstance(node.taxonomy_keys, dict) else {}
+        canonical_tags = {item.casefold() for item in tags}
+        canonical_tags.update(
+            str(stable_key).casefold()
+            for stable_keys in taxonomy_keys.values()
+            if isinstance(stable_keys, list)
+            for stable_key in stable_keys
+        )
+        if values["category"] and values["category"] != category:
+            continue
+        if values["collection"] and values["collection"].casefold() != collection.casefold():
+            continue
+        if values["tag"] and values["tag"].strip().casefold() not in canonical_tags:
+            continue
+        # Downstream sort and facet code uses these in-memory values; the database
+        # projection must not overwrite Git-authored metadata for this response.
+        record.category = category
+        record.collection = collection
+        record.tags = tags
+        cast(Any, record)._canonical_repository_metadata = {"tags": tags, "taxonomies": taxonomy_keys}
+        canonical_records.append(record)
+    base_records = canonical_records
+
+    canonical_markdown = {
+        content_id: (
+            composition["markdown"]
+            if isinstance((composition := node.composition_variants.get("msp_internal")), dict)
+            and isinstance(composition.get("markdown"), str)
+            else node.markdown
+        )
+        for content_id, node in nodes.items()
+    }
+    if not values["q"]:
+        return base_records, canonical_markdown
+
+    folded_query = cast(str, values["q"]).casefold()
+    terms = re.findall(r"\w+", folded_query)[:12] or [folded_query]
+    legacy_matches = [
+        record
+        for record in _filtered_documents(workspace, values)
+        if record.id not in repository_ids
+    ]
+    repository_matches = []
+    for record in base_records:
+        if record.id not in repository_ids:
+            continue
+        searchable = " ".join(
+            (record.entity.display_name, nodes[record.id].title, canonical_markdown[record.id])
+        ).casefold()
+        if all(term in searchable for term in terms):
+            repository_matches.append(record)
+    return legacy_matches + repository_matches, canonical_markdown
+
+
 def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer = DocumentListQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
     values = serializer.validated_data
-    selected = _filtered_documents(workspace, values)
+    selected, canonical_markdown = _search_document_records(workspace, values)
     query = serializer.validated_data["q"]
     ranks: dict[UUID, int] = {}
     for record in selected:
-        markdown = resolve_document(record).markdown
+        markdown = (
+            canonical_markdown[record.id]
+            if record.id in canonical_markdown
+            else resolve_document(record).markdown
+        )
         record.matching_excerpt = _matching_excerpt(markdown, query)
         folded_title = record.entity.display_name.casefold()
         folded_markdown = markdown.casefold()
@@ -383,8 +499,25 @@ def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
                 reverse=descending,
             )
     collection_counts = Counter(record.collection for record in selected if record.collection)
-    tag_counts = Counter(tag for record in selected for tag in document_tag_labels(record))
-    health_records = selected if not values["health"] else _filtered_documents(workspace, {**values, "health": ""})
+    tag_counts: Counter[str] = Counter()
+    for record in selected:
+        if record.id in canonical_markdown:
+            metadata = getattr(record, "_canonical_repository_metadata", {})
+            tag_counts.update(str(tag) for tag in metadata.get("tags", []))
+            taxonomy_keys = metadata.get("taxonomies", {})
+            tag_counts.update(
+                str(stable_key)
+                for stable_keys in taxonomy_keys.values()
+                if isinstance(stable_keys, list)
+                for stable_key in stable_keys
+            )
+        else:
+            tag_counts.update(document_tag_labels(record))
+    health_records = (
+        selected
+        if not values["health"]
+        else _search_document_records(workspace, {**values, "health": ""})[0]
+    )
     health_counts = Counter(record.health_status for record in health_records)
     count = len(selected)
     page = serializer.validated_data["page"]
@@ -534,10 +667,26 @@ def _retrieve(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Respons
     return Response(DocumentSerializer(_document(workspace, document_entity_id), context=context).data)
 
 
+def _legacy_content_unavailable(document: Document) -> bool:
+    return DocumentAuthority.objects.filter(
+        workspace_id=document.entity.workspace_id,
+        content_id=document.id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists()
+
+
 def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
     serializer = DocumentPreflightQuerySerializer(data=request.query_params)
     serializer.is_valid(raise_exception=True)
     document = _document(workspace, document_entity_id)
+    if _legacy_content_unavailable(document):
+        return Response(
+            {
+                "code": "repository_output_unavailable",
+                "detail": "Preflight currently requires repository-aware analysis for Git-authoritative documents.",
+            },
+            status=409,
+        )
     try:
         resolved = resolve_document(document, audience=serializer.validated_data["audience"])
     except PlacementConflict as conflict:
@@ -551,6 +700,16 @@ def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: 
 
 def _convert_topic(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
     document = _document(workspace, document_entity_id)
+    if _legacy_content_unavailable(document):
+        return Response(
+            {
+                "code": "repository_output_unavailable",
+                "detail": (
+                    "Topic conversion currently requires repository-aware analysis for Git-authoritative documents."
+                ),
+            },
+            status=409,
+        )
     _mutate_workspace(request, workspace, document)
     serializer = DocumentTopicConversionSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -868,6 +1027,7 @@ def _export_document(workspace: ResolvedWorkspace, document_entity_id: UUID, req
             workspace=workspace,
             document=document,
             attachment_ids=attachment_ids,
+            include_primary_files=format_name == "bundle",
         )
     except ExportConflict as conflict:
         return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")

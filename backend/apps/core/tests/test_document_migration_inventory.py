@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import uuid
@@ -12,6 +13,7 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection, transaction
 from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -27,10 +29,28 @@ from apps.core import (
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_index import ContentIndexError, index_repository_content
 from apps.core.content_profile import parse_content
-from apps.core.document_attachments import create_document_attachment, replace_primary_document_file
+from apps.core.document_attachments import (
+    append_repository_primary_document_file,
+    create_document_attachment,
+    replace_primary_document_file,
+)
+from apps.core.document_exports import resolve_export_snapshot
 from apps.core.document_migration_export import DocumentMigrationExportError, build_simple_document_export
 from apps.core.document_migration_inventory import inventory_legacy_documents
-from apps.core.documents import add_document_placement, create_document, create_document_block, update_document
+from apps.core.document_operations import (
+    DocumentOperationsError,
+    decide_document_review,
+    request_document_review,
+    update_document_operations,
+)
+from apps.core.documents import (
+    PlacementConflict,
+    add_document_placement,
+    create_document,
+    create_document_block,
+    resolve_document,
+    update_document,
+)
 from apps.core.models import (
     BlockKind,
     BlockRevision,
@@ -41,6 +61,8 @@ from apps.core.models import (
     ContentNode,
     ContentProperty,
     DocumentAttachmentPurpose,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentKeyBinding,
     DocumentReviewState,
     DocumentTopicType,
@@ -52,11 +74,13 @@ from apps.core.models import (
     TaxonomyBinding,
     Workspace,
     WorkspaceKind,
+    WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
-from apps.core.publications import publish_document
+from apps.core.publications import PublicationConflict, publish_document
 from apps.core.repository_editable_bundle_validation import verify_repository_editable_bundle
 from apps.core.repository_editable_bundles import export_repository_editable_bundle
+from apps.core.repository_primary_publication import prepare_repository_primary_publication
 from apps.core.repository_service import RepositoryAuditAttribution, RepositoryServiceError, commit_repository_files
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -64,6 +88,288 @@ from apps.core.topic_schemas import inspect_markdown
 from apps.core.workspaces import resolve_msp_workspace
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path):
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"), MEDIA_ROOT=str(tmp_path / "media")):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Authority Write MSP",
+            owner_email=f"authority-write-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Authority Write Owner",
+            password="MigrationPassword-2026!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+        repository_storage.ensure_workspace_repository(workspace)
+        repository = WorkspaceRepository.objects.get(workspace=workspace)
+        repository.refresh_from_db()
+        document = create_document(
+            tenant=installation.tenant,
+            organization=None,
+            actor_id=installation.owner.id,
+            title="Device repair guide",
+            markdown="Legacy-only body.\n",
+        )
+        document.collection = "Device setup"
+        document.tags = ["enrollment", "repair"]
+        document.save(update_fields=("collection", "tags", "updated_at"))
+        original_primary = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("setup.txt", b"Original setup file.\n"),
+            purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+            version_number=1,
+        )
+        export = build_simple_document_export(document)
+        copied = commit_repository_files(
+            repository_id=repository.id,
+            expected_base=repository.accepted_commit.object_id if repository.accepted_commit else None,
+            changes=dict(export.files),
+            message="Copy document for authority test",
+        )
+        index_repository_content(repository_id=repository.id)
+        reviewed_at = timezone.now()
+        document.review_state = DocumentReviewState.APPROVED
+        document.reviewer_id = installation.owner.id
+        document.review_decided_at = reviewed_at
+        document.review_note = "Historical approval from before Git reconciliation."
+        document.last_reviewed_by_id = installation.owner.id
+        document.last_reviewed_at = reviewed_at
+        document.review_content_sha256 = "0" * 64
+        document.save(
+            update_fields=(
+                "review_state",
+                "reviewer",
+                "review_decided_at",
+                "review_note",
+                "last_reviewed_by",
+                "last_reviewed_at",
+                "review_content_sha256",
+                "updated_at",
+            )
+        )
+        handoff_preview = io.StringIO()
+        call_command(
+            "transition_document_authority",
+            workspace=str(workspace.id),
+            document=str(document.id),
+            actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.REPOSITORY,
+            stdout=handoff_preview,
+        )
+        assert json.loads(handoff_preview.getvalue()) == {
+            "blockers": ["review_workflow_parity_not_verified"],
+            "status": "blocked",
+        }
+        refreshed_review = request_document_review(
+            workspace=resolve_msp_workspace(installation.owner),
+            document=document,
+            actor_id=installation.owner.id,
+            reviewer_id=installation.owner.id,
+            note="Re-review the current indexed Git composition.",
+        )
+        assert refreshed_review.review_content_sha256 == hashlib.sha256(
+            ContentNode.objects.get(repository=repository, content_id=document.id)
+            .composition_variants["all"]["markdown"]
+            .encode("utf-8")
+        ).hexdigest()
+        decide_document_review(
+            document=refreshed_review,
+            actor_id=installation.owner.id,
+            decision=DocumentReviewState.APPROVED,
+            note="Reviewed and approved against the current Git composition.",
+        )
+        handoff_preview = io.StringIO()
+        call_command(
+            "transition_document_authority",
+            workspace=str(workspace.id),
+            document=str(document.id),
+            actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.REPOSITORY,
+            stdout=handoff_preview,
+        )
+        assert json.loads(handoff_preview.getvalue()) == {
+            "authority": DocumentAuthorityMode.REPOSITORY,
+            "status": "ready",
+        }
+        handoff_output = io.StringIO()
+        call_command(
+            "transition_document_authority",
+            workspace=str(workspace.id),
+            document=str(document.id),
+            actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.REPOSITORY,
+            apply=True,
+            stdout=handoff_output,
+        )
+        assert json.loads(handoff_output.getvalue())["status"] == "transitioned"
+        assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == (
+            DocumentAuthorityMode.REPOSITORY
+        )
+        replacement_primary = append_repository_primary_document_file(
+            repository=repository,
+            content_id=document.id,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("updated-setup.txt", b"Updated setup file.\n"),
+            expected_current_entity_id=original_primary.entity_id,
+        )
+        prepared_primary = prepare_repository_primary_publication(
+            repository=repository,
+            content_id=document.id,
+            expected_current_entity_id=replacement_primary.entity_id,
+        )
+        assert [version.content for version in prepared_primary.versions] == [
+            b"Original setup file.\n",
+            b"Updated setup file.\n",
+        ]
+        browser = Client()
+        browser.force_login(installation.owner)
+        repository_owned_detail = browser.get(
+            reverse("msp-document-detail", kwargs={"document_entity_id": document.entity_id})
+        ).json()
+        assert repository_owned_detail["collection"] == "Device setup"
+        assert repository_owned_detail["tags"] == ["enrollment", "repair"]
+        with pytest.raises(DocumentOperationsError, match="indexed Git metadata"):
+            update_document_operations(
+                workspace=resolve_msp_workspace(installation.owner),
+                document=document,
+                actor_id=installation.owner.id,
+                owner_id=None,
+                review_due_on=None,
+                collection="Stale collection",
+                tags=["stale"],
+            )
+        canonical_review_markdown = ContentNode.objects.get(
+            repository=repository, content_id=document.id
+        ).composition_variants["all"]["markdown"]
+        reviewed = request_document_review(
+            workspace=resolve_msp_workspace(installation.owner),
+            document=document,
+            actor_id=installation.owner.id,
+            reviewer_id=installation.owner.id,
+            note="Review the Git-authoritative copy",
+        )
+        assert reviewed.review_content_sha256 == hashlib.sha256(canonical_review_markdown.encode("utf-8")).hexdigest()
+        decide_document_review(
+            document=reviewed,
+            actor_id=installation.owner.id,
+            decision=DocumentReviewState.APPROVED,
+            note="Approved after reviewing canonical Git content",
+        )
+        document.refresh_from_db()
+        document.review_state = DocumentReviewState.UNREVIEWED
+        document.review_requested_by = None
+        document.review_requested_at = None
+        document.review_content_sha256 = None
+        document.reviewer = None
+        document.review_decided_at = None
+        document.review_note = ""
+        document.last_reviewed_by = None
+        document.last_reviewed_at = None
+        document.save(
+            update_fields=(
+                "review_state",
+                "review_requested_by",
+                "review_requested_at",
+                "review_content_sha256",
+                "reviewer",
+                "review_decided_at",
+                "review_note",
+                "last_reviewed_by",
+                "last_reviewed_at",
+                "updated_at",
+            )
+        )
+        with pytest.raises(PublicationConflict, match="publication parity"):
+            publish_document(
+                workspace=resolve_msp_workspace(installation.owner),
+                document=document,
+                actor_id=installation.owner.id,
+                reason="Verify Git authority guard",
+                audience="msp_internal",
+                retention="permanent",
+                retention_review_on=None,
+            )
+        repository_export = resolve_export_snapshot(
+            workspace=resolve_msp_workspace(installation.owner), document=document
+        )
+        assert repository_export.markdown == canonical_review_markdown
+        assert repository_export.manifest["repository_source"]["accepted_commit"] == (
+            workspace.repository.accepted_commit.object_id
+        )
+        assert repository_export.manifest["placements"] == []
+        rollback_handoff = io.StringIO()
+        call_command(
+            "transition_document_authority",
+            workspace=str(workspace.id),
+            document=str(document.id),
+            actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.LEGACY,
+            apply=True,
+            stdout=rollback_handoff,
+        )
+        assert json.loads(rollback_handoff.getvalue())["status"] == "transitioned"
+        assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == (
+            DocumentAuthorityMode.LEGACY
+        )
+        source = read_authored_content(repository=repository, content_id=document.id)
+        assert source.accepted_commit == copied.object_id
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL tekdocs.document_authority_transition = 'on'")
+            authority = DocumentAuthority.objects.get(workspace=workspace, content_id=document.id)
+            authority.authority = DocumentAuthorityMode.REPOSITORY
+            authority.save(update_fields=("authority", "updated_at"))
+            with pytest.raises(PlacementConflict, match="Git-authoritative"):
+                update_document(
+                    document=document,
+                    actor_id=installation.owner.id,
+                    title="Legacy write must fail",
+                    markdown="Not canonical.\n",
+                    base_revision_id=export.revision_id,
+                )
+            authored = author_content(
+                repository=repository,
+                actor_id=installation.owner.id,
+                request_id=None,
+                operation="update",
+                content_id=document.id,
+                base_commit=source.accepted_commit,
+                base_blob=source.source_blob,
+                kind=None,
+                path=None,
+                title=None,
+                markdown="Git-only repair steps.\n",
+                metadata_patch={"properties": {"collection": "Git collection", "tags": ["Git tag"]}},
+            )
+
+        assert authored.markdown == "Git-only repair steps.\n"
+        assert authored.accepted_commit == authored.indexed_commit
+        assert resolve_document(document).markdown == "Legacy-only body.\n"
+        browser = Client()
+        browser.force_login(installation.owner)
+        canonical_hits = browser.get(reverse("msp-document-search"), {"q": "Git-only repair"}).json()
+        assert canonical_hits["count"] == 1
+        assert canonical_hits["results"][0]["content_authority"] == "repository"
+        assert canonical_hits["results"][0]["collection"] == "Git collection"
+        assert canonical_hits["results"][0]["tags"] == ["Git tag"]
+        assert "Git-only repair steps" in canonical_hits["results"][0]["matching_excerpt"]
+        metadata_filter = browser.get(reverse("msp-document-search"), {"collection": "Git collection"}).json()
+        assert {item["id"] for item in metadata_filter["results"]} == {str(document.entity_id)}
+        indexed_node = ContentNode.objects.get(repository=repository, content_id=document.id)
+        assert indexed_node.markdown == "Git-only repair steps.\n"
+        assert "Legacy-only body." in indexed_node.composition_variants["msp_internal"]["markdown"]
+        stale_hits = browser.get(reverse("msp-document-search"), {"q": "Legacy-only body"}).json()
+        assert str(document.entity_id) in {item["id"] for item in stale_hits["results"]}
+        repository.refresh_from_db()
+        indexed_commit_id = repository.indexed_commit_id
+        repository.indexed_commit = None
+        repository.save(update_fields=("indexed_commit", "updated_at"))
+        pending = browser.get(reverse("msp-document-search"), {"q": "Git-only repair"})
+        assert pending.status_code == 409
+        repository.indexed_commit_id = indexed_commit_id
+        repository.save(update_fields=("indexed_commit", "updated_at"))
 
 
 def test_field_key_bindings_are_portable_preview_bound_and_reader_scoped(tmp_path):
@@ -522,9 +828,14 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         )
         output = io.StringIO()
         call_command(
-            "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
-            base_commit=preview["base_commit"], plan_sha256=preview["plan_sha256"],
-            actor=str(installation.owner.id), apply=True, stdout=output,
+            "import_document_migration",
+            workspace=str(workspace.id),
+            document=str(primary.id),
+            base_commit=preview["base_commit"],
+            plan_sha256=preview["plan_sha256"],
+            actor=str(installation.owner.id),
+            apply=True,
+            stdout=output,
         )
         assert json.loads(output.getvalue())["blockers"] == ["preview_changed"]
         output = io.StringIO()
@@ -534,9 +845,14 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         assert revised_preview["attachment_count"] == 3
         output = io.StringIO()
         call_command(
-            "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
-            base_commit=revised_preview["base_commit"], plan_sha256=revised_preview["plan_sha256"],
-            actor=str(installation.owner.id), apply=True, stdout=output,
+            "import_document_migration",
+            workspace=str(workspace.id),
+            document=str(primary.id),
+            base_commit=revised_preview["base_commit"],
+            plan_sha256=revised_preview["plan_sha256"],
+            actor=str(installation.owner.id),
+            apply=True,
+            stdout=output,
         )
         assert json.loads(output.getvalue())["status"] == "imported"
         assert second_primary.replaces_id == first_primary.id
@@ -556,7 +872,7 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
         primary_status = browser.get(status_url).json()
         assert primary_status["content_copy_state"] == "in_sync"
         assert primary_status["primary_file_state"] == "retained_bytes_verified"
-        assert "primary_file_parity_not_verified" in primary_status["handoff_blockers"]
+        assert "primary_file_parity_not_verified" not in primary_status["handoff_blockers"]
         with monkeypatch.context() as patch:
             from apps.core.document_attachments import copy_attachment_content
 
@@ -569,13 +885,18 @@ def test_attachment_preview_blocks_missing_links_storage_and_primary_files(tmp_p
             damaged_status = browser.get(status_url).json()
             damaged_retry_output = io.StringIO()
             call_command(
-                "import_document_migration", workspace=str(workspace.id), document=str(primary.id),
-                base_commit=revised_preview["base_commit"], plan_sha256=revised_preview["plan_sha256"],
-                actor=str(installation.owner.id), apply=True, stdout=damaged_retry_output,
+                "import_document_migration",
+                workspace=str(workspace.id),
+                document=str(primary.id),
+                base_commit=revised_preview["base_commit"],
+                plan_sha256=revised_preview["plan_sha256"],
+                actor=str(installation.owner.id),
+                apply=True,
+                stdout=damaged_retry_output,
             )
             assert json.loads(damaged_retry_output.getvalue())["blockers"] == ["primary_file_storage_unavailable"]
         assert damaged_status["primary_file_state"] == "unavailable"
-        assert "primary_file_parity_not_verified" in damaged_status["handoff_blockers"]
+        assert "primary_file_parity_not_verified" not in damaged_status["handoff_blockers"]
         assert "primary_file_storage_unavailable" in damaged_status["handoff_blockers"]
         assert damaged_status["cutover_ready"] is False
         assert browser.get(status_url).json()["primary_file_state"] == "retained_bytes_verified"
@@ -818,9 +1139,6 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
         assert initial_status.json()["read_projection_state"] == "not_checked"
         assert initial_status.json()["handoff_blockers"] == [
             "content_copy_not_in_sync",
-            "repository_document_reads_not_authoritative",
-            "repository_document_writes_not_authoritative",
-            "publication_parity_not_verified",
         ]
         template_status_url = reverse(
             "msp-document-migration-status", kwargs={"document_entity_id": template.entity_id}
@@ -1183,12 +1501,8 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
         assert status["read_projection_state"] == "matched"
         assert status["legacy_revision_ids"] == [str(revision_id) for _block_id, revision_id in export.blocks]
         assert status["legacy_authoritative"] is True
-        assert status["cutover_ready"] is False
-        assert status["handoff_blockers"] == [
-            "repository_document_reads_not_authoritative",
-            "repository_document_writes_not_authoritative",
-            "publication_parity_not_verified",
-        ]
+        assert status["cutover_ready"] is True
+        assert status["handoff_blockers"] == []
         copied_source = read_authored_content(repository=workspace.repository, content_id=document.id)
         authoring_url = reverse("msp-content-authoring")
         for operation, changes in (
@@ -1231,17 +1545,24 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
         assert browser.get(status_url).json()["content_copy_state"] == "in_sync"
         document.review_state = DocumentReviewState.APPROVED
         document.last_reviewed_at = timezone.now()
-        document.save(update_fields=("review_state", "last_reviewed_at", "updated_at"))
+        document.review_content_sha256 = hashlib.sha256(b"First section\n\nSecond section\n").hexdigest()
+        document.save(update_fields=("review_state", "last_reviewed_at", "review_content_sha256", "updated_at"))
         reviewed_status = browser.get(status_url).json()
         assert reviewed_status["content_copy_state"] == "in_sync"
-        assert "review_workflow_parity_not_verified" in reviewed_status["handoff_blockers"]
-        assert reviewed_status["cutover_ready"] is False
+        assert "review_workflow_parity_not_verified" not in reviewed_status["handoff_blockers"]
+        assert reviewed_status["cutover_ready"] is True
+        document.review_content_sha256 = "0" * 64
+        document.save(update_fields=("review_content_sha256", "updated_at"))
+        assert "review_workflow_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
         document.review_state = DocumentReviewState.UNREVIEWED
         document.last_reviewed_at = None
-        document.save(update_fields=("review_state", "last_reviewed_at", "updated_at"))
+        document.review_content_sha256 = None
+        document.save(update_fields=("review_state", "last_reviewed_at", "review_content_sha256", "updated_at"))
         document.review_due_on = timezone.localdate()
         document.save(update_fields=("review_due_on", "updated_at"))
-        assert "review_workflow_parity_not_verified" in browser.get(status_url).json()["handoff_blockers"]
+        scheduled_status = browser.get(status_url).json()
+        assert "review_workflow_parity_not_verified" not in scheduled_status["handoff_blockers"]
+        assert scheduled_status["cutover_ready"] is True
         document.review_due_on = None
         document.save(update_fields=("review_due_on", "updated_at"))
         ContentInclude.objects.get(
@@ -2028,6 +2349,11 @@ def test_exact_workspace_entity_references_map_to_neutral_mentions_only(tmp_path
         detail_url = reverse("msp-content-document-detail", kwargs={"content_id": document.id})
         detail = browser.get(detail_url)
         assert detail.status_code == 200, detail.content
+        document_detail_url = reverse("msp-document-detail", kwargs={"document_entity_id": document.entity_id})
+        document_detail = browser.get(document_detail_url)
+        assert document_detail.status_code == 200, document_detail.content
+        assert document_detail.json()["content_authority"] == "legacy"
+        assert document_detail.json()["markdown"] == "Inspect the device.\n"
         assert {item["id"] for item in detail.json()["entity_context"]} == {
             str(asset.id),
             str(person.id),
@@ -2041,6 +2367,26 @@ def test_exact_workspace_entity_references_map_to_neutral_mentions_only(tmp_path
         )
         status_url = reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id})
         assert browser.get(status_url).json()["read_projection_state"] == "matched"
+        # The API serializer must key authority by Document.id (the stable content UUID),
+        # not by the distinct owning Entity.id.
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL tekdocs.document_authority_transition = 'on'")
+            authority = DocumentAuthority.objects.get(workspace=workspace, content_id=document.id)
+            authority.authority = "repository"
+            authority.save(update_fields=("authority", "updated_at"))
+            repository_owned_detail = browser.get(document_detail_url).json()
+            assert repository_owned_detail["content_authority"] == "repository"
+            assert repository_owned_detail["markdown"] == ""
+            assert repository_owned_detail["resolved_markdown"] == ""
+            repository_owned_list = browser.get(reverse("msp-document-list-create")).json()
+            listed_document = next(
+                item for item in repository_owned_list["results"] if item["id"] == str(document.entity_id)
+            )
+            assert listed_document["content_authority"] == "repository"
+            assert listed_document["markdown"] == ""
+            authority.authority = "legacy"
+            authority.save(update_fields=("authority", "updated_at"))
         indexed_person_link = ContentEntityLink.objects.get(source=node, target_entity_id=person.id)
         indexed_person_link.delete()
         shadow_status = browser.get(status_url).json()
@@ -2103,6 +2449,8 @@ def test_exact_workspace_entity_references_map_to_neutral_mentions_only(tmp_path
             stdout=rollback_output,
         )
         assert json.loads(rollback_output.getvalue())["status"] == "rolled_back"
+        assert browser.get(document_detail_url).json()["content_authority"] == "legacy"
+        assert browser.get(document_detail_url).json()["markdown"] == "Inspect the device.\n"
         link.archived_at = timezone.now()
         link.save(update_fields=("archived_at", "updated_at"))
         unsupported = EntityLink.objects.create(

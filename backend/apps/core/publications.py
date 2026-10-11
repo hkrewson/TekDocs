@@ -39,6 +39,8 @@ from .models import (
     AuditEvent,
     Document,
     DocumentAttachment,
+    DocumentAuthority,
+    DocumentAuthorityMode,
     DocumentPublication,
     DocumentPublicationArtifact,
     DocumentPublicationControlEvent,
@@ -207,6 +209,15 @@ def publish_document(
                 locked_document, resolved = lock_document_composition(document, audience=audience)
             except PlacementConflict as exc:
                 raise PublicationConflict(str(exc)) from exc
+            if DocumentAuthority.objects.filter(
+                workspace_id=locked_document.entity.workspace_id,
+                content_id=locked_document.id,
+                authority=DocumentAuthorityMode.REPOSITORY,
+                ).exists():
+                    raise PublicationConflict(
+                        "Static publication is unavailable for Git-authoritative documents until publication parity "
+                        "is implemented."
+                    )
             published_at = timezone.now()
             encoded_timestamp = _timestamp(published_at)
             try:

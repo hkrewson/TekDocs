@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.6
+  version: 0.9.7
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -39474,6 +39474,7 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+          readOnly: true
         topic_type:
           enum:
           - unstructured
@@ -39495,14 +39496,17 @@ components:
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
           x-spec-enum-id: 6e919a6bb6439ac8
+          readOnly: true
         topic_schema_version:
           type: integer
+          readOnly: true
         is_template:
           type: boolean
         library_visible:
           type: boolean
         collection:
           type: string
+          readOnly: true
         tags:
           type: array
           items:
@@ -39619,6 +39623,16 @@ components:
         markdown:
           type: string
           readOnly: true
+        content_authority:
+          enum:
+          - legacy
+          - repository
+          type: string
+          description: |-
+            * `legacy` - Legacy document
+            * `repository` - Git repository
+          x-spec-enum-id: d3592de727c2a73d
+          readOnly: true
         block_id:
           type: string
           format: uuid
@@ -39660,6 +39674,7 @@ components:
       - category
       - checksum
       - collection
+      - content_authority
       - created_at
       - current_revision_id
       - health_status
@@ -39926,6 +39941,17 @@ components:
           format: uuid
         legacy_authoritative:
           type: boolean
+        authority_state:
+          enum:
+          - legacy
+          - repository
+          - unavailable
+          type: string
+          description: |-
+            * `legacy` - legacy
+            * `repository` - repository
+            * `unavailable` - unavailable
+          x-spec-enum-id: 3e3f0ede9da7f614
         cutover_ready:
           type: boolean
         handoff_blockers:
@@ -39992,6 +40018,7 @@ components:
             format: uuid
       required:
       - accepted_commit
+      - authority_state
       - content_copy_state
       - cutover_ready
       - document_id
@@ -40916,6 +40943,7 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+          readOnly: true
         topic_type:
           enum:
           - unstructured
@@ -40937,14 +40965,17 @@ components:
             * `system_overview` - System overview
             * `change_runbook` - Change runbook
           x-spec-enum-id: 6e919a6bb6439ac8
+          readOnly: true
         topic_schema_version:
           type: integer
+          readOnly: true
         is_template:
           type: boolean
         library_visible:
           type: boolean
         collection:
           type: string
+          readOnly: true
         tags:
           type: array
           items:
@@ -41061,6 +41092,16 @@ components:
         markdown:
           type: string
           readOnly: true
+        content_authority:
+          enum:
+          - legacy
+          - repository
+          type: string
+          description: |-
+            * `legacy` - Legacy document
+            * `repository` - Git repository
+          x-spec-enum-id: d3592de727c2a73d
+          readOnly: true
         block_id:
           type: string
           format: uuid
@@ -41097,6 +41138,7 @@ components:
           format: date-time
         matching_excerpt:
           type: string
+          readOnly: true
       required:
       - attachment_count
       - attachments
@@ -41104,6 +41146,7 @@ components:
       - category
       - checksum
       - collection
+      - content_authority
       - created_at
       - current_revision_id
       - health_status

@@ -8,7 +8,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from difflib import unified_diff
-from typing import Any
+from typing import Any, cast
 
 from django.db import transaction
 
@@ -552,12 +552,20 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                 derived_from_object_id=(parsed.derived_from.object_id if parsed.derived_from is not None else ""),
             )
             nodes[parsed.content_id] = node
-            if parsed.kind == "document":
+            if parsed.kind in {"document", "fragment"}:
                 legacy_owner = Document.objects.filter(
                     id=parsed.content_id,
                     tenant_id=locked.tenant_id,
-                    organization_id=locked.workspace.organization_id,
+                    organization_id=cast(uuid.UUID, locked.workspace.organization_id),
                 ).exists()
+                if parsed.kind == "fragment":
+                    from .models import Block
+
+                    legacy_owner = legacy_owner or Block.objects.filter(
+                        id=parsed.content_id,
+                        tenant_id=locked.tenant_id,
+                        organization_id=cast(uuid.UUID, locked.workspace.organization_id),
+                    ).exists()
                 DocumentAuthority.objects.get_or_create(
                     workspace_id=locked.workspace_id,
                     content_id=parsed.content_id,

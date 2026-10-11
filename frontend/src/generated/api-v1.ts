@@ -10928,6 +10928,12 @@ export interface components {
             readonly publications: readonly components["schemas"]["DocumentPublication"][];
             readonly publication_count: number;
             readonly markdown: string;
+            /**
+             * @description * `legacy` - Legacy document
+             *     * `repository` - Git repository
+             * @enum {string}
+             */
+            readonly content_authority: "legacy" | "repository";
             /** Format: uuid */
             readonly block_id: string | null;
             /** Format: uuid */
@@ -11039,6 +11045,13 @@ export interface components {
             /** Format: uuid */
             readonly document_id: string;
             readonly legacy_authoritative: boolean;
+            /**
+             * @description * `legacy` - legacy
+             *     * `repository` - repository
+             *     * `unavailable` - unavailable
+             * @enum {string}
+             */
+            readonly authority_state: "legacy" | "repository" | "unavailable";
             readonly cutover_ready: boolean;
             readonly handoff_blockers: readonly string[];
             /**
@@ -11534,6 +11547,12 @@ export interface components {
             readonly publications: readonly components["schemas"]["DocumentPublication"][];
             readonly publication_count: number;
             readonly markdown: string;
+            /**
+             * @description * `legacy` - Legacy document
+             *     * `repository` - Git repository
+             * @enum {string}
+             */
+            readonly content_authority: "legacy" | "repository";
             /** Format: uuid */
             readonly block_id: string | null;
             /** Format: uuid */

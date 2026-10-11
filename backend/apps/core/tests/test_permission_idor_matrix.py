@@ -97,6 +97,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-site-detail": ("site_entity_id",),
         "msp-document-detail": ("document_entity_id",),
         "msp-content-authoring-source": ("content_id",),
+        "msp-content-authoring-primary-file": ("content_id",),
         "msp-content-authoring-attachment-create": ("content_id",),
         "msp-content-authoring-attachment-archive": ("content_id", "attachment_entity_id"),
         "msp-content-document-attachment-download": ("content_id", "attachment_entity_id"),
@@ -468,6 +469,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-content-graph": ("organization_entity_id",),
         "organization-content-authoring": ("organization_entity_id",),
         "organization-content-authoring-source": ("organization_entity_id", "content_id"),
+        "organization-content-authoring-primary-file": ("organization_entity_id", "content_id"),
         "organization-content-authoring-attachment-create": ("organization_entity_id", "content_id"),
         "organization-content-authoring-attachment-archive": (
             "organization_entity_id", "content_id", "attachment_entity_id"
@@ -670,6 +672,7 @@ def test_route_permission_inventory_covers_every_api_route_and_has_stable_unique
     assert set(contracts) | PUBLIC_API_ROUTE_NAMES == _api_route_names()
     route_methods = _api_route_methods()
     for contract in contracts.values():
+        assert reverse(contract.route_name, kwargs=_kwargs_for(contract.route_name))
         assert contract.methods
         assert set(contract.methods) == route_methods[contract.route_name]
         assert len(contract.mutation_permissions) <= len(contract.methods)

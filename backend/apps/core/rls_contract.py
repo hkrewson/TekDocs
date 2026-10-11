@@ -104,6 +104,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_contententitylink",
     "core_contentfinding",
     "core_contentindexattempt",
+    "core_documentauthority",
     "core_dataflow",
     "core_dataflowrevision",
     "core_dataflowsnapshot",

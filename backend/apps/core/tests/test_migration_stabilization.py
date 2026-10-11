@@ -92,6 +92,7 @@ LEGACY_SCOPE_HELPERS_FORWARD_SQL = legacy_scope_helper_migration.FORWARD_SQL
 LEGACY_SCOPE_HELPERS_REVERSE_SQL = legacy_scope_helper_migration.REVERSE_SQL
 
 DOCUMENT_RLS_TABLES = {
+    "core_documentauthority",
     "core_webhookinboundreceipt",
     "core_webhookoutbounddelivery",
     "core_block",

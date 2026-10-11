@@ -28,6 +28,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         IsolationBoundary.FORCED_RLS,
         "Personal presentation identifiers; tenant/user RLS and per-request workspace policy."
         if table == "core_collectionpreference"
+        else "Durable per-document authority; exact-workspace forced RLS and guarded authority transitions."
+        if table == "core_documentauthority"
         else "Append-only signed repository source evidence; exact-workspace RLS and source-identity guard."
         if table == "core_repositorypublicationevidence"
         else "Append-only exact-evidence internal review decision; exact-workspace RLS and scope guard."

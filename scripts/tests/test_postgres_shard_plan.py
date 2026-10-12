@@ -8,9 +8,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "tests" / "rehearsals" / "rehearse-postgres-test-shard.sh"
+BUILD_WORKFLOW = ROOT / ".github" / "workflows" / "build.yml"
 
 
 class PostgresShardPlanTests(unittest.TestCase):
+    def test_ci_uses_the_existing_balanced_core_partitions(self) -> None:
+        workflow = BUILD_WORKFLOW.read_text()
+
+        self.assertIn(
+            "shard: [route-access, route-methods, route-session, accounts, "
+            "core-a, core-b, core-c, migration-foundation, migration-isolation, "
+            "migration-guards]",
+            workflow,
+        )
+
     def test_local_core_partitions_cover_each_core_file_once(self) -> None:
         environment = os.environ | {"TEKDOCS_POSTGRES_SHARD_LIST_ONLY": "true"}
         selected: list[str] = []

@@ -9,7 +9,11 @@ from uuid import UUID
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.accounts.models import User
-from apps.core.document_authority_handoff import DocumentAuthorityHandoffError, transition_document_authority
+from apps.core.document_authority_handoff import (
+    DocumentAuthorityHandoffError,
+    prepare_rollback_markdown_projection,
+    transition_document_authority,
+)
 from apps.core.document_migration_coexistence import document_coexistence_status
 from apps.core.models import Document, DocumentAuthorityMode, InstallationState, Workspace
 from apps.core.workspaces import resolve_msp_workspace, resolve_organization_workspace
@@ -68,7 +72,16 @@ class Command(BaseCommand):
         elif status["authority_state"] != DocumentAuthorityMode.REPOSITORY:
             blockers = ["document_not_repository_authoritative"]
         elif status["content_copy_state"] != "in_sync" or status["read_projection_state"] != "matched":
-            blockers.append("rollback_projection_not_matched")
+            try:
+                prepare_rollback_markdown_projection(workspace=workspace, document=document)
+            except DocumentAuthorityHandoffError as exc:
+                blockers.extend(exc.codes)
+            else:
+                blockers = [
+                    blocker
+                    for blocker in blockers
+                    if blocker not in {"content_copy_not_in_sync", "repository_read_projection_not_matched"}
+                ]
         if blockers:
             self.stdout.write(json.dumps({"status": "blocked", "blockers": sorted(set(blockers))}, sort_keys=True))
             return

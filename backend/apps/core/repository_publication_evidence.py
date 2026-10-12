@@ -543,16 +543,18 @@ def _primary_evidence_valid(
             return False
         record = artifact.source_attachment
         owner = descriptor.get("owner")
-        expected_owner = "legacy_document" if record.document_id else "repository_document"
+        owner_type = owner.get("type") if isinstance(owner, dict) else None
         if (
             not isinstance(owner, dict)
-            or owner != {"type": expected_owner, "id": str(evidence.content_id)}
+            or owner_type not in {"legacy_document", "repository_document"}
+            or owner != {"type": owner_type, "id": str(evidence.content_id)}
             or record.purpose != DocumentAttachmentPurpose.PRIMARY_FILE
             or record.tenant_id != evidence.tenant_id
             or record.organization_id != evidence.organization_id
             or record.owner_workspace_id != evidence.workspace_id
             or record.owner_content_id != evidence.content_id
             or record.document_id not in {None, evidence.content_id}
+            or (owner_type == "legacy_document" and record.document_id != evidence.content_id)
             or str(record.entity_id) != source_id
             or record.version_number != number
             or (str(record.replaces_id) if record.replaces_id else None) != previous_record_id

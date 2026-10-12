@@ -316,7 +316,9 @@ def _existing_references(
     return accepted_object_id, parsed_references, pinned_commits
 
 
-def build_simple_document_export(document: Document, *, verify_attachments: bool = False) -> SimpleDocumentExport:
+def build_simple_document_export(
+    document: Document, *, verify_attachments: bool = False, allow_repository_divergence: bool = False
+) -> SimpleDocumentExport:
     """Produce stable source bytes while proving exact legacy/rendered parity."""
 
     placements = list(
@@ -414,7 +416,7 @@ def build_simple_document_export(document: Document, *, verify_attachments: bool
             }
         ),
     ).resolve(content_id=document.id, audience=None)
-    if resolved.markdown != legacy:
+    if resolved.markdown != legacy and not allow_repository_divergence:
         raise DocumentMigrationExportError("Legacy and repository composition do not match")
     try:
         attachment_digests = portable_document_attachments(document, legacy, verify_content=verify_attachments)

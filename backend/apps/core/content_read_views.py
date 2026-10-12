@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404, HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -16,7 +17,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey
 
-from .content_index_models import ContentNode
+from .content_index_models import ContentNode, DocumentAuthority, DocumentAuthorityMode
 from .content_read import document_collection, document_detail, entity_documentation, repository_for_reader
 from .document_exports import export_docx, export_html
 from .document_views import _msp_workspace, _organization_workspace, attachment_download_response
@@ -193,16 +194,21 @@ def _download_document_attachment(
             or node.indexed_commit_id != locked.indexed_commit_id
         ):
             return JsonResponse({"detail": "Repository content is not fully indexed"}, status=409)
+        if not DocumentAuthority.objects.filter(
+            workspace=locked.workspace,
+            content_id=content_id,
+            authority=DocumentAuthorityMode.REPOSITORY,
+        ).exists():
+            raise Http404("Repository content is not authoritative")
         attachment = get_object_or_404(
             DocumentAttachment.objects.filter(
                 tenant=workspace.member.tenant,
                 organization=workspace.organization,
                 owner_workspace=locked.workspace,
                 owner_content_id=content_id,
-                document__isnull=True,
                 archived_at__isnull=True,
                 scan_status="clean",
-            ),
+            ).filter(Q(document__isnull=True) | Q(document_id=content_id)),
             entity_id=attachment_entity_id,
         )
         return attachment_download_response(

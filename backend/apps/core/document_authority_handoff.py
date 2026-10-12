@@ -7,9 +7,20 @@ from uuid import UUID
 
 from django.db import connection, transaction
 
+from .content_profile import ContentProfileError, parse_content
 from .document_migration_coexistence import document_coexistence_status
 from .document_migration_export import build_simple_document_export
-from .models import AuditEvent, Document, DocumentAuthority, DocumentAuthorityMode, Workspace, WorkspaceRepository
+from .documents import _append_block_revision
+from .models import (
+    AuditEvent,
+    Block,
+    Document,
+    DocumentAuthority,
+    DocumentAuthorityMode,
+    Workspace,
+    WorkspaceRepository,
+)
+from .repository_service import RepositoryServiceError, read_accepted_repository_markdown_files
 from .workspaces import ResolvedWorkspace
 
 
@@ -17,6 +28,64 @@ class DocumentAuthorityHandoffError(ValueError):
     def __init__(self, *codes: str) -> None:
         self.codes = tuple(sorted(set(codes)))
         super().__init__(", ".join(self.codes))
+
+
+def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Document) -> dict[UUID, str]:
+    """Return safely projectable Git-authored fragment Markdown, or fail closed.
+
+    Rollback supports body edits only. Stable identities, root metadata, fragment
+    metadata, and the placement/include graph must still match the legacy export.
+    """
+
+    repository = WorkspaceRepository.objects.filter(workspace=workspace).first()
+    if (
+        repository is None
+        or repository.accepted_commit_id is None
+        or repository.accepted_commit_id != repository.indexed_commit_id
+    ):
+        raise DocumentAuthorityHandoffError("rollback_repository_not_ready")
+    try:
+        exported = build_simple_document_export(document, allow_repository_divergence=True)
+        accepted, files = read_accepted_repository_markdown_files(repository_id=repository.id)
+        if accepted.id != repository.accepted_commit_id:
+            raise DocumentAuthorityHandoffError("rollback_repository_not_ready")
+        current = dict(files)
+        expected_paths = {path for path, _source in exported.files}
+        parsed_current = {
+            path: parse_content(current[path])
+            for path in expected_paths
+            if path in current
+        }
+        parsed_expected = {path: parse_content(source) for path, source in exported.files}
+    except (ContentProfileError, RepositoryServiceError, ValueError) as exc:
+        raise DocumentAuthorityHandoffError("rollback_source_unavailable") from exc
+    if set(parsed_current) != expected_paths:
+        raise DocumentAuthorityHandoffError("rollback_file_set_changed")
+    markdown_by_block: dict[UUID, str] = {}
+    for path, expected in parsed_expected.items():
+        actual = parsed_current[path]
+        if actual.content_id != expected.content_id or actual.kind != expected.kind:
+            raise DocumentAuthorityHandoffError("rollback_content_identity_changed")
+        if path.startswith("docs/"):
+            if actual.frontmatter != expected.frontmatter or actual.markdown != expected.markdown:
+                raise DocumentAuthorityHandoffError("rollback_root_metadata_changed")
+            continue
+        if actual.frontmatter != expected.frontmatter:
+            raise DocumentAuthorityHandoffError("rollback_fragment_structure_changed")
+        if actual.markdown != expected.markdown:
+            markdown_by_block[actual.content_id] = actual.markdown
+    owned_ids = set(markdown_by_block)
+    if not owned_ids:
+        return {}
+    blocks = {
+        block.id: block
+        for block in Block.objects.select_related("current_revision").filter(
+            id__in=owned_ids, source_document=document
+        )
+    }
+    if set(blocks) != owned_ids or any(block.current_revision_id is None for block in blocks.values()):
+        raise DocumentAuthorityHandoffError("rollback_legacy_block_unavailable")
+    return markdown_by_block
 
 
 @transaction.atomic
@@ -51,6 +120,14 @@ def transition_document_authority(
         workspace=locked_workspace, document=document, reader_workspace=reader_workspace
     )
     blockers = cast(list[str], status["handoff_blockers"])
+    rollback_markdown: dict[UUID, str] | None = None
+    if target == DocumentAuthorityMode.LEGACY and status["authority_state"] == DocumentAuthorityMode.REPOSITORY:
+        rollback_markdown = prepare_rollback_markdown_projection(workspace=locked_workspace, document=document)
+        blockers = [
+            blocker
+            for blocker in blockers
+            if blocker not in {"content_copy_not_in_sync", "repository_read_projection_not_matched"}
+        ]
     if blockers:
         raise DocumentAuthorityHandoffError(*blockers)
     authority = DocumentAuthority.objects.select_for_update().filter(
@@ -101,10 +178,37 @@ def transition_document_authority(
             fragment.authority = DocumentAuthorityMode.REPOSITORY
             fragment.save(update_fields=("authority", "updated_at"))
     else:
-        if status["content_copy_state"] != "in_sync" or status["read_projection_state"] != "matched":
+        if rollback_markdown is None and (
+            status["content_copy_state"] != "in_sync" or status["read_projection_state"] != "matched"
+        ):
             raise DocumentAuthorityHandoffError("rollback_projection_not_matched")
         if authority.authority != DocumentAuthorityMode.REPOSITORY:
             raise DocumentAuthorityHandoffError("unexpected_current_authority")
+        if rollback_markdown:
+            blocks = {
+                block.id: block
+                for block in Block.objects.select_for_update(of=("self",))
+                .select_related("current_revision")
+                .filter(id__in=rollback_markdown)
+            }
+            for block_id, markdown in rollback_markdown.items():
+                block = blocks.get(block_id)
+                if block is None or block.current_revision is None:
+                    raise DocumentAuthorityHandoffError("rollback_projection_not_matched")
+                _append_block_revision(
+                    block=block,
+                    actor_id=actor_id,
+                    markdown=markdown,
+                    base_revision_id=cast(UUID, block.current_revision_id),
+                )
+            projected_status = document_coexistence_status(
+                workspace=locked_workspace, document=document, reader_workspace=reader_workspace
+            )
+            if (
+                projected_status["content_copy_state"] != "in_sync"
+                or projected_status["read_projection_state"] != "matched"
+            ):
+                raise DocumentAuthorityHandoffError("rollback_projection_not_matched")
         for fragment_id in owned_fragment_ids:
             fragment = by_id[fragment_id]
             if fragment.authority == DocumentAuthorityMode.REPOSITORY:

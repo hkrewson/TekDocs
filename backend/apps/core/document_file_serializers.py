@@ -75,12 +75,12 @@ class DocumentFileSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.ChoiceField(choices=("legacy", "repository")))
     def get_source(self, obj):  # type: ignore[no-untyped-def]
-        return "legacy" if obj.document_id else "repository"
+        return "repository" if getattr(obj, "repository_authoritative", False) or not obj.document_id else "legacy"
 
     @extend_schema_field(serializers.CharField())
     def get_download_url(self, obj):  # type: ignore[no-untyped-def]
         workspace = self.context["workspace"]
-        if obj.document_id:
+        if obj.document_id and not getattr(obj, "repository_authoritative", False):
             route = (
                 "organization-document-attachment-download"
                 if workspace.organization

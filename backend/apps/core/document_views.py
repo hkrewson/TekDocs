@@ -5,7 +5,7 @@ from uuid import UUID
 
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import F, OuterRef, Q, Subquery
+from django.db.models import Exists, F, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.http import FileResponse, Http404, HttpResponse, HttpResponseBase
 from django.shortcuts import get_object_or_404
@@ -223,6 +223,11 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
         content_id=OuterRef("owner_content_id"),
         kind="document",
     )
+    repository_authority = DocumentAuthority.objects.filter(
+        workspace=owner,
+        content_id=OuterRef("owner_content_id"),
+        authority=DocumentAuthorityMode.REPOSITORY,
+    )
     queryset = (
         DocumentAttachment.objects.filter(
             Q(document_id__in=documents_for_scope(workspace.data_scope).values("id"))
@@ -230,6 +235,7 @@ def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
             archived_at__isnull=True,
             tenant=workspace.member.tenant,
         )
+        .annotate(repository_authoritative=Exists(repository_authority))
         .annotate(native_document_title=Subquery(native_document.values("title")[:1]))
         .filter(Q(document__isnull=False) | Q(native_document_title__isnull=False))
         .annotate(file_document_title=Coalesce("document__entity__display_name", "native_document_title"))

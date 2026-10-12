@@ -9,6 +9,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
@@ -81,6 +82,10 @@ from apps.core.publications import PublicationConflict, publish_document
 from apps.core.repository_editable_bundle_validation import verify_repository_editable_bundle
 from apps.core.repository_editable_bundles import export_repository_editable_bundle
 from apps.core.repository_primary_publication import prepare_repository_primary_publication
+from apps.core.repository_publication_evidence import (
+    retain_repository_publication_evidence,
+    verify_repository_publication_evidence,
+)
 from apps.core.repository_service import RepositoryAuditAttribution, RepositoryServiceError, commit_repository_files
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -120,6 +125,11 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             version_number=1,
         )
+        original_attachment = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("checklist.txt", b"Original checklist.\n"),
+        )
         export = build_simple_document_export(document)
         copied = commit_repository_files(
             repository_id=repository.id,
@@ -128,6 +138,22 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
             message="Copy document for authority test",
         )
         index_repository_content(repository_id=repository.id)
+        legacy_primary_snapshot = prepare_repository_primary_publication(
+            repository=repository,
+            content_id=document.id,
+            expected_current_entity_id=original_primary.entity_id,
+        )
+        assert legacy_primary_snapshot.versions[-1].descriptor["owner"] == {
+            "type": "legacy_document",
+            "id": str(document.id),
+        }
+        browser = Client()
+        browser.force_login(installation.owner)
+        repository_download_url = reverse(
+            "msp-content-document-attachment-download",
+            kwargs={"content_id": document.id, "attachment_entity_id": original_primary.entity_id},
+        )
+        assert browser.get(repository_download_url).status_code == 404
         reviewed_at = timezone.now()
         document.review_state = DocumentReviewState.APPROVED
         document.reviewer_id = installation.owner.id
@@ -222,8 +248,37 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
             b"Original setup file.\n",
             b"Updated setup file.\n",
         ]
-        browser = Client()
-        browser.force_login(installation.owner)
+        assert [version.descriptor["owner"] for version in prepared_primary.versions] == [
+            {"type": "repository_document", "id": str(document.id)},
+            {"type": "repository_document", "id": str(document.id)},
+        ]
+        files = browser.get(reverse("msp-document-file-list")).json()["results"]
+        git_owned_file = next(item for item in files if item["id"] == str(replacement_primary.entity_id))
+        assert git_owned_file["source"] == "repository"
+        assert git_owned_file["download_url"] == reverse(
+            "msp-content-document-attachment-download",
+            kwargs={"content_id": document.id, "attachment_entity_id": replacement_primary.entity_id},
+        )
+        assert b"".join(browser.get(git_owned_file["download_url"]).streaming_content) == b"Updated setup file.\n"
+        git_owned_attachment = next(item for item in files if item["id"] == str(original_attachment.entity_id))
+        assert git_owned_attachment["source"] == "repository"
+        assert b"".join(browser.get(git_owned_attachment["download_url"]).streaming_content) == b"Original checklist.\n"
+        Authenticator.objects.create(
+            user=installation.owner,
+            type=Authenticator.Type.TOTP,
+            data={"secret": generate_totp_secret()},
+        )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=document.id,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        assert {
+            (item["owner"]["type"], item["owner"]["id"])
+            for item in evidence.manifest["primary_file"]["versions"]
+        } == {("repository_document", str(document.id))}
+        assert verify_repository_publication_evidence(evidence)["valid"]
         repository_owned_detail = browser.get(
             reverse("msp-document-detail", kwargs={"document_entity_id": document.entity_id})
         ).json()
@@ -298,6 +353,25 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
             workspace.repository.accepted_commit.object_id
         )
         assert repository_export.manifest["placements"] == []
+        fragment = read_authored_content(repository=repository, content_id=export.block_id)
+        authored_fragment = author_content(
+            repository=repository,
+            actor_id=installation.owner.id,
+            request_id=None,
+            operation="update",
+            content_id=export.block_id,
+            base_commit=fragment.accepted_commit,
+            base_blob=fragment.source_blob,
+            kind=None,
+            path=None,
+            title=None,
+            markdown="Git-only repair steps retained on rollback.\n",
+            metadata_patch={},
+        )
+        assert authored_fragment.accepted_commit != copied.object_id
+        legacy_revision_before_rollback = document.placements.get(
+            parent__isnull=True, position=0
+        ).block.current_revision
         rollback_handoff = io.StringIO()
         call_command(
             "transition_document_authority",
@@ -308,12 +382,38 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
             apply=True,
             stdout=rollback_handoff,
         )
-        assert json.loads(rollback_handoff.getvalue())["status"] == "transitioned"
+        rollback_result = json.loads(rollback_handoff.getvalue())
+        assert rollback_result["status"] == "transitioned", rollback_result
+        legacy_revision_after_rollback = BlockRevision.objects.get(
+            block_id=export.block_id, revision_number=legacy_revision_before_rollback.revision_number + 1
+        )
+        assert legacy_revision_after_rollback.parent_id == legacy_revision_before_rollback.id
+        assert legacy_revision_after_rollback.markdown == authored_fragment.markdown
+        assert resolve_document(document).markdown == authored_fragment.markdown
         assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == (
             DocumentAuthorityMode.LEGACY
         )
+        rolled_back_primary = prepare_repository_primary_publication(
+            repository=repository,
+            content_id=document.id,
+            expected_current_entity_id=replacement_primary.entity_id,
+        )
+        assert [version.descriptor["owner"] for version in rolled_back_primary.versions] == [
+            {"type": "legacy_document", "id": str(document.id)},
+            {"type": "legacy_document", "id": str(document.id)},
+        ]
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        rolled_back_files = browser.get(reverse("msp-document-file-list"), {"kind": "primary"}).json()["results"]
+        rolled_back_primary_file = next(
+            item for item in rolled_back_files if item["id"] == str(replacement_primary.entity_id)
+        )
+        assert rolled_back_primary_file["source"] == "legacy"
+        assert rolled_back_primary_file["download_url"] == reverse(
+            "msp-document-attachment-download",
+            kwargs={"document_entity_id": document.entity_id, "attachment_entity_id": replacement_primary.entity_id},
+        )
         source = read_authored_content(repository=repository, content_id=document.id)
-        assert source.accepted_commit == copied.object_id
+        assert source.accepted_commit == authored_fragment.accepted_commit
 
         with transaction.atomic():
             with connection.cursor() as cursor:
@@ -344,9 +444,22 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
                 metadata_patch={"properties": {"collection": "Git collection", "tags": ["Git tag"]}},
             )
 
+        structural_rollback = io.StringIO()
+        call_command(
+            "transition_document_authority",
+            workspace=str(workspace.id),
+            document=str(document.id),
+            actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.LEGACY,
+            stdout=structural_rollback,
+        )
+        structural_result = json.loads(structural_rollback.getvalue())
+        assert structural_result["status"] == "blocked"
+        assert "rollback_root_metadata_changed" in structural_result["blockers"]
+
         assert authored.markdown == "Git-only repair steps.\n"
         assert authored.accepted_commit == authored.indexed_commit
-        assert resolve_document(document).markdown == "Legacy-only body.\n"
+        assert resolve_document(document).markdown == authored_fragment.markdown
         browser = Client()
         browser.force_login(installation.owner)
         canonical_hits = browser.get(reverse("msp-document-search"), {"q": "Git-only repair"}).json()
@@ -359,8 +472,8 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
         assert {item["id"] for item in metadata_filter["results"]} == {str(document.entity_id)}
         indexed_node = ContentNode.objects.get(repository=repository, content_id=document.id)
         assert indexed_node.markdown == "Git-only repair steps.\n"
-        assert "Legacy-only body." in indexed_node.composition_variants["msp_internal"]["markdown"]
-        stale_hits = browser.get(reverse("msp-document-search"), {"q": "Legacy-only body"}).json()
+        assert authored_fragment.markdown in indexed_node.composition_variants["msp_internal"]["markdown"]
+        stale_hits = browser.get(reverse("msp-document-search"), {"q": "Git-only repair steps retained"}).json()
         assert str(document.entity_id) in {item["id"] for item in stale_hits["results"]}
         repository.refresh_from_db()
         indexed_commit_id = repository.indexed_commit_id

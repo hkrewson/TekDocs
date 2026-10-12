@@ -134,7 +134,11 @@ def prepare_repository_primary_publication(
                 descriptor={
                     "id": str(record.entity_id),
                     "owner": {
-                        "type": "legacy_document" if document else "repository_document",
+                        "type": (
+                            "repository_document"
+                            if repository_authoritative or document is None
+                            else "legacy_document"
+                        ),
                         "id": str(content_id),
                     },
                     "version_number": record.version_number,

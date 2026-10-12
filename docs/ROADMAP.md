@@ -1688,7 +1688,7 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.4` | Authorized operational-entity context, asset documentation backlinks, content-graph reads, search, health and views. |
 | `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. Implemented; release acceptance in `docs/releases/0.9.5.md`. |
 | `0.9.6` | Complete as a local development checkpoint: dry-run inventory, deterministic first-wave copy, explicit deferrals, mixed-store read-only parity, and guarded rollback. Legacy reads and writes remain authoritative. The aggregate local gate passed and [public migration guidance](https://github.com/hkrewson/TekDocs/wiki/Imports-and-migration) was published; no deployment or authority handoff is claimed. |
-| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity, per-document authority transition and repository-inclusive encrypted recovery. The local document-migration release gate now passes; remaining closure is candidate CI/release acceptance, with host-filesystem exhaustion still untested and historical review-digest mismatches remaining per-document handoff blockers. |
+| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity, per-document authority transition and repository-inclusive encrypted recovery. Local migration, production-image, encrypted backup/restore, and authority regression gates pass. Remaining release closure is hosted candidate CI and release acceptance; actual whole-host filesystem exhaustion is intentionally untested, while historical review-digest mismatches remain per-document handoff blockers. |
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
 | `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
 
@@ -2015,6 +2015,17 @@ stored-file integrity during preview/import, then resolved through existing
 authorized downloads in repository detail reads; file bytes remain outside
 Git and rollback does not remove them. Primary-file version chains remain
 deferred for `0.9.7` file/publication parity.
+That parity now carries a copied legacy chain through authority promotion
+without changing its retained rows: the Files register and download use the
+repository owner path only while Git is authoritative, signed repository
+publication evidence binds the stable repository-document identity, and offline
+verification continues to pass after rollback. The legacy download path
+remains selected before promotion and after rollback; direct repository reads
+fail closed while the legacy document is authoritative. This closes primary
+file read/publication-owner parity. Changed fragment Markdown can now roll back
+as a new immutable legacy revision when identity and metadata remain unchanged;
+structural or metadata drift stays blocked. Historical-publication and recovery
+exit gates remain.
 The `0.9.6` copy profile also carries active same-workspace field-key binding
 names and target IDs without resolved values; preview binds those identities,
 and repository reads use the existing per-reader authorization only while the

@@ -374,6 +374,10 @@ Use `--network-isolated` during a recovery rehearsal or controlled restore to
 keep the restored stack off external networks until verification is complete.
 GitHub and other optional remotes are replication targets, not backups, and are
 never required for restore.
+Secret capture excludes macOS archive sidecar metadata. Restored secret files
+match production setup: root-owned and read-only inside a private `0700` host
+directory, so unrelated native-Linux container users can read their scoped
+Compose mounts without making the host directory public.
 
 ## API
 

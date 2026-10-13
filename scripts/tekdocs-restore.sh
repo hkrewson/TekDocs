@@ -114,7 +114,12 @@ docker run --rm --network none --read-only --tmpfs /tmp \
   "$backend_image" -m tekdocs.recovery_preflight --kind media /recovery/media.tar
 mkdir -m 0700 "$secret_output"
 tar -xf "$work_directory/deployment-secrets.tar" -C "$secret_output"
-chmod 0600 "$secret_output"/*
+# Match production setup: the 0700 host directory protects key custody, while
+# read-only service mounts must be readable by the unrelated container UID on
+# native Linux. Desktop bind mounts can otherwise hide this permissions defect.
+docker run --rm --network none --read-only --user 0:0 --entrypoint sh \
+  -v "$secret_output:/secrets" "$backend_image" -c \
+  'chown 0:0 /secrets/* && chmod 0444 /secrets/*'
 
 export TEKDOCS_SECRET_DIRECTORY="$secret_output"
 echo "Replacing only the explicitly confirmed TekDocs project volumes"

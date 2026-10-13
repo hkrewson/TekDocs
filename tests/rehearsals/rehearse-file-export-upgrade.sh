@@ -142,11 +142,22 @@ artifact = DocumentPublicationArtifact.objects.get(publication=publication, kind
 with artifact.file.storage.open(artifact.file.name, "rb") as stored:
     assert stored.read(5) == b"%PDF-"
 before = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
-snapshot = resolve_export_snapshot(workspace=resolve_msp_workspace(owner), document=document, attachment_ids=tuple(record.entity_id for record in records))
+snapshot = resolve_export_snapshot(
+    workspace=resolve_msp_workspace(owner), document=document,
+    attachment_ids=tuple(record.entity_id for record in records if record.purpose == DocumentAttachmentPurpose.ATTACHMENT),
+    include_primary_files=True,
+)
+assert snapshot.manifest["primary_file"]["selected_current_id"] == str(primary[1].entity_id)
+assert [item["version_number"] for item in snapshot.manifest["primary_file"]["versions"]] == [1, 2]
 bundle = export_bundle(snapshot)
 with ZipFile(BytesIO(bundle)) as archive:
     assert archive.testzip() is None
-    assert len([name for name in archive.namelist() if name.startswith("attachments/")]) == 3
+    attachments = [name for name in archive.namelist() if name.startswith("attachments/")]
+    primary_paths = [name for name in archive.namelist() if name.startswith("primary-files/")]
+    assert len(attachments) == 1
+    assert len(primary_paths) == 2
+    assert archive.read(attachments[0]) == expected["evidence.txt"]
+    assert {archive.read(name) for name in primary_paths} == {expected["source-v1.pdf"], expected["source-v2.pdf"]}
 after = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
 assert after == before
 scope.__exit__(None, None, None)

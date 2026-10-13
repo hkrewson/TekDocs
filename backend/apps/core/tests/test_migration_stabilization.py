@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
+from django.db.migrations.executor import MigrationExecutor
+from django.db.models.query import QuerySet
 from django.test import override_settings
 from django.utils import timezone
 from psycopg import sql
@@ -370,6 +372,76 @@ def test_primary_static_validator_upgrade_and_reverse(migration_head_restored):
     assert "tekdocs-repository-static-publication/v2" not in validator_sql()
     call_command("migrate", "core", verbosity=0, interactive=False)
     assert "tekdocs-repository-static-publication/v2" in validator_sql()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_primary_file_owner_backfill_preserves_identity_and_guard(migration_head_restored, tmp_path, monkeypatch):
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Primary upgrade fixture", owner_email=f"primary-{uuid.uuid4()}@example.invalid",
+        owner_display_name="Upgrade Owner", password=secrets.token_urlsafe(32),
+    )
+    document = create_document(
+        tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+        title="Primary upgrade", markdown="Retained source.\n",
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path)):
+        attachment = create_document_attachment(
+            document=document, actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("source.txt", b"Retained primary bytes\n"),
+        )
+    target = ("core", "0179_repository_evidence_public_attachment_ids")
+    call_command("migrate", *target, verbosity=0, interactive=False)
+    historical = MigrationExecutor(connection).loader.project_state([target]).apps
+    OldAttachment = historical.get_model("core", "DocumentAttachment")
+    # Build the pre-expansion primary fixture with its historical schema. No
+    # runtime guard is disabled: ordinary deletion and primary insertion are legal.
+    old = OldAttachment.objects.get(pk=attachment.pk)
+    values = {field.attname: getattr(old, field.attname) for field in OldAttachment._meta.concrete_fields}
+    old.delete()
+    primary = OldAttachment.objects.create(**{**values, "purpose": "primary_file", "version_number": 1})
+    call_command("migrate", "core", "0180_document_attachment_content_owner", verbosity=0, interactive=False)
+    original_bulk_update = QuerySet.bulk_update
+    with monkeypatch.context() as patch:
+        def failed_batch(queryset, *args, **kwargs):
+            original_bulk_update(queryset, *args, **kwargs)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() "
+                    "AND relation='core_documentattachment'::regclass "
+                    "AND mode='ShareRowExclusiveLock' AND granted"
+                )
+                assert cursor.fetchone() == (1,)
+            raise RuntimeError("Interrupted owner backfill fixture")
+
+        patch.setattr("django.db.models.query.QuerySet.bulk_update", failed_batch)
+        with pytest.raises(RuntimeError, match="Interrupted owner backfill fixture"):
+            call_command("migrate", "core", "0181_backfill_document_attachment_owner", verbosity=0, interactive=False)
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT tgenabled FROM pg_trigger WHERE tgname='core_documentattachment_scope_guard'")
+        assert cursor.fetchone() == ("O",)
+        cursor.execute(
+            "SELECT owner_workspace_id, owner_content_id FROM core_documentattachment WHERE id=%s", [primary.pk]
+        )
+        assert cursor.fetchone() == (None, None)
+    with pytest.raises(DatabaseError), transaction.atomic():
+        OldAttachment.objects.filter(pk=primary.pk).update(original_filename="rewritten.txt")
+    for _ in range(2):
+        call_command("migrate", "core", verbosity=0, interactive=False)
+        upgraded = DocumentAttachment.objects.get(pk=primary.pk)
+        assert upgraded.owner_workspace_id == document.entity.workspace_id
+        assert upgraded.owner_content_id == document.pk
+        assert upgraded.checksum == attachment.checksum
+        assert upgraded.entity_id == attachment.entity_id
+        assert upgraded.version_number == 1
+        assert upgraded.replaces_id is None
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            assert copy_attachment_content(upgraded) == b"Retained primary bytes\n"
+        with pytest.raises(DatabaseError), transaction.atomic():
+            DocumentAttachment.objects.filter(pk=primary.pk).update(original_filename="rewritten.txt")
+        call_command("migrate", *target, verbosity=0, interactive=False)
+        with pytest.raises(DatabaseError), transaction.atomic():
+            OldAttachment.objects.filter(pk=primary.pk).update(original_filename="rewritten.txt")
 
 
 @pytest.mark.django_db(transaction=True)

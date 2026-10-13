@@ -1,9 +1,32 @@
 """Backfill stable content ownership in bounded batches after schema expansion."""
 
+from contextlib import contextmanager
+
 from django.db import migrations, transaction
 from django.db.models import Q
 
 BATCH_SIZE = 500
+
+
+@contextmanager
+def owner_backfill_batch(schema_editor):  # type: ignore[no-untyped-def]
+    # The pre-expansion validator rejects *every* primary-file UPDATE. Only
+    # this migration may populate/clear the newly added owner columns. ALTER
+    # TABLE holds its write-excluding lock until commit, so other connections
+    # cannot write while the named validator is disabled. A failed batch rolls
+    # back both its data and trigger state; no runtime bypass is installed.
+    with transaction.atomic(using=schema_editor.connection.alias):
+        with schema_editor.connection.cursor() as cursor:
+            # Check FK constraints as each batch writes, rather than leaving
+            # deferred events that would prevent re-enabling the trigger.
+            cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+            cursor.execute(
+                "ALTER TABLE core_documentattachment DISABLE TRIGGER core_documentattachment_scope_guard"
+            )
+            yield
+            cursor.execute(
+                "ALTER TABLE core_documentattachment ENABLE TRIGGER core_documentattachment_scope_guard"
+            )
 
 
 def backfill_owner(apps, schema_editor):  # type: ignore[no-untyped-def]
@@ -21,7 +44,7 @@ def backfill_owner(apps, schema_editor):  # type: ignore[no-untyped-def]
         for row in rows:
             row.owner_workspace_id = row.document.entity.workspace_id
             row.owner_content_id = row.document_id
-        with transaction.atomic(using=database):
+        with owner_backfill_batch(schema_editor):
             Attachment.objects.using(database).bulk_update(
                 rows, ["owner_workspace", "owner_content_id"], batch_size=BATCH_SIZE
             )
@@ -39,7 +62,7 @@ def clear_owner(apps, schema_editor):  # type: ignore[no-untyped-def]
         )
         if not ids:
             return
-        with transaction.atomic(using=database):
+        with owner_backfill_batch(schema_editor):
             Attachment.objects.using(database).filter(pk__in=ids).update(
                 owner_workspace_id=None, owner_content_id=None
             )

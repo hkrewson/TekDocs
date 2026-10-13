@@ -11,6 +11,7 @@ set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
 . "$repository_root/scripts/lib/recovery-checksum.sh"
+. "$repository_root/scripts/lib/recovery-secret-capture.sh"
 environment_file=.env
 secret_directory=
 output_directory=
@@ -208,7 +209,7 @@ mkfifo "$secrets_pipe"
 crypto_encrypt deployment-secrets < "$secrets_pipe" > "$partial_directory/deployment-secrets.tdr" &
 secrets_crypto_pid=$!
 # shellcheck disable=SC2086
-if ! tar -cf - -C "$absolute_secrets" $secret_names > "$secrets_pipe"; then
+if ! recovery_secret_tar "$absolute_secrets" $secret_names > "$secrets_pipe"; then
   wait "$secrets_crypto_pid" || true
   echo "Deployment-secret backup capture failed." >&2
   exit 1

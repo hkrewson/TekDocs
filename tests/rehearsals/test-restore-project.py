@@ -11,6 +11,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RestoreProjectTests(unittest.TestCase):
+    def test_restored_secret_permissions_match_production_before_volume_replacement(self):
+        source = (ROOT / "scripts/tekdocs-restore.sh").read_text()
+        private_directory = source.index('mkdir -m 0700 "$secret_output"')
+        extract = source.index('tar -xf "$work_directory/deployment-secrets.tar"')
+        prepare_mounts = source.index("chown 0:0 /secrets/* && chmod 0444 /secrets/*")
+        destroy = source.index("restore_compose down --volumes")
+        self.assertLess(private_directory, extract)
+        self.assertLess(extract, prepare_mounts)
+        self.assertLess(prepare_mounts, destroy)
+        self.assertIn("--network none --read-only --user 0:0 --entrypoint sh", source)
+
     def test_media_preflight_precedes_destructive_operations(self):
         source = (ROOT / "scripts/tekdocs-restore.sh").read_text()
         authenticate = source.index("crypto decrypt --label media")

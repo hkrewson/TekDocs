@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import secrets
 import uuid
 
 from allauth.mfa.models import Authenticator
@@ -48,6 +49,21 @@ def _post(browser, url, value=None):
     )
     assert response.status_code == 201, (url, response.status_code, response.content)
     return response.json()
+
+
+def _authorize_delivery(browser, url, password, reason):
+    # A Django force-login does not prove recent allauth authentication. Verify
+    # denial first, then use the real password reauthentication route.
+    payload = {"reason": reason}
+    denied = browser.post(url, data=json.dumps(payload), content_type="application/json", secure=True)
+    assert denied.status_code == 403, denied.status_code
+    assert denied.json()["error"]["code"] == "recent_authentication_required"
+    reauthenticated = browser.post(
+        "/_allauth/browser/v1/auth/reauthenticate", data=json.dumps({"password": password}),
+        content_type="application/json", secure=True,
+    )
+    assert reauthenticated.status_code == 200, reauthenticated.status_code
+    return _post(browser, url, payload)
 
 
 def _portal_snapshot(browser, publication_id, artifact_id):
@@ -135,6 +151,7 @@ mode = os.environ.get("TEKDOCS_RECOVERY_PUBLICATION_MODE")
 browser = Client(HTTP_HOST="localhost")
 
 if mode == "create":
+    actor_password = secrets.token_urlsafe(32)
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY,
@@ -142,7 +159,7 @@ if mode == "create":
         )
         actors = []
         for email, name in ((REVIEWER_EMAIL, "Reviewer"), (AUTHORIZER_EMAIL, "Authorizer")):
-            actor = User.objects.create_user(email=email, display_name=name)
+            actor = User.objects.create_user(email=email, display_name=name, password=actor_password)
             membership = TenantMembership.objects.create(tenant=tenant, user=actor, role=BuiltInRole.ADMINISTRATOR)
             OrganizationAccessAssignment.objects.create(
                 tenant=tenant, organization=organization, membership=membership, created_by=owner
@@ -224,7 +241,7 @@ if mode == "create":
     publication = _post(browser, static_url)
     browser.force_login(authorizer)
     _post(browser, control_url, {"action": "released", "reason": "Recovery fixture release"})
-    _post(browser, delivery_url, {"reason": "Recovery fixture delivery"})
+    _authorize_delivery(browser, delivery_url, actor_password, "Recovery fixture delivery")
     publication_id = uuid.UUID(publication["id"])
     browser.force_login(client)
     html_sha, pdf_sha, attachment_sha = _portal_snapshot(browser, publication_id, artifact.id)
@@ -278,7 +295,7 @@ if mode == "create":
     primary_publication_id = uuid.UUID(primary_publication["id"])
     browser.force_login(authorizer)
     _post(browser, primary_control_url, {"action": "released", "reason": "Primary history released"})
-    _post(browser, primary_delivery_url, {"reason": "Primary history delivered"})
+    _authorize_delivery(browser, primary_delivery_url, actor_password, "Primary history delivered")
     browser.force_login(client)
     primary_hashes = _primary_portal_snapshot(
         browser, primary_publication_id,
@@ -331,7 +348,7 @@ if mode == "create":
     native_publication_id = uuid.UUID(_post(browser, native_routes["static"])["id"])
     browser.force_login(authorizer)
     _post(browser, native_routes["control"], {"action": "released", "reason": "Native history released"})
-    _post(browser, native_routes["delivery"], {"reason": "Native history delivered"})
+    _authorize_delivery(browser, native_routes["delivery"], actor_password, "Native history delivered")
     browser.force_login(client)
     native_hashes = _primary_portal_snapshot(
         browser, native_publication_id,

@@ -81,6 +81,7 @@ case "$shard" in
     ;;
   migration-guards)
     set -- \
+      apps/core/tests/test_migration_stabilization.py::test_primary_file_owner_backfill_preserves_identity_and_guard \
       apps/core/tests/test_migration_stabilization.py::test_the_newest_guard_migration_reverses_and_reapplies_without_losing_retained_evidence \
       apps/core/tests/test_migration_stabilization.py::test_publication_manifest_v3_guard_reverses_and_reapplies_without_rewriting_evidence
     ;;

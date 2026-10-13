@@ -2,6 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+. "$repository_root/scripts/lib/recovery-secret-capture.sh"
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-supported-recovery.XXXXXX")
 source_environment="$work_directory/source.env"
 restore_environment="$work_directory/restore.env"
@@ -26,8 +27,9 @@ compose_for() {
 cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
-    echo "Recovery rehearsal failed; retained backend diagnostics follow:" >&2
-    compose_for "$restore_environment" "$restored_secrets" logs --no-color --tail 120 backend >&2 || true
+    echo "Recovery rehearsal failed; source and restore migration/backend diagnostics follow:" >&2
+    compose_for "$source_environment" "$source_secrets" logs --no-color --tail 120 migrate backend >&2 || true
+    compose_for "$restore_environment" "$restored_secrets" logs --no-color --tail 120 migrate backend >&2 || true
   fi
   compose_for "$source_environment" "$source_secrets" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   compose_for "$restore_environment" "$restored_secrets" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
@@ -58,7 +60,9 @@ copy_secret() {
   target=$2
   value=$(sed -n "s/^${name}=//p" "$source_environment" | head -n 1)
   printf '%s\n' "$value" > "$source_secrets/$target"
-  chmod 0600 "$source_secrets/$target"
+  # Keep the containing directory private, but allow the unrelated Linux
+  # container UID to read its read-only, service-scoped Compose secret mount.
+  chmod 0444 "$source_secrets/$target"
 }
 copy_secret DJANGO_SECRET_KEY django_secret_key
 copy_secret POSTGRES_OWNER_PASSWORD postgres_owner_password
@@ -281,10 +285,7 @@ compose_for "$source_environment" "$source_secrets" ps --status running --servic
 echo "Checking encrypted artifacts for plaintext deployment values"
 for secret_file in "$source_secrets"/*; do
   secret_value=$(sed -n '1p' "$secret_file")
-  if grep -aFq "$secret_value" "$backup_directory"/*; then
-    echo "An encrypted recovery artifact disclosed a deployment secret." >&2
-    exit 1
-  fi
+  recovery_assert_no_plaintext "$secret_value" "$backup_directory"/*
 done
 echo "Checking mandatory destructive confirmation"
 if "$repository_root/scripts/tekdocs-restore.sh" --env-file "$restore_environment" \

@@ -9,6 +9,17 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseGatePlanTests(unittest.TestCase):
+    def test_standalone_performance_gate_provisions_runtime_before_pytest(self) -> None:
+        result = subprocess.run(
+            ["make", "-n", "-o", "check-frontend", "test-public-beta-performance"],
+            cwd=ROOT, check=True, capture_output=True, text=True,
+        )
+        commands = result.stdout.splitlines()
+        provision = "docker compose run --rm migrate python manage.py provision_runtime_role"
+        self.assertIn(provision, commands)
+        first_test = next(index for index, command in enumerate(commands) if " pytest " in command)
+        self.assertLess(commands.index(provision), first_test)
+
     def test_release_gate_runs_each_frontend_boundary_once(self) -> None:
         result = subprocess.run(
             ["make", "-n", "release-gate"],

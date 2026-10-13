@@ -2,6 +2,64 @@
 
 Snapshot: 2026-10-12. Owner: maintainer. Local review is in progress; nothing here dismisses hosted alerts or certifies the final candidate.
 
+## Candidate rescan reconciliation — 2026-10-13
+
+### Approved, time-bounded release exceptions
+
+On 2026-10-13 the sole operator explicitly approved retaining the existing
+inline-style CSP allowance (`style-src 'unsafe-inline'`) and missing COEP header
+as documented release exceptions under issue #38. Owner: maintainer. Review is
+due **2026-11-12 or before the next candidate, whichever comes first**. Preserve
+the scope and risk analysis in `phase-8-security-review.md`, recheck the repaired
+candidate, and carry both exceptions into the final security record. This
+approval accepts the documented residual risks; it does not eliminate them,
+dismiss scanner alerts, waive other acceptance gates, or authorize deployment.
+
+### Rescan observations
+
+Read-only GitHub review of candidate `31daa14125a60dc3cbea86583abb1340fc3ecaee`
+found **282 open alerts**, all observed on that commit: 7 high, 127 medium,
+148 unrated. The unchanged count does not mean an unchanged set:
+
+- **#198 fixed by CodeQL:** the broad NetBox `ValueError` disclosure is no longer
+  reported. Its replacement **#313** flags the deliberately narrower
+  `NetBoxReferenceError` branch at `integrations.py:1190`. Reviewed all constructors
+  in `netbox_reconciliation.py`: messages are fixed domain guidance, with no SQL,
+  transport body or interpolated provider identity. The existing three-case
+  `test_netbox_adoption_error_boundary` verifies preservation of domain guidance
+  and suppression of both malformed-identity and arbitrary internal `ValueError`
+  diagnostics. Local disposition: retain the controlled domain branch; no
+  demonstrated disclosure and no hosted dismissal.
+- **#302 fixed by CodeQL:** the retained-attachment empty fallback was removed.
+  Preserve its valid-empty-file control and three read-failure cases.
+- **#314 new, unrated:** `test_remote_document_egress.py:26` wraps `SimpleNamespace`
+  in a keyword-forwarding lambda for a mocked observation constructor. This is a
+  test-only readability finding, not runtime exposure. Leave it as non-blocking
+  maintenance rather than broaden the release fix into unrelated cleanup.
+- The other **280 open alert identities** are the previously reviewed baseline
+  identities. Existing detailed dispositions below remain applicable to their
+  unchanged source paths. Counts describe scanner classifications, not 282
+  confirmed vulnerabilities or completed fixes.
+
+Extended run `38344716336` on this candidate passed all five browser projects
+and passive DAST (62 pass, 5 warnings, 0 failures). The five warning categories
+are unchanged: comments, public caching, inline-style CSP, modern application,
+and missing COEP. The detailed scope and limitations remain in
+`phase-8-security-review.md`; CSP/COEP residual-risk follow-ups are not silently
+closed by a green scan. Recheck against the repaired candidate and include their
+owner/review date in S6.
+
+Seven hosted evidence fragments were downloaded and checked locally. The
+assembler rejects closure because `upgrade`, `backup_and_restore`, and
+`source_review` are missing. Repair work changes the candidate: evidence for
+`31daa14` must not be relabeled as evidence for the subsequent fix commit.
+See [candidate notes](0.9.8-candidate.md) and the
+[operator acceptance workflow](0.9.8-operator-acceptance.md).
+
+The older entries below are dated worktree/baseline history; statements that
+hosted evidence is still on 0.9.7 describe those earlier checkpoints, not this
+rescan. S5/S6 remain open.
+
 ## Fixed remaining work packages
 
 - [x] S1 — Complete scoped egress/import/provider source review and local regressions: 77 import, 176 shared integration and 47 provider-specific checks pass. Live-provider assurance is not claimed; final-candidate reruns remain in S5.

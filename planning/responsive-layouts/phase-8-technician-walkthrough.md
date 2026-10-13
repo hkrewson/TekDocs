@@ -3,7 +3,10 @@
 This is the human acceptance record for the remaining broad responsive workspaces
 under #39/#60/#75. Automated browser, API, live-runtime, production-route and
 recovery evidence is indexed in `acceptance.json`; this record covers the parts
-that require a person using the interface. Version remains 0.8.46.
+that require a person using the interface. Current acceptance target: 0.9.8.
+Use the [guided operator workflow](0.9.8-operator-acceptance.md) for setup,
+step-by-step tasks, expected results, and pilot questions. Record the exact tested
+commit below; this version label alone does not identify a candidate.
 
 Do not mark a workspace group's `human_review.status` complete until every profile
 below has a recorded passing run for both the MSP route and an organization route.

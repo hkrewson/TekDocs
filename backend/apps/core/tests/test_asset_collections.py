@@ -73,6 +73,24 @@ def test_summary_collection_searches_all_records_and_preserves_legacy(owner_clie
     ).json()
     assert legacy["page_size"] == 50
     assert "specifications" in legacy["results"][0]
+    with CaptureQueriesContext(connection) as deep_queries:
+        legacy_second = owner_client.get(
+            reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+            {"page": 2, "page_size": 25},
+        ).json()
+    assert legacy_second["count"] == 31
+    assert [row["id"] for row in legacy_second["results"]] == [str(asset.entity_id) for asset in assets[25:]]
+    assert not legacy_second["has_more"]
+    hydration = [q["sql"] for q in deep_queries if '"core_clientasset"."specifications"' in q["sql"]]
+    assert len(hydration) == 1
+    # The wide related-record query must not walk discarded offset rows.
+    assert " OFFSET " not in hydration[0]
+    assert '"core_clientasset"."id" IN (' in hydration[0]
+    legacy_empty = owner_client.get(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"page": 100, "page_size": 25},
+    ).json()
+    assert legacy_empty["results"] == [] and legacy_empty["count"] == 31 and not legacy_empty["has_more"]
     assert owner_client.get(reverse("msp-asset-collection")).json()["count"] == 0
     assert (
         owner_client.get(

@@ -451,7 +451,7 @@ compliance-monitoring-upgrade-rehearsal:
 compliance-monitoring-backup-rehearsal:
 	./tests/rehearsals/rehearse-compliance-monitoring-backup.sh
 
-supported-recovery-rehearsal:
+supported-recovery-rehearsal: test-restore-project
 	./tests/rehearsals/rehearse-supported-recovery.sh
 
 repository-foundation-acceptance:

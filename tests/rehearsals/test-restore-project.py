@@ -11,6 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RestoreProjectTests(unittest.TestCase):
+    def test_private_preflight_uses_host_identity_and_repository_mount_is_narrow(self):
+        source = (ROOT / "scripts/tekdocs-restore.sh").read_text()
+        preflight = source.split('echo "Authenticating recovery artifacts', 1)[1].split(
+            'mkdir -m 0700 "$secret_output"', 1
+        )[0]
+        commands = preflight.split("docker run")[1:]
+        self.assertEqual(len(commands), 3)
+        for command in commands:
+            self.assertIn('--user "$(id -u):$(id -g)"', command)
+        # Runtime restore/verify keep the application UID and receive only the
+        # repository archive, never the private directory containing other keys.
+        runtime = source.split('echo "Replacing only', 1)[1]
+        self.assertNotIn('-v "$work_directory:/recovery:ro"', runtime)
+        self.assertEqual(runtime.count('-v "$work_directory/repositories.tar:/recovery/repositories.tar:ro"'), 2)
+        self.assertIn('chmod 0444 "$work_directory/repositories.tar"', source)
+        self.assertIn('chmod 0700 "$work_directory"', source)
+
     def test_restored_secret_permissions_match_production_before_volume_replacement(self):
         source = (ROOT / "scripts/tekdocs-restore.sh").read_text()
         private_directory = source.index('mkdir -m 0700 "$secret_output"')

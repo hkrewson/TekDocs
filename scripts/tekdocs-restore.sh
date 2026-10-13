@@ -99,16 +99,21 @@ crypto decrypt --label database --input /recovery/database.tdr --output /work/da
 crypto decrypt --label media --input /recovery/media.tdr --output /work/media.tar
 crypto decrypt --label deployment-secrets --input /recovery/deployment-secrets.tdr --output /work/deployment-secrets.tar
 crypto decrypt --label repositories --input /recovery/repositories.tdr --output /work/repositories.tar
+# Decryption creates host-owned private files. Offline preflight must use the
+# same identity; the application UID cannot traverse the 0700 host directory.
 docker run --rm --network none --read-only --tmpfs /tmp \
+  --user "$(id -u):$(id -g)" \
   --entrypoint python \
   -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test \
   -v "$work_directory:/recovery:ro" \
   "$backend_image" manage.py repository_recovery validate --archive /recovery/repositories.tar >/dev/null
 docker run --rm --network none --read-only --tmpfs /tmp \
+  --user "$(id -u):$(id -g)" \
   --entrypoint python \
   -v "$work_directory:/recovery:ro" \
   "$backend_image" -m tekdocs.recovery_preflight /recovery/deployment-secrets.tar
 docker run --rm --network none --read-only --tmpfs /tmp \
+  --user "$(id -u):$(id -g)" \
   --entrypoint python \
   -v "$work_directory:/recovery:ro" \
   "$backend_image" -m tekdocs.recovery_preflight --kind media /recovery/media.tar
@@ -121,6 +126,11 @@ docker run --rm --network none --read-only --user 0:0 --entrypoint sh \
   -v "$secret_output:/secrets" "$backend_image" -c \
   'chown 0:0 /secrets/* && chmod 0444 /secrets/*'
 
+# Runtime repository operations retain their application UID. Bind only this
+# read-only file, not the directory containing decrypted deployment secrets.
+# Its private 0700 host parent still excludes other host users.
+chmod 0444 "$work_directory/repositories.tar"
+
 export TEKDOCS_SECRET_DIRECTORY="$secret_output"
 echo "Replacing only the explicitly confirmed TekDocs project volumes"
 restore_compose down --volumes --remove-orphans
@@ -129,7 +139,7 @@ restore_compose exec -T db sh -c \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --clean --if-exists' \
   < "$work_directory/database.dump"
 restore_compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false \
-  -v "$work_directory:/recovery:ro" backend \
+  -v "$work_directory/repositories.tar:/recovery/repositories.tar:ro" backend \
   python manage.py repository_recovery restore --archive /recovery/repositories.tar
 restore_compose run --rm migrate
 restore_compose build --with-dependencies backend
@@ -141,7 +151,7 @@ docker run --rm -i -v "$media_volume:/restore" \
   postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
   tar -xf - -C /restore < "$work_directory/media.tar"
 restore_compose up -d --build --wait
-restore_compose run --rm --no-deps -v "$work_directory:/recovery:ro" backend \
+restore_compose run --rm --no-deps -v "$work_directory/repositories.tar:/recovery/repositories.tar:ro" backend \
   python manage.py repository_recovery verify --archive /recovery/repositories.tar
 restore_compose exec -T backend python manage.py verify_recovery_publications
 restore_compose exec -T backend python manage.py verify_recovery_managed_files

@@ -361,6 +361,10 @@ SHA-256 before publishing a recovery set; missing or changed files abort the
 backup. Restore validates all encrypted components and repository bundles before
 destructive work, then verifies the restored repositories, publications, and
 managed files against PostgreSQL before reporting success.
+Offline archive preflight runs as the invoking host user so it can read the
+private decrypted working directory on native Linux. Runtime repository restore
+and verification retain the application user and receive only a read-only
+repository-archive file mount, not the directory containing decrypted keys.
 Deployment-secret archives must contain unique allowlisted regular files, each
 1–4096 bytes, and all required keys. Links and special entries are rejected
 before extraction or volume replacement.

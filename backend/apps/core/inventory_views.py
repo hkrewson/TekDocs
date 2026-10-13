@@ -40,6 +40,7 @@ from .inventory import (
     dispose_hardware,
     lifecycle_events,
     model_choices_for_client,
+    paginate_assets_for_scope,
     require_operational_owner,
     unassign_hardware,
     update_hardware_details,
@@ -474,7 +475,7 @@ class ClientAssetListCreateView(APIView):
         workspace = _workspace(request, organization_entity_id, PermissionKey.ASSETS_VIEW)
         query = BoundedCollectionQuerySerializer(data=request.query_params)
         query.is_valid(raise_exception=True)
-        page = paginate(assets_for_scope(workspace.data_scope), **query.validated_data)
+        page = paginate_assets_for_scope(workspace.data_scope, **query.validated_data)
         return Response(
             ClientAssetResultSerializer(
                 {

@@ -8,6 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Exists, OuterRef, Prefetch, Q, QuerySet
 from django.utils import timezone
 
+from .collection_pagination import CollectionPage
 from .models import (
     AuditEvent,
     CatalogModel,
@@ -126,6 +127,23 @@ def assets_for_scope(scope: DataScope) -> QuerySet[ClientAsset]:
             "lifecycle_events__site__entity",
             "lifecycle_events__location__entity",
         )
+    )
+
+
+def paginate_assets_for_scope(scope: DataScope, *, page: int, page_size: int) -> CollectionPage[ClientAsset]:
+    records = assets_for_scope(scope)
+    count = records.count()
+    offset = (page - 1) * page_size
+    # Select the ordered, scoped IDs before loading the wide catalog/assignment
+    # graph. OFFSET on that graph joins every discarded asset on deep pages.
+    ids = list(records.select_related(None).prefetch_related(None).values_list("pk", flat=True)[
+        offset : offset + page_size
+    ])
+    selected = {asset.pk: asset for asset in records.filter(pk__in=ids)}
+    ordered = [selected[pk] for pk in ids if pk in selected]
+    return CollectionPage(
+        records=ordered, page=page, page_size=page_size, count=count,
+        has_more=offset + len(ordered) < count,
     )
 
 

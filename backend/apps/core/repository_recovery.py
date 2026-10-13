@@ -314,8 +314,9 @@ def restore_repository_recovery_archive(archive_path: Path, destination_root: Pa
                 if entry["object_format"] == RepositoryObjectFormat.SHA256:
                     init_arguments.append("--object-format=sha256")
                 init_arguments.append(str(repository_path))
-                _git(*init_arguments)
+                # Git init can leave a partial directory even when it fails.
                 created.append(repository_path)
+                _git(*init_arguments)
                 _git(
                     "fetch",
                     str(staging / entry["bundle"]),

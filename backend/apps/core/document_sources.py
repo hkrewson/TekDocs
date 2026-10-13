@@ -114,6 +114,7 @@ def fetch_remote_document(source: DocumentRemoteSource) -> DocumentRemoteObserva
         pool = pinned_https_pool(
             target, connect_timeout=3.0, read_timeout=12.0, pool_factory=urllib3.HTTPSConnectionPool
         )
+        response = None
         try:
             response = pool.urlopen(
                 "GET",
@@ -128,13 +129,10 @@ def fetch_remote_document(source: DocumentRemoteSource) -> DocumentRemoteObserva
             etag_digest = _digest_header(response.headers.get("ETag"))
             modified_digest = _digest_header(response.headers.get("Last-Modified"))
             if status_code != 200:
-                response.close()
                 raise RemoteDocumentError("remote_http_error")
             if content_type not in {"text/markdown", "text/plain", "text/html", "application/xhtml+xml"}:
-                response.close()
                 raise RemoteDocumentError("remote_content_type_invalid")
             body = response.read(MAX_REMOTE_DOCUMENT_BYTES + 1)
-            response.close()
             if len(body) > MAX_REMOTE_DOCUMENT_BYTES:
                 raise RemoteDocumentError("remote_response_too_large")
             text = body.decode("utf-8")
@@ -143,7 +141,11 @@ def fetch_remote_document(source: DocumentRemoteSource) -> DocumentRemoteObserva
                 kind = DocumentSourceKind.HTML if "html" in content_type else DocumentSourceKind.MARKDOWN
             markdown = html_to_markdown(text) if kind == DocumentSourceKind.HTML else text.rstrip() + "\n"
         finally:
-            pool.close()
+            try:
+                if response is not None:
+                    response.close()
+            finally:
+                pool.close()
     except (ApprovedEgressError, HTTPError, UnicodeDecodeError, ValidationError, RemoteDocumentError) as exc:
         error_code = (
             str(exc) if isinstance(exc, ApprovedEgressError | RemoteDocumentError) else "remote_connection_failed"

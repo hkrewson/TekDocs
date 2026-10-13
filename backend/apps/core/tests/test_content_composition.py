@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import secrets
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
@@ -10,6 +12,8 @@ from threading import Event
 from types import SimpleNamespace
 
 import pytest
+from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
+from allauth.account.internal.flows.reauthentication import did_recently_authenticate
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import generate_totp_secret
 from django.core.exceptions import ValidationError
@@ -99,6 +103,12 @@ from apps.core.scoping import DataScope
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+
+def _recent_session(browser):
+    session = browser.session
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "mfa", "at": time.time()}]
+    session.save()
 
 
 def _content(
@@ -1002,6 +1012,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     withdrawal_payload = json.dumps({"action": "withdrawn", "reason": "Withdraw before client delivery"})
     assert browser.get(control_url).json()["state"] == "recorded"
     assert browser.get(delivery_url).status_code == 404
+    _recent_session(browser)
     assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
     assert not OutboxEvent.objects.filter(topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE).exists()
     with pytest.raises(DatabaseError):
@@ -1073,11 +1084,37 @@ def test_repository_evidence_decision_is_separate_from_distribution(
             tenant=installation.tenant, organization=organization, workspace=workspace,
             publication=publication, reason="Creator cannot self-authorize delivery", actor=reviewer,
         )
+    _recent_session(browser)
     retained_pdf.storage.delete(retained_pdf.name)
     try:
         assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 409
     finally:
         assert retained_pdf.storage.save(retained_pdf.name, ContentFile(pdf_bytes)) == retained_pdf.name
+    session = browser.session
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "mfa", "at": time.time() - 86400}]
+    session.save()
+    assert not did_recently_authenticate(SimpleNamespace(user=authorizer, session=browser.session))
+    denied = browser.post(delivery_url, data=delivery_payload, content_type="application/json")
+    assert denied.status_code == 403, denied.content
+    assert denied.json()["error"]["code"] == "recent_authentication_required"
+    assert not RepositoryStaticDeliveryAuthorization.objects.filter(publication=publication).exists()
+    assert not OutboxEvent.objects.filter(topic=OutboxTopic.REPOSITORY_PUBLICATION_AVAILABLE).exists()
+    password = secrets.token_urlsafe(32)
+    authorizer.set_password(password)
+    authorizer.save(update_fields=["password"])
+    # Refresh Django's password-bound session, without adding an allauth authentication record.
+    browser.force_login(authorizer)
+    assert browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 403
+    reauthenticated = browser.post(
+        "/_allauth/browser/v1/auth/reauthenticate",
+        data=json.dumps({"password": password}), content_type="application/json",
+    )
+    assert reauthenticated.status_code == 200, reauthenticated.content
+    assert did_recently_authenticate(SimpleNamespace(user=authorizer, session=browser.session))
+    csrf_browser = Client(enforce_csrf_checks=True)
+    csrf_browser.cookies = browser.cookies.copy()
+    assert csrf_browser.post(delivery_url, data=delivery_payload, content_type="application/json").status_code == 403
+    assert not RepositoryStaticDeliveryAuthorization.objects.filter(publication=publication).exists()
     delivery = browser.post(delivery_url, data=delivery_payload, content_type="application/json")
     assert delivery.status_code == 201, delivery.content
     assert delivery.json()["currently_effective"] is True
@@ -1269,6 +1306,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     assert browser.get(portal_pdf_url).status_code == 404
     assert browser.get(portal_attachment_url).status_code == 404
     browser.force_login(authorizer)
+    _recent_session(browser)
     replacement_delivery = browser.post(
         candidate_delivery_url, data=delivery_payload, content_type="application/json"
     )
@@ -2459,6 +2497,7 @@ def test_primary_file_package_static_and_portal_retain_complete_chain(compositio
             content_type="application/json",
         )
         assert released.status_code == 201, released.content
+        _recent_session(browser)
         delivered = browser.post(
             delivery_url, data=json.dumps({"reason": "Client delivery approved"}),
             content_type="application/json",

@@ -296,6 +296,38 @@ make release-gate
 
 Docker Compose results are authoritative for runtime claims.
 
+`make test-worker-boundaries` checks integration and monitoring task scope
+binding/cleanup alongside runtime isolation and production secret/settings
+validation. Provider calls are replaced in the task-boundary tests; this does
+not exercise broker delivery or live provider requests.
+
+`make test-operations-security` checks outbox, webhook, notification, remote
+document, worker and runtime isolation boundaries together, with external
+transports replaced. `make test-database-error-security` checks safe database
+conflict responses and related catalog, inventory, commercial, invoice and publication
+regressions. Neither targeted gate replaces the final release/security review.
+`make test-network-error-security` checks network error translation alongside
+the network behavior suites and runtime isolation checks, without rerunning the
+full permission matrix.
+`make test-document-error-security` checks document/publication error boundaries
+and existing authoring/composition behavior without the separate upgrade cases;
+upgrade validation remains required for the final candidate.
+`make test-integration-security` checks integration behavior, authorization and
+runtime isolation, including safe NetBox link-failure messages. Its direct
+error-boundary cases replace provider references and do not contact NetBox.
+`make test-provider-security` adds the Microsoft Graph, HaloPSA, NinjaOne and
+UniFi adapter/integration suites with provider traffic replaced. It complements
+the shared integration-security gate without running frontend or upgrade suites.
+
+`make test-imports` runs import parsing, preview/apply/rollback checks and the
+shared permission/isolation regressions. Damaged ZIP members, duplicate bundle
+filenames and CSV parser-limit failures are rejected before import staging.
+CSV rows with extra values beyond their header columns are rejected rather than
+silently truncated; quoted commas and blank optional cells remain supported.
+Rows with malformed record types or external keys remain rejected in the
+preview, using safe fallback labels without retaining their content. Any
+rejected row blocks applying the batch.
+
 ## Backup and recovery
 
 Create and restore supported encrypted backups with:
@@ -313,6 +345,14 @@ make supported-recovery-rehearsal
 
 Store the recovery key separately from the backup. Neither is sufficient without the other.
 
+`make test-recovery-archive` runs the focused Docker archive-authentication and
+failed-decryption cleanup checks without a database. It does not replace the
+complete supported recovery rehearsal above.
+
+`make test-repository-recovery` also checks Git bundle validation, retained
+commit recovery and retry after handled restore failures. It uses an isolated
+test database and disposable repository directories, not production volumes.
+
 Current recovery sets include PostgreSQL, managed media, every managed local Git
 repository, and the allowlisted deployment secrets. Backup briefly pauses active
 TekDocs writers to keep accepted Git heads aligned with the database snapshot.
@@ -321,6 +361,15 @@ SHA-256 before publishing a recovery set; missing or changed files abort the
 backup. Restore validates all encrypted components and repository bundles before
 destructive work, then verifies the restored repositories, publications, and
 managed files against PostgreSQL before reporting success.
+Deployment-secret archives must contain unique allowlisted regular files, each
+1–4096 bytes, and all required keys. Links and special entries are rejected
+before extraction or volume replacement.
+Media archives accept only regular files and directories with unique relative
+paths. Links, special/sparse entries, parent traversal, file/directory conflicts
+and truncated file data are rejected before any volumes are replaced. Empty
+media directories and empty regular files remain supported.
+Restore pins every Compose operation to the project confirmed by
+`--confirm-destroy`; an inherited `COMPOSE_PROJECT_NAME` cannot redirect it.
 Use `--network-isolated` during a recovery rehearsal or controlled restore to
 keep the restored stack off external networks until verification is complete.
 GitHub and other optional remotes are replication targets, not backups, and are
@@ -335,6 +384,28 @@ The generated API reference is available on a running installation at:
 ```
 
 TekDocs uses session and CSRF authentication for the browser application. Personal tokens, service tokens, and webhook credentials use explicit scopes and separate security boundaries.
+
+Bearer API tokens are accepted only under `/api/v1/`. Browser account,
+authenticator and sign-in routes under `/_allauth/`, and administration routes
+under `/admin/`, reject bearer headers,
+including requests that also carry a valid browser session.
+Profile edits at `/api/v1/auth/profile` also require a browser session and CSRF
+token; personal and service API tokens cannot change account profiles.
+Token management also rejects bearer headers, including malformed ones, rather
+than falling back to an accompanying browser session.
+
+OIDC server-to-server discovery, token, user-info, and signing-key requests use
+the approved egress boundary: public DNS destinations over HTTPS port 443,
+address pinning with hostname verification, no redirects, fixed connection/read
+timeouts, and responses limited to 1 MiB. Private-address identity providers,
+outbound proxies, and compressed responses are not supported by this profile.
+Use direct public HTTPS endpoints for the configured provider.
+
+Changing an integration's saved API destination requires a recently
+authenticated browser session, in addition to integration-management permission
+and MFA. The editor retains the draft while asking for password confirmation.
+Name, schedule and pause/resume edits do not add this reauthentication step when
+the destination is unchanged.
 
 ## GitHub automation
 

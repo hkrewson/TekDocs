@@ -51,6 +51,34 @@ it('can omit the source disclosure in a guided editing context', async () => {
   expect(screen.queryByText('Mermaid source')).not.toBeInTheDocument()
 })
 
+it.each([
+  '<image href="//example.invalid/tracking.svg"/>',
+  '<image href="/external.svg"/>',
+  '<image xlink:href="relative.svg#diagram"/>',
+  '<image href="&#47;&#47;example.invalid/tracking.svg"/>',
+])('refuses non-fragment SVG references: %s', async (reference) => {
+  renderDiagram.mockResolvedValueOnce({
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${reference}</svg>`,
+  })
+  render(<MermaidDiagram source="flowchart LR\nA-->B" index={4} showSource />)
+
+  expect(await screen.findByText('The diagram could not be rendered. Its Mermaid source remains available below.')).toBeVisible()
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Download SVG' })).not.toBeInTheDocument()
+})
+
+it('retains local fragment links and paint references', async () => {
+  renderDiagram.mockResolvedValueOnce({
+    svg: '<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ink"/></defs><rect fill="url(#ink)"/><a href="#label"><text id="label">Local reference</text></a></svg>',
+  })
+  render(<MermaidDiagram source="flowchart LR\nA-->B" index={5} />)
+
+  const graphic = await screen.findByRole('img')
+  expect(graphic.querySelector('a')).toHaveAttribute('href', '#label')
+  expect(graphic.querySelector('rect')).toHaveAttribute('fill', 'url(#ink)')
+  expect(screen.getByRole('button', { name: 'Download SVG' })).toBeEnabled()
+})
+
 it('zooms with keyboard-operable controls and downloads sanitized SVG', async () => {
   const user = userEvent.setup()
   const source = `flowchart LR

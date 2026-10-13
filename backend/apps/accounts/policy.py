@@ -5,6 +5,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from allauth.account.internal.flows.reauthentication import did_recently_authenticate
 from allauth.mfa.models import Authenticator
 from django.db.models import Q, QuerySet
 from rest_framework.exceptions import APIException, PermissionDenied
@@ -34,6 +35,19 @@ class InstallationContextUnavailable(APIException):
 class PrivilegedMFARequired(PermissionDenied):
     default_detail = "Two-factor authentication is required for this privileged action."
     default_code = "privileged_mfa_required"
+
+
+class RecentAuthenticationRequired(PermissionDenied):
+    default_detail = "Recent password or MFA reauthentication is required."
+    default_code = "recent_authentication_required"
+
+
+def require_recent_interactive_authentication(request) -> None:  # type: ignore[no-untyped-def]
+    """Supplement permission/MFA checks with a recent interactive session."""
+    if getattr(request, "auth", None) is not None or getattr(request, "api_token", None) is not None:
+        raise PermissionDenied("An interactive session is required for this action.")
+    if not did_recently_authenticate(request._request):
+        raise RecentAuthenticationRequired()
 
 
 class PermissionKey(StrEnum):
@@ -462,6 +476,18 @@ def require_installation_member(user: User) -> InstallationMemberContext:
         membership_id=membership.id,
         organization=membership.organization,
     )
+
+
+def require_profile_edit(request) -> InstallationMemberContext:  # type: ignore[no-untyped-def]
+    """Profile edits belong to the CSRF-checked browser session, never a token."""
+    authorization = request.headers.get("Authorization", "").split()
+    if (
+        getattr(request, "auth", None) is not None
+        or getattr(request, "api_token", None) is not None
+        or (authorization and authorization[0].lower() == "bearer")
+    ):
+        raise PermissionDenied("A browser session without bearer credentials is required.")
+    return require_installation_member(request.user)
 
 
 def _organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:

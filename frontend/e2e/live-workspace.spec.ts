@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import * as OTPAuth from 'otpauth'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { rehearseRepositoryContent } from './repository-live-journey'
 
 function successStatus(page: Page) {
   return page.locator('.form-message.success[role="status"], .form-success[role="status"], .settings-success[role="status"], span[role="status"]')
@@ -1333,6 +1334,10 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('alertdialog').getByRole('button', { name: 'Restore' }).click()
   await expect(successStatus(page)).toHaveText('Live Recovery Site restored.')
   await expect(page.getByText('No archived records match these filters.')).toBeVisible()
+
+  await test.step('Git documents retain files and protect concurrent edits across reloads', async () => {
+    await rehearseRepositoryContent(page, clientId)
+  })
 
   await page.goto('/notification-delivery')
   await expect(page.getByRole('heading', { name: 'Email delivery' })).toBeVisible()

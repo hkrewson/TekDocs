@@ -1,6 +1,21 @@
 import os
 
 
+def bind_fixture_user_scope(scope, *, organization_mode, actor_user_id):
+    # Older upgrade sources predate explicit principals. Current runtime reads
+    # must identify the fixture owner, not bypass the tenant/user policies.
+    from apps.core import rls as rls_module
+
+    principal_mode = getattr(rls_module, "RLSPrincipalMode", None)
+    if principal_mode is not None:
+        rls_module.bind_local_rls_scope(
+            scope,
+            organization_mode=organization_mode,
+            actor_user_id=actor_user_id,
+            principal_mode=principal_mode.USER,
+        )
+
+
 def create_fixture():
     from django.utils import timezone
 
@@ -23,6 +38,11 @@ def create_fixture():
         password=os.environ["TEKDOCS_FIXTURE_PASSWORD"],
     )
     with rls_scope(DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        bind_fixture_user_scope(
+            DataScope.tenant(result.tenant),
+            organization_mode=OrganizationRLSMode.MSP_ONLY,
+            actor_user_id=result.owner.id,
+        )
         organization = create_organization(
             tenant=result.tenant,
             actor_id=result.owner.id,
@@ -50,6 +70,11 @@ def create_fixture():
         DataScope.organization(result.tenant, organization),
         organization_mode=OrganizationRLSMode.ORGANIZATION,
     ):
+        bind_fixture_user_scope(
+            DataScope.organization(result.tenant, organization),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=result.owner.id,
+        )
         document = create_document(
             tenant=result.tenant,
             organization=organization,
@@ -92,17 +117,28 @@ def verify_fixture():
         InstallationState,
         NotificationEmailDelivery,
         NotificationPreference,
+        Organization,
         OutboxDeliveryReceipt,
         OutboxEvent,
-        Organization,
     )
     from apps.core.publications import verify_publication
     from apps.core.rls import OrganizationRLSMode, rls_scope
     from apps.core.scoping import DataScope
 
-    state = InstallationState.objects.select_related("tenant").get(pk=InstallationState.SINGLETON_ID)
+    state = InstallationState.objects.select_related("tenant", "owner").get(pk=InstallationState.SINGLETON_ID)
     assert state.tenant is not None
-    with rls_scope(DataScope.tenant(state.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+    with rls_scope(DataScope.tenant(state.tenant), organization_mode=OrganizationRLSMode.ALL_AUTHORIZED):
+        from apps.core import rls as rls_module
+
+        if hasattr(rls_module, "RLSPrincipalMode"):
+            assert not Organization.scoped.for_tenant(state.tenant).filter(
+                entity__display_name="Portal Notification Recovery Client"
+            ).exists(), "Runtime organization reads must fail closed without an explicit principal"
+        bind_fixture_user_scope(
+            DataScope.tenant(state.tenant),
+            organization_mode=OrganizationRLSMode.ALL_AUTHORIZED,
+            actor_user_id=state.owner.id,
+        )
         organization = Organization.scoped.for_tenant(state.tenant).get(
             entity__display_name="Portal Notification Recovery Client"
         )
@@ -110,6 +146,11 @@ def verify_fixture():
         DataScope.organization(state.tenant, organization),
         organization_mode=OrganizationRLSMode.ORGANIZATION,
     ):
+        bind_fixture_user_scope(
+            DataScope.organization(state.tenant, organization),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+            actor_user_id=state.owner.id,
+        )
         publication = DocumentPublication.objects.get(title="Portal notification recovery guide")
         assert verify_publication(publication)["valid"] is True
         assert list(

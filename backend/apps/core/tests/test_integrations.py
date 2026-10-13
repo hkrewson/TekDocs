@@ -1,12 +1,17 @@
+import base64
 import hashlib
 import io
 import json
 import secrets
+import time
 import uuid
 import zipfile
+from types import SimpleNamespace
 
 import pytest
+from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.db import DatabaseError, transaction
 from django.test import Client, override_settings
@@ -15,6 +20,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import repository_service, repository_storage
 from apps.core.content_index import index_repository_content
 from apps.core.content_profile import parse_content
@@ -32,6 +38,7 @@ from apps.core.integration_providers import (
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import enqueue_sync, process_sync_job
 from apps.core.models import (
+    AuditEvent,
     ClientAsset,
     CredentialReference,
     DocumentKeyBinding,
@@ -50,6 +57,7 @@ from apps.core.models import (
     NetworkMACAddress,
     NetworkSubnet,
     OrganizationKind,
+    Tenant,
     Workspace,
     workspace_for_owner,
 )
@@ -94,6 +102,43 @@ def repository_installation(db, tmp_path, settings):
 
 
 TEST_PROVIDER_TOKEN = "-".join(("provider", "token", "value"))
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [
+        "tenant_id",
+        "connection_id",
+        "generation",
+        "ciphertext",
+        "data_nonce",
+        "wrapped_key",
+        "wrap_nonce",
+        "algorithm",
+        "provider",
+    ],
+)
+def test_integration_credential_binding_and_tampering_fail_closed(changed):
+    secret = secrets.token_bytes(32)
+    identity = {"tenant_id": uuid.uuid4(), "connection_id": uuid.uuid4(), "generation": 1}
+    envelope = encrypt_integration_secret(secret=secret, **identity)
+    assert decrypt_integration_secret(envelope_payload=envelope, **identity) == secret
+    if changed in {"tenant_id", "connection_id"}:
+        identity[changed] = uuid.uuid4()
+    elif changed == "generation":
+        identity[changed] = 2
+    elif changed in {"algorithm", "provider"}:
+        envelope[changed] = "unsupported"
+    else:
+        value = bytearray(base64.urlsafe_b64decode(envelope[changed]))
+        value[0] ^= 1
+        envelope[changed] = base64.urlsafe_b64encode(value).decode()
+    with pytest.raises(ImproperlyConfigured) as error:
+        decrypt_integration_secret(envelope_payload=envelope, **identity)
+    assert str(error.value) in {
+        "Integration credential could not be decrypted",
+        "Integration credential is not encrypted with the TekDocs provider",
+    }
 
 
 def test_static_manifest_credential_metadata_is_not_exportable():
@@ -489,6 +534,9 @@ def test_connection_api_edits_details_without_rotating_the_credential(installati
     original_generation = source.secret_generation
     browser = Client()
     browser.force_login(installation.owner)
+    session = browser.session
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "mfa", "at": time.time()}]
+    session.save()
 
     response = browser.patch(
         reverse(
@@ -514,6 +562,129 @@ def test_connection_api_edits_details_without_rotating_the_credential(installati
     assert source.last_error_code == ""
     assert source.secret_generation == original_generation
     assert source.secret_envelope == original_envelope
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("stale", [False, True])
+def test_connection_destination_change_requires_recent_session(installation, stale):
+    record = organization(installation, "Destination client")
+    source = connection(installation, record)
+    password = secrets.token_urlsafe(24)
+    installation.owner.set_password(password)
+    installation.owner.save(update_fields=("password",))
+    browser = Client(enforce_csrf_checks=True)
+    browser.force_login(installation.owner)
+    if stale:
+        session = browser.session
+        session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "mfa", "at": time.time() - 86400}]
+        session.save()
+    browser.get("/_allauth/browser/v1/auth/session")
+    headers = {"X-CSRFToken": browser.cookies["csrftoken"].value}
+    original_envelope = source.secret_envelope
+    audit_count = AuditEvent.objects.filter(action="integration_connection.updated").count()
+    url = reverse(
+        "organization-integration-connection-detail",
+        kwargs={
+            "organization_entity_id": record.entity_id,
+            "connection_id": source.id,
+        },
+    )
+    payload = {"base_url": "https://new.example.com/api/", "active": True, "sync_interval_minutes": 30}
+    response = browser.patch(
+        url,
+        data=json.dumps(payload),
+        headers=headers,
+        content_type="application/json",
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "recent_authentication_required"
+    source.refresh_from_db()
+    assert source.base_url == "https://netbox.example.com/api/"
+    assert AuditEvent.objects.filter(action="integration_connection.updated").count() == audit_count
+    assert source.secret_envelope == original_envelope
+    assert (
+        browser.post(
+            "/_allauth/browser/v1/auth/reauthenticate",
+            data=json.dumps({"password": password}),
+            content_type="application/json",
+            headers=headers,
+        ).status_code
+        == 200
+    )
+    assert browser.patch(url, data=json.dumps(payload), content_type="application/json").status_code == 403
+    assert (
+        browser.patch(url, data=json.dumps(payload), content_type="application/json", headers=headers).status_code
+        == 200
+    )
+    source.refresh_from_db()
+    assert source.base_url == payload["base_url"]
+    assert source.secret_envelope == original_envelope
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("base_url", [None, "https://netbox.example.com/api/"])
+def test_connection_non_destination_edits_do_not_require_recent_session(installation, base_url):
+    record = organization(installation, "Schedule client")
+    source = connection(installation, record)
+    browser = Client()
+    browser.force_login(installation.owner)
+    payload = {"name": "Renamed source", "active": False, "sync_interval_minutes": 30}
+    if base_url is not None:
+        payload["base_url"] = base_url
+    response = browser.patch(
+        reverse(
+            "organization-integration-connection-detail",
+            kwargs={
+                "organization_entity_id": record.entity_id,
+                "connection_id": source.id,
+            },
+        ),
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    source.refresh_from_db()
+    assert source.name == "Renamed source"
+    assert not source.active
+    assert source.base_url == "https://netbox.example.com/api/"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("foreign_tenant", [False, True])
+def test_connection_destination_change_cannot_cross_scope(installation, foreign_tenant):
+    local = organization(installation, "Local client")
+    other = SimpleNamespace(
+        tenant=Tenant.objects.create(name="Other tenant", slug="destination-other")
+        if foreign_tenant
+        else installation.tenant,
+        owner=installation.owner,
+    )
+    if foreign_tenant:
+        other.owner = User.objects.create_user(
+            email="other-integration-owner@example.invalid", display_name="Other owner"
+        )
+        TenantMembership.objects.create(tenant=other.tenant, user=other.owner, role=BuiltInRole.ADMINISTRATOR)
+    remote = organization(other, "Other client")
+    source = connection(other, remote)
+    browser = Client()
+    browser.force_login(installation.owner)
+    session = browser.session
+    session[AUTHENTICATION_METHODS_SESSION_KEY] = [{"method": "mfa", "at": time.time()}]
+    session.save()
+    response = browser.patch(
+        reverse(
+            "organization-integration-connection-detail",
+            kwargs={
+                "organization_entity_id": local.entity_id,
+                "connection_id": source.id,
+            },
+        ),
+        data=json.dumps({"base_url": "https://new.example.com/api/", "active": True, "sync_interval_minutes": 30}),
+        content_type="application/json",
+    )
+    assert response.status_code == 404
+    source.refresh_from_db()
+    assert source.base_url == "https://netbox.example.com/api/"
 
 
 @pytest.mark.django_db

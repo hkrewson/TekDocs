@@ -625,7 +625,9 @@ class ClientAssetMACAddressListCreateView(APIView):
                 hardware_asset_entity_id=asset.entity_id,
                 **serializer.validated_data,
             )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except (NetworkEndpointError, DjangoValidationError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(AssetMACAddressSerializer(record).data, status=201)
 
@@ -647,7 +649,9 @@ class ClientAssetMACAddressDetailView(APIView):
                 actor_id=request.user.pk,
                 values={**serializer.validated_data, "hardware_asset_entity_id": asset.entity_id},
             )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except (NetworkEndpointError, DjangoValidationError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(AssetMACAddressSerializer(updated).data)
 
@@ -687,7 +691,9 @@ class ClientAssetIPAddressListCreateView(APIView):
                 hardware_asset_entity_id=asset.entity_id,
                 **values,
             )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except (NetworkEndpointError, DjangoValidationError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(AssetIPAddressSerializer(record).data, status=201)
 
@@ -711,7 +717,9 @@ class ClientAssetIPAddressDetailView(APIView):
                 actor_id=request.user.pk,
                 values={**serializer.validated_data, "hardware_asset_entity_id": asset.entity_id},
             )
-        except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except (NetworkEndpointError, DjangoValidationError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(AssetIPAddressSerializer(updated).data)
 

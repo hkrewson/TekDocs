@@ -54,6 +54,19 @@ function sanitizeSvg(svg: string) {
     USE_PROFILES: { svg: true, svgFilters: true },
     FORBID_TAGS: ['foreignObject', 'script'],
   })
+  // Inspect decoded attributes, not just scheme substrings: relative and
+  // protocol-relative references can also fetch resources or survive SVG download.
+  const parsed = new DOMParser().parseFromString(sanitized, 'image/svg+xml')
+  if (parsed.querySelector('parsererror') || parsed.documentElement.localName !== 'svg') {
+    throw new Error('Unsafe diagram output')
+  }
+  for (const element of Array.from(parsed.querySelectorAll('*'))) {
+    for (const attribute of Array.from(element.attributes)) {
+      if (['href', 'src'].includes(attribute.localName) && !attribute.value.trim().startsWith('#')) {
+        throw new Error('Unsafe diagram output')
+      }
+    }
+  }
   const scanned = sanitized.toLowerCase()
     .replace('xmlns="http://www.w3.org/2000/svg"', '')
     .replace('xmlns:xlink="http://www.w3.org/1999/xlink"', '')

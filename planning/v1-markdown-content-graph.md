@@ -942,6 +942,12 @@ release, hosted service, external certification or independent security audit.
 - Expanded conditional-content profiles, hierarchical key scopes, remote Git
   collaboration, pull-request authoring and bidirectional provider writeback
   remain post-1.0 unless separately promoted with bounded acceptance criteria.
+- **Runtime-role arbitrary-SQL resistance (`TD-RISK-073`):** prioritized for
+  1.x, not a `0.9.8` blocker. The 1.0 threat boundary trusts the application
+  runtime database role; transaction-local custom settings and forced RLS are
+  not claimed to resist hostile SQL under that role. Design a least-privilege
+  database boundary that prevents forged scope and direct authority changes,
+  then test it using the actual runtime credentials.
 - **Synced-block-style reuse interaction:** carry forward as an interface
   backlog item for the `0.9.3`–`0.9.5` Git-backed authoring experience, with final
   acceptance during the `0.9.8` interface review. Present reusable fragments as

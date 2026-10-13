@@ -58,6 +58,20 @@ async function mockAuthenticated(page: Page) {
   await page.route('**/api/v1/documents**', (route) => route.fulfill({
     json: { results: [documentRecord], count: 1, page: 1, page_size: 25, has_more: false },
   }))
+  await page.route('**/api/v1/workspaces/msp/content-graph/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    const commit = 'a'.repeat(40)
+    if (path.endsWith(`/authoring/${documentRecord.id}`)) return route.fulfill({ json: {
+      content_id: documentRecord.id, title: 'Git capacity runbook', kind: 'document',
+      path: 'docs/capacity.md', markdown: documentRecord.markdown, source: documentRecord.markdown,
+      source_blob: 'b'.repeat(40), accepted_commit: commit, indexed_commit: commit,
+    } })
+    if (path.endsWith('/documents')) return route.fulfill({ json: {
+      results: [{ id: documentRecord.id, title: 'Git capacity runbook', kind: 'document', path: 'docs/capacity.md' }],
+      count: 1, has_more: false, accepted_commit: commit, indexed_commit: commit,
+    } })
+    return route.fulfill({ json: { results: [], count: 0, has_more: false, page: 1, page_size: 25 } })
+  })
 }
 
 type ResourceMetric = { name: string; initiatorType: string; decodedBodySize: number; transferSize: number }
@@ -77,6 +91,7 @@ async function resources(page: Page): Promise<ResourceMetric[]> {
 async function measureProfile(
   browser: Browser,
   profile: { name: string; width: number; height: number; cpuRate: number; latency: number; download: number },
+  editor: 'legacy' | 'repository' = 'legacy',
 ) {
   const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height } })
   const page = await context.newPage()
@@ -100,9 +115,17 @@ async function measureProfile(
   expect(beforeEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(false)
 
   const editorStarted = Date.now()
-  await page.getByRole('button', { name: 'Capacity Runbook' }).click()
-  await page.getByRole('button', { name: 'Edit this content' }).click()
-  await expect(page.locator('.milkdown-host [contenteditable="true"]')).toBeVisible({ timeout: 12_000 })
+  if (editor === 'repository') {
+    await page.getByRole('button', { name: 'Repository content', exact: true }).click()
+    await page.getByRole('button', { name: /Git capacity runbook/ }).click()
+    await expect(page.getByLabel('Markdown body')).toHaveValue(documentRecord.markdown, { timeout: 12_000 })
+    await page.getByLabel('Markdown body').fill(`${documentRecord.markdown}\nDraft update.`)
+    await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeEnabled()
+  } else {
+    await page.getByRole('button', { name: 'Capacity Runbook' }).click()
+    await page.getByRole('button', { name: 'Edit this content' }).click()
+    await expect(page.locator('.milkdown-host [contenteditable="true"]')).toBeVisible({ timeout: 12_000 })
+  }
   const editorReadyMs = Date.now() - editorStarted
   const afterEditor = await resources(page)
   const initialJavaScript = beforeEditor
@@ -116,25 +139,27 @@ async function measureProfile(
   expect(editorReadyMs, `${profile.name} editor ready time`).toBeLessThan(12_000)
   expect(initialJavaScript, `${profile.name} initial decoded JavaScript`).toBeLessThan(900 * 1024)
   expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(editorDecodedJavaScriptBudget)
-  expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(true)
+  expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(editor === 'legacy')
   await context.close()
-  return { ...profile, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }
+  return { ...profile, editor, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }
 }
 
-test('constrained desktop and mobile profiles keep the editor out of the shell path', async ({ browser }, testInfo) => {
-  test.skip(!enabled, 'Run through make test-public-beta-performance.')
-  test.skip(testInfo.project.name !== 'chromium', 'Deterministic CPU/network emulation is Chromium-only.')
-
-  const measurements = []
-  measurements.push(await measureProfile(browser, {
-    name: 'constrained desktop', width: 1440, height: 900, cpuRate: 4, latency: 80, download: 2_000 * 1024 / 8,
-  }))
-  measurements.push(await measureProfile(browser, {
-    name: 'constrained mobile', width: 390, height: 844, cpuRate: 6, latency: 120, download: 1_600 * 1024 / 8,
-  }))
-  console.log(JSON.stringify({ measurements }))
-  await testInfo.attach('performance-metrics.json', {
-    body: Buffer.from(JSON.stringify({ measurements }, null, 2)),
-    contentType: 'application/json',
-  })
-})
+// Never run throttled timing profiles concurrently or retry them into a pass.
+test.describe.configure({ mode: 'serial', retries: 0 })
+for (const editor of ['legacy', 'repository'] as const) {
+  for (const profile of [
+    { name: 'constrained desktop', width: 1440, height: 900, cpuRate: 4, latency: 80, download: 2_000 * 1024 / 8 },
+    { name: 'constrained mobile', width: 390, height: 844, cpuRate: 6, latency: 120, download: 1_600 * 1024 / 8 },
+  ]) {
+    test(`${editor} editing stays within budget on ${profile.name}`, async ({ browser }, testInfo) => {
+      test.skip(!enabled, 'Run through make test-public-beta-performance.')
+      test.skip(testInfo.project.name !== 'chromium', 'Deterministic CPU/network emulation is Chromium-only.')
+      const measurements = [await measureProfile(browser, profile, editor)]
+      console.log(JSON.stringify({ measurements }))
+      await testInfo.attach('performance-metrics.json', {
+        body: Buffer.from(JSON.stringify({ measurements }, null, 2)),
+        contentType: 'application/json',
+      })
+    })
+  }
+}

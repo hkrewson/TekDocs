@@ -3,7 +3,7 @@ import secrets
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.test import Client
 from django.urls import reverse
 
@@ -58,6 +58,29 @@ def client(installation):
     browser = Client(enforce_csrf_checks=False)
     browser.force_login(installation.owner)
     return browser
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("database_failure", (True, False))
+def test_catalog_creation_does_not_expose_database_diagnostics(client, supplier, monkeypatch, database_failure):
+    diagnostic = "synthetic private row value and database constraint"
+    public_message = "The product conflicts with a catalog rule."
+
+    def fail_create(**kwargs):
+        if database_failure:
+            raise IntegrityError(diagnostic)
+        raise CatalogError(public_message)
+
+    monkeypatch.setattr("apps.core.catalog_views.create_product", fail_create)
+    response = client.post(
+        reverse("organization-catalog-product-list-create", kwargs={"organization_entity_id": supplier.entity_id}),
+        data={"name": "Fixture product", "kind": "hardware"},
+        content_type="application/json",
+    )
+    assert response.status_code == 400
+    assert diagnostic not in response.content.decode()
+    expected = "The request conflicts with stored data." if database_failure else public_message
+    assert response.json()["error"]["detail"]["detail"] == expected
 
 
 def test_schema_contract_rejects_remote_and_open_ended_shapes():

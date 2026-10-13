@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.http import HttpRequest
+from django.http import HttpRequest, JsonResponse
 from rest_framework.authentication import BaseAuthentication, get_authorization_header
 from rest_framework.exceptions import AuthenticationFailed
 
@@ -35,6 +35,21 @@ class APITokenAuthenticationMiddleware:
         authorization = request.headers.get("Authorization", "")
         if authorization:
             parts = authorization.split()
+            # Browser/account/admin views do not enforce API-token permissions.
+            # Reject mixed credentials there before replacing the session user.
+            if parts and parts[0].lower() == "bearer" and not request.path_info.startswith("/api/v1/"):
+                response = JsonResponse(
+                    {
+                        "error": {
+                            "status": 403,
+                            "code": "browser_session_required",
+                            "message": "Use a browser session without bearer credentials.",
+                        }
+                    },
+                    status=403,
+                )
+                response["Cache-Control"] = "no-store"
+                return response
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 try:
                     token = authenticate_bearer_token(parts[1])

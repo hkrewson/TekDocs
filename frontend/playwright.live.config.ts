@@ -5,11 +5,13 @@ export default defineConfig({
   testMatch: 'live-workspace.spec.ts',
   fullyParallel: false,
   retries: 0,
-  reporter: [['list']],
+  reporter: [['list'], ['./safe-summary-reporter.ts']],
+  outputDir: '/tmp/tekdocs-playwright-live-results',
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL,
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    trace: 'off',
+    screenshot: 'off',
+    video: 'off',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })

@@ -64,7 +64,8 @@ class ContentAuthoringMutationSerializer(serializers.Serializer):
     path = serializers.CharField(max_length=512, required=False, allow_null=True, default=None)
     title = serializers.CharField(max_length=240, required=False, allow_null=True, default=None)
     markdown = serializers.CharField(
-        max_length=1048576, allow_blank=True, required=False, allow_null=True, default=None
+        max_length=1048576, allow_blank=True, required=False, allow_null=True, default=None,
+        trim_whitespace=False,
     )
     metadata_patch = serializers.DictField(required=False, default=dict)
 

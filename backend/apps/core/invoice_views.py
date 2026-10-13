@@ -733,7 +733,9 @@ class InvoiceListCreateView(APIView):
                 updates["customer_snapshot"] = dict(bill_to)
             if updates:
                 record = update_invoice(invoice=record, actor_id=request.user.pk, values=updates)
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
@@ -757,7 +759,9 @@ class MSPInvoiceSettingsView(APIView):
                 actor_id=request.user.pk,
                 values=values,
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(member.tenant)).data)
 
@@ -772,7 +776,9 @@ class InvoiceIssueView(APIView):
             require_permission(request.user, PermissionKey.INVOICES_VOID, organization=workspace.organization)
         try:
             record = issue_invoice(invoice=invoice, actor_id=request.user.pk)
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
 
@@ -789,7 +795,9 @@ class InvoiceFollowUpView(APIView):
                 actor_id=request.user.pk,
                 source_kind=serializer.validated_data["mode"],
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
@@ -813,7 +821,9 @@ class InvoiceCreditNoteView(APIView):
                 actor_id=request.user.pk,
                 values={"reference": serializer.validated_data["reason"]},
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
@@ -831,7 +841,9 @@ class InvoiceVoidView(APIView):
                 actor_id=request.user.pk,
                 reason=serializer.validated_data["reason"],
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(record).data)
 
@@ -849,7 +861,9 @@ class InvoiceRecurringWithdrawalView(APIView):
                 actor_id=request.user.pk,
                 reason=serializer.validated_data["reason"],
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
 
@@ -942,7 +956,9 @@ class InvoiceLifecycleEventView(APIView):
                 related_invoice=related,
                 **values,
             )
-        except (InvoiceError, DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except (InvoiceError, DjangoValidationError) as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data, status=201)
 
@@ -1033,7 +1049,9 @@ class InvoiceLineListCreateView(APIView):
                 origin_id=origin_id,
                 tax_rate=tax_rate,
             )
-        except (InvoiceError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InvoiceError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data, status=201)
 
@@ -1175,7 +1193,9 @@ class ServiceRateListCreateView(APIView):
         try:
             record.full_clean()
             record.save()
-        except (DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except DjangoValidationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(ServiceRateSerializer(record).data, status=201)
 
@@ -1202,7 +1222,9 @@ class ServiceRateDetailView(APIView):
         try:
             record.full_clean()
             record.save()
-        except (DjangoValidationError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except DjangoValidationError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(ServiceRateSerializer(record).data)
 

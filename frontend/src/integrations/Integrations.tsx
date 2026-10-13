@@ -74,7 +74,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   const [publication, setPublication] = useState<{ observation: IntegrationObservation; proposal: NetBoxPublicationProposal } | null>(null)
   const [editing, setEditing] = useState<{ connection: IntegrationConnection; name: string; base_url: string; sync_interval_minutes: number } | null>(null)
   const [adopting, setAdopting] = useState<IntegrationConflict | null>(null)
-  const [reauthenticationAction, setReauthenticationAction] = useState<'create' | 'rotate' | 'write' | null>(null)
+  const [reauthenticationAction, setReauthenticationAction] = useState<'create' | 'edit' | 'rotate' | 'write' | null>(null)
   const [password, setPassword] = useState('')
   const [reload, setReload] = useState(0)
   const sourcePage = Math.max(1, Number(params.get('source_page')) || 1)
@@ -214,6 +214,7 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     if (action === 'rotate' && rotating) await rotate(rotating.connection, rotating.credentials)
     else if (action === 'write' && writeCredential) await saveWriteCredential(writeCredential.connection, writeCredential.apiToken)
     else if (action === 'create') await createConnection()
+    else if (action === 'edit') await saveConnectionEdit()
   }
 
   const selectedProvider = providers.find((provider) => provider.key === draft.provider)
@@ -256,7 +257,13 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
       })
       setConnections((current) => current.map((item) => item.id === updated.id ? updated : item).sort((a, b) => a.name.localeCompare(b.name)))
       setEditing(null)
-    } catch { setError(translate('integrations.changeFailed')) }
+    } catch (caught) {
+      if (caught instanceof IntegrationRequestError && caught.code === 'recent_authentication_required') {
+        setReauthenticationAction('edit')
+      } else {
+        setError(translate('integrations.changeFailed'))
+      }
+    }
     finally { setSaving(false) }
   }
 

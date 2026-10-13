@@ -185,6 +185,13 @@ def _read_upload(upload: Any) -> bytes:
 
 
 def _decode_csv(payload: bytes, *, record_type: str) -> list[dict[str, Any]]:
+    try:
+        return _decode_csv_records(payload, record_type=record_type)
+    except csv.Error:
+        raise ValidationError({"file": "The CSV is malformed or exceeds parser field limits."}) from None
+
+
+def _decode_csv_records(payload: bytes, *, record_type: str) -> list[dict[str, Any]]:
     if record_type not in TEMPLATE_FIELDS:
         raise ValidationError({"record_type": "Choose a supported CSV record type."})
     try:
@@ -205,6 +212,8 @@ def _decode_csv(payload: bytes, *, record_type: str) -> list[dict[str, Any]]:
     for number, source in enumerate(reader, start=2):
         if len(rows) >= MAX_ROWS:
             raise ValidationError({"file": "The import exceeds the 10,000-row limit."})
+        if None in source:
+            raise ValidationError({"file": f"CSV row {number} has more values than header columns."})
         normalized = {_normalize_header(key): value for key, value in source.items() if key is not None}
         normalized["record_type"] = record_type
         normalized["_row_number"] = number
@@ -214,14 +223,20 @@ def _decode_csv(payload: bytes, *, record_type: str) -> list[dict[str, Any]]:
 
 def _decode_bundle(payload: bytes) -> list[dict[str, Any]]:
     try:
-        archive = zipfile.ZipFile(io.BytesIO(payload))
-    except zipfile.BadZipFile as exc:
-        raise ValidationError({"file": "The TekDocs bundle is not a valid ZIP archive."}) from exc
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            return _decode_bundle_records(archive)
+    except (zipfile.BadZipFile, EOFError, NotImplementedError, RuntimeError):
+        raise ValidationError({"file": "The TekDocs bundle is damaged or uses an unsupported ZIP format."}) from None
+
+
+def _decode_bundle_records(archive: zipfile.ZipFile) -> list[dict[str, Any]]:
     infos = archive.infolist()
     if len(infos) > MAX_ARCHIVE_MEMBERS:
         raise ValidationError({"file": "The bundle contains too many files."})
     expanded = 0
     member_names = {info.filename.replace("\\", "/") for info in infos if not info.is_dir()}
+    if len(member_names) != sum(not info.is_dir() for info in infos):
+        raise ValidationError({"file": "The bundle contains duplicate file names."})
     if member_names != {"manifest.json", "records.jsonl"}:
         raise ValidationError({"file": "The bundle must contain only manifest.json and records.jsonl."})
     for info in infos:
@@ -519,8 +534,21 @@ def create_preview(
             keys.append((kind, key))
         except (ValueError, TypeError) as exc:
             reason = str(exc) if str(exc) else "row_invalid"
-            fallback = _text(source.get("record_type") or "unknown", maximum=40) or "unknown"
-            key = _text(source.get("external_key") or f"row-{number}", maximum=160)
+            # Rejection must not repeat a failing validation on its identifiers.
+            # Retain only independently valid labels; never stringify structures
+            # or truncate an unsafe key into something that looks authoritative.
+            try:
+                fallback = _text(source.get("record_type"), maximum=40).lower()
+            except (ValueError, TypeError):
+                fallback = "unknown"
+            if fallback not in RECORD_TYPES:
+                fallback = "unknown"
+            try:
+                key = _text(source.get("external_key"), maximum=160)
+            except (ValueError, TypeError):
+                key = ""
+            if not SAFE_KEY.fullmatch(key):
+                key = f"row-{number}"
             normalized_rows.append(
                 {
                     "row_number": number,
@@ -785,9 +813,7 @@ def _apply_row(batch: ImportBatch, row: ImportRow, actor_id: UUID) -> Entity:
         product_entity = _linked_entity(batch, "products", data["product_external_key"])
         if product_entity is None:
             raise ValueError("product_dependency_missing")
-        product = CatalogProduct.objects.select_related("entity").get(
-            entity=product_entity, organization=organization
-        )
+        product = CatalogProduct.objects.select_related("entity").get(entity=product_entity, organization=organization)
         definition = (
             CatalogSpecificationDefinition.objects.filter(
                 tenant=tenant,
@@ -999,8 +1025,7 @@ def apply_batch(
     for row in rows:
         requested = selected_matches.get(str(row.id))
         if requested and not (
-            row.action == ImportRowAction.CONFLICT
-            and row.reason_code == "possible_match_requires_confirmation"
+            row.action == ImportRowAction.CONFLICT and row.reason_code == "possible_match_requires_confirmation"
         ):
             raise ValidationError({"matches": "Only a proposed exact match can be confirmed."})
         if (
@@ -1011,12 +1036,14 @@ def apply_batch(
             try:
                 requested_id = UUID(requested)
                 if row.record_type == "people" and workspace.organization is not None:
-                    association = PersonAssociation.scoped.for_scope(workspace.data_scope).select_related(
-                        "person__entity"
-                    ).get(
-                        person__entity_id=requested_id,
-                        person__entity__archived_at__isnull=True,
-                        archived_at__isnull=True,
+                    association = (
+                        PersonAssociation.scoped.for_scope(workspace.data_scope)
+                        .select_related("person__entity")
+                        .get(
+                            person__entity_id=requested_id,
+                            person__entity__archived_at__isnull=True,
+                            archived_at__isnull=True,
+                        )
                     )
                     entity = association.person.entity
                 else:

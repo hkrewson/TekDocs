@@ -6,21 +6,41 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
-from allauth.mfa.totp.internal.auth import format_hotp_value, hotp_value
+from allauth.account.models import EmailAddress
+from allauth.mfa.totp.internal.auth import TOTP, format_hotp_value, generate_totp_secret, hotp_value
 from django.contrib.auth.hashers import check_password
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import Client
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import APIToken, APITokenKind, APITokenPermission, User
+from apps.accounts.models import (
+    APIToken,
+    APITokenKind,
+    APITokenPermission,
+    BuiltInRole,
+    OrganizationAccessAssignment,
+    TenantMembership,
+    User,
+)
 from apps.core.models import AuditEvent, Entity, InstallationState, Organization, OrganizationClassification
 
 SESSION_URL = "/_allauth/browser/v1/auth/session"
 LOGIN_URL = "/_allauth/browser/v1/auth/login"
 TOTP_URL = "/_allauth/browser/v1/account/authenticators/totp"
 API_PATH = "/api/v1/auth/api-tokens"
+
+
+@pytest.fixture(autouse=True)
+def isolate_auth_rate_limits():
+    # The test profile uses LocMemCache, which database rollback does not reset.
+    cache.clear()
+    try:
+        yield
+    finally:
+        cache.clear()
 
 
 def csrf(client: Client) -> str:
@@ -73,6 +93,141 @@ def issue(client: Client, **overrides):  # type: ignore[no-untyped-def]
     }
     payload.update(overrides)
     return post(client, API_PATH, payload)
+
+
+def authenticated_staff(tenant, *, role=BuiltInRole.READ_ONLY):  # type: ignore[no-untyped-def]
+    password = f"{secrets.token_urlsafe(24)}Aa7!"
+    user = User.objects.create_user(email="token-staff@example.com", password=password, display_name="Token staff")
+    # Match the verified identity created by successful invitation redemption.
+    EmailAddress.objects.create(user=user, email=user.email, primary=True, verified=True)
+    membership = TenantMembership.objects.create(tenant=tenant, user=user, role=role)
+    client = Client(enforce_csrf_checks=True)
+    client.get(SESSION_URL)
+    assert post(client, LOGIN_URL, {"email": user.email, "password": password}).status_code == 200
+    TOTP.activate(user, generate_totp_secret())
+    return membership, client
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+def test_issued_token_loses_access_after_membership_removal(kind):
+    installation, _password, owner_client = authenticated_owner()
+    if kind == "personal":
+        _membership, issuer = authenticated_staff(installation.tenant)
+    else:
+        issuer = owner_client
+    created = issue(issuer, kind=kind)
+    assert created.status_code == 201
+    record = APIToken.objects.get(pk=created.json()["id"])
+    client = Client(enforce_csrf_checks=True)
+    headers = {"Authorization": f"Bearer {created.json()['token']}"}
+    assert client.get("/api/v1/documents", headers=headers).status_code == 200
+    TenantMembership.objects.get(tenant=installation.tenant, user=record.subject).delete()
+    assert client.get("/api/v1/documents", headers=headers).status_code == 403
+    assert client.get("/api/v1/auth/context", headers=headers).status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+def test_issued_token_loses_assigned_only_client_access_immediately(kind):
+    installation, _password, owner_client = authenticated_owner()
+    organization = create_client(installation.tenant, "Restricted token client")
+    organization.access_mode = "assigned_only"
+    organization.save(update_fields=("access_mode",))
+    other = create_client(installation.tenant, "Other token client")
+    if kind == "personal":
+        membership, issuer = authenticated_staff(installation.tenant)
+        OrganizationAccessAssignment.objects.create(
+            tenant=installation.tenant,
+            organization=organization,
+            membership=membership,
+            created_by=installation.owner,
+        )
+    else:
+        issuer = owner_client
+    created = issue(
+        issuer,
+        kind=kind,
+        workspace_scope="organization",
+        organization_id=str(organization.entity_id),
+        permissions=["workspaces.view", "documents.view"],
+    )
+    assert created.status_code == 201
+    record = APIToken.objects.get(pk=created.json()["id"])
+    client = Client(enforce_csrf_checks=True)
+    headers = {"Authorization": f"Bearer {created.json()['token']}"}
+    path = f"/api/v1/workspaces/organizations/{organization.entity_id}/documents"
+    assert client.get(path, headers=headers).status_code == 200
+    OrganizationAccessAssignment.objects.get(organization=organization, membership__user=record.subject).delete()
+    assert client.get(path, headers=headers).status_code in {403, 404}
+    assert client.get(f"/api/v1/workspaces/organizations/{other.entity_id}/documents", headers=headers).status_code in {
+        403,
+        404,
+    }
+    assert client.get("/api/v1/documents", headers=headers).status_code == 403
+
+
+@pytest.mark.django_db
+def test_personal_token_permission_context_tracks_role_reduction():
+    installation, _password, _owner_client = authenticated_owner()
+    membership, issuer = authenticated_staff(installation.tenant, role=BuiltInRole.ADMINISTRATOR)
+    created = issue(issuer, permissions=["documents.view", "costs.view"])
+    assert created.status_code == 201
+    client = Client(enforce_csrf_checks=True)
+    headers = {"Authorization": f"Bearer {created.json()['token']}"}
+    before = client.get("/api/v1/auth/context", headers=headers)
+    assert before.status_code == 200
+    assert set(before.json()["permissions"]) == {"documents.view", "costs.view"}
+    membership.role = BuiltInRole.READ_ONLY
+    membership.save(update_fields=("role",))
+    after = client.get("/api/v1/auth/context", headers=headers)
+    assert after.status_code == 200
+    assert after.json()["permissions"] == ["documents.view"]
+    assert client.get("/api/v1/documents", headers=headers).status_code == 200
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("authorization", ["Bearer", "bEaReR\tinvalid", "Bearer invalid extra"])
+@pytest.mark.parametrize("operation", ["list", "create", "rotate", "revoke"])
+def test_token_management_rejects_malformed_bearer_with_valid_browser_session(authorization, operation):
+    _installation, _password, client = authenticated_owner()
+    created = issue(client)
+    assert created.status_code == 201
+    token_id = created.json()["id"]
+    before = list(APIToken.objects.values())
+    audit_count = AuditEvent.objects.filter(action__startswith="api_token.").count()
+    headers = {"Authorization": authorization, "X-CSRFToken": csrf(client)}
+    if operation == "list":
+        response = client.get(API_PATH, headers=headers)
+    elif operation == "create":
+        response = client.post(
+            API_PATH,
+            data=json.dumps(
+                {
+                    "name": "Must not issue",
+                    "kind": "personal",
+                    "workspace_scope": "msp",
+                    "organization_id": None,
+                    "permissions": ["documents.view"],
+                    "expires_in_days": 30,
+                }
+            ),
+            content_type="application/json",
+            headers=headers,
+        )
+    elif operation == "rotate":
+        response = client.post(
+            f"{API_PATH}/{token_id}/rotate",
+            data=json.dumps({"expires_in_days": 30}),
+            content_type="application/json",
+            headers=headers,
+        )
+    else:
+        response = client.delete(f"{API_PATH}/{token_id}", headers=headers)
+    assert response.status_code == 403
+    assert list(APIToken.objects.values()) == before
+    assert AuditEvent.objects.filter(action__startswith="api_token.").count() == audit_count
+    assert "token" not in response.json() and "tokens" not in response.json()
 
 
 @pytest.mark.django_db
@@ -186,6 +341,143 @@ def test_rotation_revocation_and_invalid_tokens_fail_closed():
     malformed = client.get("/api/v1/documents", headers={"Authorization": "Bearer not-a-token"})
     assert malformed.status_code == 401
     assert malformed.json()["error"]["message"] == "Authentication is required."
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("authorization", ["Bearer", "bEaReR invalid", "Bearer invalid extra"])
+def test_profile_rejects_malformed_bearer_even_with_browser_session(authorization):
+    installation, _password, client = authenticated_owner()
+    original_name = installation.owner.display_name
+    response = client.patch(
+        "/api/v1/auth/profile",
+        data=json.dumps({"display_name": "Unexpected mixed credential edit"}),
+        content_type="application/json",
+        headers={"Authorization": authorization, "X-CSRFToken": csrf(client)},
+    )
+    assert response.status_code == 403
+    installation.owner.refresh_from_db()
+    assert installation.owner.display_name == original_name
+    assert not AuditEvent.objects.filter(action="auth.profile_updated").exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+@pytest.mark.parametrize("browser_session", [False, True])
+def test_read_only_token_cannot_change_account_profile(kind, browser_session):
+    _installation, _password, owner_client = authenticated_owner()
+    created = issue(owner_client, kind=kind)
+    assert created.status_code == 201
+    subject = APIToken.objects.get(pk=created.json()["id"]).subject
+    original_name = subject.display_name
+    client = owner_client if browser_session else Client(enforce_csrf_checks=True)
+    response = client.patch(
+        "/api/v1/auth/profile",
+        data=json.dumps({"display_name": "Unexpected token edit"}),
+        content_type="application/json",
+        headers={"Authorization": f"Bearer {created.json()['token']}", "X-CSRFToken": csrf(owner_client)},
+    )
+    assert response.status_code == 403
+    subject.refresh_from_db()
+    assert subject.display_name == original_name
+    assert not AuditEvent.objects.filter(action="auth.profile_updated").exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+@pytest.mark.parametrize("browser_session", [False, True])
+@pytest.mark.parametrize("path", [SESSION_URL, "/_allauth/browser/v1/auth/sessions", TOTP_URL])
+def test_document_token_cannot_authenticate_browser_account_routes(kind, browser_session, path):
+    _installation, _password, owner_client = authenticated_owner()
+    created = issue(owner_client, kind=kind)
+    assert created.status_code == 201
+    client = owner_client if browser_session else Client(enforce_csrf_checks=True)
+    response = client.get(path, headers={"Authorization": f"Bearer {created.json()['token']}"})
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "browser_session_required"
+    assert response["Cache-Control"] == "no-store"
+    assert "data" not in response.json()
+    assert owner_client.get(SESSION_URL).status_code == 200
+
+
+@pytest.mark.django_db
+def test_document_token_cannot_revoke_browser_sessions_even_with_csrf():
+    _installation, _password, client = authenticated_owner()
+    created = issue(client)
+    assert created.status_code == 201
+    path = "/_allauth/browser/v1/auth/sessions"
+    sessions = client.get(path).json()["data"]
+    assert sessions
+    response = client.delete(
+        path,
+        data=json.dumps({"sessions": [item["id"] for item in sessions]}),
+        content_type="application/json",
+        headers={"Authorization": f"Bearer {created.json()['token']}", "X-CSRFToken": csrf(client)},
+    )
+    assert response.status_code == 403
+    assert {item["id"] for item in client.get(path).json()["data"]} == {item["id"] for item in sessions}
+    assert not AuditEvent.objects.filter(action="auth.session_revoked").exists()
+
+
+@pytest.mark.parametrize("path", [SESSION_URL, "/admin/", "/_allauth/oidc/login/", "/api/v10/documents"])
+@pytest.mark.parametrize("authorization", ["Bearer", "bEaReR invalid", "Bearer invalid extra"])
+def test_non_api_bearer_rejected_before_token_lookup(path, authorization, monkeypatch):
+    from django.test import RequestFactory
+
+    from apps.accounts.authentication import APITokenAuthenticationMiddleware
+
+    def unexpected_call(*args):
+        pytest.fail("Browser bearer rejection must not authenticate or dispatch the request")
+
+    monkeypatch.setattr("apps.accounts.authentication.authenticate_bearer_token", unexpected_call)
+    request = RequestFactory().get(path, HTTP_AUTHORIZATION=authorization)
+    assert APITokenAuthenticationMiddleware(unexpected_call)(request).status_code == 403
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("authorization", ["Bearer", "Bearer ", "Bearer invalid extra", "bEaReR invalid"])
+def test_malformed_bearer_does_not_fall_back_to_authenticated_browser(authorization):
+    _installation, _password, client = authenticated_owner()
+    assert client.get("/api/v1/documents").status_code == 200
+    denied = client.get("/api/v1/documents", headers={"Authorization": authorization})
+    assert denied.status_code == 401
+    assert denied.json()["error"]["message"] == "Authentication is required."
+    assert client.get("/api/v1/documents").status_code == 200
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+def test_existing_token_loses_access_when_subject_is_disabled(kind):
+    _installation, _password, client = authenticated_owner()
+    created = issue(client, kind=kind)
+    assert created.status_code == 201
+    record = APIToken.objects.get(pk=created.json()["id"])
+    bearer = {"Authorization": f"Bearer {created.json()['token']}"}
+    token_client = Client(enforce_csrf_checks=True)
+    assert token_client.get("/api/v1/documents", headers=bearer).status_code == 200
+    User.objects.filter(pk=record.subject_id).update(is_active=False)
+    assert token_client.get("/api/v1/documents", headers=bearer).status_code == 401
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["personal", "service"])
+def test_existing_token_loses_access_when_its_organization_is_archived(kind):
+    installation, _password, client = authenticated_owner()
+    organization = create_client(installation.tenant, "Archived token scope")
+    created = issue(
+        client,
+        kind=kind,
+        workspace_scope="organization",
+        organization_id=str(organization.entity_id),
+        permissions=["workspaces.view", "documents.view"],
+    )
+    assert created.status_code == 201
+    bearer = {"Authorization": f"Bearer {created.json()['token']}"}
+    token_client = Client(enforce_csrf_checks=True)
+    path = f"/api/v1/workspaces/organizations/{organization.entity_id}/documents"
+    assert token_client.get(path, headers=bearer).status_code == 200
+    Entity.objects.filter(pk=organization.entity_id).update(archived_at=timezone.now())
+    assert token_client.get(path, headers=bearer).status_code in {403, 404}
+    assert token_client.get("/api/v1/documents", headers=bearer).status_code == 403
 
 
 @pytest.mark.django_db

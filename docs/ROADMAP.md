@@ -8,14 +8,22 @@ Known limitations are release obligations, not informal notes. `docs/ENGINEERING
 
 ## Frozen 0.9.0 baseline and version 1 transition — 2026-10-03
 
+Candidate preparation, 2026-10-12: version metadata is now `0.9.8` for the
+completed local hardening and acceptance work. See [candidate notes](../planning/responsive-layouts/0.9.8-candidate.md).
+This does not close the acceptance checklist: final commit-matched hosted
+evidence, security closeout, human walkthroughs and pilot acceptance remain
+pending. The Wiki draft is reconciled locally but remains unpublished.
+
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 
-Repository foundation issues #92–#98, Markdown/index issue #101 and reusable
-fragment composition issue #102 are complete. The application is at the
-`0.9.3` composition checkpoint. Operational entity context and read paths in
-#103 are the next implementation boundary.
-Candidate security, pilot, interface, and release acceptance remain owned by
-`0.9.8` and must run against the migrated system.
+Repository foundation issues #92–#98, Markdown/index issue #101, reusable
+fragment composition issue #102, and the `0.9.4`–`0.9.7` architecture slices
+are complete. `v0.9.7` is tagged and its tag-triggered CI, production-container,
+SBOM, and vulnerability checks passed. The next boundary is `0.9.8` acceptance:
+validate the Git-backed system through interface and technician walkthroughs,
+security and browser review, performance/DAST/image checks, and upgrade/recovery
+evidence. Issue #103 is completed architecture work, not the next implementation
+slice.
 
 The pre-1.0 responsive integration checkpoint now includes first-run NetBox adoption: unmatched observations show **Link to TekDocs** beside the missing local relationship, open on existing-record matching without retyping remote identity, and allow all six supported NetBox object types—racks, hardware devices, VLANs, prefixes, IP addresses, and MAC addresses—to create and link their canonical TekDocs record atomically after the operator supplies the required local context. Each current source row carries its own exact open review item, and Reconciliation filters open work before URL-backed search, type filtering, and 25-row paging, so retained decision history cannot hide actionable records. Endpoint assignment remains a separate explicit operation after adoption.
 
@@ -1688,9 +1696,247 @@ Evidence: `docs/releases/0.8.46.md`.
 | `0.9.4` | Authorized operational-entity context, asset documentation backlinks, content-graph reads, search, health and views. |
 | `0.9.5` | Managed Git authoring, minimal source edits, renames, compare-and-swap writes and three-way conflicts. Implemented; release acceptance in `docs/releases/0.9.5.md`. |
 | `0.9.6` | Complete as a local development checkpoint: dry-run inventory, deterministic first-wave copy, explicit deferrals, mixed-store read-only parity, and guarded rollback. Legacy reads and writes remain authoritative. The aggregate local gate passed and [public migration guidance](https://github.com/hkrewson/TekDocs/wiki/Imports-and-migration) was published; no deployment or authority handoff is claimed. |
-| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity, per-document authority transition and repository-inclusive encrypted recovery. Local migration, production-image, encrypted backup/restore, and authority regression gates pass. Remaining release closure is hosted candidate CI and release acceptance; actual whole-host filesystem exhaustion is intentionally untested, while historical review-digest mismatches remain per-document handoff blockers. |
+| `0.9.7` | STATIC/publication dependency freezing, files/exports/portal parity, per-document authority transition and repository-inclusive encrypted recovery. Candidate CI and tag-triggered production-container/SBOM/vulnerability checks passed; `v0.9.7` is tagged. |
 | `0.9.8` | Interface, technician, security, browser, accessibility, performance, DAST, image, upgrade and recovery acceptance. |
-| `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. |
+| `1.0.0` | Freeze the supported repository/frontmatter schema, Git revision contract, content graph, migration path and 1.x compatibility boundary. The runtime database role remains inside the trusted application boundary; arbitrary-SQL resistance is not claimed. |
+
+### `0.9.8` acceptance checklist
+
+This is a stabilization checkpoint for the Git-backed 1.0 candidate, not a
+version bump, deployment authorization, or release tag. Historical evidence is
+reusable only when it exercises the current candidate and its Git-backed
+document model.
+
+- [ ] **Interface and workflows:** Complete the Documentation/Files review
+  against Git-backed authority, including reads, edits, history, fragments,
+  links/backlinks, attachments, exports, publications, and unavailable/conflict
+  states. Record the accepted route/state inventory.
+- [ ] **Technician acceptance:** Record human desktop keyboard, touch/mobile,
+  screen-reader, and 200% zoom walkthroughs for Assets, Contracts, Networks,
+  and Documentation/Files in
+  `planning/responsive-layouts/phase-8-technician-walkthrough.md`. Automation
+  does not substitute for these checks.
+- [ ] **Browser and accessibility:** Run the maintained browser matrix and
+  accessibility checks on the candidate; resolve or disposition every failure
+  without weakening assertions to mask regressions.
+- [ ] **Security and performance:** Complete candidate security review, DAST,
+  and bounded performance checks. Record scope, image digest, findings, and
+  disposition in the relevant evidence.
+- [ ] **Image and operations:** Validate exact production images, provenance,
+  SBOM and vulnerability policy, supported-source upgrade, and
+  production-shaped startup/readiness.
+- [ ] **Backup and recovery:** Rehearse encrypted repository-inclusive backup
+  and network-isolated restore on the candidate. Verify organization
+  isolation, document authority, content/index consistency, retained files,
+  publication evidence, and restore without GitHub access.
+- [ ] **Pilot and release evidence:** Complete the planned pilot against the
+  Git-backed candidate, reconcile findings, and record exact commit/image
+  digests with links to each gate.
+
+Each checkbox requires dated evidence for the candidate commit or image.
+Historical responsive acceptance, prior local rehearsals, and CI from another
+commit do not satisfy a current-candidate gate. Keep human results pending until
+performed, and record remaining blockers with an owner and disposition before
+0.9.8 closeout.
+
+2026-10-12 progress is recorded in
+`planning/responsive-layouts/phase-8-security-review.md`: the baseline maintained
+browser matrix passed (1,181 checks; three dedicated-performance skips), five
+hosted security categories were verified, and passive DAST warnings received
+explicit dispositions. New real-Git editor acceptance found and corrected
+Markdown whitespace trimming and a file-section heading-level defect. The
+revised candidate still requires its final matched release evidence; these
+results do not close the human, pilot, performance, upgrade, or recovery gates.
+
+The same dated record now includes passing worktree encrypted recovery,
+repository-foundation interruption/recreation/restore, recurring-invoice
+recovery, all eight supported upgrade cases, and fresh-versus-0.8.46 document
+migration parity. Rehearsal fixes restore explicit user-principal scoping,
+historical fixture API compatibility, and Git repository custody in the older
+invoice-recovery harness. No production authorization policy was relaxed.
+The dedicated local performance slice is recorded in
+`planning/responsive-layouts/phase-8-performance-acceptance.md`. New Git-backed
+read coverage exposed and corrected a full-repository scan when opening one
+document: warmed source p95 fell from 1,902.8 ms to 47.4 ms while preserving
+canonical Git reads and safe fallback checks. All 158 authoring-gate checks,
+repository-service checks, and four constrained legacy/Git browser profiles
+passed. Capacity timing now uses the intended 40 samples. Final commit-matched
+aggregate evidence, the remaining security review, pilot, and human acceptance
+remain open.
+
+The publication/delivery source-review slice and Docker
+`make test-content-composition` gate also passed their scoped checks. The
+security record identified a stale-session gap in final delivery approval.
+A regression reproduced a day-old authenticated session enabling client delivery;
+the delivery API now requires recent interactive authentication in addition to
+permission and TOTP enrollment. Follow-up confirmed that earlier stages cannot
+bypass this final delivery boundary; withdrawal and supersession remove access
+without granting it to a replacement. The rendering review added ten hostile
+reference-label regressions and fixed relative-resource references surviving
+the browser SVG filter. Focused component checks, three real-browser diagram
+journeys, the Git-backed read gate, and production build checks passed. The full
+security gate and final commit-matched aggregate evidence remain open.
+
+The account/token review added eight regressions for malformed bearer headers
+with a valid browser session, disabled personal/service-token subjects, and
+archived organization scopes. All passed without a runtime change, together
+with the full Docker account suite. Remaining account lifecycle source checks
+and the wider security acceptance are still tracked in the security record.
+
+Follow-up reproduced a bearer/browser boundary gap: document-read tokens could
+read account/session/authenticator information through allauth browser routes.
+Bearer credentials are now restricted to `/api/v1/`, with 25 new denial and
+session-preservation cases. All 131 account checks passed in Docker after
+isolating test-only rate-limit counters. Retest evidence is maintained in the
+security record; this does not close the wider account-lifecycle review.
+
+The profile follow-up reproduced read-only personal/service tokens changing
+their subject's display name. Profile edits now require CSRF-checked browser
+sessions and reject bearer credentials through central policy. Seven added
+regressions and an updated API contract cover this bounded fix. All 138 account
+checks passed in Docker, along with API consistency and type checks; remaining
+account-lifecycle review is still tracked in the security record.
+
+Five follow-up token transition checks passed without a runtime change:
+membership removal and assigned-only client-grant removal deny existing personal
+and service tokens, and a personal token's permission context reflects role
+reduction. All 143 account checks passed in Docker after correcting a new test
+fixture to include the verified email identity created by invitation acceptance.
+OIDC identity linking and mixed-credential token management remain explicit
+account-review follow-ups before the integration and operations workstreams.
+
+Those follow-ups now pass locally: token management consistently rejects bare
+and tab-separated bearer headers, and OIDC email lookup requires a provider-
+verified identity claim. All 158 account checks passed in Docker. The malformed
+header fix retains normal browser login/MFA/CSRF requirements; it closes an
+ambiguous-credential fallback, not an unauthenticated takeover. Next are external
+egress/import/integration credentials, including OIDC transport, and operational
+jobs/recovery/production configuration before GitHub alert inventory.
+
+OIDC server-to-server traffic now uses approved public-address HTTPS egress
+with address pinning, hostname verification, redirect rejection, connection/read
+timeouts and a 1 MiB response cap. Three failing regressions reproduced the
+previous unguarded transport; all 175 account checks now pass in Docker,
+including 17 transport cases and maintained allauth token exchange checks.
+The documented profile excludes private-address providers, proxies and
+compressed responses. Live-provider SSO is not claimed by these mocked network
+checks. Other integration/import and operations source reviews remain next.
+
+The import parser review reproduced and fixed uncaught CSV field-limit and
+ZIP member-checksum failures, plus duplicate bundle filename acceptance. Eight
+new decoder/API checks require safe rejection before staging; the rebuilt
+`make test-imports` passed 67 import, permission and runtime-isolation checks.
+The shortcut selects import-route permission cases to keep local runs bounded;
+full-suite/CI discovery is unchanged. Integration credentialed-destination
+changes are the next explicit review target, followed by remaining integration
+and operations review and GitHub scanning inventory.
+
+The credentialed-destination follow-up reproduced and fixed missing recent
+authentication on connection URL edits. Such changes now require the central
+interactive-session check; unchanged-destination edits retain existing behavior.
+The editor preserves the draft through password confirmation and retry. The
+final bounded integration-security gate passed 162 checks, including fresh/stale
+session, CSRF and cross-client/tenant cases; the complete frontend gate passed
+758 tests plus coverage, API consistency, lint, types and production build.
+Remaining integration/import source review and operations/recovery review still
+precede the GitHub scanning inventory; this is not full 0.9.8 acceptance.
+
+The rejected-row import follow-up fixed a second-validation crash for malformed
+record types and external keys. Six failing API regressions now pass with safe
+fallback labels, empty rejected-row content and blocked batch application;
+the rebuilt import/permission/isolation gate passed 73 checks. Nine additional
+credential tests verified tenant/connection/generation binding and tamper
+rejection without changing encryption. These are bounded worktree checks,
+not a completed source audit or frozen-candidate release acceptance.
+
+The provider-response follow-up reproduced and fixed retry-delay overflow and
+missing response cleanup after read failures. The rebuilt bounded integration
+gate now passes 173 checks, including the preceding credential-binding tests;
+changed-file lint and transport types also pass. This closes that transport
+robustness slice, not the remaining source/recovery review or release acceptance.
+
+The recovery archive authentication/cleanup review passed 23 Docker checks,
+including 18 new cases covering wrong keys, swapped artifact labels, changed
+nonce/ciphertext/tag, truncation, invalid format, existing-destination preservation,
+temporary-plaintext cleanup and manifest authentication. The maintained crypto
+implementation required no change. `make test-recovery-archive` provides a fast,
+database-free gate; restore orchestration and frozen-candidate recovery evidence
+remain separate obligations.
+
+The repository restore follow-up reproduced and fixed a partial Git-init
+directory surviving a handled failure and blocking retry. The rebuilt focused
+repository-recovery gate passed all 36 tests, including cleanup and exact-head
+retry checks at init, fetch and head-update fault points. Lint and service types
+passed. Whole-stack restore orchestration, jobs and production configuration
+remain review work; this does not replace final-candidate recovery evidence.
+
+Restore project binding now prevents an inherited `COMPOSE_PROJECT_NAME` from
+overriding the operator-confirmed target. Read-only Compose tests reproduced the
+mismatch in normal and isolated modes; all four override/no-override combinations
+now pass, including project-based volume naming. The production configuration
+gate passes and includes the regression in CI. No live restore or deletion ran.
+
+The integration/domain/certificate worker scope review passed 93 Docker checks,
+including 21 new exact-scope, failure-cleanup and malformed-identifier cases
+alongside runtime isolation and production secret/settings tests. No worker
+runtime change was needed. Provider calls were replaced; broker delivery and
+other operational service boundaries are not claimed complete by this gate.
+
+Security closeout now follows the fixed packages in
+[`security-closeout-checklist.md`](../planning/responsive-layouts/security-closeout-checklist.md).
+The read-only CodeQL inventory contains 282 open alerts at the 0.9.7 baseline:
+7 high, 127 medium, and 148 without security ratings. These are scanner findings,
+not confirmed vulnerabilities; no hosted alerts were dismissed. Priority review
+separates fixture warnings from raw database-exception exposure candidates.
+Restore secret preflight now rejects links, duplicate/special entries, missing
+keys and out-of-bounds secret files before extraction; 34 archive checks pass.
+The subsequent database-error review reproduced diagnostic disclosure and
+replaced raw database messages in 29 handlers with a fixed safe response;
+123 targeted checks pass. Remote-document timeout cleanup was also reproduced
+and fixed. Remaining alert dispositions, media preflight and final-candidate
+release evidence stay explicit in the closeout checklist.
+Media preflight now rejects unsafe archive members and damaged file data before
+volume replacement; 49 archive checks and the three restore contract tests pass.
+The seven high-rated baseline alerts have local source-review dispositions
+(fixture/test contexts or non-password hashing), with no hosted dismissal.
+Exception-exposure review, quality triage and final-candidate evidence remain.
+The network exception review now has 98 passing Docker checks, including 15
+new safe-error translation cases. Twenty-one exception-exposure alerts have
+explicit local source dispositions; 105 still need complete review. These are
+scanner-review counts, not counts of confirmed vulnerabilities.
+The catalog/inventory/commercial/stock/invoice follow-up passes 141 Docker
+checks and completes 56 more exception-alert dispositions. The current total
+was 77 locally reviewed and 49 remaining; hosted alert state is unchanged.
+The document/domain follow-up completes 48 more source dispositions and passes
+218 document, authoring, composition and error-boundary checks. The last
+exception alert (#198) reproduced internal diagnostics in NetBox link failures;
+the handler now preserves domain guidance but replaces broad `ValueError`
+messages. All 176 integration-security checks pass, including its three new
+regressions. All 134 security-rated baseline alerts now have local dispositions
+(S4b complete), without hosted dismissal or a fresh scan. Remaining security
+packages are S1 provider/import review, S4c quality triage, and S5/S6 final
+candidate evidence and closeout.
+Quality triage has reviewed 26 of the 148 unrated findings. A retained empty-file
+download could report success after a storage failure; a separate unavailable
+sentinel now rejects that case while preserving valid empty downloads. Three
+failure cases reproduced it before the fix. The remaining 122 quality findings
+stay open in the closeout checklist.
+After approved unused build-cache cleanup resolved Docker disk exhaustion,
+all 222 document-error security checks passed, including four new retained-file
+cases. No containers or volumes were removed.
+The remaining 122 quality findings now have explicit local dispositions (S4c
+complete), including 69 passing compatibility-export identity checks. All 282
+baseline alerts are locally reviewed; none were dismissed on GitHub. Intentional
+patterns and non-blocking maintenance are recorded separately from fixes.
+Remaining security packages are S1 provider/import review and S5/S6 final
+candidate evidence and closeout.
+The S1 import follow-up reproduced silent truncation of extra CSV cells and
+now rejects them before staging, preserving quoted commas and blank optional
+cells. All 77 import-security checks pass, including four new cases. The
+subsequent provider/credential and remaining import-path review completes S1
+locally: 176 shared integration and 47 provider-specific checks pass. All
+fixed S1–S4 local security packages are complete; S5 final-candidate evidence
+and S6 closeout remain open. No hosted scan, publication or deployment is implied.
 
 The repository publication path now includes an internal signed, append-only
 STATIC record for an independently authorized package. It binds the exact Git
@@ -2051,3 +2297,8 @@ Previously planned hardening is not discarded. Existing webhook/throttle/OIDC, a
 ## Stretch lane and post-1.0 boundary
 
 Remote Git replication, pull-request authoring and external repository authority remain optional post-1.0 work; local managed Git is the 1.0 requirement. Read-only authenticated trust views, Snipe-IT reconciliation and calendar feeds remain later candidates. Direct Google Docs/Drive creation requires user-authorized OAuth, least-privilege scopes, destination selection, explicit external-write confirmation, revocation, and value-minimized audit events. Full appointment scheduling, bidirectional connector write-back, MDM connectors, SNMP monitoring, anonymous trust portals, native ticketing/general-ledger work and a hosted multi-MSP control plane remain post-1.0.
+
+`TD-RISK-073` is prioritized for 1.x security hardening, not as a `0.9.8`
+blocker. The work must review all caller-settable RLS context and transition
+flags under the actual runtime role, then establish and test a stronger
+least-privilege database boundary before claiming resistance to hostile SQL.

@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
-from apps.core import repository_service, repository_storage
+from apps.core import content_authoring, repository_service, repository_storage
 from apps.core.content_authoring import (
     ContentAuthoringConflict,
     ContentAuthoringError,
@@ -307,6 +307,87 @@ def test_authoring_preserves_unedited_frontmatter_and_reindexes(authoring_contex
     assert ContentNode.objects.get(content_id=first.content_id).markdown == "Updated instructions.\n"
 
 
+def test_indexed_source_reads_git_without_scanning_every_file(authoring_context, monkeypatch):
+    installation, repository = authoring_context
+    first = _create(installation, repository)
+    # Derived content is not the authored source, even when the index marker agrees.
+    ContentNode.objects.filter(repository=repository).update(markdown="Not canonical", title="Not canonical")
+
+    def no_snapshot(_repository):
+        pytest.fail("An indexed source read scanned the entire repository")
+
+    monkeypatch.setattr(content_authoring, "_snapshot", no_snapshot)
+    assert read_authored_content(repository=repository, content_id=first.content_id) == first
+    with pytest.raises(repository_service.RepositoryConflictError):
+        repository_service.read_accepted_repository_file(
+            repository_id=repository.id, path=first.path, expected_commit="0" * 40
+        )
+
+    def unavailable(**_kwargs):
+        raise repository_service.RepositoryReconciliationError("Unavailable")
+
+    monkeypatch.setattr(content_authoring, "read_accepted_repository_file", unavailable)
+    with pytest.raises(repository_service.RepositoryReconciliationError):
+        read_authored_content(repository=repository, content_id=first.content_id)
+
+
+@pytest.mark.parametrize("drift", ["lag", "missing_node", "missing_path", "digest", "wrong_identity"])
+def test_source_locator_drift_falls_back_to_canonical_git(authoring_context, monkeypatch, drift):
+    installation, repository = authoring_context
+    first = _create(installation, repository)
+    node = ContentNode.objects.get(repository=repository, content_id=first.content_id)
+    if drift == "lag":
+        repository.indexed_commit = None
+        repository.save(update_fields=["indexed_commit"])
+    elif drift == "missing_node":
+        node.delete()
+    elif drift == "missing_path":
+        node.source_path = "docs/missing.md"
+        node.save(update_fields=["source_path"])
+    elif drift == "digest":
+        node.content_digest = "0" * 64
+        node.save(update_fields=["content_digest"])
+    else:
+        other = _create(installation, repository, title="Other document")
+        ContentNode.objects.filter(repository=repository, content_id=other.content_id).delete()
+        ContentNode.objects.filter(repository=repository, content_id=first.content_id).update(source_path=other.path)
+    snapshot = content_authoring._snapshot
+    scanned = []
+
+    def track_snapshot(selected):
+        scanned.append(selected.id)
+        return snapshot(selected)
+
+    monkeypatch.setattr(content_authoring, "_snapshot", track_snapshot)
+    current = read_authored_content(repository=repository, content_id=first.content_id)
+    assert current.source == first.source
+    assert current.path == first.path
+    assert scanned == [repository.id]
+
+
+def test_source_locator_head_race_returns_one_consistent_new_snapshot(authoring_context, monkeypatch):
+    installation, repository = authoring_context
+    first = _create(installation, repository)
+    original_read = content_authoring.read_accepted_repository_file
+    advanced = []
+
+    def advance_then_read(**kwargs):
+        commit = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=first.accepted_commit,
+            changes={first.path: first.source.replace("Initial instructions.", "New instructions.").encode()},
+            message="Advance during source lookup",
+        )
+        advanced.append(commit.object_id)
+        return original_read(**kwargs)
+
+    monkeypatch.setattr(content_authoring, "read_accepted_repository_file", advance_then_read)
+    current = read_authored_content(repository=repository, content_id=first.content_id)
+    assert advanced == [current.accepted_commit]
+    assert current.markdown == "New instructions.\n"
+    assert current.indexed_commit == first.indexed_commit
+    assert current.source_blob != first.source_blob
+
+
 def test_stale_blob_conflicts_but_unrelated_head_change_merges_safely(authoring_context):
     installation, repository = authoring_context
     first = _create(installation, repository)
@@ -427,12 +508,15 @@ def test_authoring_api_checks_permissions_and_returns_conflicts(authoring_contex
             "base_commit": repository.accepted_commit.object_id if repository.accepted_commit_id else None,
             "kind": "document",
             "title": "API guide",
-            "markdown": "First revision.\n",
+            "markdown": "    First revision.\n\n",
         },
         content_type="application/json",
     )
     assert create.status_code == 200, create.content
     created = create.json()
+    assert created["markdown"] == "    First revision.\n\n"
+    source_url = reverse("msp-content-authoring-source", args=[document_id])
+    assert browser.get(source_url).json()["markdown"] == created["markdown"]
     assert (
         browser.get(reverse("msp-content-authoring-source", args=[document_id])).json()["source_blob"]
         == created["source_blob"]
@@ -444,11 +528,13 @@ def test_authoring_api_checks_permissions_and_returns_conflicts(authoring_contex
             "content_id": str(document_id),
             "base_commit": created["accepted_commit"],
             "base_blob": created["source_blob"],
-            "markdown": "Second revision.\n",
+            "markdown": "    Second revision.  \n\n",
         },
         content_type="application/json",
     )
     assert update.status_code == 200, update.content
+    assert update.json()["markdown"] == "    Second revision.  \n\n"
+    assert browser.get(source_url).json()["markdown"] == update.json()["markdown"]
     stale = browser.post(
         url,
         data={

@@ -336,7 +336,9 @@ class CatalogProductListCreateView(APIView):
                 actor_id=request.user.pk,
                 **serializer.validated_data,
             )
-        except (CatalogError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except CatalogError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(CatalogProductSerializer(product).data, status=201)
 
@@ -383,7 +385,9 @@ class CatalogModelListCreateView(APIView):
                 specification_version=version,
                 **data,
             )
-        except (CatalogError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except CatalogError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         model = _model(workspace, _product(workspace, product_entity_id), model.entity_id)
         model = (
@@ -420,7 +424,9 @@ class CatalogModelDetailView(APIView):
                 {"detail": str(exc), "current_revision": CatalogModelRevisionSerializer(exc.current_revision).data},
                 status=409,
             )
-        except (CatalogError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except CatalogError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         refreshed = products_for_scope(workspace.data_scope).get(pk=product.pk).models.get(pk=model.pk)
         return Response(CatalogModelSerializer(refreshed).data)
@@ -455,7 +461,9 @@ class CatalogSpecificationDefinitionListCreateView(APIView):
                 actor_id=request.user.pk,
                 **serializer.validated_data,
             )
-        except (CatalogError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except CatalogError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         definition = definitions_for_scope(workspace.data_scope).get(pk=definition.pk)
         return Response(SpecificationDefinitionSerializer(definition).data, status=201)
@@ -473,7 +481,9 @@ class CatalogSpecificationDefinitionVersionView(APIView):
                 actor_id=request.user.pk,
                 **serializer.validated_data,
             )
-        except (CatalogError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except CatalogError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         return Response(SpecificationVersionSerializer(version).data, status=201)
 
@@ -523,7 +533,9 @@ class CatalogProductDocumentListCreateView(APIView):
                 model=model,
                 actor_id=request.user.pk,
             )
-        except (InventoryError, IntegrityError) as exc:
+        except IntegrityError as exc:
+            raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
+        except InventoryError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
         association = product_documents(product).get(pk=association.pk)
         return Response(CatalogProductDocumentSerializer(association).data, status=201)

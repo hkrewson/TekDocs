@@ -813,7 +813,9 @@ def commit_repository_files(
     return RepositoryCommitResult(repository.id, commit_id, object_format, created)
 
 
-def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> bytes:
+def read_accepted_repository_file(
+    *, repository_id: uuid.UUID, path: str, expected_commit: str | None = None
+) -> bytes:
     validated_path = _validate_path(path)
     repository, root, repository_path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
@@ -823,6 +825,8 @@ def read_accepted_repository_file(*, repository_id: uuid.UUID, path: str) -> byt
         accepted = _accepted_object(repository, object_format)
         if accepted is None:  # pragma: no cover - guarded above
             raise RepositoryInputError("Repository has no accepted content")
+        if expected_commit is not None and accepted != expected_commit:
+            raise RepositoryConflictError("Repository accepted commit changed before file read")
         git = _GitRepository(repository.id, repository_path, object_format)
         reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
         _record_reconciliation(repository, reconciliation)

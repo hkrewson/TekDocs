@@ -29,6 +29,7 @@ from .policy import (
     require_client_portal_member,
     require_installation_member,
     require_permission,
+    require_profile_edit,
 )
 from .serializers import (
     AuthenticatedContextSerializer,
@@ -143,7 +144,10 @@ class ClientPortalContextView(APIView):
 
 
 class ProfileView(APIView):
+    authentication_classes = [SessionAuthentication]
+
     @extend_schema(
+        description="Edit your own display name using a browser session and CSRF token. Bearer tokens are rejected.",
         request=ProfileUpdateSerializer,
         responses={
             200: AuthenticatedContextSerializer,
@@ -153,7 +157,7 @@ class ProfileView(APIView):
     )
     @transaction.atomic
     def patch(self, request):  # type: ignore[no-untyped-def]
-        context = require_installation_member(request.user)
+        context = require_profile_edit(request)
         serializer = ProfileUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         request.user.display_name = serializer.validated_data["display_name"]

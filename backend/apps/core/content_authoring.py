@@ -20,6 +20,7 @@ from .content_index import (
 from .content_profile import ALLOWED_FIELDS, CONTENT_SCHEMA, parse_content
 from .models import (
     Block,
+    ContentNode,
     Document,
     DocumentAuthority,
     DocumentAuthorityMode,
@@ -34,6 +35,7 @@ from .repository_service import (
     _load_repository,
     _validate_path,
     commit_repository_files,
+    read_accepted_repository_file,
     read_accepted_repository_markdown_files,
     read_repository_markdown_files_at_commit,
 )
@@ -195,9 +197,38 @@ def _validate_patch(patch: dict[str, Any]) -> None:
         raise ContentAuthoringError("Metadata patch is invalid") from exc
 
 
+def _indexed_source(
+    repository: WorkspaceRepository, content_id: uuid.UUID
+) -> tuple[str, tuple[str, bytes]] | None:
+    """Use the current projection only as a locator; Git still supplies every byte."""
+    repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
+    if repository.accepted_commit is None or repository.indexed_commit_id != repository.accepted_commit_id:
+        return None
+    node = ContentNode.objects.filter(
+        repository=repository, indexed_commit_id=repository.accepted_commit_id, content_id=content_id
+    ).only("source_path", "content_digest").first()
+    if node is None:
+        return None
+    accepted = repository.accepted_commit.object_id
+    try:
+        source = read_accepted_repository_file(
+            repository_id=repository.id, path=node.source_path, expected_commit=accepted
+        )
+    except (RepositoryConflictError, RepositoryFileNotFoundError):
+        return None
+    parsed = parse_content(source)
+    if parsed.content_id != content_id or parsed.content_digest != node.content_digest:
+        return None
+    return accepted, (node.source_path, source)
+
+
 def read_authored_content(*, repository: WorkspaceRepository, content_id: uuid.UUID) -> AuthoredContent:
-    accepted, files = _snapshot(repository)
-    located = _source_for_id(files, content_id)
+    indexed = _indexed_source(repository, content_id)
+    if indexed is None:
+        accepted, files = _snapshot(repository)
+        located = _source_for_id(files, content_id)
+    else:
+        accepted, located = indexed
     if located is None:
         raise RepositoryFileNotFoundError("Content does not exist")
     path, source = located

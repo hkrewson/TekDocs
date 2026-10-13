@@ -37,12 +37,12 @@ crypto() {
 }
 restore_compose() {
   if [ "$network_isolated" = true ]; then
-    docker compose --env-file "$environment_file" \
+    COMPOSE_PROJECT_NAME="$project_name" docker compose --project-name "$project_name" --env-file "$environment_file" \
       -f "$repository_root/compose.yml" -f "$repository_root/compose.production.yml" \
       -f "$repository_root/compose.secret-files.yml" -f "$repository_root/compose.bootstrap-secret.yml" \
       -f "$repository_root/compose.recovery-isolated.yml" "$@"
   else
-    docker compose --env-file "$environment_file" \
+    COMPOSE_PROJECT_NAME="$project_name" docker compose --project-name "$project_name" --env-file "$environment_file" \
       -f "$repository_root/compose.yml" -f "$repository_root/compose.production.yml" \
       -f "$repository_root/compose.secret-files.yml" -f "$repository_root/compose.bootstrap-secret.yml" "$@"
   fi
@@ -104,14 +104,14 @@ docker run --rm --network none --read-only --tmpfs /tmp \
   -e DJANGO_SETTINGS_MODULE=tekdocs.settings.test \
   -v "$work_directory:/recovery:ro" \
   "$backend_image" manage.py repository_recovery validate --archive /recovery/repositories.tar >/dev/null
-tar -tf "$work_directory/deployment-secrets.tar" > "$work_directory/secret-members"
-if grep -Ev '^(django_secret_key|postgres_owner_password|postgres_runtime_password|tekdocs_master_key|publication_signing_key|bootstrap_token|email_host_password|oidc_client_secret)$' "$work_directory/secret-members" | grep -q .; then
-  echo "The encrypted secret archive contains an unexpected path." >&2
-  exit 1
-fi
-for required_secret in django_secret_key postgres_owner_password postgres_runtime_password tekdocs_master_key publication_signing_key; do
-  grep -qx "$required_secret" "$work_directory/secret-members" || { echo "The encrypted secret archive is incomplete." >&2; exit 1; }
-done
+docker run --rm --network none --read-only --tmpfs /tmp \
+  --entrypoint python \
+  -v "$work_directory:/recovery:ro" \
+  "$backend_image" -m tekdocs.recovery_preflight /recovery/deployment-secrets.tar
+docker run --rm --network none --read-only --tmpfs /tmp \
+  --entrypoint python \
+  -v "$work_directory:/recovery:ro" \
+  "$backend_image" -m tekdocs.recovery_preflight --kind media /recovery/media.tar
 mkdir -m 0700 "$secret_output"
 tar -xf "$work_directory/deployment-secrets.tar" -C "$secret_output"
 chmod 0600 "$secret_output"/*

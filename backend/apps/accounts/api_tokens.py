@@ -63,11 +63,11 @@ class IssuedAPIToken:
 
 
 def require_token_management_browser_session(request) -> InstallationMemberContext:  # type: ignore[no-untyped-def]
-    authorization = request.headers.get("Authorization", "")
+    authorization = request.headers.get("Authorization", "").split()
     if (
         getattr(request, "api_token", None) is not None
         or getattr(request, "auth", None) is not None
-        or authorization.lower().startswith("bearer ")
+        or (authorization and authorization[0].lower() == "bearer")
     ):
         raise PermissionDenied("API tokens cannot manage API tokens.")
     context = require_installation_member(request.user)

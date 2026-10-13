@@ -343,7 +343,7 @@ describe('Integrations', () => {
     expect(screen.queryByText(/Create a TekDocs/i)).not.toBeInTheDocument()
   })
 
-  it('edits connection details without asking for the credential again', async () => {
+  it.each([false, true])('edits connection details with reauthentication when requested: %s', async (reauthenticate) => {
     const provider = providerClient()
     const connection = {
       id: 'connection-1', provider: 'netbox', name: 'Primary NetBox', base_url: 'https://netbox.example.com/',
@@ -356,6 +356,9 @@ describe('Integrations', () => {
       ...connection, name: 'Client NetBox', base_url: 'https://netbox.example.com/api/', sync_interval_minutes: 30,
       health_status: 'unknown', last_error_code: '',
     })
+    if (reauthenticate) vi.mocked(provider.updateConnection).mockRejectedValueOnce(
+      new IntegrationRequestError('Recent authentication required.', 403, 'recent_authentication_required'),
+    )
     const user = userEvent.setup()
     setup(provider)
 
@@ -367,6 +370,15 @@ describe('Integrations', () => {
     await user.clear(screen.getByLabelText('Sync interval (minutes)'))
     await user.type(screen.getByLabelText('Sync interval (minutes)'), '30')
     await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    if (reauthenticate) {
+      expect(await screen.findByRole('heading', { name: 'Confirm this sensitive change' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Name')).toHaveValue('Client NetBox')
+      expect(screen.getByLabelText('API base URL')).toHaveValue('https://netbox.example.com/')
+      await user.type(screen.getByLabelText('Current password'), 'test-password')
+      await user.click(screen.getByRole('button', { name: 'Confirm and save' }))
+      await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledTimes(2))
+    }
 
     await waitFor(() => expect(provider.updateConnection).toHaveBeenCalledWith(workspace, connection, {
       name: 'Client NetBox', base_url: 'https://netbox.example.com/', active: true, sync_interval_minutes: 30,

@@ -10,6 +10,7 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
+from urllib3.exceptions import ReadTimeoutError
 
 from apps.core.integration_egress import (
     MAX_INTEGRATION_RESPONSE_BYTES,
@@ -134,9 +135,10 @@ def test_provider_egress_rejects_redirect_content_type_size_and_invalid_json(mon
     assert response.closed
 
 
-def test_provider_egress_honors_bounded_rate_limit_without_exposing_response(monkeypatch):
+@pytest.mark.parametrize("retry_after", ("999999", "9" * 100))
+def test_provider_egress_honors_bounded_rate_limit_without_exposing_response(monkeypatch, retry_after):
     _mock_egress(monkeypatch)
-    FakePool.response = FakeResponse(status=429, body=b"sensitive provider text", headers={"Retry-After": "999999"})
+    FakePool.response = FakeResponse(status=429, body=b"sensitive provider text", headers={"Retry-After": retry_after})
     started = timezone.now()
     with pytest.raises(ProviderRateLimited) as caught:
         get_provider_json(
@@ -146,6 +148,21 @@ def test_provider_egress_honors_bounded_rate_limit_without_exposing_response(mon
         )
     assert timedelta(seconds=1) <= caught.value.retry_at - started <= timedelta(hours=1, seconds=1)
     assert "sensitive" not in str(caught.value)
+    assert FakePool.response.closed
+
+
+def test_provider_egress_closes_response_after_read_failure(monkeypatch):
+    _mock_egress(monkeypatch)
+
+    def failed_read(_amount):
+        raise ReadTimeoutError(None, "/api/", "sensitive provider detail")
+
+    monkeypatch.setattr(FakePool.response, "read", failed_read)
+    with pytest.raises(WebhookEgressError, match="^provider_connection_failed$"):
+        get_provider_json(
+            base_url="https://provider.example/api/", relative_path="dcim/devices/", authorization="Token x"
+        )
+    assert FakePool.response.closed
 
 
 def test_provider_cursor_cannot_escape_with_credentials_fragment_or_non_https():

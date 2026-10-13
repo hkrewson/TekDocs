@@ -28,7 +28,7 @@ def _retry_at(value: str, *, now: datetime | None = None) -> datetime:
     current = now or datetime.now(UTC)
     try:
         seconds = int(value)
-        requested = current + timedelta(seconds=max(1, seconds))
+        requested = current + timedelta(seconds=min(MAX_RETRY_AFTER_SECONDS, max(1, seconds)))
     except ValueError:
         try:
             requested = parsedate_to_datetime(value)
@@ -79,6 +79,7 @@ def _provider_json_request(
         read_timeout=10.0,
         pool_factory=urllib3.HTTPSConnectionPool,
     )
+    response = None
     try:
         response = pool.urlopen(
             method,
@@ -91,23 +92,17 @@ def _provider_json_request(
         )
         if response.status == 429:
             retry_at = _retry_at(response.headers.get("Retry-After", "60"))
-            response.close()
             raise ProviderRateLimited(retry_at)
         if response.status == 410:
-            response.close()
             raise WebhookEgressError("provider_cursor_expired")
         if response.status in {400, 401, 403}:
-            response.close()
             raise WebhookEgressError("provider_authentication_failed")
         if response.status not in success_statuses:
-            response.close()
             raise WebhookEgressError("provider_http_error")
         content_type = response.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
         if content_type != "application/json":
-            response.close()
             raise WebhookEgressError("provider_content_type_invalid")
         body = response.read(MAX_INTEGRATION_RESPONSE_BYTES + 1)
-        response.close()
         if len(body) > MAX_INTEGRATION_RESPONSE_BYTES:
             raise WebhookEgressError("provider_response_too_large")
         payload = json.loads(body)
@@ -117,7 +112,11 @@ def _provider_json_request(
     except (HTTPError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise WebhookEgressError("provider_connection_failed") from exc
     finally:
-        pool.close()
+        try:
+            if response is not None:
+                response.close()
+        finally:
+            pool.close()
 
 
 def get_provider_json(*, base_url: str, relative_path: str, authorization: str) -> dict[str, Any]:

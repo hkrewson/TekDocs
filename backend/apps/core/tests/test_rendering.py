@@ -1,3 +1,4 @@
+from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import urlsplit
 
@@ -7,6 +8,7 @@ from django.urls import reverse
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.core.models import InstallationState
 from apps.core.rendering import render_markdown, render_pdf, split_markdown_sections
+from apps.core.repository_publication_render import render_repository_evidence_html
 
 
 def test_live_pdf_uses_reader_resolved_references_not_raw_key_or_entity_tokens(monkeypatch) -> None:
@@ -191,6 +193,65 @@ def test_markdown_renderer_malicious_corpus_cannot_emit_executable_or_authored_h
         for _tag, name, value in probe.attributes
         if name in {"href", "src"}
     )
+
+
+@pytest.mark.parametrize("retained", (False, True), ids=("live", "retained"))
+@pytest.mark.parametrize("container", (
+    "Paragraph {references}",
+    "> [!WARNING]\n> {references}",
+    "| References |\n| --- |\n| {references} |",
+    "A note.[^r]\n\n[^r]: {references}",
+))
+def test_repository_reference_labels_remain_inert(retained: bool, container: str) -> None:
+    entity_id = "00000000-0000-4000-8000-000000000001"
+    attachment_id = "00000000-0000-4000-8000-000000000002"
+    hostile = '\"><img src=x onerror="alert(1)"><script>alert(2)</script>'
+    card = {
+        "id": entity_id, "display_name": hostile,
+        "entity_type": "hardware_asset", "workspace_label": hostile,
+    }
+    references = (
+        f"[authored-entity-label](tekdocs://entity/{entity_id}) "
+        f"[authored-file-label](tekdocs://attachment/{attachment_id})"
+    )
+    markdown = container.format(references=references)
+    if retained:
+        rendered = render_repository_evidence_html(markdown=markdown, manifest={
+            "entity_cards": [card],
+            "attachments": [{"source_id": attachment_id, "filename": hostile, "size": 42}],
+        })
+    else:
+        rendered = render_markdown(
+            markdown, entity_mentions={entity_id: card},
+            attachments={attachment_id: {"id": attachment_id, "filename": hostile, "size": 42}},
+        )
+    probe = RenderedHTMLProbe()
+    probe.feed(rendered)
+    assert hostile in unescape(rendered)
+    assert "authored-entity-label" not in rendered and "authored-file-label" not in rendered
+    assert not {"script", "img", "svg", "iframe", "style"}.intersection(probe.tags)
+    assert all(name != "style" and not name.startswith("on") for _tag, name, _value in probe.attributes)
+    assert not any(
+        name == "href" and not (value or "").startswith("#")
+        for _tag, name, value in probe.attributes
+    )
+
+
+@pytest.mark.parametrize("retained", (False, True), ids=("live", "retained"))
+def test_repository_missing_reference_projection_does_not_reveal_authored_labels(retained: bool) -> None:
+    markdown = (
+        "[unavailable-device-label](tekdocs://entity/00000000-0000-4000-8000-000000000001) "
+        "[unavailable-file-label](tekdocs://attachment/00000000-0000-4000-8000-000000000002)"
+    )
+    rendered = (
+        render_repository_evidence_html(markdown=markdown, manifest={"entity_cards": [], "attachments": []})
+        if retained else render_markdown(markdown)
+    )
+    assert "Unavailable reference" in rendered and "Unavailable attachment" in rendered
+    assert "unavailable-device-label" not in rendered and "unavailable-file-label" not in rendered
+    probe = RenderedHTMLProbe()
+    probe.feed(rendered)
+    assert "a" not in probe.tags
 
 
 def test_pdf_renderer_produces_a_pdf_document() -> None:

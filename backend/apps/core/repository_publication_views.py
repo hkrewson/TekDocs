@@ -15,7 +15,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey, require_permission
+from apps.accounts.policy import PermissionKey, require_permission, require_recent_interactive_authentication
 
 from .content_publication_sources import ContentPublicationSourceError
 from .document_views import _msp_workspace, _organization_workspace
@@ -409,15 +409,16 @@ def _review_attachment(  # type: ignore[no-untyped-def]
         descriptor = next(
             (item for item in descriptors if isinstance(item, dict) and item.get("id") == str(artifact.id)), None
         )
-        content = b""
+        content: bytes | None = None
         if descriptor is not None and 0 <= artifact.size <= MAX_RETAINED_ATTACHMENT_BYTES:
             try:
                 with artifact.file.storage.open(artifact.file.name, "rb") as stream:
                     content = bytes(stream.read(MAX_RETAINED_ATTACHMENT_BYTES + 1))
             except (OSError, ValueError, TypeError):
-                pass
+                content = None
         if (
             descriptor is None
+            or content is None
             or len(content) != artifact.size
             or len(content) > MAX_RETAINED_ATTACHMENT_BYTES
             or hashlib.sha256(content).hexdigest() != descriptor.get("checksum")
@@ -525,7 +526,9 @@ def _package(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respon
         return Response(_package_data(package))
     try:
         package = create_repository_publication_package(decision_id=decision.id, actor=request.user)
-    except (RepositoryPublicationPackageError, IntegrityError) as exc:
+    except IntegrityError:
+        return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
+    except RepositoryPublicationPackageError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_package_data(package), status=status.HTTP_201_CREATED)
 
@@ -567,7 +570,9 @@ def _authorization(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> 
             reason=serializer.validated_data["reason"],
             actor=request.user,
         )
-    except (RepositoryPackageAuthorizationError, IntegrityError) as exc:
+    except IntegrityError:
+        return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
+    except RepositoryPackageAuthorizationError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_authorization_data(authorization), status=status.HTTP_201_CREATED)
 
@@ -604,7 +609,9 @@ def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID
         return Response(_static_publication_data(publication))
     try:
         publication = create_repository_static_publication(authorization_id=authorization.id, actor=request.user)
-    except (RepositoryStaticPublicationError, IntegrityError) as exc:
+    except IntegrityError:
+        return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
+    except RepositoryStaticPublicationError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
 
@@ -716,7 +723,9 @@ def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) ->
             actor=request.user,
             supersedes_id=serializer.validated_data.get("supersedes_id"),
         )
-    except (RepositoryStaticControlError, IntegrityError) as exc:
+    except IntegrityError:
+        return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
+    except RepositoryStaticControlError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_static_control_data(publication), status=status.HTTP_201_CREATED)
 
@@ -754,11 +763,14 @@ def _static_delivery(request, workspace: ResolvedWorkspace, evidence_id: UUID) -
         return Response(_static_delivery_data(authorization))
     serializer = RepositoryStaticDeliveryWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
+    require_recent_interactive_authentication(request)
     try:
         authorization = authorize_repository_static_delivery(
             publication_id=publication.id, reason=serializer.validated_data["reason"], actor=request.user
         )
-    except (RepositoryStaticDeliveryError, IntegrityError) as exc:
+    except IntegrityError:
+        return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
+    except RepositoryStaticDeliveryError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_static_delivery_data(authorization), status=status.HTTP_201_CREATED)
 
@@ -1091,7 +1103,17 @@ class OrganizationRepositoryStaticDeliveryView(APIView):
     @extend_schema(
         operation_id="repository_evidence_organization_static_delivery_authorize",
         request=RepositoryStaticDeliveryWriteSerializer,
-        responses={201: RepositoryStaticDeliverySerializer},
+        description=(
+            "Requires document approval permission, TOTP enrollment, and an interactive session with recent "
+            "password or MFA authentication. On recent_authentication_required, reauthenticate through "
+            "the browser authentication API and explicitly retry the unchanged approval. API tokens are not accepted."
+        ),
+        responses={
+            201: RepositoryStaticDeliverySerializer,
+            403: OpenApiResponse(
+                description="Approval permission, MFA, and recent interactive authentication required"
+            ),
+        },
     )
     def post(self, request, organization_entity_id, evidence_id):  # type: ignore[no-untyped-def]
         return _static_delivery(

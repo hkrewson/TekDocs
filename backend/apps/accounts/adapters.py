@@ -3,6 +3,7 @@ from urllib.parse import quote
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.core import context
 from allauth.mfa.adapter import DefaultMFAAdapter
+from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from allauth.usersessions.adapter import DefaultUserSessionsAdapter
 from django.conf import settings
 
@@ -15,6 +16,12 @@ from apps.core.email import (
 
 from .audit import record_auth_event
 from .mfa_storage import decrypt_mfa_value, encrypt_mfa_value
+from .oidc_egress import oidc_requests_session
+
+
+class ApprovedSocialAccountAdapter(DefaultSocialAccountAdapter):
+    def get_requests_session(self):  # type: ignore[no-untyped-def]
+        return oidc_requests_session()
 
 
 class InviteOnlyAccountAdapter(DefaultAccountAdapter):

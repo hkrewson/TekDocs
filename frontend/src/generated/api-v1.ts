@@ -321,6 +321,7 @@ export interface paths {
         readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
+        /** @description Edit your own display name using a browser session and CSRF token. Bearer tokens are rejected. */
         readonly patch: operations["auth_profile_partial_update"];
         readonly trace?: never;
     };
@@ -8630,6 +8631,7 @@ export interface paths {
         };
         readonly get: operations["repository_evidence_organization_static_delivery_retrieve"];
         readonly put?: never;
+        /** @description Requires document approval permission, TOTP enrollment, and an interactive session with recent password or MFA authentication. On recent_authentication_required, reauthenticate through the browser authentication API and explicitly retry the unchanged approval. API tokens are not accepted. */
         readonly post: operations["repository_evidence_organization_static_delivery_authorize"];
         readonly delete?: never;
         readonly options?: never;
@@ -40897,6 +40899,17 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["RepositoryStaticDelivery"];
+                };
+            };
+            /** @description Approval permission, MFA, and recent interactive authentication required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

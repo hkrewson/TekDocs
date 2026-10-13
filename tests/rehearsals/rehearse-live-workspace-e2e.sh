@@ -12,6 +12,10 @@ work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-live-workspace.XXXXXX")
 environment_file="$work_directory/live-workspace.env"
 project_name="tekdocs_live_workspace_$$"
 playwright_image="tekdocs-live-workspace-e2e:local"
+safe_artifact_directory="$repository_root/artifacts/playwright-safe"
+safe_summary="$safe_artifact_directory/live-workspace.json"
+quarantine_directory="$repository_root/artifacts/playwright-quarantine"
+quarantine_summary="$quarantine_directory/live-workspace.json"
 
 #======================# FUNCTIONS #=======================#
 
@@ -51,15 +55,26 @@ if ! grep -A 3 '"node_modules/@playwright/test"' "$repository_root/frontend/pack
 fi
 
 echo "Starting isolated real-stack workspace browser journey"
+mkdir -p "$safe_artifact_directory" "$quarantine_directory"
+rm -f "$safe_summary" "$quarantine_summary"
 live_compose build --quiet
 live_compose up -d --wait
 docker build --build-arg "PLAYWRIGHT_VERSION=$playwright_version" -f "$repository_root/frontend/Dockerfile.e2e" -t "$playwright_image" "$repository_root/frontend" >/dev/null
 frontend_id=$(live_compose ps -q frontend)
+test_status=0
 docker run --rm \
   --network "container:$frontend_id" \
   -e PLAYWRIGHT_BASE_URL=http://localhost:8080 \
   -e TEKDOCS_E2E_BOOTSTRAP_TOKEN="$bootstrap_token" \
-  "$playwright_image" npx playwright test --config=playwright.live.config.ts
+  -e PLAYWRIGHT_SAFE_SUMMARY=/app/quarantine/live-workspace.json \
+  -v "$quarantine_directory:/app/quarantine" \
+  "$playwright_image" sh -c \
+  'npx playwright test --config=playwright.live.config.ts; status=$?;
+  if [ -f "$PLAYWRIGHT_SAFE_SUMMARY" ]; then chmod 0644 "$PLAYWRIGHT_SAFE_SUMMARY"; fi;
+  exit "$status"' || test_status=$?
+"$repository_root/scripts/check-browser-artifacts.sh" "$quarantine_summary"
+mv "$quarantine_summary" "$safe_summary"
+[ "$test_status" -eq 0 ] || exit "$test_status"
 
 live_compose run --rm -v "${project_name}_media_data:/app/media:ro" migrate python manage.py shell -c '
 from datetime import timedelta

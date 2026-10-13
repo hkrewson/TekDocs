@@ -13,7 +13,7 @@ from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 
-from apps.accounts.policy import PermissionKey, require_permission
+from apps.accounts.policy import PermissionKey, require_permission, require_recent_interactive_authentication
 
 from .integration_egress import ProviderRateLimited, validate_integration_base_url
 from .integration_providers import (
@@ -270,6 +270,7 @@ def update_connection(
         elif connection.provider == IntegrationProvider.UNIFI:
             normalized_base_url = unifi_api_base_url(normalized_base_url)
         if normalized_base_url != connection.base_url:
+            require_recent_interactive_authentication(request)
             connection.base_url = normalized_base_url
             connection.last_error_code = ""
             connection.rate_limit_reset_at = None
@@ -1185,8 +1186,10 @@ def adopt_netbox_conflict(
             object_id=int(conflict.remote_id),
             fingerprint=conflict.remote_fingerprint,
         )
-    except (NetBoxReferenceError, ValueError) as exc:
+    except NetBoxReferenceError as exc:
         raise ValidationError({"detail": str(exc)}) from exc
+    except ValueError as exc:
+        raise ValidationError({"detail": "The NetBox record could not be linked."}) from exc
     reference.last_observed_at = conflict.observation.observed_at
     reference.save(update_fields=("last_observed_at", "updated_at"))
 

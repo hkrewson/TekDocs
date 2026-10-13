@@ -55,7 +55,14 @@ def validate(wiki: Path | None) -> None:
     missing = sorted(slug for slug in slugs if not (checkout / f"{slug}.md").is_file())
     if missing:
         raise ValueError(f"Wiki checkout is missing pages: {missing}")
-    for source in [checkout / f"{slug}.md" for slug in slugs] + [checkout / "_Sidebar.md"]:
+    # The manifest owns required product/help pages, not the entire operator
+    # manual. Retain supplemental setup guides and check their links as well.
+    page_paths = {
+        path.stem: path
+        for path in checkout.glob("*.md")
+        if path.is_file() and SLUG.fullmatch(path.stem)
+    }
+    for source in list(page_paths.values()) + [checkout / "_Sidebar.md"]:
         if not source.is_file():
             raise ValueError(f"Wiki checkout is missing {source.name}")
         for raw_target in LINK.findall(source.read_text(encoding="utf-8")):
@@ -63,9 +70,12 @@ def validate(wiki: Path | None) -> None:
             if not target or target.startswith(("#", "https://", "mailto:")):
                 continue
             linked_slug = unquote(target.split("#", 1)[0]).removesuffix(".md")
-            if linked_slug not in slugs:
+            if linked_slug not in page_paths:
                 raise ValueError(f"{source.name} has an unknown local page link: {raw_target}")
-    print(f"Wiki checkout passed: {len(slugs)} pages and local links are complete")
+    print(
+        f"Wiki checkout passed: {len(slugs)} required pages, "
+        f"{len(page_paths)} total pages and local links are complete"
+    )
 
 
 def main() -> int:

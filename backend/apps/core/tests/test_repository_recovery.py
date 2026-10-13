@@ -241,3 +241,35 @@ def test_repository_archive_restore_requires_empty_destination(recovery_reposito
     with pytest.raises(RepositoryRecoveryError, match="must be empty"):
         restore_repository_recovery_archive(archive, destination)
     assert (destination / "retained").read_text() == "do not replace"
+
+
+@pytest.mark.parametrize("failed_operation", ("init", "fetch", "update-ref"))
+def test_repository_restore_failure_cleans_destination_and_allows_retry(
+    recovery_repository, tmp_path, monkeypatch, failed_operation
+):
+    repository, _, _ = recovery_repository
+    archive = tmp_path / "repositories.tar"
+    create_repository_recovery_archive(archive)
+    destination = tmp_path / "restored"
+    restored = destination / f"{repository.id}.git"
+    original_git = repository_recovery._git
+    injected = False
+
+    def fail_restore(*arguments, **kwargs):
+        nonlocal injected
+        result = original_git(*arguments, **kwargs)
+        targets_restore = kwargs.get("git_dir") == restored or str(restored) in arguments
+        if targets_restore and arguments[0] == failed_operation and not injected:
+            injected = True
+            raise RepositoryRecoveryError("Injected repository restore interruption.")
+        return result
+
+    with monkeypatch.context() as fault:
+        fault.setattr(repository_recovery, "_git", fail_restore)
+        with pytest.raises(RepositoryRecoveryError, match="Injected repository restore interruption"):
+            restore_repository_recovery_archive(archive, destination)
+
+    assert injected
+    assert list(destination.iterdir()) == []
+    restore_repository_recovery_archive(archive, destination)
+    assert _git(restored, "rev-parse", CANONICAL_REF) == repository.accepted_commit.object_id

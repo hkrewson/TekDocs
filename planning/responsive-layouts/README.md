@@ -1,6 +1,10 @@
 # Pre-1.0 responsive layouts and record navigation
 
-Required 1.0 acceptance under #60; coordinates with #40 and #39 and preserves #75/#76 obligations. Version remains 0.8.46. No deployment or publication implied.
+Historical responsive-layout implementation and acceptance evidence for the
+pre-1.0 interface programme. Its remaining human walkthrough and release
+acceptance are carried into `0.9.8` and must be rerun/reconfirmed against the
+Git-backed candidate; older 0.8.46 evidence is context, not current release
+acceptance. No deployment or publication implied.
 
 ## Accepted interaction contract
 
@@ -40,6 +44,8 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Phase 8 release-gate execution](phase-8-release-gate-execution.md)
 
 - [Phase 8 production-image acceptance](phase-8-production-image-acceptance.md)
+
+- [Phase 8 local performance acceptance](phase-8-performance-acceptance.md)
 
 - [Phase 8 recovery acceptance](phase-8-recovery-acceptance.md)
 
@@ -135,6 +141,7 @@ Excluded: named saved views, resizable/reorderable columns, density modes, infin
 - [Phase 8 route and state inventory](phase-8-route-state-inventory.md)
 - [Phase 8 technician and assistive-technology walkthrough](phase-8-technician-walkthrough.md)
 - [Phase 8 responsive workspace recovery acceptance](phase-8-recovery-acceptance.md)
+- [Phase 8 candidate security acceptance and DAST dispositions](phase-8-security-review.md)
 
 - [Document ownership and review](ownership-and-review.md)
 

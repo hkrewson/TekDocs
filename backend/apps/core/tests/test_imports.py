@@ -1,3 +1,4 @@
+import csv
 import io
 import json
 import secrets
@@ -9,9 +10,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, transaction
 from django.test import Client
 from django.urls import reverse
+from rest_framework.exceptions import ValidationError
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.core.imports import create_preview, template_csv
+from apps.core.imports import _decode_bundle, _decode_csv, create_preview, template_csv
 from apps.core.models import ImportBatch, ImportExternalKey, ImportRow, InstallationState, Organization, Site, Workspace
 from apps.core.workspaces import resolve_msp_workspace
 
@@ -32,6 +34,127 @@ def installation(db):
 def _csv(record_type: str, *rows: str) -> SimpleUploadedFile:
     header = template_csv(record_type).decode().strip()
     return SimpleUploadedFile(f"{record_type}.csv", ("\n".join((header, *rows)) + "\n").encode(), "text/csv")
+
+
+def _damaged_bundle(kind):
+    output = io.BytesIO()
+    manifest = json.dumps({"format": "tekdocs-import", "version": 1})
+    records = '{"record_type":"sites","external_key":"site-1","name":"Example"}'
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("manifest.json", manifest)
+        archive.writestr("records.jsonl", records)
+        if kind == "duplicate":
+            with pytest.warns(UserWarning, match="Duplicate name"):
+                archive.writestr("records.jsonl", records)
+    payload = output.getvalue()
+    if kind == "manifest_crc":
+        payload = payload.replace(manifest.encode(), b"x" + manifest.encode()[1:], 1)
+    elif kind == "records_crc":
+        payload = payload.replace(records.encode(), b"x" + records.encode()[1:], 1)
+    return payload
+
+
+@pytest.mark.parametrize("kind", ["manifest_crc", "records_crc", "duplicate"])
+def test_bundle_decoder_rejects_corrupt_and_ambiguous_members(kind):
+    with pytest.raises(ValidationError):
+        _decode_bundle(_damaged_bundle(kind))
+
+
+def test_csv_decoder_reports_parser_limits_as_validation_errors():
+    payload = b"external_key,name\nsite-1," + b"x" * (csv.field_size_limit() + 1)
+    with pytest.raises(ValidationError):
+        _decode_csv(payload, record_type="sites")
+
+
+@pytest.mark.parametrize("extra", ("private-unmapped-value", ""))
+def test_csv_decoder_rejects_extra_cells_instead_of_discarding_them(extra):
+    payload = f"external_key,name\nsite-1,Example,{extra}\n".encode()
+    with pytest.raises(ValidationError) as caught:
+        _decode_csv(payload, record_type="sites")
+    assert str(caught.value.detail["file"]) == "CSV row 2 has more values than header columns."
+    assert "private-unmapped-value" not in str(caught.value.detail)
+
+
+def test_csv_decoder_preserves_quoted_commas_and_blank_optional_fields():
+    rows = _decode_csv(b'external_key,name,code\nsite-1,"Office, West",\n', record_type="sites")
+    assert rows[0]["name"] == "Office, West"
+    assert rows[0]["code"] == ""
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("kind", ["manifest_crc", "records_crc", "duplicate", "csv_limit", "csv_extra"])
+def test_invalid_import_container_returns_400_without_staging(installation, kind):
+    browser = Client()
+    browser.force_login(installation.owner)
+    is_csv = kind.startswith("csv_")
+    if kind == "csv_extra":
+        payload = b"external_key,name\nsite-1,Example,private-unmapped-value\n"
+    elif kind == "csv_limit":
+        payload = b"external_key,name\nsite-1," + b"x" * (csv.field_size_limit() + 1)
+    else:
+        payload = _damaged_bundle(kind)
+    response = browser.post(
+        reverse("msp-import-list-create"),
+        data={
+            "source_format": "tekdocs_csv" if is_csv else "tekdocs_bundle",
+            "record_type": "sites",
+            "file": SimpleUploadedFile("invalid.csv" if is_csv else "invalid.zip", payload),
+        },
+    )
+    assert response.status_code == 400
+    assert not ImportBatch.objects.exists()
+    assert not ImportRow.objects.exists()
+    assert not Site.objects.exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("field", ["record_type", "external_key"])
+@pytest.mark.parametrize(
+    "bad_value,reason",
+    [
+        ({"nested": "invalid"}, "field_type_invalid"),
+        ("=HYPERLINK(1)", "spreadsheet_formula_rejected"),
+        ("x" * 500, "field_length_invalid"),
+    ],
+)
+def test_invalid_import_identity_is_rejected_without_crashing_or_retaining_content(
+    installation, field, bad_value, reason
+):
+    invalid = {
+        "record_type": "sites",
+        "external_key": "invalid-row",
+        "name": "Do not retain this row",
+        field: bad_value,
+    }
+    valid = {"record_type": "sites", "external_key": "valid-row", "name": "Valid site"}
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("manifest.json", json.dumps({"format": "tekdocs-import", "version": 1}))
+        archive.writestr("records.jsonl", "\n".join(json.dumps(row) for row in (invalid, valid)))
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.post(
+        reverse("msp-import-list-create"),
+        data={
+            "source_format": "tekdocs_bundle",
+            "file": SimpleUploadedFile("identities.zip", output.getvalue()),
+        },
+    )
+    assert response.status_code == 201
+    batch = ImportBatch.objects.get(pk=response.json()["id"])
+    rejected, accepted = list(batch.rows.order_by("row_number"))
+    assert (rejected.action, rejected.reason_code, rejected.normalized_data) == ("rejected", reason, {})
+    assert rejected.record_type == ("unknown" if field == "record_type" else "sites")
+    assert rejected.external_key == ("row-1" if field == "external_key" else "invalid-row")
+    assert accepted.action == "create"
+    assert accepted.external_key == "valid-row"
+    assert (
+        browser.post(
+            reverse("msp-import-apply", kwargs={"batch_id": batch.id}), data="{}", content_type="application/json"
+        ).status_code
+        == 400
+    )
+    assert not Site.objects.exists()
 
 
 @pytest.mark.django_db

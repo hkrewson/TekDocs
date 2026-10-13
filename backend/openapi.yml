@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.7
+  version: 0.9.8
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -1015,6 +1015,8 @@ paths:
   /api/v1/auth/profile:
     patch:
       operationId: auth_profile_partial_update
+      description: Edit your own display name using a browser session and CSRF token.
+        Bearer tokens are rejected.
       tags:
       - auth
       requestBody:
@@ -1029,7 +1031,6 @@ paths:
             schema:
               $ref: '#/components/schemas/PatchedProfileUpdate'
       security:
-      - TekDocsBearerToken: []
       - cookieAuth: []
       responses:
         '200':
@@ -33671,6 +33672,10 @@ paths:
                 format: uuid
     post:
       operationId: repository_evidence_organization_static_delivery_authorize
+      description: Requires document approval permission, TOTP enrollment, and an
+        interactive session with recent password or MFA authentication. On recent_authentication_required,
+        reauthenticate through the browser authentication API and explicitly retry
+        the unchanged approval. API tokens are not accepted.
       parameters:
       - in: path
         name: evidence_id
@@ -33714,6 +33719,19 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '403':
+          description: Approval permission, MFA, and recent interactive authentication
+            required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package/static-publication/export/html
   : get:
       operationId: repository_evidence_organization_static_html_export

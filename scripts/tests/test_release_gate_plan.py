@@ -37,15 +37,22 @@ class ReleaseGatePlanTests(unittest.TestCase):
             commands.count("./tests/rehearsals/rehearse-postgres-test-matrix.sh"), 1
         )
         self.assertNotIn("docker compose run --rm migrate pytest --cov", commands)
-        self.assertEqual(len(pytest_commands), 2)
-        self.assertTrue(
-            any("test_public_beta_capacity.py" in command for command in pytest_commands)
+        performance_prefix = (
+            "docker compose run --rm -e TEKDOCS_ENFORCE_LATENCY_BUDGETS=true "
+            "migrate pytest "
         )
-        self.assertTrue(
-            any(
-                "TEKDOCS_ENFORCE_LATENCY_BUDGETS=true" in command
-                for command in pytest_commands
-            )
+        self.assertCountEqual(
+            pytest_commands,
+            [
+                performance_prefix
+                + "apps/core/tests/test_public_beta_capacity.py -m performance -q -s",
+                performance_prefix
+                + "apps/core/tests/test_content_performance.py -m performance -q -s",
+                performance_prefix
+                + "apps/core/tests/test_stabilization_performance.py "
+                "apps/core/tests/test_inventory_stabilization.py "
+                "apps/core/tests/test_portal_notification_stabilization.py -q -s",
+            ],
         )
 
 

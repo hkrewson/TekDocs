@@ -165,6 +165,27 @@ def test_oidc_redirect_uses_allauth_state_boundary(client, monkeypatch):
 
 @pytest.mark.django_db
 @override_settings(TEKDOCS_OIDC_PROVIDER=OIDC_PROVIDER, SOCIALACCOUNT_PROVIDERS=OIDC_ALLAUTH_SETTINGS)
+@pytest.mark.parametrize("verified", [False, None, True])
+def test_oidc_email_lookup_requires_provider_verified_identity(owner, verified):
+    request = RequestFactory().get("/", HTTP_HOST="testserver")
+    request.user = AnonymousUser()
+    claims = {"sub": "new-provider-subject", "email": owner.owner.email}
+    if verified is not None:
+        claims["email_verified"] = verified
+    with request_context(request):
+        provider = get_socialaccount_adapter(request).get_provider(request, OIDC_PROVIDER["id"])
+        sociallogin = provider.sociallogin_from_response(request, claims)
+        sociallogin.lookup()
+    assert sociallogin.is_existing is (verified is True)
+    if verified is True:
+        assert sociallogin.user.pk == owner.owner.pk
+    else:
+        assert sociallogin.user.pk != owner.owner.pk
+    assert not SocialAccount.objects.filter(user=owner.owner).exists()
+
+
+@pytest.mark.django_db
+@override_settings(TEKDOCS_OIDC_PROVIDER=OIDC_PROVIDER, SOCIALACCOUNT_PROVIDERS=OIDC_ALLAUTH_SETTINGS)
 def test_existing_oidc_identity_with_enrolled_totp_stops_at_mfa(owner):
     TOTP.activate(owner.owner, generate_totp_secret())
     request = RequestFactory().get("/", HTTP_HOST="testserver")

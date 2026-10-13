@@ -2,6 +2,7 @@ import importlib
 import json
 import secrets
 import time
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -12,9 +13,11 @@ from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from django.test import Client
 from django.urls import reverse
+from rest_framework.exceptions import PermissionDenied
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.mfa_storage import PREFIX, decrypt_mfa_value, encrypt_mfa_value
+from apps.accounts.policy import require_recent_interactive_authentication
 from apps.core.models import AuditEvent, InstallationState
 
 LOGIN_URL = "/_allauth/browser/v1/auth/login"
@@ -24,6 +27,17 @@ REAUTH_URL = "/_allauth/browser/v1/auth/reauthenticate"
 AUTHENTICATORS_URL = "/_allauth/browser/v1/account/authenticators"
 TOTP_URL = "/_allauth/browser/v1/account/authenticators/totp"
 RECOVERY_URL = "/_allauth/browser/v1/account/authenticators/recovery-codes"
+
+
+@pytest.mark.parametrize("token_attribute", ("auth", "api_token"))
+def test_recent_interactive_policy_rejects_token_even_with_a_recent_session(monkeypatch, token_attribute):
+    def unexpected_session_check(_request):
+        pytest.fail("Bearer credentials must be rejected before considering the accompanying session")
+
+    monkeypatch.setattr("apps.accounts.policy.did_recently_authenticate", unexpected_session_check)
+    request = SimpleNamespace(_request=object(), **{token_attribute: object()})
+    with pytest.raises(PermissionDenied, match="interactive session"):
+        require_recent_interactive_authentication(request)
 
 
 @pytest.fixture

@@ -104,3 +104,71 @@ def test_archive_encryption_and_decryption_enforce_plaintext_security_bound(tmp_
     monkeypatch.setattr(recovery_archive, "MAX_PLAINTEXT_BYTES", 8)
     with pytest.raises(RecoveryArchiveError, match="16 GiB"):
         decrypt_file(artifact, tmp_path / "restored.dump", key=key, label="database")
+
+
+@pytest.mark.parametrize("failure", ("wrong_key", "wrong_label", "nonce", "ciphertext", "tag", "truncated", "magic"))
+@pytest.mark.parametrize("existing_destination", (False, True))
+def test_rejected_archive_preserves_destination_and_removes_plaintext(tmp_path, failure, existing_destination):
+    key = os.urandom(32)
+    encrypted = io.BytesIO()
+    encrypt_stream(io.BytesIO(b"private recovery fixture"), encrypted, key=key, label="database")
+    data = bytearray(encrypted.getvalue())
+    label = "database"
+    expected_error = InvalidTag
+    if failure == "wrong_key":
+        key = os.urandom(32)
+    elif failure == "wrong_label":
+        label = "media"
+    elif failure == "nonce":
+        data[len(recovery_archive.MAGIC)] ^= 1
+    elif failure == "ciphertext":
+        data[len(recovery_archive.MAGIC) + recovery_archive.NONCE_SIZE] ^= 1
+    elif failure == "tag":
+        data[-1] ^= 1
+    elif failure == "truncated":
+        del data[-1]
+    else:
+        data[0] ^= 1
+        expected_error = RecoveryArchiveError
+    artifact = tmp_path / "database.tdr"
+    artifact.write_bytes(data)
+    destination_directory = tmp_path / "output"
+    destination_directory.mkdir()
+    destination = destination_directory / "database.dump"
+    if existing_destination:
+        destination.write_bytes(b"existing destination")
+
+    with pytest.raises(expected_error):
+        decrypt_file(artifact, destination, key=key, label=label)
+
+    assert list(destination_directory.iterdir()) == ([destination] if existing_destination else [])
+    if existing_destination:
+        assert destination.read_bytes() == b"existing destination"
+
+
+@pytest.mark.parametrize("failure", (None, "changed_manifest", "wrong_key", "wrong_mac"))
+def test_manifest_cli_authentication_rejects_changed_inputs(tmp_path, monkeypatch, capsys, failure):
+    key = os.urandom(32)
+    manifest = tmp_path / "manifest.json"
+    manifest.write_bytes(b'{"format":"tekdocs-recovery-v2","artifacts":{}}\n')
+    expected_mac = manifest_mac(manifest, key=key)
+    if failure == "changed_manifest":
+        manifest.write_bytes(b'{"format":"tekdocs-recovery-v2","artifacts":{"changed":true}}\n')
+    elif failure == "wrong_key":
+        key = os.urandom(32)
+    elif failure == "wrong_mac":
+        expected_mac = "0" * 64
+    key_file = tmp_path / "recovery.key"
+    key_file.write_bytes(base64.urlsafe_b64encode(key))
+    key_file.chmod(0o600)
+    monkeypatch.setattr(
+        recovery_archive.sys,
+        "argv",
+        ["recovery_archive", "verify-manifest", "--key-file", str(key_file),
+         "--input", str(manifest), "--expected-mac", expected_mac],
+    )
+
+    assert recovery_archive.main() == (2 if failure else 0)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ("The recovery manifest authentication failed.\n" if failure else "")

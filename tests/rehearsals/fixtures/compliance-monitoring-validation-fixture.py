@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import User
+from apps.core import rls as rls_module
 from apps.core.certificate_monitoring import create_certificate_endpoint
 from apps.core.compliance_bundles import create_bundle, verify_bundle
 from apps.core.compliance_catalogs import ControlInput, create_framework
@@ -22,10 +23,9 @@ from apps.core.models import (
     ReminderSchedule,
 )
 from apps.core.organizations import create_organization
-from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope, rls_scope
+from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope, rls_scope
 from apps.core.scoping import DataScope
 from apps.core.workspaces import resolve_organization_workspace
-
 
 OWNER_EMAIL = "validation-recovery@example.invalid"
 ORGANIZATION_NAME = "Validation Recovery Client"
@@ -35,6 +35,20 @@ BUNDLE_TITLE = "Validation Recovery Evidence"
 HEX_A = "a" * 64
 HEX_B = "b" * 64
 HEX_C = "c" * 64
+
+
+def bind_fixture_user_scope(scope, *, organization_mode, actor_user_id):
+    # Historical upgrade sources do not yet have explicit user principals.
+    principal_mode = getattr(rls_module, "RLSPrincipalMode", None)
+    if principal_mode is None:
+        bind_local_rls_scope(scope, organization_mode=organization_mode)
+    else:
+        bind_local_rls_scope(
+            scope,
+            organization_mode=organization_mode,
+            actor_user_id=actor_user_id,
+            principal_mode=principal_mode.USER,
+        )
 
 
 def create_fixture():
@@ -54,11 +68,10 @@ def create_fixture():
             website="",
             classifications=["client"],
         )
-        bind_local_rls_scope(
+        bind_fixture_user_scope(
             DataScope.tenant(result.tenant),
             organization_mode=OrganizationRLSMode.ALL_AUTHORIZED,
             actor_user_id=result.owner.id,
-            principal_mode=RLSPrincipalMode.USER,
         )
         workspace = resolve_organization_workspace(result.owner, entity_id=organization.entity_id)
 
@@ -210,11 +223,10 @@ def verify_fixture():
     owner = User.objects.get(email=OWNER_EMAIL)
     tenant = owner.tenant_memberships.get().tenant
     with rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.ALL_AUTHORIZED):
-        bind_local_rls_scope(
+        bind_fixture_user_scope(
             DataScope.tenant(tenant),
             organization_mode=OrganizationRLSMode.ALL_AUTHORIZED,
             actor_user_id=owner.id,
-            principal_mode=RLSPrincipalMode.USER,
         )
         organization = Organization.objects.get(tenant=tenant, entity__display_name=ORGANIZATION_NAME)
         workspace = resolve_organization_workspace(owner, entity_id=organization.entity_id)

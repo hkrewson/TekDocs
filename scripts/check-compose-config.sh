@@ -15,6 +15,7 @@ sh -n \
 "$repository_root/scripts/bootstrap-env.sh" --help >/dev/null
 "$repository_root/scripts/setup-production.sh" --help >/dev/null
 "$repository_root/tests/rehearsals/test-production-setup.sh"
+python3 "$repository_root/tests/rehearsals/test-restore-project.py"
 
 TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \

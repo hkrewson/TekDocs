@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "milestone": "0.9.8",
+  "date": "2026-10-12",
+  "base_commit": "b987fe738b47097654ffffad01d27357e18fa9cb",
+  "frozen_candidate": false,
+  "scope": "Local dirty-worktree measurements, not release attestation. Capacity and older-domain measurements preceded the Git source-read optimization; Git and browser retests followed it.",
+  "runtime_diff_sha256": "4ddf9231c243eb1b5448d52d69d61939e7099ba8f7f706638efd495b8e2db12d",
+  "runtime_diff_paths": [
+    "backend/apps/core/content_authoring.py",
+    "backend/apps/core/content_authoring_views.py",
+    "backend/apps/core/repository_service.py",
+    "frontend/src/documentation/RepositoryContentPanel.tsx"
+  ],
+  "test_sha256": {
+    "backend": "9b72339283717ba78642481542221727426f94ec5574967edb7955ed5c181ffd",
+    "browser": "68784a8b84f8d8a79146fe6523476feb242420d0e883ca0140199cc46cccf352"
+  },
+  "test_images": {
+    "migrate": "sha256:c5d177a24b8c6f26412648056cec7f083c3f611515d97407ef1cd610b3aa0cda",
+    "browser_frontend": "sha256:66fa3f2ada02ac611bd691f17ecd004d6527ab6a9f4dbffe70a8962c29eb59d6",
+    "browser_runner": "sha256:af4f08d98be4c6251872103501caca24cd02e95ad0bfd238545c585ff56d2210"
+  },
+  "tools": {
+    "pytest": "9.1.1",
+    "playwright": "1.62.1"
+  },
+  "api_budgets": {
+    "warmed_read_p95_ms": 500,
+    "burst_max_ms": 2000,
+    "git_request_query_ceiling": 64
+  },
+  "capacity_reference": {
+    "clients": 100,
+    "entities": 100000,
+    "revisions": 250000,
+    "assets": 25000,
+    "warmed_samples_per_path": 40,
+    "asset_first_page_p95_ms": 114.3,
+    "asset_middle_page_p95_ms": 243.1,
+    "asset_last_page_p95_ms": 354.7,
+    "history_page_5000_p95_ms": 295.1,
+    "entity_search_p95_ms": 35.6,
+    "eight_request_burst_max_ms": 928
+  },
+  "git_reference": {
+    "documents": 250,
+    "shared_fragments": 1,
+    "warmed_samples_per_path": 40,
+    "source_read_before_p95_ms": 1902.8,
+    "after": [
+      {
+        "path": "listing_last_page",
+        "p95_ms": 22.2,
+        "queries": 51
+      },
+      {
+        "path": "composed_read",
+        "p95_ms": 15.9,
+        "queries": 30
+      },
+      {
+        "path": "authoring_source",
+        "p95_ms": 47.4,
+        "queries": 36
+      }
+    ]
+  },
+  "browser_budgets": {
+    "shell_ready_ms": 8000,
+    "editor_ready_ms": 12000,
+    "initial_decoded_javascript_bytes": 921600,
+    "editor_decoded_javascript_bytes": 1536000
+  },
+  "browser_measurements": [
+    {
+      "name": "constrained desktop",
+      "width": 1440,
+      "height": 900,
+      "cpuRate": 4,
+      "latency": 80,
+      "download": 256000,
+      "editor": "legacy",
+      "shellReadyMs": 5044,
+      "editorReadyMs": 6614,
+      "initialJavaScript": 677714,
+      "editorJavaScript": 1467518
+    },
+    {
+      "name": "constrained mobile",
+      "width": 390,
+      "height": 844,
+      "cpuRate": 6,
+      "latency": 120,
+      "download": 204800,
+      "editor": "legacy",
+      "shellReadyMs": 6544,
+      "editorReadyMs": 8310,
+      "initialJavaScript": 677714,
+      "editorJavaScript": 1467518
+    },
+    {
+      "name": "constrained desktop",
+      "width": 1440,
+      "height": 900,
+      "cpuRate": 4,
+      "latency": 80,
+      "download": 256000,
+      "editor": "repository",
+      "shellReadyMs": 4957,
+      "editorReadyMs": 346,
+      "initialJavaScript": 677714,
+      "editorJavaScript": 0
+    },
+    {
+      "name": "constrained mobile",
+      "width": 390,
+      "height": 844,
+      "cpuRate": 6,
+      "latency": 120,
+      "download": 204800,
+      "editor": "repository",
+      "shellReadyMs": 6522,
+      "editorReadyMs": 417,
+      "initialJavaScript": 677714,
+      "editorJavaScript": 0
+    }
+  ],
+  "verification": {
+    "frontend_tests_passed": 752,
+    "authoring_gate_tests_passed": 158,
+    "repository_service_tests": "passed",
+    "browser_profiles_passed": 4,
+    "browser_retries": 0,
+    "frontend_lint_types_build": "passed",
+    "changed_backend_lint_types": "passed"
+  },
+  "limitations": [
+    "One local Docker host with ordinary background services; heavy timing jobs ran sequentially.",
+    "Browser APIs are mocked; server timings use actual Git and PostgreSQL in separate tests.",
+    "No physical-device, sustained-load, cold-cache, Git write/history capacity, maximum-repository, or Core Web Vitals claim.",
+    "Index drift intentionally retains the slower full-snapshot fallback.",
+    "Initial aggregate make invocation failed on combined browser-test timeout; corrected components passed in targeted runs. A final commit-matched aggregate run is still required."
+  ]
+}

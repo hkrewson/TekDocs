@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: ./tests/rehearsals/rehearse-browser-e2e.sh ${{ matrix.project }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: playwright-${{ matrix.project }}-summary
@@ -47,7 +47,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:chromium+firefox+webkit+mobile"
           --output artifacts/security-evidence/browser-security.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: tekdocs-security-evidence-browser-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/browser-security.json
@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - run: ./scripts/bootstrap-env.sh .env
       - run: make test-public-beta-performance
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: public-beta-performance
@@ -85,7 +85,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:dast"
           --output artifacts/security-evidence/dast.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: tekdocs-security-evidence-dast-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/dast.json
@@ -113,7 +113,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:supported-upgrades"
           --output artifacts/security-evidence/upgrade.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: tekdocs-security-evidence-upgrade-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/upgrade.json
@@ -140,7 +140,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:supported-recovery"
           --output artifacts/security-evidence/backup-and-restore.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: tekdocs-security-evidence-backup-and-restore-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/security-evidence/backup-and-restore.json
@@ -163,7 +163,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT:diagram-upgrade+restore"
           --output artifacts/diagram-release-evidence/upgrade-and-restore.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: tekdocs-diagram-evidence-upgrade-and-restore-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/diagram-release-evidence/upgrade-and-restore.json

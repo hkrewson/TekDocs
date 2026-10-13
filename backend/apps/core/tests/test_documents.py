@@ -24,7 +24,7 @@ from django.core.management.base import CommandError
 from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.db.models.deletion import ProtectedError
 from django.test import Client
-from django.test.utils import override_settings
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from docx import Document as WordDocument
@@ -1647,10 +1647,18 @@ def test_revision_history_is_paginated_and_rejects_unbounded_pages(owner_client,
         ).json()
     history_url = reverse("msp-document-revision-list", kwargs={"document_entity_id": record["id"]})
     first = owner_client.get(history_url).json()
-    second = owner_client.get(history_url, {"page": 2, "page_size": 50}).json()
+    with CaptureQueriesContext(connection) as queries:
+        second = owner_client.get(history_url, {"page": 2, "page_size": 50}).json()
     assert (first["count"], first["page"], first["has_more"], len(first["results"])) == (52, 1, True, 50)
     assert first["results"][0]["revision_number"] == 52
     assert [item["revision_number"] for item in second["results"]] == [2, 1]
+    hydrated = [query["sql"] for query in queries
+                if 'FROM "core_blockrevision"' in query["sql"] and 'JOIN "core_blockrevision"' in query["sql"]]
+    assert len(hydrated) == 1
+    assert " OFFSET " not in hydrated[0]
+    assert '"core_blockrevision"."id" IN (' in hydrated[0]
+    assert second["results"][0]["parent_id"] == second["results"][1]["id"]
+    assert second["results"][1]["parent_id"] is None
     assert second["has_more"] is False
     assert owner_client.get(history_url, {"page_size": 101}).status_code == 400
 

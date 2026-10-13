@@ -114,6 +114,10 @@ test('DNS denied, unavailable, failed and empty states retain navigation', async
   await page.goto('/networks?view=dns&dns=dns-999')
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('unavailable')
   await page.keyboard.press('Escape')
+  // Closing restores focus asynchronously. Do not fill behind the departing
+  // modal: WebKit can otherwise deliver no input event and submit an empty query.
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('heading', { level: 1, name: 'DNS', exact: true })).toBeFocused()
   await expect(page.getByRole('button', { name: 'Add zone', exact: true })).toHaveCount(0)
   await page.getByRole('searchbox', { name: 'Search DNS zones' }).fill('missing')
   await page.locator('.collection-search').getByRole('button', { name: 'Search', exact: true }).click()

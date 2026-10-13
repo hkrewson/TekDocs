@@ -42,7 +42,9 @@ copy_secret() {
   value=$(sed -n "s/^${name}=//p" "$source_environment" | head -n 1)
   [ -n "$value" ] || { echo "Repository acceptance could not prepare $name." >&2; exit 1; }
   printf '%s\n' "$value" > "$source_secrets/$target"
-  chmod 0600 "$source_secrets/$target"
+  # The private 0700 parent protects host custody; the individually mounted key
+  # must be readable by TekDocs' unrelated container UID on native Linux.
+  chmod 0444 "$source_secrets/$target"
 }
 
 run_fixture() {
@@ -59,9 +61,9 @@ run_fixture() {
 cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
-    echo "Repository foundation acceptance failed; retained backend diagnostics follow." >&2
-    compose_for "$source_environment" "$source_secrets" logs --no-color --tail 120 backend >&2 || true
-    compose_for "$restore_environment" "$restored_secrets" logs --no-color --tail 120 backend >&2 || true
+    echo "Repository foundation acceptance failed; retained migration/backend diagnostics follow." >&2
+    compose_for "$source_environment" "$source_secrets" logs --no-color --tail 120 migrate backend >&2 || true
+    compose_for "$restore_environment" "$restored_secrets" logs --no-color --tail 120 migrate backend >&2 || true
   fi
   compose_for "$source_environment" "$source_secrets" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   compose_for "$restore_environment" "$restored_secrets" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true

@@ -455,6 +455,7 @@ supported-recovery-rehearsal: test-restore-project
 	./tests/rehearsals/rehearse-supported-recovery.sh
 
 repository-foundation-acceptance:
+	python3 -m unittest discover -s scripts/tests -p test_recovery_secret_capture.py -q
 	./tests/rehearsals/rehearse-repository-foundation.sh
 
 supported-upgrade-matrix:

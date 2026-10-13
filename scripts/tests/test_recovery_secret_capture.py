@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import os
+import stat
 import subprocess
 import sys
 import tarfile
@@ -13,6 +15,24 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class RecoverySecretCaptureTests(unittest.TestCase):
+    def test_recovery_rehearsal_keys_are_readable_through_service_mounts(self) -> None:
+        for filename in ("rehearse-supported-recovery.sh", "rehearse-repository-foundation.sh"):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = (ROOT / "tests/rehearsals" / filename).read_text()
+                function = "copy_secret() {" + source.split("copy_secret() {", 1)[1].split("\n}", 1)[0] + "\n}"
+                environment = root / "fixture.env"
+                environment.write_text("FIXTURE_VALUE=synthetic-test-value\n")
+                keys = root / "keys"
+                keys.mkdir(mode=0o700)
+                subprocess.run(
+                    ["sh", "-c", function + "\ncopy_secret FIXTURE_VALUE fixture"],
+                    env={**os.environ, "source_environment": str(environment), "source_secrets": str(keys)},
+                    capture_output=True, check=True,
+                )
+                self.assertEqual(stat.S_IMODE(keys.stat().st_mode), 0o700)
+                self.assertEqual(stat.S_IMODE((keys / "fixture").stat().st_mode), 0o444)
+
     def test_plaintext_check_handles_option_like_values_and_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="tekdocs-plaintext-test-") as directory:
             artifact = Path(directory) / "artifact"

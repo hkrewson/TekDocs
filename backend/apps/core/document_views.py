@@ -1394,7 +1394,14 @@ def _revision_list(request: Request, workspace: ResolvedWorkspace, document_enti
     records_query = revisions_for_document(document)
     count = records_query.count()
     offset = (page - 1) * page_size
-    records = list(records_query[offset : offset + page_size])
+    # Revision numbers are unique within this exact block. Select a narrow page
+    # using that order before hydrating author/parent details; joining the entire
+    # revision chain before OFFSET makes deep history unnecessarily expensive.
+    ids = list(records_query.select_related(None).order_by("-revision_number").values_list("pk", flat=True)[
+        offset : offset + page_size
+    ])
+    selected = {revision.pk: revision for revision in records_query.filter(pk__in=ids)}
+    records = [selected[pk] for pk in ids if pk in selected]
     current_id = document.active_placements[0].block.current_revision_id
     context = {"current_revision_id": current_id}
     return Response(

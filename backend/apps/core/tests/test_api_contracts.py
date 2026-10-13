@@ -1,4 +1,6 @@
 import secrets
+import tomllib
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -26,12 +28,17 @@ def owner_client(db):
 
 @pytest.mark.django_db
 def test_public_api_root_describes_versioned_conventions(client):
+    # Compare installed runtime metadata with the independently maintained
+    # package source; retain an exact version check without pinning a release.
+    package_metadata = tomllib.loads(
+        (Path(__file__).resolve().parents[3] / "pyproject.toml").read_text(encoding="utf-8")
+    )
     response = client.get(reverse("api-root"))
 
     assert response.status_code == 200
     assert response.json() == {
         "name": "TekDocs API",
-        "version": "0.9.7",
+        "version": package_metadata["project"]["version"],
         "status": "pre-alpha",
         "api_version": "v1",
         "schema_url": "/api/v1/schema/",

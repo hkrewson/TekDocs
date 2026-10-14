@@ -39,6 +39,12 @@ The application is `0.9.0`. Automated workspace, production-image, upgrade, invo
 
 Core-code decomposition under #40 produced the seams needed for the migration: publication, file, template, review, monitored-source, authoring, reuse, key and export contracts are separated behind compatibility exports. Further extraction of the old document aggregate stops where it would only optimize a persistence model scheduled for retirement. Remaining #40 work becomes repository, parser, graph-index and storage-adapter boundaries. Automated security evidence, independent pilots, Wiki reconciliation and final release closure recur against the version 1 candidate.
 
+The 2026-10-12 [architecture deepening backlog](../planning/architecture-deepening-backlog.md)
+adds two unscheduled follow-ons: `TD-BACKLOG-ARCH-001` retained-publication reads
+first, then `TD-BACKLOG-ARCH-002` authority-aware document reads after shared
+semantics are established. Neither expands 0.9.8 acceptance or automatically
+blocks 1.0. Detailed constraints and testable exit criteria live in that brief.
+
 ## Release-line overview
 
 | Stable release | Capability validated |

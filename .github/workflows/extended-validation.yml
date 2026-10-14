@@ -7,12 +7,27 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: extended-validation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  failure-triage:
+    name: Assign validation failure follow-up
+    needs: [browser-matrix, browser-evidence, performance, dast, supported-upgrades, supported-recovery, diagram-upgrade-and-restore-evidence]
+    if: ${{ failure() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Record compact failure inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo 'Owner: TekDocs maintainer. Track each failure in planning/releases/validation-failures.json; see planning/releases/README.md.' >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci_status.py --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+
   browser-matrix:
     name: Browser (${{ matrix.project }})
     runs-on: ubuntu-latest

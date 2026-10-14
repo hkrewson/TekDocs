@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "candidate_commit": "da198027dbfce44f926ffafd518387a84e587431",
+  "completed_at": "2026-10-14T06:07:06Z",
+  "reviewer": {
+    "kind": "automated_or_ai_assisted",
+    "name": "Codex",
+    "version": "Review session 2026-10-14; model build identifier not recorded",
+    "operator": "TekDocs sole maintainer",
+    "method": "Cumulative bounded source passes, final diff review, exact-commit hosted artifacts, read-only per-alert reconciliation and generated-bundle inspection. See hash-bound local report and candidate source records.",
+    "limitations": [
+      "Not an independent human assessment, penetration test, compliance audit or certification; not an exhaustive audit.",
+      "No live provider/SMTP/OIDC or deployed-production configuration assurance. Scoped mocks and source guards are not fault injection at every endpoint.",
+      "282 hosted alerts remain open with documented local dispositions; scanner success does not resolve findings. Unrated cleanup remains maintainer-owned.",
+      "Unperformed manual device/screen-reader/pilot checks remain unverified despite operator acceptance of current state.",
+      "Trusted-role arbitrary SQL and host administrators are outside the claimed boundary; TD-RISK-073 remains approved 1.x work.",
+      "CSP/COEP review deadline is November 12 OR before the next candidate; this record does not extend it. Existing Mailpit exception expires October 24."
+    ]
+  },
+  "private_report_reference": "planning/releases/0.9.8-source-review.md (sha256:4d4962bbb6001a4a9584a5da4daf745470c2f1a02122db40e86a48fdd0fda154)",
+  "evidence": [
+    {
+      "category": "authorization_and_rls",
+      "completed_at": "2026-10-14T05:42:21.742181Z",
+      "immutable_identifier": "38516198438:1:runtime+postgres-shards",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "TekDocs PostgreSQL authorization, IDOR, and forced-RLS suites",
+      "tool_version": "TekDocs 0.9.8"
+    },
+    {
+      "category": "backup_and_restore",
+      "completed_at": "2026-10-14T05:52:26.201048Z",
+      "immutable_identifier": "38516229558:1:supported-recovery",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516229558",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "TekDocs encrypted recovery and repository-foundation acceptance rehearsals",
+      "tool_version": "recovery scripts at da198027dbfce44f926ffafd518387a84e587431"
+    },
+    {
+      "category": "browser_security",
+      "completed_at": "2026-10-14T05:38:53.200669Z",
+      "immutable_identifier": "38516229558:1:chromium+firefox+webkit+mobile",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516229558",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "TekDocs Playwright desktop and mobile browser matrix",
+      "tool_version": "frontend lockfile at da198027dbfce44f926ffafd518387a84e587431"
+    },
+    {
+      "category": "codeql",
+      "completed_at": "2026-10-14T05:28:38.159997Z",
+      "immutable_identifier": "38516198437:1:python+javascript-typescript",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516198437",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "GitHub CodeQL security-extended and security-and-quality",
+      "tool_version": "github/codeql-action@5595ccaf912efad79be6eef63a5619ff05969be3"
+    },
+    {
+      "category": "dast",
+      "completed_at": "2026-10-14T05:29:56.491203Z",
+      "immutable_identifier": "38516229558:1:dast",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516229558",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "OWASP ZAP passive baseline against production-shaped TekDocs",
+      "tool_version": "zaproxy/zap-stable@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
+    },
+    {
+      "category": "dependency_license_secret",
+      "completed_at": "2026-10-14T05:22:47.834526Z",
+      "immutable_identifier": "38516198438:1:security",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "TekDocs locked dependency, license, Bandit, and Gitleaks gate",
+      "tool_version": "repository lockfiles and pinned actions at da198027dbfce44f926ffafd518387a84e587431"
+    },
+    {
+      "category": "image_scan",
+      "completed_at": "2026-10-14T05:49:48.389933Z",
+      "immutable_identifier": "38516198438:1:backend+frontend+renderer+mailpit",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "Trivy production image vulnerability scan",
+      "tool_version": "aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c"
+    },
+    {
+      "category": "production_images_sbom_provenance",
+      "completed_at": "2026-10-14T05:53:37.114066Z",
+      "immutable_identifier": "sha256:a3c7200fc95cf38bc541edcf837bfaf61940b3023d64ba1ae622ec704ab100d0:sha256:6072221263ec0e100c5267864dd494a95645bde41fcc958cdb9897128e72cf1b:sha256:62768ded70cebeea17fc547b263b81e4bbf8beff79638ea31a4249fe8c3ce595",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "GitHub artifact attestations and CycloneDX image SBOMs",
+      "tool_version": "actions/attest@a1948c3f048ba23858d222213b7c278aabede763"
+    },
+    {
+      "schema_version": 1,
+      "category": "source_review",
+      "status": "passed",
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "completed_at": "2026-10-14T06:07:06Z",
+      "tool": "Codex maintainer-directed bounded source and findings review",
+      "tool_version": "Review session 2026-10-14; model build identifier not recorded",
+      "reference": "planning/releases/0.9.8-source-review.md",
+      "immutable_identifier": "sha256:4d4962bbb6001a4a9584a5da4daf745470c2f1a02122db40e86a48fdd0fda154"
+    },
+    {
+      "category": "upgrade",
+      "completed_at": "2026-10-14T05:49:33.774798Z",
+      "immutable_identifier": "38516229558:1:supported-upgrades",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/38516229558",
+      "schema_version": 1,
+      "scope_commit": "da198027dbfce44f926ffafd518387a84e587431",
+      "status": "passed",
+      "tool": "TekDocs supported-minor production upgrade rehearsals",
+      "tool_version": "upgrade matrix at da198027dbfce44f926ffafd518387a84e587431"
+    }
+  ],
+  "findings": [
+    {
+      "id": "TD-SOURCE-DELIVERY-FRESHNESS",
+      "severity": "medium",
+      "title": "Final publication delivery session freshness",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Scoped final delivery requires recent interactive authentication; actor and audience controls retained.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-SVG-REFERENCES",
+      "severity": "medium",
+      "title": "Nonlocal SVG resource references",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Filtered renderer output allows fragment-local references only; unsafe output falls back.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-BEARER-BROWSER",
+      "severity": "medium",
+      "title": "Bearer credentials on browser account routes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Bearer authentication is limited to the API boundary; browser/admin paths reject bearer headers.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-TOKEN-PROFILE",
+      "severity": "medium",
+      "title": "Token-driven browser profile changes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Profile mutation requires browser session and CSRF; tokens cannot substitute.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-TOKEN-HEADER",
+      "severity": "low",
+      "title": "Mixed credential token management",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Token management rejects bearer headers instead of falling back to a browser session.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-OIDC-EGRESS",
+      "severity": "medium",
+      "title": "OIDC requests outside approved egress",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Allauth outbound transport uses bounded approved HTTPS; provider traffic is mocked in tests.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-IMPORT-PARSER",
+      "severity": "low",
+      "title": "Malformed import container and parser handling",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Damaged and duplicate archive entries and CSV parser failures reject safely before staging.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-INTEGRATION-DESTINATION",
+      "severity": "medium",
+      "title": "Credentialed destination change without session freshness",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Changing saved API destination requires recent interactive authentication; ordinary edits preserve prior behavior.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-IMPORT-REJECTION",
+      "severity": "low",
+      "title": "Malformed import identities retained in rejected rows",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Rejected rows use safe labels and prevent batch application.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-INTEGRATION-RESPONSE",
+      "severity": "low",
+      "title": "Provider response lifecycle",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Bounded response cleanup runs on successful and failing provider reads.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-CLEANUP",
+      "severity": "low",
+      "title": "Handled Git init failure obstructed recovery retry",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "New restore destination is registered for cleanup before Git initialization.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-PROJECT",
+      "severity": "medium",
+      "title": "Inherited project name could redirect restore",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Both wrappers bind the explicitly confirmed project; regression uses read-only Compose configuration.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-SECRET-MEMBERS",
+      "severity": "medium",
+      "title": "Incomplete secret archive member validation",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Authenticated archive is structurally validated before extraction or destructive replacement.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-DATABASE-DIAGNOSTICS",
+      "severity": "medium",
+      "title": "Raw database diagnostics in API errors",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Inspected database branches use fixed errors; controlled domain validation remains distinct.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-REMOTE-DOCUMENT-CLEANUP",
+      "severity": "low",
+      "title": "Remote document timeout response cleanup",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Nested finalization closes response and pool even on failed reads.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-MEDIA-MEMBERS",
+      "severity": "medium",
+      "title": "Missing media archive structural preflight",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Links, special entries, unsafe paths, collisions and truncated content reject before volume replacement.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-NETBOX-DIAGNOSTICS",
+      "severity": "medium",
+      "title": "Broad NetBox ValueError disclosure",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Controlled NetBoxReferenceError guidance remains; arbitrary ValueError details are replaced.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-RETAINED-FILE-READ",
+      "severity": "medium",
+      "title": "Unavailable retained file mistaken for empty bytes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Unavailable stream produces conflict; valid empty attachment remains valid.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-SOURCE-CSV-SURPLUS",
+      "severity": "low",
+      "title": "Surplus CSV cells silently lost",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Surplus nonempty or trailing empty cells reject before staging; quoted commas remain valid.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438"
+      ],
+      "retest": "Exact-candidate Build backend/frontend regression suites passed; Extended upgrade/recovery/browser gates passed. Detailed bounded reproductions and test limitations remain in the referenced dated source report."
+    },
+    {
+      "id": "TD-DAST-INLINE-STYLE",
+      "severity": "medium",
+      "title": "Inline-style CSP compatibility allowance",
+      "disposition": "Operator approved October 13; unchanged source and fresh candidate DAST rechecked October 14. Residual style injection risk is not eliminated.",
+      "status": "accepted",
+      "owner": "Maintainer / #38",
+      "acceptance": {
+        "rationale": "Existing layout and generated diagrams require compatibility; retain only for the reviewed candidate, not a permanent waiver.",
+        "mitigation": "Same-origin script CSP, sanitized Markdown and strict diagram rendering remain. Investigate narrower generated-style hashes/nonces under #38; review before any next candidate or November 12, whichever is earlier.",
+        "owner_issue": "#38",
+        "review_at": "2026-11-12T00:00:00Z"
+      }
+    },
+    {
+      "id": "TD-DAST-COEP",
+      "severity": "low",
+      "title": "Cross-Origin-Embedder-Policy absent",
+      "disposition": "Operator approved October 13; fresh DAST confirms omission remains. No cross-origin isolation guarantee is made.",
+      "status": "accepted",
+      "owner": "Maintainer / #38",
+      "acceptance": {
+        "rationale": "A header change requires compatibility checks across OIDC navigation, PDF workers, diagrams, fonts and maintained browsers.",
+        "mitigation": "Retain existing same-origin CSP and frame restrictions, without claiming equivalence to COEP. Review before any next candidate or November 12, whichever is earlier.",
+        "owner_issue": "#38",
+        "review_at": "2026-11-12T00:00:00Z"
+      }
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "TD-MAILPIT-XNET",
+      "scanner": "Trivy; Mailpit-only image scan",
+      "dependency": "pkg:golang/golang.org/x/net@v0.59.0",
+      "advisory": "CVE-2026-78669",
+      "rationale": "Existing TD-RISK-062 and .trivyignore.yaml exception, unchanged and applied only to pinned Mailpit 0b58ee82. Prior source analysis identifies Go 1.27.2 fixed standard-library HTTP/2 path rather than legacy x/net implementation. Hosted scan passed with this policy; no new upstream reachability analysis or renewal claimed.",
+      "owner_issue": "#38",
+      "expires_at": "2026-10-24T00:00:00Z"
+    }
+  ],
+  "public_claims": {
+    "independent_human_security_assessment": false,
+    "penetration_test": false,
+    "compliance_audit": false,
+    "certification": false,
+    "independent_assurance": false,
+    "statement": "TekDocs has not received an independent human security assessment, penetration test, compliance audit, certification, or independent assurance. Automated and AI-assisted checks provide evidence only for their tested scope."
+  }
+}

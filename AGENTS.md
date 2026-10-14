@@ -2,6 +2,8 @@
 
 These instructions apply to the entire repository. More specific instructions in `backend/AGENTS.md` and `frontend/AGENTS.md` add subsystem invariants.
 
+For release status, evidence, CI failures, or operator acceptance, read `planning/releases/README.md` and use the pinned candidate manifest before historical review notes.
+
 ## Before changing code
 
 1. Read `README.md`, these instructions, the relevant subsystem instructions, and the public GitHub Wiki when it is available.

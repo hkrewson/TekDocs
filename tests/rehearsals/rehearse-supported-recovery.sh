@@ -2,6 +2,7 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+python3 "$repository_root/scripts/recovery_preflight.py"
 . "$repository_root/scripts/lib/recovery-secret-capture.sh"
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-supported-recovery.XXXXXX")
 source_environment="$work_directory/source.env"

@@ -6,6 +6,8 @@ DIAGRAM_EVIDENCE_DIRECTORY ?= artifacts/diagram-release-evidence
 DIAGRAM_EVIDENCE_OUTPUT ?= artifacts/diagram-release-evidence.json
 CANDIDATE_COMMIT ?= $(shell git rev-parse HEAD)
 
+.PHONY: release-status recovery-preflight
+
 BACKEND_IMAGE_GATES := check security test-recovery-archive test-repository-recovery test-worker-boundaries test-operations-security test-database-error-security test-network-error-security test-document-error-security \
 	test test-localization test-api-contracts test-api-tokens test-webhooks test-integrations test-imports \
 	test-integration-stabilization test-integration-validation test-integration-security test-provider-security test-monitoring-stabilization \
@@ -87,6 +89,12 @@ external-security-review-gate: automated-security-review-gate
 
 wiki-check:
 	./scripts/check-wiki.py $(if $(WIKI_CHECKOUT),--checkout "$(WIKI_CHECKOUT)")
+
+release-status:
+	python3 scripts/release_status.py --online
+
+recovery-preflight:
+	python3 scripts/recovery_preflight.py
 
 check-renderer-dependency-contract:
 	python3 scripts/check_renderer_dependency_contract.py

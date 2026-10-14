@@ -255,6 +255,11 @@ Remaining pre-1.0 work is tracked in the [version 1 delivery plan](planning/v1-m
 
 ## Development gates
 
+For a compact current-candidate status, run `make release-status`. Release evidence,
+failed-run triage and disposable operator acceptance preparation are described in
+[release operations](planning/releases/README.md). These tools keep the tested
+application commit separate from subsequent evidence-only commits.
+
 Run the fast local gate:
 
 ```bash

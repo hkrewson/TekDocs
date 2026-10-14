@@ -11,6 +11,7 @@ set -eu
 #=======================# VARIABLES #=======================#
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+python3 "$repository_root/scripts/recovery_preflight.py"
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-repository-foundation.XXXXXX")
 source_environment="$work_directory/source.env"
 restore_environment="$work_directory/restore.env"

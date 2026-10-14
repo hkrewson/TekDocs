@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "default_owner": "TekDocs maintainer",
+  "instructions": "Add each observed failing run/job with owner, reproduction command, cause (unknown is explicit), next_action, fix_commit and retest_run. A tracked failure is not a passing gate. Historical results remain in the 0.9.8 candidate record.",
+  "failures": []
+}

@@ -19,7 +19,7 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Isolated Docker PostgreSQL: pytest apps/core/tests/test_network_endpoints.py::test_canonical_host_property -q; passed.",
       "cause": "unknown; CI reported Hypothesis HealthCheck.too_slow after generating four valid address inputs, while the isolated reproduction passed.",
-      "next_action": "The newer hosted run 38616820770 passed core-c. Keep the original failure as historical evidence; if it recurs, inspect runner load and input-generation timing before changing or suppressing the health check.",
+      "next_action": "The newer hosted run 38616820770 passed core-c, but the same failure recurred in run 38626420781. Keep both records open and inspect runner load and input-generation timing before changing or suppressing the health check.",
       "fix_commit": null,
       "retest_run": "38616820770"
     },
@@ -30,6 +30,16 @@
       "reproduction": "CI failed test_profile_rejects_malformed_bearer_even_with_browser_session[bEaReR invalid] in authenticated_owner() during TOTP enrollment. A deterministic isolated Docker test at apps/accounts/tests/test_api_tokens.py::test_totp_enrollment_retries_when_code_window_changes reproduced HTTP 400 before the fix; the isolated accounts shard then passed 176 tests.",
       "cause": "TOTP enrollment generated its code at 18:53:59.972 UTC and submitted it at 18:54:00.006 UTC, across the 30-second TOTP counter boundary. The verifier accepts the current counter only, so the pre-boundary code was stale.",
       "next_action": "Rerun the accounts shard in hosted CI after this fix is committed and pushed; keep this failure open until that hosted retest passes.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "38626420781",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted CI failed apps/core/tests/test_network_endpoints.py::test_canonical_host_property with Hypothesis seed 134995871983709165990371357280350553116. The same targeted command could not run on the local host because pytest is not installed; isolated Docker reproduction is pending.",
+      "cause": "unknown; Hypothesis reported one address strategy draw taking 1.757 seconds and raised HealthCheck.too_slow after six generated inputs. The shard log also shows unusually long setup and test durations, which may indicate runner contention but does not establish the cause.",
+      "next_action": "Reproduce the reported seed in an isolated Docker run and inspect resource timing before changing the test or suppressing HealthCheck.too_slow.",
       "fix_commit": null,
       "retest_run": null
     }

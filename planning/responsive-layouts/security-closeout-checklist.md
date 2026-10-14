@@ -4,6 +4,38 @@ Snapshot: 2026-10-12. Owner: maintainer. Local review is in progress; nothing he
 
 ## Candidate rescan reconciliation — 2026-10-13
 
+### Closeout refresh — 2026-10-14
+
+The operator accepted the current state; this is not a claim that every manual
+profile was executed. Candidate `74e62db` passed Build, both CodeQL languages,
+and the entire Extended workflow. All nine hosted security-category artifacts
+are collected locally. The browser-recovery follow-up changes the candidate,
+so S5/S6 remain open until that exact commit has fresh evidence and source review.
+
+Read-only scanner inspection found 282 open alerts, all observed on
+`74e62dba72a640bce986f2617076acaa10114135`: 7 high, 127 medium, 148 unrated.
+The high-rated source paths are unchanged from the previously reviewed candidate;
+#313 remains the controlled NetBox domain-error branch, and #314 remains the
+test-only lambda. These are scanner classifications, not 282 confirmed exploits.
+No alert was dismissed and no scanner was suppressed.
+
+Reviewed the intervening runtime delta: asset and revision paging retain the
+same scoped query for both ID selection and row hydration; migration 0181's
+named trigger suspension remains transaction-locked with rollback and runtime
+immutability tests; offline restore preflight uses the invoking UID, while
+runtime restore receives only the read-only repository archive, never the
+decrypted-secret directory. The private host directory remains 0700. The new
+router fallback does not change authorization, CSP, cookies, or network policy,
+and never renders the thrown diagnostic or stack.
+
+Hosted DAST on `74e62db` reports 62 PASS, 0 FAIL, 5 WARN, 0 IGNORE: suspicious
+comments, public caching, inline-style CSP, modern application, and missing
+COEP. Rechecked that the documented CSP/COEP compatibility posture is unchanged;
+the existing operator-approved residual-risk dispositions under #38 still apply.
+Their November 12 / next-candidate review boundary remains in force, including
+fresh DAST and generated-bundle checks for the recovery-fix candidate. Passing
+this scan does not close findings or replace the final security record.
+
 ### Approved, time-bounded release exceptions
 
 On 2026-10-13 the sole operator explicitly approved retaining the existing

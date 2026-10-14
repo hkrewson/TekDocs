@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { createBrowserRouter, createMemoryRouter, RouterProvider } from 'react-router'
 import { NavigationGuardProvider } from './NavigationGuardProvider'
+import { ApplicationError } from './ApplicationError'
 
 const ApplicationContent = createContext<ReactNode>(null)
 function Root() {
@@ -12,7 +13,7 @@ export function ApplicationRouter({ children, initialPath }: { children: ReactNo
   const [router, setRouter] = useState<ReturnType<typeof createBrowserRouter> | null>(null)
   useEffect(() => {
     // Create/dispose in the effect so StrictMode cannot leak a history listener.
-    const routes = [{ path: '*', element: <Root /> }]
+    const routes = [{ path: '*', element: <Root />, errorElement: <ApplicationError /> }]
     const next = initialPath ? createMemoryRouter(routes, { initialEntries: [initialPath] }) : createBrowserRouter(routes)
     // Router creation attaches external history listeners; this effect owns their cleanup.
     // eslint-disable-next-line react-hooks/set-state-in-effect

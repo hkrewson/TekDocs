@@ -1,4 +1,12 @@
 {
+  "applicationError.moduleTitle": "Reload TekDocs to continue",
+  "applicationError.moduleHelp": "Part of this page could not be downloaded. TekDocs may have been updated, or your connection may have been interrupted.",
+  "applicationError.title": "This page could not open",
+  "applicationError.help": "An unexpected error prevented this page from opening. You can reload to try again.",
+  "applicationError.unsavedWarning": "Reloading may discard unsaved changes. This screen cannot recover an interrupted draft.",
+  "applicationError.acknowledge": "I understand that reloading may discard unsaved changes.",
+  "applicationError.reload": "Reload TekDocs",
+  "applicationError.persistentHelp": "If reloading does not help, check your connection and report which page failed. You do not need to clear all browser data.",
   "navigation.unsaved.ready": "Ready to leave",
   "navigation.unsaved.finished": "The request finished. Continue leaving this form?",
   "navigation.unsaved.continue": "Continue",

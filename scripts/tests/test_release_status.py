@@ -84,6 +84,14 @@ class ReleaseStatusTests(unittest.TestCase):
             return parsed
 
         def run(endpoint):
+            # Unexpected calls must fail the test, not become a release blocker.
+            self.assertIn(
+                endpoint,
+                {
+                    f"repos/{manifest['repository']}/actions/runs/{run_id}"
+                    for run_id in manifest["workflows"].values()
+                },
+            )
             run_id = int(endpoint.rsplit("/", 1)[1])
             return dict(
                 id=run_id,
@@ -94,6 +102,19 @@ class ReleaseStatusTests(unittest.TestCase):
                 status="completed",
                 conclusion="success",
             )
+
+        with (
+            patch.object(release_status.json, "loads", side_effect=replacement),
+            patch.object(release_status, "gh_json", side_effect=run),
+            # Artifact verification has its own positive/mismatch/expiry tests.
+            patch.object(release_status, "verify_production_evidence") as production,
+        ):
+            self.assertEqual(
+                release_status.inspect(manifest, release_status.ROOT, True)["blockers"],
+                [],
+                "Valid identities must pass before exercising negative cases",
+            )
+            production.assert_called_once()
 
         for identifier in (
             "unrelated-run:999:missing-artifact",
@@ -107,6 +128,7 @@ class ReleaseStatusTests(unittest.TestCase):
                 with (
                     patch.object(release_status.json, "loads", side_effect=replacement),
                     patch.object(release_status, "gh_json", side_effect=run),
+                    patch.object(release_status, "verify_production_evidence"),
                 ):
                     self.assertIn(
                         "security evidence",

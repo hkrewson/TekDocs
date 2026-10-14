@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from allauth.account.internal.flows.login import AUTHENTICATION_METHODS_SESSION_KEY
 from allauth.account.models import EmailAddress
+from allauth.mfa.totp.internal import auth as totp_auth
 from allauth.mfa.totp.internal.auth import TOTP, format_hotp_value, generate_totp_secret, hotp_value
 from django.contrib.auth.hashers import check_password
 from django.core.cache import cache
@@ -56,6 +57,20 @@ def post(client: Client, url: str, payload: dict):  # type: ignore[type-arg,no-u
     )
 
 
+def activate_totp(client: Client, secret: str, *, clock=time.time):  # type: ignore[no-untyped-def]
+    timestamp = clock()
+    period = totp_auth.app_settings.TOTP_PERIOD
+    counter = int(timestamp) // period
+    code = format_hotp_value(hotp_value(secret, counter))
+    response = post(client, TOTP_URL, {"code": code})
+    # A test request can cross the TOTP step after code generation.
+    if response.status_code == 400 and int(clock()) // period > counter:
+        timestamp = clock()
+        code = format_hotp_value(hotp_value(secret, int(timestamp) // period))
+        response = post(client, TOTP_URL, {"code": code})
+    return response
+
+
 def authenticated_owner() -> tuple[object, str, Client]:
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     password = f"{secrets.token_urlsafe(24)}Aa7!"
@@ -70,9 +85,44 @@ def authenticated_owner() -> tuple[object, str, Client]:
     assert post(client, LOGIN_URL, {"email": result.owner.email, "password": password}).status_code == 200
     started = client.get(TOTP_URL)
     secret = parse_qs(urlsplit(started.json()["meta"]["totp_url"]).query)["secret"][0]
-    code = format_hotp_value(hotp_value(secret, int(time.time()) // 30))
-    assert post(client, TOTP_URL, {"code": code}).status_code == 200
+    assert activate_totp(client, secret).status_code == 200
     return result, password, client
+
+
+@pytest.mark.django_db
+def test_totp_enrollment_retries_when_code_window_changes(monkeypatch):  # type: ignore[no-untyped-def]
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    password = f"{secrets.token_urlsafe(24)}Aa7!"
+    result = bootstrap_owner(
+        tenant_name="Example MSP",
+        owner_email="owner@example.com",
+        owner_display_name="Primary Owner",
+        password=password,
+    )
+    client = Client(enforce_csrf_checks=True)
+    client.get(SESSION_URL)
+    assert post(client, LOGIN_URL, {"email": result.owner.email, "password": password}).status_code == 200
+    started = client.get(TOTP_URL)
+    secret = parse_qs(urlsplit(started.json()["meta"]["totp_url"]).query)["secret"][0]
+
+    period = totp_auth.app_settings.TOTP_PERIOD
+    counter = int(time.time()) // period
+    clock_values = iter((counter * period + period - 0.01, (counter + 1) * period + 0.01))
+    latest = [counter * period + period - 0.01]
+
+    def clock() -> float:
+        try:
+            latest[0] = next(clock_values)
+        except StopIteration:
+            pass
+        return latest[0]
+
+    def verifier_counters():
+        yield int(clock()) // period
+
+    monkeypatch.setattr(totp_auth, "yield_hotp_counters_from_time", verifier_counters)
+
+    assert activate_totp(client, secret, clock=clock).status_code == 200
 
 
 def create_client(tenant, name: str) -> Organization:  # type: ignore[no-untyped-def]

@@ -8,8 +8,8 @@
       "job": "PostgreSQL shard (accounts)",
       "owner": "TekDocs maintainer",
       "reproduction": "Isolated Docker PostgreSQL: pytest apps/accounts/tests/test_api_tokens.py::test_read_only_token_cannot_change_account_profile -q; all four parameter combinations passed.",
-      "cause": "unknown; CI failed the [True-service] case during owner TOTP enrollment with HTTP 400, while the isolated reproduction passed.",
-      "next_action": "Keep the failure tracked and rerun the accounts shard in hosted CI. If it recurs, capture the safe TOTP validation response and timing to determine whether enrollment crosses a 30-second code boundary.",
+      "cause": "TOTP enrollment generated a code just before a 30-second counter boundary and submitted it just after. CI logged the enrollment GET at 17:27:29.997 UTC and POST at 17:27:30.014 UTC; a deterministic isolated regression reproduced the HTTP 400 before the helper fix.",
+      "next_action": "Rerun the accounts shard in hosted CI after this fix is committed and pushed; keep this failure open until that hosted retest passes.",
       "fix_commit": null,
       "retest_run": null
     },
@@ -19,7 +19,17 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Isolated Docker PostgreSQL: pytest apps/core/tests/test_network_endpoints.py::test_canonical_host_property -q; passed.",
       "cause": "unknown; CI reported Hypothesis HealthCheck.too_slow after generating four valid address inputs, while the isolated reproduction passed.",
-      "next_action": "Keep the failure tracked and rerun the core-c shard in hosted CI. If the property test fails again, inspect runner load and input-generation timing before changing or suppressing the health check.",
+      "next_action": "The newer hosted run 38616820770 passed core-c. Keep the original failure as historical evidence; if it recurs, inspect runner load and input-generation timing before changing or suppressing the health check.",
+      "fix_commit": null,
+      "retest_run": "38616820770"
+    },
+    {
+      "run_id": "38616820770",
+      "job": "PostgreSQL shard (accounts)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "CI failed test_profile_rejects_malformed_bearer_even_with_browser_session[bEaReR invalid] in authenticated_owner() during TOTP enrollment. A deterministic isolated Docker test at apps/accounts/tests/test_api_tokens.py::test_totp_enrollment_retries_when_code_window_changes reproduced HTTP 400 before the fix; the isolated accounts shard then passed 176 tests.",
+      "cause": "TOTP enrollment generated its code at 18:53:59.972 UTC and submitted it at 18:54:00.006 UTC, across the 30-second TOTP counter boundary. The verifier accepts the current counter only, so the pre-boundary code was stale.",
+      "next_action": "Rerun the accounts shard in hosted CI after this fix is committed and pushed; keep this failure open until that hosted retest passes.",
       "fix_commit": null,
       "retest_run": null
     }

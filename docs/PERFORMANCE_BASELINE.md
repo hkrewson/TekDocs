@@ -113,3 +113,9 @@ Five serial local baseline repetitions passed, with mobile legacy editor readine
 that duration to approximately 3.1 seconds. This confirms download-cost reduction,
 not the root cause of the earlier intermittent hosted timeout. Commit-bound final
 candidate results remain tracked in the release record.
+
+
+The container exports only these value-safe JSON reports with mode 0644 so a
+Linux host uploader can read them. The test exit code is preserved even on failure;
+raw Playwright output is explicitly kept under container `/tmp`. The Docker
+artifact-permission regression is part of `make test-browser-artifact-hygiene`.

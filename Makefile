@@ -347,6 +347,7 @@ test-e2e-all:
 
 test-browser-artifact-hygiene:
 	./tests/rehearsals/test-browser-artifact-hygiene.sh
+	sh ./tests/rehearsals/test-performance-artifact-permissions.sh
 
 test-production-setup:
 	./tests/rehearsals/test-production-setup.sh

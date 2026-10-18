@@ -53,7 +53,9 @@ docker run --rm \
   -v "$performance_artifacts:/app/test-results" \
   -e PLAYWRIGHT_BASE_URL=http://localhost:8080 \
   -e TEKDOCS_PERFORMANCE_REHEARSAL=true \
+  -e "TEKDOCS_PERFORMANCE_REPETITIONS=$repetitions" \
   -e TEKDOCS_PERFORMANCE_DIAGNOSTICS=/app/test-results/diagnostics \
   -e PLAYWRIGHT_SAFE_SUMMARY=/app/test-results/summary.json \
-  "$playwright_image" npx playwright test --config=playwright.compose.config.ts --project=chromium --workers=1 --repeat-each="$repetitions" e2e/performance.spec.ts
+  -e PLAYWRIGHT_OUTPUT_DIR=/tmp/tekdocs-playwright-results \
+  "$playwright_image" sh scripts/run-performance-rehearsal.sh
 echo "Constrained-device browser performance suite passed"

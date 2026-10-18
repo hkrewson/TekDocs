@@ -14,3 +14,12 @@ d0ca059c1273ead353dba83789f5d56329d9ab4e:planning/responsive-layouts/progress.md
 718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1598
 718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1601
 718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1616
+
+# Reviewed source-scan matches: static route metadata, browser preference key,
+# and validation prose. Exact /src path + line fingerprints; no directory exclusions.
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1102
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1485
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1488
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1491
+/src/frontend/src/App.tsx:generic-api-key:189
+/src/planning/responsive-layouts/progress.md:generic-api-key:957

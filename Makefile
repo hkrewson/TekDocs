@@ -359,7 +359,7 @@ security:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend bandit -c pyproject.toml -r apps tekdocs
 	./scripts/frontend-gate.sh audit
 	docker compose run --rm --no-deps --entrypoint node diagram-renderer check-licenses.mjs
-	docker run --rm -v "$(CURDIR):/src:ro" -v /dev/null:/src/.env:ro zricethezav/gitleaks:latest@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f detect --source=/src --no-git --no-banner --redact
+	python3 scripts/scan_source_secrets.py
 	docker build --pull --no-cache --target production -t tekdocs-backend-security ./backend
 	docker build --pull --no-cache --target production -t tekdocs-frontend-security ./frontend
 	docker build --pull --no-cache -t tekdocs-diagram-renderer-security ./renderer

@@ -275,7 +275,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('link', { name: 'MSP members' }).click()
   const technicianRow = page.getByRole('table', { name: 'MSP members' }).getByRole('row').filter({ hasText: 'Live Assigned Technician' })
   await technicianRow.getByRole('combobox', { name: 'Role for Live Assigned Technician' }).selectOption('administrator')
-  await technicianRow.getByRole('button', { name: 'Review change' }).click()
+  await technicianRow.getByRole('button', { name: 'Review role', exact: true }).click()
   await expect(page.getByRole('alertdialog')).toContainText('Change Live Assigned Technician from Read-only to Administrator')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(successStatus(page)).toContainText('Live Assigned Technician’s role was updated')

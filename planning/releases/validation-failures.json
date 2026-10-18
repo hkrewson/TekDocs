@@ -42,6 +42,256 @@
       "next_action": "Reproduce the reported seed in an isolated Docker run and inspect resource timing before changing the test or suppressing HealthCheck.too_slow.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Supported upgrade matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Supported backup and restore",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Dynamic application security test",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Browser (chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Browser (firefox)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Browser (mobile-chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Browser (mobile-webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154668959",
+      "job": "Dependency, license, code, and secret policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Gitleaks 8.24.3 full-history Docker scan reproduced the same eight findings across 579 commits.",
+      "cause": "Full-history dispatch scanned historical route permission metadata and a validation-prose line. Each exact commit/path/line was inspected and contains no credential.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39154668959",
+      "job": "Chromium regression",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39154668959",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39154668959",
+      "job": "Diagram authoring, failures, and exports",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39154668959",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted test_canonical_host_property failed Hypothesis generation health check. Full local core-c passed; focused Docker replay with reported seed 256410302584671052071762764188812004718 passed without changes.",
+      "cause": "unknown; hosted input generation exceeded the Hypothesis health-check budget, not a canonical_host assertion failure.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": null,
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Public-beta performance reference",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker build --pull --no-cache -t tekdocs-renderer-candidate renderer failed with the same Chromium version assertion.",
+      "cause": "Alpine now supplies Chromium 155.0.8059.39; the renderer requires reviewed series 152. The image fails before application tests execute.",
+      "next_action": "Advance reviewed series to 155 without weakening the guard; run complete diagram, production-image and browser gates and rerun hosted extended validation.",
+      "fix_commit": "ba607b17a2ba46938b1fd53d151ec190bcccb764",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39156446886",
+      "job": "Frontend code and tests",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Coverage-enabled focused ApplicationError suite reproduced heading-present/body-focus failure on repetition 12. Diagnostic replay recorded zero focus calls at heading discovery and one successful focus call after the passive effect.",
+      "cause": "Test synchronization race: findByRole can resolve after the route heading mounts but before its passive focus effect runs.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "c80eadbbf03a401eaefecf5f65acbf1a55338f9c",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "39156449403",
+      "job": "Browser (chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All three hosted desktops failed six account-layout cases at New token and the owner policy journey at Review change. Local full browser run reproduced layout failures; isolated Docker two-case replay reproduced both exact missing-control failures.",
+      "cause": "Account fixture omitted required workspace_scope=tenant, hiding token management; role journey still selected Review change after role and scope actions gained distinct accessible labels.",
+      "next_action": "Supply current fixture scope and select exact Review role action; retain policy and accessibility assertions. Rerun seven cases on all desktop engines, then complete browser matrix.",
+      "fix_commit": "c80eadbbf03a401eaefecf5f65acbf1a55338f9c",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39156449403",
+      "job": "Browser (firefox)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All three hosted desktops failed six account-layout cases at New token and the owner policy journey at Review change. Local full browser run reproduced layout failures; isolated Docker two-case replay reproduced both exact missing-control failures.",
+      "cause": "Account fixture omitted required workspace_scope=tenant, hiding token management; role journey still selected Review change after role and scope actions gained distinct accessible labels.",
+      "next_action": "Supply current fixture scope and select exact Review role action; retain policy and accessibility assertions. Rerun seven cases on all desktop engines, then complete browser matrix.",
+      "fix_commit": "c80eadbbf03a401eaefecf5f65acbf1a55338f9c",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39156449403",
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All three hosted desktops failed six account-layout cases at New token and the owner policy journey at Review change. Local full browser run reproduced layout failures; isolated Docker two-case replay reproduced both exact missing-control failures.",
+      "cause": "Account fixture omitted required workspace_scope=tenant, hiding token management; role journey still selected Review change after role and scope actions gained distinct accessible labels.",
+      "next_action": "Supply current fixture scope and select exact Review role action; retain policy and accessibility assertions. Rerun seven cases on all desktop engines, then complete browser matrix.",
+      "fix_commit": "c80eadbbf03a401eaefecf5f65acbf1a55338f9c",
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39154673863",
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "ci_status.py returns nonzero when the run contains failures or has not completed; the workflow writes that summary before exiting.",
+      "cause": "Intentional nonzero failure-summary result for the failed Extended run; no additional application defect indicated.",
+      "next_action": "Resolve the individually recorded failures; final Extended run should pass without invoking failure triage.",
+      "fix_commit": null,
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39156449403",
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "ci_status.py returns nonzero when the run contains failures or has not completed; the workflow writes that summary before exiting.",
+      "cause": "Intentional nonzero failure-summary result for the failed Extended run; no additional application defect indicated.",
+      "next_action": "Resolve the individually recorded failures; final Extended run should pass without invoking failure triage.",
+      "fix_commit": null,
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "local-c80eadb-six-workers",
+      "job": "Full Docker browser matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Resumed full matrix: 1163 passed, 12 skipped, 33 failed, including Firefox timeouts/crashes and WebKit worker SIGKILL. Docker kernel recorded browser-container global OOM kill at 2026-10-18T19:29:21Z.",
+      "cause": "Confirmed local resource exhaustion for worker kill; attribution of all other assertions remains unverified.",
+      "next_action": "Retest passed: identical full isolated matrix with two workers completed 1196 passed and 12 expected performance skips; artifact hygiene passed. No assertion, timeout or test-selection changes.",
+      "fix_commit": null,
+      "retest_run": "local-c80eadb-two-workers"
+    },
+    {
+      "run_id": "39158325009",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Isolated local rehearse-live-workspace-e2e.sh reproduced the exact 15-second timeout at technicianRow Review change after real bootstrap, MFA, invitation and client-access changes.",
+      "cause": "Live test retained obsolete Review change label for the member-role action, now named Review role.",
+      "next_action": "Final-candidate Build 39160355564 passed completely for 0af1bdc, including this job. Retain original failure/reproduction/cause; do not relabel failed runs.",
+      "fix_commit": "0af1bdc4d610a80ff22c2832864894661411d0cb",
+      "retest_run": "39160355564"
+    },
+    {
+      "run_id": "local-0af1bdc-release-gate",
+      "job": "client-portal-upgrade-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Resumed make release-gate passed production image, clean install and baseline upgrade, then exited before migration: Client-portal upgrade expected current version 0.5.2, found 0.9.8.",
+      "cause": "Aggregate release-gate still includes historical release-specific scripts with hard-coded destination versions. Client portal requires 0.5.2; other historical targets also restrict destinations.",
+      "next_action": "Keep aggregate gate explicitly blocked; final-candidate hosted Supported upgrade matrix, Supported backup and restore, diagram upgrade/recovery and production-image jobs must confirm supported current paths. Align aggregate composition in a separate reviewed tooling change; do not weaken historical assertions or claim all local gates passed.",
+      "fix_commit": null,
+      "retest_run": "39161339120"
+    },
+    {
+      "run_id": "39161339120",
+      "job": "Public-beta performance reference",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted job 117775118038: constrained-mobile legacy editor editable element absent after 12000 ms. Desktop passed; two repository profiles did not run. Unchanged local Docker replay passed all four cases in 39.2 seconds; mobile editor 8226 ms. Hosted symptom not locally reproduced.",
+      "cause": "unknown",
+      "next_action": "Retain value-safe hosted loading/error/timing diagnostics, then reproduce and distinguish initialization delay from runner contention. No assertion/limit change, fix, or hosted retry into a pass. Existing harness did not retain performance artifacts.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "39161339120",
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Job 117784405105 returned nonzero when ci_status.py summarized the failed Extended workflow.",
+      "cause": "Intentional failure summary after performance failure; no independent application defect established.",
+      "next_action": "Resolve recorded performance failure before claiming complete Extended validation.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

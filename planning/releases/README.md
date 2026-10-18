@@ -5,6 +5,15 @@ start here. Historical review narratives are supporting evidence, not the live
 work queue. `.github/release-candidate.json` names the application candidate;
 the checkout's HEAD may be a later evidence/tooling commit.
 
+## Active access-fix candidate
+
+The assigned-organization follow-up is tracked in
+[0.9.8 access candidate validation](0.9.8-access-candidate-validation.md), with
+its exact application commit, hosted runs, reproduced fixes and remaining gates.
+The pinned manifest still describes the earlier accepted candidate; it must not
+be used as evidence for this changed application. Promotion remains pending the
+new candidate's release closeout.
+
 ## Status and evidence
 
 1. Run `make release-status`. This performs read-only GitHub checks for the three

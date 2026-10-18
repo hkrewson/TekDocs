@@ -206,7 +206,7 @@ test('owner reviews role, client access-mode, and staff-assignment changes throu
   await expect(page.getByRole('heading', { name: 'Access control' })).toBeVisible()
 
   await page.getByRole('combobox', { name: 'Role for Morgan Ellis' }).selectOption('technician')
-  await page.getByRole('button', { name: 'Review change' }).first().click()
+  await page.getByRole('button', { name: 'Review role', exact: true }).click()
   await expect(page.getByRole('alertdialog')).toContainText('Change Morgan Ellis from Read-only to Technician')
   await page.getByRole('button', { name: 'Confirm change' }).click()
   await expect(page.getByRole('status')).toContainText('Morgan Ellis’s role was updated')

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, expect, test, vi } from 'vitest'
@@ -22,7 +22,8 @@ test.each([
 ])('module failure offers explicit recovery: %s', async message => {
   failRoute(new TypeError(message))
   const heading = await screen.findByRole('heading', { name: 'Reload TekDocs to continue' })
-  expect(heading).toHaveFocus()
+  // Route rendering can expose the heading before its passive focus effect runs.
+  await waitFor(() => expect(heading).toHaveFocus())
   expect(screen.queryByText(message)).not.toBeInTheDocument()
   const button = screen.getByRole('button', { name: 'Reload TekDocs' })
   expect(button).toBeDisabled()

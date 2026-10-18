@@ -21,7 +21,7 @@ async function fixtures(page: Page) {
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (route) => route.fulfill({ json: {
-    user: members[0], tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', surface: 'msp', organization: null, mfa_enrollment_required: false,
+    user: members[0], tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', surface: 'msp', workspace_scope: 'tenant', organization: null, mfa_enrollment_required: false,
     permissions: ['staff_invitations.view', 'memberships.view', 'memberships.assign_role', 'organizations.manage_access', 'organizations.assign_staff', 'integrations.manage'],
   } }))
   await page.route('**/_allauth/browser/v1/auth/sessions', (route) => route.fulfill({ json: { data: [

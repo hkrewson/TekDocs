@@ -3,3 +3,14 @@
 
 # Browser-local navigation preference key in historical commit 7a53d3 is not a credential.
 7a53d3a59c975723b63942d030f22f7aa46bec92:frontend/src/App.tsx:generic-api-key:186
+
+# Reviewed 2026-10-18: exact historical route metadata and validation prose.
+# Full-history workflow_dispatch reproduced all eight; none is a credential.
+d8770124ad22b8ab1e645956995a9cef389830c6:backend/apps/core/permission_inventory.py:generic-api-key:1455
+45ec9c9d6443b5e48b7f52b9f624a0af8ea27bd8:backend/apps/core/permission_inventory.py:generic-api-key:1451
+e1d31d1881c8104abdf5d41c3581b8acac2e32ac:backend/apps/core/permission_inventory.py:generic-api-key:1447
+4419a0df342132aaad45af24c38c7db52c5d5f5a:backend/apps/core/permission_inventory.py:generic-api-key:983
+d0ca059c1273ead353dba83789f5d56329d9ab4e:planning/responsive-layouts/progress.md:generic-api-key:577
+718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1598
+718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1601
+718d38f313e5b83efd7ab2cafd7027a717061a00:backend/apps/core/permission_inventory.py:generic-api-key:1616

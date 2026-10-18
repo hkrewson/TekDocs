@@ -13,7 +13,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import Invitation, InvitationState, TenantMembership, User
+from apps.accounts.models import (
+    Invitation,
+    InvitationState,
+    MembershipWorkspaceScope,
+    TenantMembership,
+    User,
+)
 from apps.core.models import AuditEvent, InstallationState
 
 SESSION_URL = "/_allauth/browser/v1/auth/session"
@@ -32,12 +38,16 @@ def installation(db):
     return result
 
 
-def issue_token(installation) -> tuple[Invitation, str]:  # type: ignore[no-untyped-def]
+def issue_token(
+    installation,
+    *,
+    workspace_scope: MembershipWorkspaceScope = MembershipWorkspaceScope.TENANT,
+) -> tuple[Invitation, str]:  # type: ignore[no-untyped-def]
     owner_client = Client()
     owner_client.force_login(installation.owner)
     response = owner_client.post(
         reverse("invitation-list-create"),
-        {"email": "invitee@example.com"},
+        {"email": "invitee@example.com", "workspace_scope": workspace_scope},
         content_type="application/json",
     )
     assert response.status_code == 201
@@ -76,6 +86,7 @@ def test_invitation_acceptance_creates_verified_member_and_session(installation)
     user = User.objects.get(email="invitee@example.com")
     payload = response.json()
     assert payload["role"] == "read_only"
+    assert payload["workspace_scope"] == MembershipWorkspaceScope.TENANT
     assert "people.view" in payload["permissions"]
     assert "people.create" not in payload["permissions"]
     assert {key: payload[key] for key in ("user", "tenant")} == {
@@ -99,6 +110,25 @@ def test_invitation_acceptance_creates_verified_member_and_session(installation)
     assert token not in str(response.json())
     assert token not in str(event.metadata)
     assert client.get(reverse("invitation-list-create")).status_code == 403
+
+
+@pytest.mark.django_db
+def test_assigned_workspace_scope_is_preserved_when_staff_invitation_is_accepted(installation):
+    invitation, token = issue_token(
+        installation,
+        workspace_scope=MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS,
+    )
+    client, csrf = acceptance_client()
+
+    response = accept(client, csrf, token)
+
+    assert response.status_code == 200
+    assert response.json()["workspace_scope"] == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    membership = TenantMembership.objects.get(user__email="invitee@example.com")
+    assert membership.workspace_scope == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    assert client.get(reverse("workspace-msp")).status_code == 403
+    invitation.refresh_from_db()
+    assert invitation.state == InvitationState.ACCEPTED
 
 
 @pytest.mark.django_db

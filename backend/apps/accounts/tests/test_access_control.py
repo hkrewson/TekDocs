@@ -8,7 +8,13 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.accounts.models import BuiltInRole, OrganizationAccessAssignment, TenantMembership, User
+from apps.accounts.models import (
+    BuiltInRole,
+    MembershipWorkspaceScope,
+    OrganizationAccessAssignment,
+    TenantMembership,
+    User,
+)
 from apps.accounts.policy import PERMISSION_CATALOG, ROLE_DEFINITIONS, PermissionKey
 from apps.core.models import (
     AuditEvent,
@@ -271,6 +277,60 @@ def test_assigned_only_boundaries_cover_msp_entity_search_mentions_and_record_ty
 
 
 @pytest.mark.django_db
+def test_assigned_workspace_scope_denies_msp_and_requires_assignments_even_for_open_clients(
+    owner_client,
+    installation,
+):
+    assigned = organization(installation.tenant, "Assigned Workspace Client")
+    unassigned = organization(installation.tenant, "Unassigned Workspace Client")
+    _reader, membership, reader_client = member(installation, role=BuiltInRole.READ_ONLY)
+    membership.workspace_scope = MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    membership.save(update_fields=("workspace_scope",))
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant,
+        organization=assigned,
+        membership=membership,
+        created_by=installation.owner,
+    )
+
+    search = reader_client.get(reverse("workspace-organization-search"))
+    msp = reader_client.get(reverse("workspace-msp"))
+    msp_documents = reader_client.get(reverse("msp-content-documents"))
+    assigned_workspace = reader_client.get(
+        reverse("workspace-organization", kwargs={"entity_id": assigned.entity_id})
+    )
+    unassigned_workspace = reader_client.get(
+        reverse("workspace-organization", kwargs={"entity_id": unassigned.entity_id})
+    )
+
+    assert search.status_code == 200
+    assert [row["name"] for row in search.json()["results"]] == ["Assigned Workspace Client"]
+    assert msp.status_code == 403
+    assert msp_documents.status_code == 403
+    assert assigned_workspace.status_code == 200
+    assert unassigned_workspace.status_code == 404
+    assert owner_client.get(reverse("workspace-msp")).status_code == 200
+
+
+@pytest.mark.django_db
+def test_owner_can_change_member_workspace_scope_with_mfa_and_audit_value_free(owner_client, installation):
+    target, membership, _ = member(installation, role=BuiltInRole.READ_ONLY)
+    url = reverse("access-control-member-workspace-scope", kwargs={"user_id": target.id})
+
+    changed = owner_client.patch(
+        url,
+        {"workspace_scope": MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS},
+        content_type="application/json",
+    )
+
+    assert changed.status_code == 200
+    assert changed.json()["workspace_scope"] == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    membership.refresh_from_db()
+    assert membership.workspace_scope == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    assert AuditEvent.objects.get(action="membership.workspace_scope_changed", entity_id=target.id).metadata == {}
+
+
+@pytest.mark.django_db
 def test_explicit_staff_assignment_unlocks_only_the_assigned_organization_without_granting_permissions(
     owner_client,
     installation,
@@ -458,3 +518,53 @@ def test_guessed_membership_identifiers_remain_non_disclosing(owner_client):
     )
     assert response.status_code == 404
     assert "email" not in str(response.content).lower()
+
+
+@pytest.mark.django_db
+def test_restricted_membership_scope_cannot_be_changed_by_self_or_foreign_members(owner_client, installation):
+    reader, membership, reader_client = member(installation, role=BuiltInRole.READ_ONLY)
+    payload = {"workspace_scope": "assigned_organizations"}
+    url = reverse("access-control-member-workspace-scope", kwargs={"user_id": reader.id})
+    assert reader_client.patch(url, payload, content_type="application/json").status_code == 403
+    foreign = Tenant.objects.create(name="Foreign scope", slug="foreign-scope")
+    foreign_user = User.objects.create_user(email="foreign-scope@example.invalid", display_name="Foreign")
+    TenantMembership.objects.create(tenant=foreign, user=foreign_user, role=BuiltInRole.READ_ONLY)
+    foreign_url = reverse("access-control-member-workspace-scope", kwargs={"user_id": foreign_user.id})
+    assert owner_client.patch(foreign_url, payload, content_type="application/json").status_code == 404
+    installation.owner.authenticator_set.filter(type="totp").delete()
+    assert owner_client.patch(url, payload, content_type="application/json").status_code == 403
+    membership.refresh_from_db()
+    assert membership.workspace_scope == MembershipWorkspaceScope.TENANT
+
+
+@pytest.mark.django_db
+def test_restricted_scope_requires_assignment_for_archived_organizations_and_revokes_immediately(installation):
+    from django.utils import timezone
+
+    from apps.accounts.policy import (
+        context_has_archived_organization_permission,
+        context_has_permission,
+        require_installation_member,
+    )
+
+    reader, membership, _client = member(installation, role=BuiltInRole.READ_ONLY)
+    membership.workspace_scope = MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+    membership.save(update_fields=("workspace_scope",))
+    assigned = organization(installation.tenant, "Archived assigned")
+    unassigned = organization(installation.tenant, "Archived unassigned")
+    assignment = OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant, organization=assigned, membership=membership, created_by=installation.owner,
+    )
+    context = require_installation_member(reader)
+    assert context_has_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=assigned)
+    for record in (assigned, unassigned):
+        record.entity.archived_at = timezone.now()
+        record.entity.save(update_fields=("archived_at",))
+    assert context_has_archived_organization_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=assigned)
+    assert not context_has_archived_organization_permission(
+        context, PermissionKey.DOCUMENTS_VIEW, organization=unassigned,
+    )
+    assignment.delete()
+    assert not context_has_archived_organization_permission(
+        context, PermissionKey.DOCUMENTS_VIEW, organization=assigned,
+    )

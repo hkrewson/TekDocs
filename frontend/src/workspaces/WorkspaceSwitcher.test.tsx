@@ -25,10 +25,10 @@ function Location() {
   return <output aria-label="Current route">{useLocation().pathname}</output>
 }
 
-function renderSwitcher(client: WorkspaceClient) {
+function renderSwitcher(client: WorkspaceClient, workspaceRestricted = false) {
   return render(
-    <MemoryRouter initialEntries={[`/workspaces/organizations/${acme.id}/documentation`]}>
-      <WorkspaceSwitcher tenant={{ id: 'tenant', name: 'Example MSP' }} activeWorkspace={acme} activeArea="documentation" client={client} collapsed={false} workspaceLoading={false} onNavigate={() => undefined} />
+    <MemoryRouter initialEntries={[workspaceRestricted ? '/overview' : `/workspaces/organizations/${acme.id}/documentation`]}>
+      <WorkspaceSwitcher tenant={{ id: 'tenant', name: 'Example MSP' }} activeWorkspace={workspaceRestricted ? null : acme} activeArea="documentation" client={client} collapsed={false} workspaceRestricted={workspaceRestricted} workspaceLoading={false} onNavigate={() => undefined} />
       <Location />
     </MemoryRouter>,
   )
@@ -43,7 +43,8 @@ describe('WorkspaceSwitcher', () => {
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
     const search = screen.getByRole('textbox', { name: 'Find a client' })
     await user.type(search, 'north')
-    expect(await screen.findByRole('button', { name: 'Northwind Clinic. Client · Vendor' })).toBeInTheDocument()
+    const option = await screen.findByRole('button', { name: 'Northwind Clinic. Client · Vendor' })
+    expect(option).toBeInTheDocument()
     await waitFor(() => expect(searchOrganizations).toHaveBeenLastCalledWith('north', 1, expect.any(AbortSignal), 'client'))
     await user.click(screen.getByRole('button', { name: 'Northwind Clinic. Client · Vendor' }))
 
@@ -65,6 +66,20 @@ describe('WorkspaceSwitcher', () => {
     await user.click(screen.getByRole('button', { name: /Current workspace: Acme Dental/ }))
     await user.click(screen.getByRole('button', { name: 'Back to Example MSP. MSP workspace' }))
     expect(screen.getByRole('status', { name: 'Current route' })).toHaveTextContent('/documentation')
+  })
+
+  it('omits the MSP workspace for members limited to assigned organizations', async () => {
+    const user = userEvent.setup()
+    const searchOrganizations = vi.fn().mockResolvedValue({ results: [northwind], page: 1, page_size: 15, has_more: false })
+    renderSwitcher({ searchOrganizations } as unknown as WorkspaceClient, true)
+
+    await user.click(screen.getByRole('button', { name: /Choose an assigned workspace/ }))
+    expect(screen.queryByRole('button', { name: /MSP workspace/ })).not.toBeInTheDocument()
+    const option = await screen.findByRole('button', { name: 'Northwind Clinic. Client · Vendor' })
+    expect(option).toBeInTheDocument()
+    await user.click(screen.getByRole('textbox', { name: 'Find an organization' }))
+    await user.keyboard('{ArrowDown}')
+    expect(option).toHaveFocus()
   })
 
   it('shows safe loading, empty, and denial states', async () => {

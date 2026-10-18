@@ -14,6 +14,7 @@ from .access_collections import (
 from .access_control import (
     access_mode_organizations,
     assign_membership_role,
+    assign_membership_workspace_scope,
     assign_organization_staff,
     change_organization_access_mode,
     members_for_context,
@@ -28,6 +29,7 @@ from .access_serializers import (
     CustomRoleUpdateSerializer,
     MemberRoleWriteSerializer,
     MemberSerializer,
+    MemberWorkspaceScopeWriteSerializer,
     OrganizationAccessSerializer,
     OrganizationAccessWriteSerializer,
     OrganizationStaffWriteSerializer,
@@ -43,7 +45,7 @@ from .custom_roles import (
     scoped_assignments_for_context,
     update_custom_role,
 )
-from .models import BuiltInRole, CustomRoleScope
+from .models import BuiltInRole, CustomRoleScope, MembershipWorkspaceScope
 from .policy import (
     PermissionKey,
     custom_assignable_permission_catalog,
@@ -221,6 +223,41 @@ class MemberRoleView(APIView):
                     "display_name": membership.user.display_name,
                     "email": membership.user.email,
                     "role": membership.role,
+                    "workspace_scope": membership.workspace_scope,
+                    "is_owner": False,
+                    "joined_at": membership.created_at,
+                }
+            ).data
+        )
+
+
+class MemberWorkspaceScopeView(APIView):
+    @extend_schema(
+        request=MemberWorkspaceScopeWriteSerializer,
+        responses={
+            200: MemberSerializer,
+            400: OpenApiResponse(description="Invalid workspace access scope"),
+            403: OpenApiResponse(description="Workspace access administration permission and MFA required"),
+            404: OpenApiResponse(description="Tenant member not found"),
+        },
+    )
+    def patch(self, request, user_id):  # type: ignore[no-untyped-def]
+        require_permission(request.user, PermissionKey.MEMBERSHIPS_ASSIGN_ROLE)
+        serializer = MemberWorkspaceScopeWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = assign_membership_workspace_scope(
+            actor=request.user,
+            member_user_id=user_id,
+            workspace_scope=MembershipWorkspaceScope(serializer.validated_data["workspace_scope"]),
+        )
+        return Response(
+            MemberSerializer(
+                {
+                    "id": membership.user_id,
+                    "display_name": membership.user.display_name,
+                    "email": membership.user.email,
+                    "role": membership.role,
+                    "workspace_scope": membership.workspace_scope,
                     "is_owner": False,
                     "joined_at": membership.created_at,
                 }

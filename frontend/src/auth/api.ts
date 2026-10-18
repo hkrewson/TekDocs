@@ -9,6 +9,7 @@ export type AuthenticatedContext = {
     name: string
   }
   role: 'owner' | 'administrator' | 'technician' | 'contributor' | 'read_only' | 'client_administrator' | 'client_user'
+  workspace_scope: 'tenant' | 'assigned_organizations'
   permissions: string[]
   surface: 'msp' | 'client_portal'
   organization: { id: string; name: string } | null

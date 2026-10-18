@@ -10,12 +10,12 @@ describe('staff administration API', () => {
   it('issues an invitation through a same-origin CSRF request', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'invitation' }), { status: 201 }))
 
-    await browserStaffAdministrationClient.issue('new@example.com')
+    await browserStaffAdministrationClient.issue('new@example.com', 'tenant')
 
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/invitations', expect.objectContaining({
       method: 'POST',
       credentials: 'same-origin',
-      body: JSON.stringify({ email: 'new@example.com' }),
+      body: JSON.stringify({ email: 'new@example.com', workspace_scope: 'tenant' }),
     }))
     const request = fetchMock.mock.calls[0][1] as RequestInit
     expect(request.headers).toMatchObject({ 'X-CSRFToken': 'staff-csrf' })

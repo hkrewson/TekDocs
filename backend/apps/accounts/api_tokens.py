@@ -71,7 +71,7 @@ def require_token_management_browser_session(request) -> InstallationMemberConte
     ):
         raise PermissionDenied("API tokens cannot manage API tokens.")
     context = require_installation_member(request.user)
-    if context.surface != "msp":
+    if context.surface != "msp" or context.workspace_scope.value != "tenant":
         raise PermissionDenied("API tokens are available only to MSP staff.")
     return context
 

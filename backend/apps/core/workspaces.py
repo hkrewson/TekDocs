@@ -6,7 +6,7 @@ from uuid import UUID
 from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404
 
-from apps.accounts.models import User
+from apps.accounts.models import MembershipWorkspaceScope, User
 from apps.accounts.policy import (
     InstallationMemberContext,
     PermissionKey,
@@ -168,8 +168,12 @@ def search_organization_workspaces(
     page: int,
     page_size: int,
 ) -> tuple[list[dict[str, object]], bool]:
-    member = require_permission(user, PermissionKey.ORGANIZATIONS_VIEW)
-    organizations = active_organizations_for_member(member)
+    member = require_installation_member(user)
+    if member.workspace_scope != MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS:
+        require_permission(user, PermissionKey.ORGANIZATIONS_VIEW)
+    organizations = accessible_organizations(member, PermissionKey.ORGANIZATIONS_VIEW).select_related(
+        "entity", "tenant"
+    ).prefetch_related("classifications")
     if classification:
         organizations = organizations.filter(classifications__kind=classification)
     if query:

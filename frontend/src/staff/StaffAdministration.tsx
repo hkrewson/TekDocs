@@ -7,6 +7,7 @@ import { FilterMenu } from '../FilterMenu'
 import { formatDateTime, translate } from '../i18n/localization'
 import { AuthRequestError } from '../auth/api'
 import type { Member } from '../access-control/api'
+import type { MembershipWorkspaceScope } from '../access-control/api'
 import type { StaffAdministrationClient, StaffInvitation } from './api'
 import { RecordSections } from '../records/RecordNavigation'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
@@ -43,6 +44,7 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
   const [members, setMembers] = useState<Member[] | null>(null)
   const [invitations, setInvitations] = useState<StaffInvitation[] | null>(null)
   const [email, setEmail] = useState('')
+  const [workspaceScope, setWorkspaceScope] = useState<MembershipWorkspaceScope>('tenant')
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [working, setWorking] = useState(false)
   const [closingAfterSave, setClosingAfterSave] = useState(false)
@@ -57,7 +59,7 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
     setParameters(next)
   }
   const closeInvitation = () => updateParameters({ invite: null })
-  useUnsavedChanges(inviting && Boolean(email.trim()) && !closingAfterSave, working && !closingAfterSave, () => setEmail(''), inviting && !closingAfterSave)
+  useUnsavedChanges(inviting && (Boolean(email.trim()) || workspaceScope !== 'tenant') && !closingAfterSave, working && !closingAfterSave, () => { setEmail(''); setWorkspaceScope('tenant') }, inviting && !closingAfterSave)
   useEffect(() => {
     if (!inviting) return
     const overflow = document.body.style.overflow
@@ -101,9 +103,10 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
     setNotice(null)
     setWorking(true)
     try {
-      const created = await client.issue(submittedEmail)
+      const created = await client.issue(submittedEmail, workspaceScope)
       setInvitations((current) => [created, ...(current ?? []).filter((item) => item.id !== created.id)])
       setEmail('')
+      setWorkspaceScope('tenant')
       setClosingAfterSave(true)
       window.setTimeout(() => { closeInvitation(); setClosingAfterSave(false) }, 50)
       setNotice(translate('staff.invitationSent', { email: created.email }))
@@ -168,11 +171,11 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
         {invitations === null ? <p role="status" className="settings-state">{translate('staff.loadingHistory')}</p> : filteredInvitations.length === 0 ? <p className="settings-state">{translate('staff.noMatchingInvitations')}</p> : <><ul className="staff-invitation-list" aria-label={translate('staff.invitationTable')}>{invitationPage.map((invitation) => {
           const state = effectiveState(invitation)
           const actionable = invitation.state === 'pending' && state !== 'expired'
-          return <li key={invitation.id}><div className="staff-invitation-identity"><strong>{invitation.email}</strong><small>{translate('staff.initialRole')}</small></div><span className={`invitation-state ${state}`}>{stateLabel(invitation)}</span><dl><div><dt>{translate('staff.sent')}</dt><dd>{invitation.last_sent_at ? <time dateTime={invitation.last_sent_at}>{formatDateTime(invitation.last_sent_at)}</time> : translate('staff.notDelivered')}</dd></div><div><dt>{translate('staff.expires')}</dt><dd><time dateTime={invitation.expires_at}>{formatDateTime(invitation.expires_at)}</time></dd></div><div><dt>{translate('staff.attempts')}</dt><dd>{invitation.delivery_attempts}</dd></div></dl><div className="table-actions">{actionable && <><button type="button" className="secondary-button" onClick={() => setPending({ kind: 'resend', invitation })}>{translate('staff.resend')}</button><button type="button" className="secondary-button danger-button" onClick={() => setPending({ kind: 'revoke', invitation })}>{translate('staff.revoke')}</button></>}{state === 'expired' && <button type="button" className="secondary-button" onClick={() => { setClosingAfterSave(false); setEmail(invitation.email); updateParameters({ invite: 1 }) }}>{translate('staff.inviteAgain')}</button>}</div></li>
+          return <li key={invitation.id}><div className="staff-invitation-identity"><strong>{invitation.email}</strong><small>{translate('staff.readOnlyScope', { scope: invitation.workspace_scope === 'assigned_organizations' ? translate('accessControl.assignedWorkspacesOnly') : translate('accessControl.allWorkspaces') })}</small></div><span className={`invitation-state ${state}`}>{stateLabel(invitation)}</span><dl><div><dt>{translate('staff.sent')}</dt><dd>{invitation.last_sent_at ? <time dateTime={invitation.last_sent_at}>{formatDateTime(invitation.last_sent_at)}</time> : translate('staff.notDelivered')}</dd></div><div><dt>{translate('staff.expires')}</dt><dd><time dateTime={invitation.expires_at}>{formatDateTime(invitation.expires_at)}</time></dd></div><div><dt>{translate('staff.attempts')}</dt><dd>{invitation.delivery_attempts}</dd></div></dl><div className="table-actions">{actionable && <><button type="button" className="secondary-button" onClick={() => setPending({ kind: 'resend', invitation })}>{translate('staff.resend')}</button><button type="button" className="secondary-button danger-button" onClick={() => setPending({ kind: 'revoke', invitation })}>{translate('staff.revoke')}</button></>}{state === 'expired' && <button type="button" className="secondary-button" onClick={() => { setClosingAfterSave(false); setEmail(invitation.email); setWorkspaceScope(invitation.workspace_scope); updateParameters({ invite: 1 }) }}>{translate('staff.inviteAgain')}</button>}</div></li>
         })}</ul><CollectionPagination label={translate('staff.invitations')} page={page} pageSize={pageSize} count={filteredInvitations.length} hasMore={page * pageSize < filteredInvitations.length} onPageChange={(next) => updateParameters({ page: next })} /></>}
       </section>}
 
-      {inviting && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invite-staff-heading"><form className="record-form" onSubmit={(event) => { void issue(event) }}><div className="section-heading"><div><h2 id="invite-staff-heading">{translate('staff.inviteHeading')}</h2><p>{translate('staff.inviteHelp')}</p></div></div><label><span>{translate('auth.emailAddress')}</span><input autoFocus type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" maxLength={254} required /></label><div className="form-actions"><button className="primary-button" type="submit" disabled={working || !email.trim()}><MailPlus size={16} />{working ? translate('staff.sending') : translate('staff.sendInvitation')}</button><button className="secondary-button" type="button" disabled={working} onClick={closeInvitation}>{translate('common.cancel')}</button></div></form></section>}
+      {inviting && <section className="form-overlay" role="dialog" aria-modal="true" aria-labelledby="invite-staff-heading"><form className="record-form" onSubmit={(event) => { void issue(event) }}><div className="section-heading"><div><h2 id="invite-staff-heading">{translate('staff.inviteHeading')}</h2><p>{translate('staff.inviteHelp')}</p></div></div><label><span>{translate('auth.emailAddress')}</span><input autoFocus type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" maxLength={254} required /></label><label><span>{translate('accessControl.workspaceScope')}</span><select value={workspaceScope} onChange={(event) => setWorkspaceScope(event.target.value as MembershipWorkspaceScope)}><option value="tenant">{translate('accessControl.allWorkspaces')}</option><option value="assigned_organizations">{translate('accessControl.assignedWorkspacesOnly')}</option></select></label><p className="form-help">{translate('staff.workspaceScopeHelp')}</p><div className="form-actions"><button className="primary-button" type="submit" disabled={working || !email.trim()}><MailPlus size={16} />{working ? translate('staff.sending') : translate('staff.sendInvitation')}</button><button className="secondary-button" type="button" disabled={working} onClick={closeInvitation}>{translate('common.cancel')}</button></div></form></section>}
 
       {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="staff-invitation-confirmation-heading"><div><strong id="staff-invitation-confirmation-heading">{translate('staff.confirmInvitation')}</strong><p>{pending.kind === 'resend' ? translate('staff.confirmResend', { email: pending.invitation.email }) : translate('staff.confirmRevoke', { email: pending.invitation.email })}</p></div><div className="form-actions"><button className="primary-button" type="button" disabled={working} onClick={() => { void confirm() }}>{working ? translate('common.saving') : pending.kind === 'resend' ? translate('staff.sendReplacement') : translate('staff.revokeInvitation')}</button><button className="secondary-button" type="button" disabled={working} onClick={() => setPending(null)}>{translate('common.cancel')}</button></div></div>}
     </section>

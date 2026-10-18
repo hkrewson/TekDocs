@@ -10,6 +10,7 @@ const context: AuthenticatedContext = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
   role: 'owner',
+  workspace_scope: 'tenant',
   permissions: ['memberships.view', 'memberships.assign_role', 'organizations.manage_access'],
   surface: 'msp',
   organization: null,

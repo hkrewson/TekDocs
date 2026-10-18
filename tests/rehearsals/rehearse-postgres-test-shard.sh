@@ -87,6 +87,7 @@ case "$shard" in
     ;;
   runtime)
     set -- \
+      apps/core/tests/test_inventory.py::test_runtime_assigned_reader_can_read_asset_with_unassigned_supplier \
       apps/core/tests/test_migration_stabilization.py::test_legacy_scope_helper_privileges_reverse_and_reapply \
       apps/core/tests/test_workspaces.py::test_runtime_role_workspace_routes_enforce_assigned_client_boundary \
       apps/accounts/tests/test_client_portal_boundary.py::test_runtime_role_client_portal_context_is_exactly_organization_scoped \

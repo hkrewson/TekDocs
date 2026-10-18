@@ -47,6 +47,11 @@ class BuiltInRole(models.TextChoices):
     CLIENT_USER = "client_user", "Client User"
 
 
+class MembershipWorkspaceScope(models.TextChoices):
+    TENANT = "tenant", "All authorized workspaces"
+    ASSIGNED_ORGANIZATIONS = "assigned_organizations", "Assigned organizations only"
+
+
 TENANT_ASSIGNABLE_ROLES = (
     BuiltInRole.ADMINISTRATOR,
     BuiltInRole.TECHNICIAN,
@@ -71,6 +76,11 @@ class Invitation(models.Model):
         blank=True,
     )
     role = models.CharField(max_length=32, choices=MEMBERSHIP_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
+    workspace_scope = models.CharField(
+        max_length=32,
+        choices=MembershipWorkspaceScope,
+        default=MembershipWorkspaceScope.TENANT,
+    )
     email = models.EmailField(max_length=254)
     token_digest = models.CharField(max_length=64, blank=True)
     state = models.CharField(max_length=16, choices=InvitationState, default=InvitationState.PENDING)
@@ -143,6 +153,22 @@ class Invitation(models.Model):
                 ),
                 name="invitation_role_matches_organization_scope",
             ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    workspace_scope__in=tuple(value for value, _label in MembershipWorkspaceScope.choices)
+                ),
+                name="invitation_workspace_scope_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        role__in=(BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER),
+                        workspace_scope=MembershipWorkspaceScope.TENANT,
+                    )
+                    | models.Q(role__in=TENANT_ASSIGNABLE_ROLES)
+                ),
+                name="portal_invitation_workspace_scope_default",
+            ),
         ]
         indexes = [models.Index(fields=("tenant", "state", "expires_at"))]
 
@@ -167,6 +193,11 @@ class TenantMembership(models.Model):
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="memberships")
     user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="tenant_memberships")
     role = models.CharField(max_length=32, choices=MEMBERSHIP_ROLE_CHOICES, default=BuiltInRole.READ_ONLY)
+    workspace_scope = models.CharField(
+        max_length=32,
+        choices=MembershipWorkspaceScope,
+        default=MembershipWorkspaceScope.TENANT,
+    )
     organization = models.ForeignKey(
         "core.Organization",
         on_delete=models.PROTECT,
@@ -195,6 +226,22 @@ class TenantMembership(models.Model):
                     | models.Q(role__in=TENANT_ASSIGNABLE_ROLES, organization__isnull=True)
                 ),
                 name="membership_role_matches_organization_scope",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    workspace_scope__in=tuple(value for value, _label in MembershipWorkspaceScope.choices)
+                ),
+                name="membership_workspace_scope_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        role__in=(BuiltInRole.CLIENT_ADMINISTRATOR, BuiltInRole.CLIENT_USER),
+                        workspace_scope=MembershipWorkspaceScope.TENANT,
+                    )
+                    | models.Q(role__in=TENANT_ASSIGNABLE_ROLES)
+                ),
+                name="portal_membership_workspace_scope_default",
             ),
         ]
 

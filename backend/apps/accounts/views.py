@@ -22,7 +22,7 @@ from apps.core.models import InstallationState, Organization
 from .audit import record_auth_event
 from .bootstrap import bootstrap_owner
 from .invitations import InvitationConflict, accept_invitation, issue_invitation, resend_invitation, revoke_invitation
-from .models import BuiltInRole, Invitation, User
+from .models import BuiltInRole, Invitation, MembershipWorkspaceScope, User
 from .policy import (
     InstallationMemberContext,
     PermissionKey,
@@ -55,6 +55,7 @@ def _context_payload(user: User, context: InstallationMemberContext) -> dict[str
         "user": {"id": str(user.pk), "email": user.email, "display_name": user.display_name},
         "tenant": {"id": str(context.tenant.id), "name": context.tenant.name},
         "role": context.role.value,
+        "workspace_scope": context.workspace_scope.value,
         "permissions": sorted(permission.value for permission in context.permissions),
         "surface": context.surface,
         "organization": (
@@ -235,6 +236,7 @@ class InvitationListCreateView(APIView):
             tenant=context.tenant,
             actor=request.user,
             email=serializer.validated_data["email"],
+            workspace_scope=MembershipWorkspaceScope(serializer.validated_data["workspace_scope"]),
         )
         return Response(InvitationSerializer(invitation).data, status=201)
 

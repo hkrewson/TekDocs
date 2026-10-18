@@ -16,6 +16,7 @@ const authContext: AuthenticatedContext = {
   user: { id: '00000000-0000-4000-8000-000000000001', email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: '00000000-0000-4000-8000-000000000002', name: 'Example MSP' },
   role: 'owner',
+  workspace_scope: 'tenant',
   permissions: ['staff_invitations.view', 'memberships.view', 'memberships.assign_role', 'organizations.manage_access', 'system_diagnostics.view'],
   surface: 'msp',
   organization: null,

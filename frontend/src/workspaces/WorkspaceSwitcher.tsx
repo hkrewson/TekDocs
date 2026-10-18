@@ -18,6 +18,7 @@ export function WorkspaceSwitcher({
   activeArea,
   client,
   collapsed,
+  workspaceRestricted = false,
   workspaceLoading,
   onNavigate,
 }: {
@@ -26,6 +27,7 @@ export function WorkspaceSwitcher({
   activeArea: WorkspaceArea
   client: WorkspaceClient
   collapsed: boolean
+  workspaceRestricted?: boolean
   workspaceLoading: boolean
   onNavigate: () => void
 }) {
@@ -44,8 +46,8 @@ export function WorkspaceSwitcher({
   const requestRef = useRef(0)
   const overlay = useShellOverlay('workspace-switcher')
   const navigate = useNavigate()
-  const workspaceName = activeWorkspace?.name ?? tenant.name
-  const workspaceLabel = activeWorkspace ? translate('workspaceSwitcher.classifiedWorkspace', { classification: classificationSummary(activeWorkspace.classifications) }) : translate('workspaceSwitcher.mspWorkspace')
+  const workspaceName = activeWorkspace?.name ?? (workspaceRestricted ? translate('workspaceSwitcher.chooseAssignedWorkspace') : tenant.name)
+  const workspaceLabel = activeWorkspace ? translate('workspaceSwitcher.classifiedWorkspace', { classification: classificationSummary(activeWorkspace.classifications) }) : workspaceRestricted ? translate('workspaceSwitcher.assignedWorkspaceAccess') : translate('workspaceSwitcher.mspWorkspace')
   const searchClassification = activeWorkspace?.classifications.includes('client') ? 'client' : undefined
   const searchLabel = searchClassification ? translate('workspaceSwitcher.findClient') : translate('workspaceSwitcher.findOrganization')
 
@@ -166,17 +168,16 @@ export function WorkspaceSwitcher({
             />
           </label>
           <div className="workspace-options" aria-live="polite">
-            <button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={activeWorkspace ? translate('workspaceSwitcher.backToMspLabel', { name: tenant.name }) : translate('workspaceSwitcher.mspLabel', { name: tenant.name })} aria-current={activeWorkspace ? undefined : 'true'}>
+            {!workspaceRestricted && <><button ref={firstOptionRef} type="button" className="workspace-option" onClick={selectMsp} aria-label={activeWorkspace ? translate('workspaceSwitcher.backToMspLabel', { name: tenant.name }) : translate('workspaceSwitcher.mspLabel', { name: tenant.name })} aria-current={activeWorkspace ? undefined : 'true'}>
               {activeWorkspace ? <CornerLeftUp size={17} aria-hidden="true" /> : <Building2 size={17} aria-hidden="true" />}
               <span><strong>{activeWorkspace ? translate('workspaceSwitcher.backToMsp', { name: tenant.name }) : tenant.name}</strong><span>{translate('workspaceSwitcher.mspWorkspace')}</span></span>
               {!activeWorkspace && <Check size={15} aria-label={translate('workspaceSwitcher.current')} />}
-            </button>
-            <div className="workspace-option-divider" />
+            </button><div className="workspace-option-divider" /></>}
             {phase === 'loading' && <p className="workspace-switcher-state">{translate('workspaceSwitcher.searching')}</p>}
             {phase === 'error' && <p className="workspace-switcher-state" role="alert">{translate('workspaceSwitcher.loadFailed')}</p>}
             {phase === 'ready' && results.length === 0 && <p className="workspace-switcher-state">{searchClassification ? translate('workspaceSwitcher.noClients') : translate('workspaceSwitcher.noOrganizations')}</p>}
-            {results.map((workspace) => (
-              <button key={workspace.id} type="button" className="workspace-option" onClick={() => selectOrganization(workspace)} aria-label={`${workspace.name}. ${classificationSummary(workspace.classifications)}`} aria-current={workspace.id === activeWorkspace?.id ? 'true' : undefined}>
+            {results.map((workspace, index) => (
+              <button ref={workspaceRestricted && index === 0 ? firstOptionRef : undefined} key={workspace.id} type="button" className="workspace-option" onClick={() => selectOrganization(workspace)} aria-label={`${workspace.name}. ${classificationSummary(workspace.classifications)}`} aria-current={workspace.id === activeWorkspace?.id ? 'true' : undefined}>
                 <span className="workspace-option-initials" aria-hidden="true">{initials(workspace.name)}</span>
                 <span><strong>{workspace.name}</strong><span>{classificationSummary(workspace.classifications)}</span></span>
                 {workspace.id === activeWorkspace?.id && <Check size={15} aria-label={translate('workspaceSwitcher.current')} />}

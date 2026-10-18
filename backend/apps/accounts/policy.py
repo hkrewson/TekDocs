@@ -16,6 +16,7 @@ from apps.core.scoping import DataScope
 from .models import (
     TENANT_ASSIGNABLE_ROLES,
     BuiltInRole,
+    MembershipWorkspaceScope,
     OrganizationAccessAssignment,
     ScopedRoleAssignment,
     TenantMembership,
@@ -411,6 +412,7 @@ class InstallationMemberContext:
     is_owner: bool
     membership_id: UUID | None = None
     organization: Organization | None = None
+    workspace_scope: MembershipWorkspaceScope = MembershipWorkspaceScope.TENANT
 
     @property
     def surface(self) -> str:
@@ -475,6 +477,7 @@ def require_installation_member(user: User) -> InstallationMemberContext:
         is_owner=False,
         membership_id=membership.id,
         organization=membership.organization,
+        workspace_scope=MembershipWorkspaceScope(membership.workspace_scope),
     )
 
 
@@ -495,7 +498,10 @@ def _organization_allowed(context: InstallationMemberContext, organization: Orga
         return False
     if context.surface == "client_portal":
         return context.organization is not None and organization.id == context.organization.id
-    if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED:
+    if (
+        context.workspace_scope != MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+        and organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED
+    ):
         return True
     if context.is_owner:
         return True
@@ -512,7 +518,12 @@ def _organization_allowed(context: InstallationMemberContext, organization: Orga
 def _archived_organization_allowed(context: InstallationMemberContext, organization: Organization) -> bool:
     if organization.tenant_id != context.tenant.id or organization.entity.archived_at is None:
         return False
-    if organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED or context.is_owner:
+    if (
+        context.workspace_scope != MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+        and organization.access_mode == OrganizationAccessMode.ALL_AUTHORIZED
+    ):
+        return True
+    if context.is_owner:
         return True
     return (
         OrganizationAccessAssignment.scoped.for_tenant(context.tenant)
@@ -531,6 +542,8 @@ def context_has_permission(
     organization: Organization | None = None,
 ) -> bool:
     if context.surface == "client_portal":
+        return False
+    if organization is None and context.workspace_scope == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS:
         return False
     if not _token_allows(context, permission, organization=organization):
         return False
@@ -634,6 +647,10 @@ def accessible_organizations(
         if context.organization is None:
             return organizations.none()
         organizations = organizations.filter(pk=context.organization.id)
+    elif context.workspace_scope == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS:
+        if context.membership_id is None:
+            return organizations.none()
+        organizations = organizations.filter(access_assignments__membership_id=context.membership_id)
     elif not context.is_owner:
         organizations = organizations.filter(
             Q(access_mode=OrganizationAccessMode.ALL_AUTHORIZED) | Q(access_assignments__membership__user=context.user)

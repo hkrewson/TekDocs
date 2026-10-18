@@ -5,8 +5,8 @@ import { AccessControl } from './AccessControl'
 import type { AccessControlClient } from './api'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 
-const owner = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner' as const, is_owner: true, joined_at: '2026-08-08T12:00:00Z' }
-const technician = { id: 'member', display_name: 'Morgan Ellis', email: 'morgan@example.com', role: 'read_only' as const, is_owner: false, joined_at: '2026-08-08T13:00:00Z' }
+const owner = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner' as const, workspace_scope: 'tenant' as const, is_owner: true, joined_at: '2026-08-08T12:00:00Z' }
+const technician = { id: 'member', display_name: 'Morgan Ellis', email: 'morgan@example.com', role: 'read_only' as const, workspace_scope: 'tenant' as const, is_owner: false, joined_at: '2026-08-08T13:00:00Z' }
 const clientOrganization = { id: 'organization', name: 'Acme Dental', access_mode: 'all_authorized' as const, assigned_staff: [] }
 const customRole = { id: 'custom-role', name: 'Documentation lead', description: 'Publishes client documents.', scope: 'organization' as const, permissions: ['documents.edit'], assignment_count: 0, archived_at: null, created_at: '2026-08-08T13:00:00Z', updated_at: '2026-08-08T13:00:00Z' }
 const accessCollection = { id: 'collection', name: 'Priority clients', description: 'Primary support group.', organizations: [{ id: clientOrganization.id, name: clientOrganization.name }], assignment_count: 0, archived_at: null, created_at: '2026-08-08T13:00:00Z', updated_at: '2026-08-08T13:00:00Z' }
@@ -33,6 +33,7 @@ function client(overrides: Partial<AccessControlClient> = {}): AccessControlClie
     scopedAssignments: vi.fn().mockResolvedValue([]),
     accessCollections: vi.fn().mockResolvedValue([]),
     assignRole: vi.fn().mockResolvedValue({ ...technician, role: 'technician' }),
+    assignWorkspaceScope: vi.fn().mockResolvedValue({ ...technician, workspace_scope: 'assigned_organizations' }),
     changeAccessMode: vi.fn().mockResolvedValue({ ...clientOrganization, access_mode: 'assigned_only' }),
     assignStaff: vi.fn().mockResolvedValue({ ...clientOrganization, assigned_staff: [{ id: technician.id, display_name: technician.display_name, email: technician.email, role: technician.role }] }),
     removeStaff: vi.fn().mockResolvedValue(clientOrganization),
@@ -61,12 +62,24 @@ describe('access control', () => {
     expect(await screen.findByText('Primary Owner')).toBeInTheDocument()
     expect(screen.getByText('Always has access')).toBeInTheDocument()
     await user.selectOptions(screen.getByRole('combobox', { name: 'Role for Morgan Ellis' }), 'technician')
-    await user.click(screen.getAllByRole('button', { name: 'Review change' })[0])
+    await user.click(screen.getByRole('button', { name: 'Review role' }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Change Morgan Ellis from Read-only to Technician')
     await user.click(screen.getByRole('button', { name: 'Confirm change' }))
 
     await waitFor(() => expect(assignRole).toHaveBeenCalledWith('member', 'technician'))
     expect(await screen.findByRole('status')).toHaveTextContent('Morgan Ellis’s role was updated')
+  })
+
+  it('requires confirmation before restricting workspace access', async () => {
+    const user = userEvent.setup()
+    const assignWorkspaceScope = vi.fn().mockResolvedValue({ ...technician, workspace_scope: 'assigned_organizations' })
+    renderAccess(client({ assignWorkspaceScope }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Workspace access for Morgan Ellis' }), 'assigned_organizations')
+    expect(assignWorkspaceScope).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Review workspace access' }))
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Assigned organizations only')
+    await user.click(screen.getByRole('button', { name: 'Confirm change' }))
+    await waitFor(() => expect(assignWorkspaceScope).toHaveBeenCalledWith('member', 'assigned_organizations'))
   })
 
   it('explains the assignment boundary before changing the mode', async () => {

@@ -10,6 +10,7 @@ from apps.accounts.access_views import (
     CustomRoleListCreateView,
     MemberListView,
     MemberRoleView,
+    MemberWorkspaceScopeView,
     OrganizationAccessDetailView,
     OrganizationAccessListView,
     OrganizationStaffAssignmentDetailView,
@@ -907,6 +908,11 @@ urlpatterns = [
         "api/v1/access-control/members/<uuid:user_id>",
         MemberRoleView.as_view(),
         name="access-control-member-role",
+    ),
+    path(
+        "api/v1/access-control/members/<uuid:user_id>/workspace-scope",
+        MemberWorkspaceScopeView.as_view(),
+        name="access-control-member-workspace-scope",
     ),
     path(
         "api/v1/access-control/organizations",

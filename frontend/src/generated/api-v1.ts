@@ -132,6 +132,22 @@ export interface paths {
         readonly patch: operations["access_control_members_partial_update"];
         readonly trace?: never;
     };
+    readonly "/api/v1/access-control/members/{user_id}/workspace-scope": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch: operations["access_control_members_workspace_scope_partial_update"];
+        readonly trace?: never;
+    };
     readonly "/api/v1/access-control/organizations": {
         readonly parameters: {
             readonly query?: never;
@@ -9233,6 +9249,12 @@ export interface components {
             readonly user: components["schemas"]["AuthenticatedUser"];
             readonly tenant: components["schemas"]["BootstrapTenantResult"];
             readonly role: string;
+            /**
+             * @description * `tenant` - All authorized workspaces
+             *     * `assigned_organizations` - Assigned organizations only
+             * @enum {string}
+             */
+            readonly workspace_scope: "tenant" | "assigned_organizations";
             readonly permissions: readonly string[];
             /**
              * @description * `msp` - msp
@@ -12452,6 +12474,12 @@ export interface components {
              * @enum {string}
              */
             readonly role: "administrator" | "technician" | "contributor" | "read_only" | "client_administrator" | "client_user";
+            /**
+             * @description * `tenant` - All authorized workspaces
+             *     * `assigned_organizations` - Assigned organizations only
+             * @enum {string}
+             */
+            readonly workspace_scope: "tenant" | "assigned_organizations";
             readonly organization: {
                 readonly [key: string]: string;
             } | null;
@@ -12485,6 +12513,13 @@ export interface components {
         readonly InvitationRequest: {
             /** Format: email */
             readonly email: string;
+            /**
+             * @description * `tenant` - All authorized workspaces
+             *     * `assigned_organizations` - Assigned organizations only
+             * @default tenant
+             * @enum {string}
+             */
+            readonly workspace_scope: "tenant" | "assigned_organizations";
         };
         readonly Invoice: {
             /** Format: uuid */
@@ -13588,6 +13623,12 @@ export interface components {
              * @enum {string}
              */
             readonly role: "owner" | "administrator" | "technician" | "contributor" | "read_only" | "client_administrator" | "client_user";
+            /**
+             * @description * `tenant` - All authorized workspaces
+             *     * `assigned_organizations` - Assigned organizations only
+             * @enum {string}
+             */
+            readonly workspace_scope: "tenant" | "assigned_organizations";
             readonly is_owner: boolean;
             /** Format: date-time */
             readonly joined_at: string | null;
@@ -14671,6 +14712,14 @@ export interface components {
              * @enum {string}
              */
             readonly role?: "administrator" | "technician" | "contributor" | "read_only";
+        };
+        readonly PatchedMemberWorkspaceScopeWrite: {
+            /**
+             * @description * `tenant` - All authorized workspaces
+             *     * `assigned_organizations` - Assigned organizations only
+             * @enum {string}
+             */
+            readonly workspace_scope?: "tenant" | "assigned_organizations";
         };
         readonly PatchedModelRevisionWrite: {
             readonly name?: string;
@@ -17456,6 +17505,68 @@ export interface operations {
                 };
             };
             /** @description Role assignment permission and MFA required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Tenant member not found */
+            readonly 404: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly access_control_members_workspace_scope_partial_update: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly user_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["PatchedMemberWorkspaceScopeWrite"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["PatchedMemberWorkspaceScopeWrite"];
+                readonly "multipart/form-data": components["schemas"]["PatchedMemberWorkspaceScopeWrite"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["Member"];
+                };
+            };
+            /** @description Invalid workspace access scope */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Workspace access administration permission and MFA required */
             readonly 403: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */

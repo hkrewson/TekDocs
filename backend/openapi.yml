@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: TekDocs API
-  version: 0.9.8
+  version: 0.8.46
   description: Self-hosted MSP knowledge and inventory API
 paths:
   /api/v1/:
@@ -387,6 +387,81 @@ paths:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
         '403':
           description: Role assignment permission and MFA required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '404':
+          description: Tenant member not found
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/access-control/members/{user_id}/workspace-scope:
+    patch:
+      operationId: access_control_members_workspace_scope_partial_update
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - access-control
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberWorkspaceScopeWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberWorkspaceScopeWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedMemberWorkspaceScopeWrite'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid workspace access scope
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Workspace access administration permission and MFA required
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -35530,6 +35605,15 @@ components:
           $ref: '#/components/schemas/BootstrapTenantResult'
         role:
           type: string
+        workspace_scope:
+          enum:
+          - tenant
+          - assigned_organizations
+          type: string
+          description: |-
+            * `tenant` - All authorized workspaces
+            * `assigned_organizations` - Assigned organizations only
+          x-spec-enum-id: 5a76169ae493cc56
         permissions:
           type: array
           items:
@@ -35557,6 +35641,7 @@ components:
       - surface
       - tenant
       - user
+      - workspace_scope
     AuthenticatedUser:
       type: object
       properties:
@@ -43269,6 +43354,16 @@ components:
             * `client_user` - Client User
           x-spec-enum-id: b8c54d272ee62232
           readOnly: true
+        workspace_scope:
+          enum:
+          - tenant
+          - assigned_organizations
+          type: string
+          description: |-
+            * `tenant` - All authorized workspaces
+            * `assigned_organizations` - Assigned organizations only
+          x-spec-enum-id: 5a76169ae493cc56
+          readOnly: true
         organization:
           type: object
           additionalProperties:
@@ -43330,6 +43425,7 @@ components:
       - send_count
       - state
       - updated_at
+      - workspace_scope
     InvitationAcceptance:
       type: object
       properties:
@@ -43354,6 +43450,16 @@ components:
           type: string
           format: email
           maxLength: 254
+        workspace_scope:
+          enum:
+          - tenant
+          - assigned_organizations
+          type: string
+          description: |-
+            * `tenant` - All authorized workspaces
+            * `assigned_organizations` - Assigned organizations only
+          x-spec-enum-id: 5a76169ae493cc56
+          default: tenant
       required:
       - email
     Invoice:
@@ -45766,6 +45872,15 @@ components:
             * `client_administrator` - Client Administrator
             * `client_user` - Client User
           x-spec-enum-id: 4b6261cea6bba5a2
+        workspace_scope:
+          enum:
+          - tenant
+          - assigned_organizations
+          type: string
+          description: |-
+            * `tenant` - All authorized workspaces
+            * `assigned_organizations` - Assigned organizations only
+          x-spec-enum-id: 5a76169ae493cc56
         is_owner:
           type: boolean
         joined_at:
@@ -45779,6 +45894,7 @@ components:
       - is_owner
       - joined_at
       - role
+      - workspace_scope
     MigrationImpact:
       type: object
       properties:
@@ -48225,6 +48341,18 @@ components:
             * `contributor` - Contributor
             * `read_only` - Read-only
           x-spec-enum-id: f5bef89b40e7470e
+    PatchedMemberWorkspaceScopeWrite:
+      type: object
+      properties:
+        workspace_scope:
+          enum:
+          - tenant
+          - assigned_organizations
+          type: string
+          description: |-
+            * `tenant` - All authorized workspaces
+            * `assigned_organizations` - Assigned organizations only
+          x-spec-enum-id: 5a76169ae493cc56
     PatchedModelRevisionWrite:
       type: object
       properties:

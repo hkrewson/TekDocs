@@ -20,7 +20,15 @@ from apps.core.outbox import OutboxTopic, enqueue_outbox_event
 from apps.core.rls import OrganizationRLSMode, system_rls_scope_if_postgresql
 from apps.core.scoping import DataScope
 
-from .models import EMPTY_DIGEST, BuiltInRole, Invitation, InvitationState, TenantMembership, User
+from .models import (
+    EMPTY_DIGEST,
+    BuiltInRole,
+    Invitation,
+    InvitationState,
+    MembershipWorkspaceScope,
+    TenantMembership,
+    User,
+)
 
 
 class InvitationConflict(APIException):
@@ -122,6 +130,7 @@ def issue_invitation(
     email: str,
     organization: Organization | None = None,
     role: BuiltInRole = BuiltInRole.READ_ONLY,
+    workspace_scope: MembershipWorkspaceScope = MembershipWorkspaceScope.TENANT,
 ) -> Invitation:
     normalized_email = User.objects.normalize_email(email).strip().lower()
     if organization is not None and organization.tenant_id != tenant.id:
@@ -147,6 +156,7 @@ def issue_invitation(
                 tenant=tenant,
                 organization=organization,
                 role=role,
+                workspace_scope=workspace_scope,
                 email=normalized_email,
                 token_digest=Invitation.digest_token(token),
                 invited_by=actor,
@@ -251,6 +261,7 @@ def accept_invitation(*, token: str, display_name: str, password: str) -> Accept
                         user=user,
                         role=invitation.role,
                         organization=invitation.organization,
+                        workspace_scope=invitation.workspace_scope,
                     )
                     invitation.state = InvitationState.ACCEPTED
                     invitation.accepted_by = user

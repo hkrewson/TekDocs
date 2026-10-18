@@ -13,6 +13,7 @@ const context: AuthenticatedContext = {
   organization: { id: 'org-1', name: 'Example Client' },
   user: { id: 'user-1', email: 'reader@example.com', display_name: 'Client Reader' },
   role: 'client_user', permissions: [],
+  workspace_scope: 'tenant',
   mfa_enrollment_required: false,
 }
 

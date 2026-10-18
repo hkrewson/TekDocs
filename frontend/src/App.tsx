@@ -253,7 +253,7 @@ function NavSection({ id, items, label, collapsed, sectionCollapsed, onToggle, o
   )
 }
 
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDismiss, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDismiss, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings, workspaceRestricted }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
@@ -266,6 +266,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
   workspaceLoading: boolean
   organizationRoute: boolean
   canManageInvoiceSettings: boolean
+  workspaceRestricted: boolean
 }) {
   const sidebarRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -286,7 +287,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
       ...section,
       items: section.items.filter((item) => workspace
         ? workspace.capabilities.includes(item.area)
-        : item.area !== 'invoices' || canManageInvoiceSettings),
+        : (!workspaceRestricted && (item.area !== 'invoices' || canManageInvoiceSettings))),
     }))
     .filter((section) => section.items.length > 0)
 
@@ -345,7 +346,7 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
           <button ref={closeRef} className="icon-button mobile-close" onClick={onMobileDismiss} aria-label={translate('navigation.close')}><X size={19} /></button>
         </div>
 
-        <WorkspaceSwitcher tenant={tenant} activeWorkspace={workspace} activeArea={activeArea} client={workspaceClient} collapsed={collapsed} workspaceLoading={workspaceLoading} onNavigate={onMobileClose} />
+        <WorkspaceSwitcher tenant={tenant} activeWorkspace={workspace} activeArea={activeArea} client={workspaceClient} collapsed={collapsed} workspaceRestricted={workspaceRestricted} workspaceLoading={workspaceLoading} onNavigate={onMobileClose} />
 
         <div className="sidebar-scroll">
           {organizationRoute && !workspace
@@ -439,6 +440,10 @@ function UnavailablePage({ organizationOverview }: { organizationOverview?: stri
       <Link className="secondary-button" to={organizationOverview ?? '/overview'}>{translate('navigation.returnToOverview')}</Link>
     </section>
   )
+}
+
+function AssignedWorkspacePrompt() {
+  return <section className="content-section" aria-labelledby="assigned-workspace-heading"><h1 id="assigned-workspace-heading">{translate('workspaceSwitcher.chooseAssignedWorkspace')}</h1><p>{translate('workspaceSwitcher.chooseAssignedWorkspaceHelp')}</p></section>
 }
 
 type OrganizationWorkspaceState =
@@ -537,6 +542,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   const previousPathname = useRef(location.pathname)
   const organizationMatch = useMatch('/workspaces/organizations/:organizationId/*')
   const organizationId = organizationMatch?.params.organizationId
+  const workspaceRestricted = shellContext.workspace_scope === 'assigned_organizations'
 
   useEffect(() => {
     if (!organizationId) return
@@ -611,18 +617,18 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">{translate('shell.skip')}</a>
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={closeMobileNavigation} onMobileDismiss={dismissMobileNavigation} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={closeMobileNavigation} onMobileDismiss={dismissMobileNavigation} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} workspaceRestricted={workspaceRestricted} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button ref={mobileMenuRef} className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={translate('navigation.open')}><Menu size={20} /></button>
-          <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
+          <form className="search-field" role="search" onSubmit={submitSearch}><Search size={17} aria-hidden="true" /><label className="sr-only" htmlFor="global-search">{translate('shell.search')}</label><input id="global-search" type="search" value={searchDraft} maxLength={80} disabled={workspaceRestricted && !selectedWorkspace} placeholder={translate('shell.search')} onChange={(event) => setSearchDraft(event.target.value)} /><button className="sr-only" type="submit">{translate('search.submit')}</button></form>
           <ContextualHelp key={location.pathname} pathname={location.pathname} />
-          <Suspense fallback={<span className="notification-menu" aria-hidden="true"><button className="notification-trigger" type="button" disabled tabIndex={-1} /></span>}><NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} /></Suspense>
-          <ProfileMenu user={shellContext.user} canManageAccess={shellContext.permissions?.includes('memberships.assign_role') ?? false} canManageStaff={shellContext.permissions?.includes('staff_invitations.view') ?? false} canManageNotifications={shellContext.permissions?.includes('notifications.manage') ?? false} canViewSystemStatus={shellContext.permissions?.includes('system_diagnostics.view') ?? false} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
+          {!workspaceRestricted && <Suspense fallback={<span className="notification-menu" aria-hidden="true"><button className="notification-trigger" type="button" disabled tabIndex={-1} /></span>}><NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} /></Suspense>}
+          <ProfileMenu user={shellContext.user} canManageAccess={!workspaceRestricted && (shellContext.permissions?.includes('memberships.assign_role') ?? false)} canManageStaff={!workspaceRestricted && (shellContext.permissions?.includes('staff_invitations.view') ?? false)} canManageNotifications={!workspaceRestricted && (shellContext.permissions?.includes('notifications.manage') ?? false)} canViewSystemStatus={!workspaceRestricted && (shellContext.permissions?.includes('system_diagnostics.view') ?? false)} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
         </header>
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
-          <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}><Routes>
+          <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}>{workspaceRestricted && !organizationId && location.pathname !== '/settings' ? <AssignedWorkspacePrompt /> : <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
             <Route path="/overview" element={<Suspense fallback={<section role="status">{translate('collections.loading')}</section>}><Overview /></Suspense>} />
@@ -663,7 +669,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
             <Route path="/workspaces/organizations/:organizationId/accounting" element={<Navigate to={`/workspaces/organizations/${organizationId}/invoices`} replace />} />
             <Route path="/workspaces/organizations/:organizationId/*" element={<UnavailablePage organizationOverview={`/workspaces/organizations/${organizationId}/overview`} />} />
             <Route path="*" element={<UnavailablePage />} />
-          </Routes></Suspense>
+          </Routes>}</Suspense>
         </main>
       </div>
     </div>

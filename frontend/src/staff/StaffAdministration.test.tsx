@@ -7,9 +7,9 @@ import type { StaffAdministrationClient, StaffInvitation } from './api'
 import { StaffAdministration } from './StaffAdministration'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 
-const owner: Member = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner', is_owner: true, joined_at: null }
+const owner: Member = { id: 'owner', display_name: 'Primary Owner', email: 'owner@example.com', role: 'owner', workspace_scope: 'tenant', is_owner: true, joined_at: null }
 const invitation: StaffInvitation = {
-  id: 'invitation', email: 'technician@example.com', role: 'read_only', organization: null, state: 'pending',
+  id: 'invitation', email: 'technician@example.com', role: 'read_only', workspace_scope: 'tenant', organization: null, state: 'pending',
   expires_at: '2026-08-20T12:00:00Z', last_sent_at: '2026-08-13T12:00:00Z', last_delivery_failed_at: null,
   delivery_attempts: 1, send_count: 1, created_at: '2026-08-13T12:00:00Z', updated_at: '2026-08-13T12:00:00Z',
 }
@@ -58,7 +58,7 @@ describe('staff administration', () => {
     await user.type(screen.getByRole('textbox', { name: 'Email address' }), 'new@example.com')
     await user.click(screen.getByRole('button', { name: 'Send invitation' }))
 
-    await waitFor(() => expect(issue).toHaveBeenCalledWith('new@example.com'))
+    await waitFor(() => expect(issue).toHaveBeenCalledWith('new@example.com', 'tenant'))
     expect(screen.getByRole('status')).toHaveTextContent('start with Read-only access')
     expect(screen.getByText('new@example.com')).toBeInTheDocument()
     await user.click(screen.getByRole('link', { name: 'MSP members' }))

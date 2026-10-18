@@ -9,6 +9,7 @@ from apps.accounts.models import (
     User,
     TenantMembership,
     BuiltInRole,
+    MembershipWorkspaceScope,
     OrganizationAccessAssignment,
 )
 from apps.core.models import (
@@ -71,7 +72,15 @@ with transaction.atomic():
         )
         EmailAddress.objects.create(user=user, email=email, primary=True, verified=True)
         member = TenantMembership.objects.create(
-            tenant=tenant, user=user, role=role, organization=organization
+            tenant=tenant,
+            user=user,
+            role=role,
+            organization=organization,
+            workspace_scope=(
+                MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
+                if email == "reader-a@acceptance.invalid"
+                else MembershipWorkspaceScope.TENANT
+            ),
         )
         if role == BuiltInRole.READ_ONLY:
             OrganizationAccessAssignment.objects.create(

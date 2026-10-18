@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { translate } from '../i18n/localization'
-import type { AccessCatalog, AccessControlClient, AssignedStaff, BuiltInRole, Member, OrganizationAccess, OrganizationAccessMode, TenantRole } from './api'
+import type { AccessCatalog, AccessControlClient, AssignedStaff, BuiltInRole, Member, MembershipWorkspaceScope, OrganizationAccess, OrganizationAccessMode, TenantRole } from './api'
 import { browserAccessControlClient } from './api'
 import { CustomRolesPanel } from './CustomRolesPanel'
 import { RecordSections } from '../records/RecordNavigation'
@@ -11,6 +11,7 @@ const tenantRoles: TenantRole[] = ['administrator', 'technician', 'contributor',
 
 type PendingChange =
   | { kind: 'role'; member: Member; role: TenantRole }
+  | { kind: 'workspace_scope'; member: Member; workspaceScope: MembershipWorkspaceScope }
   | { kind: 'access'; organization: OrganizationAccess; accessMode: OrganizationAccessMode }
   | { kind: 'assign'; organization: OrganizationAccess; member: Member }
   | { kind: 'remove'; organization: OrganizationAccess; member: AssignedStaff }
@@ -27,6 +28,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
   const [members, setMembers] = useState<Member[] | null>(null)
   const [organizations, setOrganizations] = useState<OrganizationAccess[] | null>(null)
   const [selectedRoles, setSelectedRoles] = useState<Record<string, TenantRole>>({})
+  const [selectedWorkspaceScopes, setSelectedWorkspaceScopes] = useState<Record<string, MembershipWorkspaceScope>>({})
   const [selectedModes, setSelectedModes] = useState<Record<string, OrganizationAccessMode>>({})
   const [selectedStaff, setSelectedStaff] = useState<Record<string, string>>({})
   const [pending, setPending] = useState<PendingChange | null>(null)
@@ -43,6 +45,7 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
         setMembers(loadedMembers)
         setOrganizations(loadedOrganizations)
         setSelectedRoles(Object.fromEntries(loadedMembers.filter((item) => !item.is_owner).map((item) => [item.id, item.role as TenantRole])))
+        setSelectedWorkspaceScopes(Object.fromEntries(loadedMembers.filter((item) => !item.is_owner).map((item) => [item.id, item.workspace_scope])))
         setSelectedModes(Object.fromEntries(loadedOrganizations.map((item) => [item.id, item.access_mode])))
       })
       .catch((loadError: unknown) => { if (!controller.signal.aborted) setError(errorMessage(loadError)) })
@@ -60,6 +63,10 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
         const updated = await client.assignRole(pending.member.id, pending.role)
         setMembers((current) => current?.map((item) => item.id === updated.id ? updated : item) ?? null)
         setMessage(translate('accessControl.roleUpdated', { name: updated.display_name }))
+      } else if (pending.kind === 'workspace_scope') {
+        const updated = await client.assignWorkspaceScope(pending.member.id, pending.workspaceScope)
+        setMembers((current) => current?.map((item) => item.id === updated.id ? updated : item) ?? null)
+        setMessage(translate('accessControl.workspaceScopeUpdated', { name: updated.display_name }))
       } else if (pending.kind === 'access') {
         const updated = await client.changeAccessMode(pending.organization.id, pending.accessMode)
         setOrganizations((current) => current?.map((item) => item.id === updated.id ? updated : item) ?? null)
@@ -109,16 +116,19 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
           {section === 'members' && <section className="access-section administration-section" aria-labelledby="members-heading">
             <div className="section-heading"><div><h2 id="members-heading">{translate('accessControl.members')}</h2><p>{translate('accessControl.membersHelp')}</p></div></div>
             {members.length === 0 && <p>{translate('accessControl.noMembers')}</p>}
-            {members.length > 0 && <div className="access-table" role="table" aria-label={translate('accessControl.members')}>
-              <div className="access-row header" role="row"><span role="columnheader">{translate('accessControl.member')}</span><span role="columnheader">{translate('accessControl.role')}</span><span role="columnheader">{translate('accessControl.action')}</span></div>
+            {members.length > 0 && <div className="access-table member-access-table" role="table" aria-label={translate('accessControl.members')}>
+              <div className="access-row header" role="row"><span role="columnheader">{translate('accessControl.member')}</span><span role="columnheader">{translate('accessControl.role')}</span><span role="columnheader">{translate('accessControl.workspaceScope')}</span><span role="columnheader">{translate('accessControl.action')}</span></div>
               {members.map((member) => <div className="access-row" role="row" key={member.id}>
                 <span role="cell"><strong>{member.display_name}</strong><span>{member.email}</span></span>
-                <span role="cell">{member.is_owner
+                <span role="cell" data-label={translate('accessControl.role')}>{member.is_owner
                   ? <span>{translate('accessControl.owner')}</span>
                   : <label><span className="sr-only">{translate('accessControl.roleFor', { name: member.display_name })}</span><select value={selectedRoles[member.id]} onChange={(event) => setSelectedRoles((current) => ({ ...current, [member.id]: event.target.value as TenantRole }))}>{tenantRoles.map((role) => <option key={role} value={role}>{roleByValue.get(role as BuiltInRole)?.label ?? role}</option>)}</select></label>}</span>
-                <span role="cell">{member.is_owner
+                <span role="cell" data-label={translate('accessControl.workspaceScope')}>{member.is_owner
+                  ? translate('accessControl.allWorkspaces')
+                  : <label><span className="sr-only">{translate('accessControl.workspaceScopeFor', { name: member.display_name })}</span><select value={selectedWorkspaceScopes[member.id]} onChange={(event) => setSelectedWorkspaceScopes((current) => ({ ...current, [member.id]: event.target.value as MembershipWorkspaceScope }))}><option value="tenant">{translate('accessControl.allWorkspaces')}</option><option value="assigned_organizations">{translate('accessControl.assignedWorkspacesOnly')}</option></select></label>}</span>
+                <span role="cell" data-label={translate('accessControl.action')}>{member.is_owner
                   ? <span>{translate('accessControl.alwaysHasAccess')}</span>
-                  : <button className="secondary-button" type="button" disabled={selectedRoles[member.id] === member.role} onClick={() => setPending({ kind: 'role', member, role: selectedRoles[member.id] })}>{translate('accessControl.reviewChange')}</button>}</span>
+                  : <div className="table-actions"><button className="secondary-button" type="button" disabled={selectedRoles[member.id] === member.role} onClick={() => setPending({ kind: 'role', member, role: selectedRoles[member.id] })}>{translate('accessControl.reviewRoleChange')}</button><button className="secondary-button" type="button" disabled={selectedWorkspaceScopes[member.id] === member.workspace_scope} onClick={() => setPending({ kind: 'workspace_scope', member, workspaceScope: selectedWorkspaceScopes[member.id] })}>{translate('accessControl.reviewScopeChange')}</button></div>}</span>
               </div>)}
             </div>}
           </section>}
@@ -159,6 +169,8 @@ export function AccessControl({ client = browserAccessControlClient }: { client?
       {pending && <div className="archive-confirmation" role="alertdialog" aria-labelledby="access-change-heading">
         <div><strong id="access-change-heading">{translate('accessControl.confirmAccessChange')}</strong><p>{pending.kind === 'role'
           ? translate('accessControl.confirmRole', { name: pending.member.display_name, from: roleByValue.get(pending.member.role)?.label ?? pending.member.role, to: roleByValue.get(pending.role)?.label ?? pending.role })
+          : pending.kind === 'workspace_scope'
+            ? translate('accessControl.confirmWorkspaceScope', { name: pending.member.display_name, scope: pending.workspaceScope === 'assigned_organizations' ? translate('accessControl.assignedWorkspacesOnly') : translate('accessControl.allWorkspaces') })
           : pending.kind === 'access'
             ? pending.accessMode === 'assigned_only'
               ? translate('accessControl.confirmRestriction', { name: pending.organization.name })

@@ -10,6 +10,7 @@ from .models import (
     BuiltInRole,
     CustomRole,
     CustomRoleScope,
+    MembershipWorkspaceScope,
     ScopedRoleAssignment,
 )
 
@@ -40,12 +41,17 @@ class MemberSerializer(serializers.Serializer):
     display_name = serializers.CharField()
     email = serializers.EmailField()
     role = serializers.ChoiceField(choices=BuiltInRole.choices)
+    workspace_scope = serializers.ChoiceField(choices=MembershipWorkspaceScope.choices)
     is_owner = serializers.BooleanField()
     joined_at = serializers.DateTimeField(allow_null=True)
 
 
 class MemberRoleWriteSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=TENANT_ASSIGNABLE_ROLE_CHOICES)
+
+
+class MemberWorkspaceScopeWriteSerializer(serializers.Serializer):
+    workspace_scope = serializers.ChoiceField(choices=MembershipWorkspaceScope.choices)
 
 
 class AssignedStaffSerializer(serializers.Serializer):

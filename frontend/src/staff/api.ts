@@ -1,5 +1,6 @@
 import { AuthRequestError, browserCsrfToken, privilegedActionError } from '../auth/api'
 import type { Member } from '../access-control/api'
+import type { MembershipWorkspaceScope } from '../access-control/api'
 
 export type InvitationState = 'pending' | 'expired' | 'revoked' | 'accepted'
 
@@ -7,6 +8,7 @@ export type StaffInvitation = {
   id: string
   email: string
   role: 'read_only'
+  workspace_scope: MembershipWorkspaceScope
   organization: null
   state: InvitationState
   expires_at: string
@@ -21,7 +23,7 @@ export type StaffInvitation = {
 export interface StaffAdministrationClient {
   members(signal?: AbortSignal): Promise<Member[]>
   invitations(signal?: AbortSignal): Promise<StaffInvitation[]>
-  issue(email: string): Promise<StaffInvitation>
+  issue(email: string, workspaceScope: MembershipWorkspaceScope): Promise<StaffInvitation>
   resend(invitationId: string): Promise<StaffInvitation>
   revoke(invitationId: string): Promise<StaffInvitation>
 }
@@ -75,7 +77,7 @@ async function mutate<T>(path: string, body?: object): Promise<T> {
 export const browserStaffAdministrationClient: StaffAdministrationClient = {
   members: (signal) => load<Member[]>('/api/v1/access-control/members', signal),
   invitations: (signal) => load<StaffInvitation[]>('/api/v1/invitations', signal),
-  issue: (email) => mutate<StaffInvitation>('/api/v1/invitations', { email }),
+  issue: (email, workspaceScope) => mutate<StaffInvitation>('/api/v1/invitations', { email, workspace_scope: workspaceScope }),
   resend: (invitationId) => mutate<StaffInvitation>(`/api/v1/invitations/${encodeURIComponent(invitationId)}/resend`),
   revoke: (invitationId) => mutate<StaffInvitation>(`/api/v1/invitations/${encodeURIComponent(invitationId)}/revoke`),
 }

@@ -64,6 +64,7 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "custom-role-detail": ("role_id",),
         "scoped-role-assignment-detail": ("assignment_id",),
         "access-control-member-role": ("user_id",),
+        "access-control-member-workspace-scope": ("user_id",),
         "access-control-organization-detail": ("organization_entity_id",),
         "access-control-organization-staff": ("organization_entity_id",),
         "access-control-organization-staff-detail": ("organization_entity_id", "user_id"),

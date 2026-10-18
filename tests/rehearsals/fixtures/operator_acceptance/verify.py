@@ -21,6 +21,7 @@ from apps.core.models import (
 from apps.accounts.models import (
     TenantMembership,
     BuiltInRole,
+    MembershipWorkspaceScope,
     OrganizationAccessAssignment,
 )
 from apps.core.rls import bind_local_rls_scope, OrganizationRLSMode, RLSPrincipalMode
@@ -58,6 +59,7 @@ with transaction.atomic():
         user__email="reader-a@acceptance.invalid",
         role=BuiltInRole.READ_ONLY,
     )
+    assert reader.workspace_scope == MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS
     assert set(
         OrganizationAccessAssignment.objects.filter(membership=reader).values_list(
             "organization_id", flat=True

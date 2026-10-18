@@ -1150,3 +1150,53 @@ def test_postgres_rejects_client_asset_provenance_mutation(owner_client, install
         ClientAssetLifecycleEvent.objects.filter(pk=lifecycle_event.pk).update(to_state="repair")
     with pytest.raises(DatabaseError), transaction.atomic():
         ClientHardwareAsset.objects.filter(pk=profile.pk).update(serial_number="not-normalized")
+
+
+@pytest.mark.django_db(transaction=True)
+def test_runtime_assigned_reader_can_read_asset_with_unassigned_supplier(
+    owner_client, installation, django_runtime_role
+):
+    from apps.accounts.models import MembershipWorkspaceScope
+    from apps.core.models import Entity
+    from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
+    from apps.core.scoping import DataScope
+
+    supplier = _organization(installation, "Retained supplier", "manufacturer")
+    unrelated = _organization(installation, "Unrelated supplier", "manufacturer")
+    client = _organization(installation, "Assigned client", "client")
+    sibling = _organization(installation, "Unassigned client", "client")
+    _, _, model, _, _ = _catalog(owner_client, supplier)
+    created = owner_client.post(
+        reverse("organization-client-asset-list-create", kwargs={"organization_entity_id": client.entity_id}),
+        {"model_id": model["id"], "name": "Assigned laptop"}, content_type="application/json",
+    )
+    assert created.status_code == 201
+    reader = User.objects.create_user(email="assigned-reader@example.invalid", display_name="Assigned reader")
+    membership = TenantMembership.objects.create(
+        tenant=installation.tenant, user=reader, role=BuiltInRole.READ_ONLY,
+        workspace_scope=MembershipWorkspaceScope.ASSIGNED_ORGANIZATIONS,
+    )
+    OrganizationAccessAssignment.objects.create(
+        tenant=installation.tenant, organization=client, membership=membership, created_by=installation.owner,
+    )
+    browser = Client()
+    browser.force_login(reader)
+    with django_runtime_role():
+        response = browser.get(reverse("organization-client-asset-detail", kwargs={
+            "organization_entity_id": client.entity_id, "asset_entity_id": created.json()["id"],
+        }))
+        assert response.status_code == 200
+        assert response.json()["supplier_name"] == "Retained supplier"
+        assert browser.get(f"/api/v1/workspaces/organizations/{supplier.entity_id}").status_code == 404
+        assert browser.get(f"/api/v1/workspaces/organizations/{sibling.entity_id}").status_code == 404
+        assert browser.get("/api/v1/workspaces/msp/assets/collection").status_code == 403
+        with transaction.atomic():
+            bind_local_rls_scope(
+                DataScope.organization(installation.tenant, client),
+                organization_mode=OrganizationRLSMode.ORGANIZATION,
+                actor_user_id=reader.id, principal_mode=RLSPrincipalMode.USER,
+            )
+            assert Entity.objects.filter(pk=supplier.entity_id).exists()
+            assert not Entity.objects.filter(pk=unrelated.entity_id).exists()
+            with pytest.raises(DatabaseError), transaction.atomic():
+                Entity.objects.filter(pk=supplier.entity_id).update(display_name="Unauthorized change")

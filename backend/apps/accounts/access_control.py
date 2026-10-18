@@ -14,6 +14,7 @@ from apps.core.models import AuditEvent, Organization, OrganizationAccessMode
 from .models import (
     TENANT_ASSIGNABLE_ROLES,
     BuiltInRole,
+    MembershipWorkspaceScope,
     OrganizationAccessAssignment,
     TenantMembership,
     User,
@@ -27,6 +28,7 @@ class MemberProjection:
     display_name: str
     email: str
     role: str
+    workspace_scope: str
     is_owner: bool
     joined_at: datetime | None
 
@@ -49,6 +51,7 @@ def members_for_context(context: InstallationMemberContext) -> list[MemberProjec
                 display_name=owner.display_name,
                 email=owner.email,
                 role=BuiltInRole.OWNER,
+                workspace_scope=MembershipWorkspaceScope.TENANT,
                 is_owner=True,
                 joined_at=context.state.bootstrapped_at,
             )
@@ -59,6 +62,7 @@ def members_for_context(context: InstallationMemberContext) -> list[MemberProjec
             display_name=membership.user.display_name,
             email=membership.user.email,
             role=membership.role,
+            workspace_scope=membership.workspace_scope,
             is_owner=False,
             joined_at=membership.created_at,
         )
@@ -98,6 +102,43 @@ def assign_membership_role(
         tenant=context.tenant,
         actor=actor,
         action="membership.role_assigned",
+        entity_id=membership.user_id,
+        metadata={},
+    )
+    return membership
+
+
+@transaction.atomic
+def assign_membership_workspace_scope(
+    *,
+    actor: User,
+    member_user_id: UUID,
+    workspace_scope: MembershipWorkspaceScope,
+) -> TenantMembership:
+    context = require_permission(actor, PermissionKey.MEMBERSHIPS_ASSIGN_ROLE)
+    if workspace_scope not in MembershipWorkspaceScope:
+        raise ValidationError({"workspace_scope": "Select a supported workspace access scope."})
+    if member_user_id == actor.id:
+        raise ValidationError({"workspace_scope": "You cannot change your own workspace access scope."})
+    try:
+        membership = (
+            TenantMembership.scoped.for_tenant(context.tenant)
+            .select_for_update()
+            .select_related("user")
+            .get(user_id=member_user_id)
+        )
+    except TenantMembership.DoesNotExist as exc:
+        raise NotFound("The tenant member is not available.") from exc
+    if membership.user.is_service_account or membership.organization_id is not None:
+        raise NotFound("The tenant member is not available.")
+    if membership.workspace_scope == workspace_scope:
+        return membership
+    membership.workspace_scope = workspace_scope
+    membership.save(update_fields=("workspace_scope",))
+    AuditEvent.objects.create(
+        tenant=context.tenant,
+        actor=actor,
+        action="membership.workspace_scope_changed",
         entity_id=membership.user_id,
         metadata={},
     )

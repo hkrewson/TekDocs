@@ -1045,6 +1045,8 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .role-definitions small { margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
 .access-table { border-top: 1px solid var(--border); }
 .access-row { display: grid; grid-template-columns: minmax(220px, 1.2fr) minmax(190px, .8fr) minmax(120px, auto); align-items: center; gap: 16px; min-height: 54px; padding: 9px 2px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.member-access-table .access-row { grid-template-columns: minmax(190px, 1.2fr) minmax(145px, .8fr) minmax(190px, 1fr) minmax(250px, auto); }
+.member-access-table .table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .access-row.header { min-height: 38px; color: var(--muted); font-size: 11px; font-weight: 600; }
 .access-row > span:first-child { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .access-row > span:first-child > span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -1405,6 +1407,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .access-row > span:not(:first-child)::before { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 600; }
   .access-row > span:nth-child(2)::before { content: 'Role or access mode'; }
   .access-row > span:nth-child(3)::before { content: 'Action'; }
+  .member-access-table .access-row > span:not(:first-child)::before { content: attr(data-label); }
   .staff-assignment-group { grid-template-columns: 1fr; gap: 12px; }
   .access-collection-form { grid-template-columns: 1fr; }
   .collection-organization-picker, .access-collection-form .form-actions { grid-column: auto; }

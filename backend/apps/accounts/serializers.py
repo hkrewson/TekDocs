@@ -2,7 +2,7 @@ from django.contrib.auth import password_validation
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import Invitation, User
+from .models import Invitation, MembershipWorkspaceScope, User
 
 
 class OwnerBootstrapSerializer(serializers.Serializer):
@@ -49,6 +49,7 @@ class AuthenticatedContextSerializer(serializers.Serializer):
     user = AuthenticatedUserSerializer()
     tenant = BootstrapTenantResultSerializer()
     role = serializers.CharField()
+    workspace_scope = serializers.ChoiceField(choices=MembershipWorkspaceScope.choices)
     permissions = serializers.ListField(child=serializers.CharField())
     surface = serializers.ChoiceField(choices=("msp", "client_portal"))
     organization = serializers.DictField(allow_null=True)
@@ -75,6 +76,11 @@ class OidcProviderListSerializer(serializers.Serializer):
 
 class InvitationRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
+    workspace_scope = serializers.ChoiceField(
+        choices=MembershipWorkspaceScope.choices,
+        required=False,
+        default=MembershipWorkspaceScope.TENANT,
+    )
 
 
 class InvitationAcceptanceSerializer(serializers.Serializer):
@@ -101,6 +107,7 @@ class InvitationSerializer(serializers.ModelSerializer):
             "id",
             "email",
             "role",
+            "workspace_scope",
             "organization",
             "state",
             "expires_at",

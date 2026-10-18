@@ -33,8 +33,9 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
   onProfileUpdated: (context: AuthenticatedContext) => void
 }) {
   const [parameters] = useSearchParams()
+  const canManageTokens = context.surface === 'msp' && context.workspace_scope === 'tenant'
   const requestedSection = parameters.get('section')
-  const section = requestedSection === 'two-factor' || requestedSection === 'sessions' || requestedSection === 'api-tokens' ? requestedSection : 'profile'
+  const section = requestedSection === 'two-factor' || requestedSection === 'sessions' || (requestedSection === 'api-tokens' && canManageTokens) ? requestedSection : 'profile'
   const [displayName, setDisplayName] = useState(context.user.display_name)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -55,7 +56,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
     { id: 'profile', label: translate('settings.profile'), href: '/settings?section=profile' },
     { id: 'two-factor', label: translate('auth.twoFactorHeading'), href: '/settings?section=two-factor' },
     { id: 'sessions', label: translate('settings.activeSessions'), href: '/settings?section=sessions' },
-    ...(context.surface === 'msp' ? [{ id: 'api-tokens', label: translate('settings.apiTokens'), href: '/settings?section=api-tokens' }] : []),
+    ...(canManageTokens ? [{ id: 'api-tokens', label: translate('settings.apiTokens'), href: '/settings?section=api-tokens' }] : []),
   ]
 
   const loadSessions = useCallback(async () => {
@@ -291,7 +292,7 @@ export function SecuritySettings({ client, context, onProfileUpdated }: {
           </ul>
         )}
       </section>}
-      {context.surface === 'msp' && section === 'api-tokens' && <ApiTokenSettings client={client} context={context} />}
+      {canManageTokens && section === 'api-tokens' && <ApiTokenSettings client={client} context={context} />}
     </>
   )
 }

@@ -3,6 +3,7 @@ import { AuthRequestError, browserCsrfToken, privilegedActionError } from '../au
 export type BuiltInRole = 'owner' | 'administrator' | 'technician' | 'contributor' | 'read_only' | 'client_administrator' | 'client_user'
 export type TenantRole = 'administrator' | 'technician' | 'contributor' | 'read_only'
 export type OrganizationAccessMode = 'all_authorized' | 'assigned_only'
+export type MembershipWorkspaceScope = 'tenant' | 'assigned_organizations'
 
 export type PermissionDefinition = {
   key: string
@@ -20,7 +21,7 @@ export type RoleDefinition = {
 }
 
 export type AccessCatalog = { permissions: PermissionDefinition[]; roles: RoleDefinition[]; custom_assignable_permissions: PermissionDefinition[] }
-export type Member = { id: string; display_name: string; email: string; role: BuiltInRole; is_owner: boolean; joined_at: string | null }
+export type Member = { id: string; display_name: string; email: string; role: BuiltInRole; workspace_scope: MembershipWorkspaceScope; is_owner: boolean; joined_at: string | null }
 export type AssignedStaff = { id: string; display_name: string; email: string; role: TenantRole }
 export type OrganizationAccess = { id: string; name: string; access_mode: OrganizationAccessMode; assigned_staff: AssignedStaff[] }
 export type CustomRoleScope = 'tenant' | 'organization' | 'collection'
@@ -38,6 +39,7 @@ export interface AccessControlClient {
   accessCollections(signal?: AbortSignal): Promise<AccessCollection[]>
   scopedAssignments(signal?: AbortSignal): Promise<ScopedRoleAssignment[]>
   assignRole(userId: string, role: TenantRole): Promise<Member>
+  assignWorkspaceScope(userId: string, workspaceScope: MembershipWorkspaceScope): Promise<Member>
   changeAccessMode(organizationId: string, accessMode: OrganizationAccessMode): Promise<OrganizationAccess>
   assignStaff(organizationId: string, userId: string): Promise<OrganizationAccess>
   removeStaff(organizationId: string, userId: string): Promise<OrganizationAccess>
@@ -108,6 +110,7 @@ export const browserAccessControlClient: AccessControlClient = {
   accessCollections: (signal) => load<AccessCollection[]>('/api/v1/access-control/collections', signal),
   scopedAssignments: (signal) => load<ScopedRoleAssignment[]>('/api/v1/access-control/role-assignments', signal),
   assignRole: (userId, role) => patch<Member>(`/api/v1/access-control/members/${encodeURIComponent(userId)}`, { role }),
+  assignWorkspaceScope: (userId, workspaceScope) => patch<Member>(`/api/v1/access-control/members/${encodeURIComponent(userId)}/workspace-scope`, { workspace_scope: workspaceScope }),
   changeAccessMode: (organizationId, accessMode) => patch<OrganizationAccess>(
     `/api/v1/access-control/organizations/${encodeURIComponent(organizationId)}`,
     { access_mode: accessMode },

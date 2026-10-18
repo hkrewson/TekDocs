@@ -354,6 +354,11 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         mutations=(PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,),
     ),
     route(
+        "access-control-member-workspace-scope",
+        ("PATCH",),
+        mutations=(PermissionKey.MEMBERSHIPS_ASSIGN_ROLE,),
+    ),
+    route(
         "access-control-organizations",
         ("GET",),
         PermissionKey.ORGANIZATIONS_MANAGE_ACCESS,

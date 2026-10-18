@@ -279,9 +279,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted job 117775118038: constrained-mobile legacy editor editable element absent after 12000 ms. Desktop passed; two repository profiles did not run. Unchanged local Docker replay passed all four cases in 39.2 seconds; mobile editor 8226 ms. Hosted symptom not locally reproduced.",
       "cause": "unknown",
-      "next_action": "Retain value-safe hosted loading/error/timing diagnostics, then reproduce and distinguish initialization delay from runner contention. No assertion/limit change, fix, or hosted retry into a pass. Existing harness did not retain performance artifacts.",
+      "next_action": "Original timeout cause remains unknown and was not reproduced in five baseline repetitions. Separately reproduced static transfer defect fixed in a470d00; final b6d65fe experiment 39170595354 passed 20 cases (mobile editor 3565\u20133670 ms), and Extended performance job 117803768878 passed four cases (3417 ms). Both artifacts downloaded and verified; no assertion limits or retries changed.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "39170977036"
     },
     {
       "run_id": "39161339120",
@@ -289,9 +289,59 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Job 117784405105 returned nonzero when ci_status.py summarized the failed Extended workflow.",
       "cause": "Intentional failure summary after performance failure; no independent application defect established.",
-      "next_action": "Resolve recorded performance failure before claiming complete Extended validation.",
+      "next_action": "Final b6d65fe Extended 39170977036 passed completely; failure triage skipped. Original performance timeout cause remains unknown as recorded separately.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "39170977036"
+    },
+    {
+      "run_id": "local-a470d00-compression-regression",
+      "job": "Production frontend static bundle delivery",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Docker GET accepted gzip but returned 1142067 uncompressed editor-JavaScript bytes. make test-frontend-routing with the new regression failed twice against the original image: Content-Encoding absent for editor JS and CSS.",
+      "cause": "Public /assets/ location did not enable gzip, although build budgets use compressed sizes. This proves excess transfer cost, not the precise cause of the earlier one-off hosted timeout.",
+      "next_action": "Corrected image passed six Docker routing tests and 20 local performance cases. Final b6d65fe hosted experiment passed 20 cases and normal performance passed four, with readable verified reports. Keep original timeout diagnosis separate.",
+      "fix_commit": "a470d00648b24e23c479f89b80e182a7536f49e2",
+      "retest_run": "39170977036"
+    },
+    {
+      "run_id": "39167910692",
+      "job": "Constrained browser performance diagnostics / artifact upload",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All 20 uncompressed hosted profiles passed, then upload failed EACCES reading root-owned mode-0600 diagnostic JSON. A Linux container reproduced non-root reader Permission denied for the same producer mode.",
+      "cause": "New diagnostic handoff omitted the existing browser harness export-permission step. Docker root-owned 0600 files are unreadable by the Linux host uploader; Docker Desktop local ownership mapping did not expose this.",
+      "next_action": "Resolved handoff: b6d65fe experiment 39170595354 passed all 20 cases and upload. Downloaded 21 JSON files passed value-safe schema and zero-retry checks. Retain original failed workflow and separate original timeout with unknown cause.",
+      "fix_commit": "b6d65fe2b51c03d6ae84a52488d3c9fc50a275cf",
+      "retest_run": "39170595354"
+    },
+    {
+      "run_id": "39169101572",
+      "job": "Constrained browser performance diagnostics / artifact upload",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All 20 compressed hosted profiles passed; mobile editor 3376\u20133432 ms. Upload then failed EACCES reading a root-owned 0600 report. Linux non-root reader reproduction is recorded with baseline 39167910692.",
+      "cause": "Same confirmed Linux report export permission defect as run 39167910692; timing assertions passed. The runs started before the exporter correction and were retained for their numerical evidence.",
+      "next_action": "Resolved handoff: b6d65fe experiment 39170595354 passed all 20 cases and upload. Downloaded 21 JSON files passed value-safe schema and zero-retry checks. Retain original failed workflow and separate original timeout with unknown cause.",
+      "fix_commit": "b6d65fe2b51c03d6ae84a52488d3c9fc50a275cf",
+      "retest_run": "39170595354"
+    },
+    {
+      "run_id": "39169113662",
+      "job": "Public-beta performance reference / artifact upload",
+      "owner": "TekDocs maintainer",
+      "reproduction": "All four hosted browser performance profiles passed; mobile editor 3651 ms. Upload then failed EACCES reading a root-owned 0600 report. Linux non-root reader reproduction is recorded with baseline 39167910692.",
+      "cause": "Same confirmed Linux report export permission defect as run 39167910692; timing assertions passed. The runs started before the exporter correction and were retained for their numerical evidence.",
+      "next_action": "Final b6d65fe Extended 39170977036 passed completely, including performance report upload. Downloaded reports verified. Retain this original failed workflow as historical evidence.",
+      "fix_commit": "b6d65fe2b51c03d6ae84a52488d3c9fc50a275cf",
+      "retest_run": "39170977036"
+    },
+    {
+      "run_id": "39169113662",
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Failure summary returned nonzero for the Extended run whose performance artifact upload failed after all timing assertions passed.",
+      "cause": "Intentional nonzero workflow failure summary; no additional application defect.",
+      "next_action": "Final b6d65fe Extended 39170977036 passed completely, including performance report upload. Downloaded reports verified. Retain this original failed workflow as historical evidence.",
+      "fix_commit": null,
+      "retest_run": "39170977036"
     }
   ]
 }

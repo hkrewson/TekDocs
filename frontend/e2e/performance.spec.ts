@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Browser, Page } from '@playwright/test'
+import { performanceDiagnostics } from './performance-diagnostics'
 
 const enabled = process.env.TEKDOCS_PERFORMANCE_REHEARSAL === 'true'
 const editorDecodedJavaScriptBudget = 1_500 * 1024
@@ -92,56 +93,72 @@ async function measureProfile(
   browser: Browser,
   profile: { name: string; width: number; height: number; cpuRate: number; latency: number; download: number },
   editor: 'legacy' | 'repository' = 'legacy',
+  repetition = 0,
 ) {
   const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height } })
   const page = await context.newPage()
   const session = await context.newCDPSession(page)
-  await session.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuRate })
-  await session.send('Network.enable')
-  await session.send('Network.emulateNetworkConditions', {
-    offline: false,
-    latency: profile.latency,
-    downloadThroughput: profile.download,
-    uploadThroughput: 750 * 1024 / 8,
-    connectionType: 'cellular4g',
-  })
-  await mockAuthenticated(page)
+  const diagnostics = performanceDiagnostics(page, session)
+  await session.send('Performance.enable')
+  try {
+    await session.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuRate })
+    await session.send('Network.enable')
+    await session.send('Network.emulateNetworkConditions', {
+      offline: false,
+      latency: profile.latency,
+      downloadThroughput: profile.download,
+      uploadThroughput: 750 * 1024 / 8,
+      connectionType: 'cellular4g',
+    })
+    await mockAuthenticated(page)
 
-  const shellStarted = Date.now()
-  await page.goto('/documentation')
-  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
-  const shellReadyMs = Date.now() - shellStarted
-  const beforeEditor = await resources(page)
-  expect(beforeEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(false)
+    diagnostics.phase('shell-start')
+    const shellStarted = Date.now()
+    await page.goto('/documentation')
+    await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
+    const shellReadyMs = Date.now() - shellStarted
+    diagnostics.phase('shell-ready')
+    const beforeEditor = await resources(page)
+    expect(beforeEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(false)
 
-  const editorStarted = Date.now()
-  if (editor === 'repository') {
-    await page.getByRole('button', { name: 'Repository content', exact: true }).click()
-    await page.getByRole('button', { name: /Git capacity runbook/ }).click()
-    await expect(page.getByLabel('Markdown body')).toHaveValue(documentRecord.markdown, { timeout: 12_000 })
-    await page.getByLabel('Markdown body').fill(`${documentRecord.markdown}\nDraft update.`)
-    await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeEnabled()
-  } else {
-    await page.getByRole('button', { name: 'Capacity Runbook' }).click()
-    await page.getByRole('button', { name: 'Edit this content' }).click()
-    await expect(page.locator('.milkdown-host [contenteditable="true"]')).toBeVisible({ timeout: 12_000 })
+    const editorStarted = Date.now()
+    if (editor === 'repository') {
+      await page.getByRole('button', { name: 'Repository content', exact: true }).click()
+      await page.getByRole('button', { name: /Git capacity runbook/ }).click()
+      await expect(page.getByLabel('Markdown body')).toHaveValue(documentRecord.markdown, { timeout: 12_000 })
+      await page.getByLabel('Markdown body').fill(`${documentRecord.markdown}\nDraft update.`)
+      await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeEnabled()
+    } else {
+      await page.getByRole('button', { name: 'Capacity Runbook' }).click()
+      diagnostics.phase('document-open')
+      await page.getByRole('button', { name: 'Edit this content' }).click()
+      diagnostics.phase('edit-clicked')
+      await expect(page.locator('.milkdown-host [contenteditable="true"]')).toBeVisible({ timeout: 12_000 })
+    }
+    const editorReadyMs = Date.now() - editorStarted
+    diagnostics.phase('editor-ready')
+    const afterEditor = await resources(page)
+    const initialJavaScript = beforeEditor
+      .filter((entry) => entry.initiatorType === 'script')
+      .reduce((total, entry) => total + entry.decodedBodySize, 0)
+    const editorJavaScript = afterEditor
+      .filter((entry) => entry.initiatorType === 'script' && !beforeEditor.some((before) => before.name === entry.name))
+      .reduce((total, entry) => total + entry.decodedBodySize, 0)
+
+    expect(shellReadyMs, `${profile.name} shell ready time`).toBeLessThan(8_000)
+    expect(editorReadyMs, `${profile.name} editor ready time`).toBeLessThan(12_000)
+    expect(initialJavaScript, `${profile.name} initial decoded JavaScript`).toBeLessThan(900 * 1024)
+    expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(editorDecodedJavaScriptBudget)
+    expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(editor === 'legacy')
+    diagnostics.phase('budgets-passed')
+    return { ...profile, editor, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }
+  } finally {
+    try {
+      await diagnostics.save(editor, profile.width, repetition)
+    } finally {
+      await context.close()
+    }
   }
-  const editorReadyMs = Date.now() - editorStarted
-  const afterEditor = await resources(page)
-  const initialJavaScript = beforeEditor
-    .filter((entry) => entry.initiatorType === 'script')
-    .reduce((total, entry) => total + entry.decodedBodySize, 0)
-  const editorJavaScript = afterEditor
-    .filter((entry) => entry.initiatorType === 'script' && !beforeEditor.some((before) => before.name === entry.name))
-    .reduce((total, entry) => total + entry.decodedBodySize, 0)
-
-  expect(shellReadyMs, `${profile.name} shell ready time`).toBeLessThan(8_000)
-  expect(editorReadyMs, `${profile.name} editor ready time`).toBeLessThan(12_000)
-  expect(initialJavaScript, `${profile.name} initial decoded JavaScript`).toBeLessThan(900 * 1024)
-  expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(editorDecodedJavaScriptBudget)
-  expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(editor === 'legacy')
-  await context.close()
-  return { ...profile, editor, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }
 }
 
 // Never run throttled timing profiles concurrently or retry them into a pass.
@@ -154,7 +171,7 @@ for (const editor of ['legacy', 'repository'] as const) {
     test(`${editor} editing stays within budget on ${profile.name}`, async ({ browser }, testInfo) => {
       test.skip(!enabled, 'Run through make test-public-beta-performance.')
       test.skip(testInfo.project.name !== 'chromium', 'Deterministic CPU/network emulation is Chromium-only.')
-      const measurements = [await measureProfile(browser, profile, editor)]
+      const measurements = [await measureProfile(browser, profile, editor, testInfo.repeatEachIndex)]
       console.log(JSON.stringify({ measurements }))
       await testInfo.attach('performance-metrics.json', {
         body: Buffer.from(JSON.stringify({ measurements }, null, 2)),

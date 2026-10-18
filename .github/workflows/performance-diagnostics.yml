@@ -1,0 +1,26 @@
+name: Performance diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A bounded reproduction experiment, not replacement release evidence or retries.
+jobs:
+  browser-performance:
+    name: Constrained browser performance diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: ./tests/rehearsals/rehearse-browser-performance.sh
+        env:
+          TEKDOCS_PERFORMANCE_REPETITIONS: "5"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: browser-performance-diagnostics
+          path: artifacts/playwright-performance/
+          retention-days: 14
+          if-no-files-found: error

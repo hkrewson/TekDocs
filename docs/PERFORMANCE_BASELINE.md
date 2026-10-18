@@ -75,3 +75,21 @@ make test-public-beta-performance
 - Cold image startup and fixture construction are excluded from request timing.
 - The public-beta fixture reaches the planned 1.0 reference record counts. It does not establish the maximum supported dataset, sustained concurrency, a hosted-service SLA, or an operator-specific production sizing guide.
 - Final release-candidate measurements still require a quiet documented reference host, retained trend artifacts, and remediation of any browser, database, or external-review regression.
+
+## Failure diagnostics
+
+The browser rehearsal retains `summary.json` and one value-safe diagnostic JSON
+per editor, viewport and repetition under `artifacts/playwright-performance`.
+Diagnostics include fixed phase names, elapsed times, script completion/failure
+counts, editor-presence counts and an allowlist of numeric Chromium metrics.
+They are written in teardown even when readiness assertions fail. URLs, request
+or response payloads, browser error text, DOM text, screenshots and traces are
+not retained. An absent browser response is represented by null metrics.
+
+The normal release gate still runs each profile once, serially, with no retries
+and unchanged 8-second shell / 12-second editor limits. The manual **Performance
+diagnostics** workflow runs a fixed five-repetition experiment on one worker;
+any failure fails the experiment. It is diagnosis, not replacement release
+validation. Repetition results have distinct files and are never overwritten by
+later passes. `TEKDOCS_PERFORMANCE_REPETITIONS` accepts only integers 1 through 5.
+The Extended workflow treats missing performance artifacts as an error.

@@ -2,6 +2,11 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
+repetitions=${TEKDOCS_PERFORMANCE_REPETITIONS:-1}
+case "$repetitions" in
+  1|2|3|4|5) ;;
+  *) echo "Performance repetitions must be between 1 and 5." >&2; exit 1 ;;
+esac
 work_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-browser-performance.XXXXXX")
 environment_file="$work_directory/performance.env"
 project_name="tekdocs_browser_performance_$$"
@@ -48,5 +53,7 @@ docker run --rm \
   -v "$performance_artifacts:/app/test-results" \
   -e PLAYWRIGHT_BASE_URL=http://localhost:8080 \
   -e TEKDOCS_PERFORMANCE_REHEARSAL=true \
-  "$playwright_image" npx playwright test --config=playwright.compose.config.ts --project=chromium e2e/performance.spec.ts
+  -e TEKDOCS_PERFORMANCE_DIAGNOSTICS=/app/test-results/diagnostics \
+  -e PLAYWRIGHT_SAFE_SUMMARY=/app/test-results/summary.json \
+  "$playwright_image" npx playwright test --config=playwright.compose.config.ts --project=chromium --workers=1 --repeat-each="$repetitions" e2e/performance.spec.ts
 echo "Constrained-device browser performance suite passed"

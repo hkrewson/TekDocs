@@ -82,6 +82,7 @@ jobs:
           name: public-beta-performance
           path: artifacts/playwright-performance/
           retention-days: 14
+          if-no-files-found: error
 
   dast:
     name: Dynamic application security test

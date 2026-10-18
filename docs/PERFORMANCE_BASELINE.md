@@ -93,3 +93,23 @@ any failure fails the experiment. It is diagnosis, not replacement release
 validation. Repetition results have distinct files and are never overwritten by
 later passes. `TEKDOCS_PERFORMANCE_REPETITIONS` accepts only integers 1 through 5.
 The Extended workflow treats missing performance artifacts as an error.
+
+
+### Static bundle delivery correction (0.9.8 candidate)
+
+The production Nginx image now negotiates gzip for public build assets only,
+using level 6 compression and `Vary: Accept-Encoding`, including requests carrying
+`Via`. API/authentication proxy routes and the entry document are outside this
+location. Decoded-JavaScript and readiness limits remain unchanged.
+
+A Docker GET requesting gzip reproduced the former delivery gap: the optional
+editor still transferred 1,142,067 uncompressed bytes. The new routing regression
+failed for missing gzip on both editor JavaScript and CSS before correction. It
+now verifies exact decoded-byte equality, preserved cache/security headers,
+identity negotiation, proxy negotiation, uncompressed HTML, and missing-file 404s.
+
+Five serial local baseline repetitions passed, with mobile legacy editor readiness
+8,159–8,219 ms. The isolated compression experiment passed all 20 cases and reduced
+that duration to approximately 3.1 seconds. This confirms download-cost reduction,
+not the root cause of the earlier intermittent hosted timeout. Commit-bound final
+candidate results remain tracked in the release record.

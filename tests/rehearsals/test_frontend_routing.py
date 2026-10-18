@@ -2,6 +2,7 @@
 
 Run through make test-frontend-routing; the disposable container has no data volumes.
 """
+import gzip
 import http.client
 import json
 import os
@@ -9,6 +10,7 @@ import re
 import subprocess
 import time
 import unittest
+from itertools import product
 from pathlib import Path
 
 
@@ -130,6 +132,39 @@ class FrontendRoutingTests(unittest.TestCase):
             'Host': 'docs.example.invalid', 'X-Forwarded-Proto': 'https'})
         self.assertEqual(status, 301)
         self.assertEqual(headers.get('Location'), '/routing-probe/')
+
+    def test_public_editor_bundles_negotiate_compression_without_changing_content(self):
+        assets = subprocess.check_output([
+            'docker', 'exec', self.container, 'ls', '/usr/share/nginx/html/assets',
+        ], text=True).splitlines()
+        bundles = [name for name in assets if name.startswith('EditorSpike-') and name.endswith(('.js', '.css'))]
+        self.assertEqual(len(bundles), 2)
+        for name, via in product(bundles, ('', '1.1 proxy.example.invalid')):
+            with self.subTest(asset=name, via=via):
+                status, identity_headers, identity = self.request('/assets/' + name, {'Accept-Encoding': 'identity'})
+                self.assertEqual(status, 200)
+                self.assertNotIn('Content-Encoding', identity_headers)
+                request_headers = {'Accept-Encoding': 'gzip'}
+                if via:
+                    request_headers['Via'] = via
+                status, compressed_headers, compressed = self.request('/assets/' + name, request_headers)
+                self.assertEqual(status, 200)
+                self.assertEqual(compressed_headers.get('Content-Encoding'), 'gzip')
+                self.assertIn('Accept-Encoding', compressed_headers.get('Vary', ''))
+                self.assertEqual(gzip.decompress(compressed), identity)
+                self.assertLess(len(compressed), len(identity) / 2)
+                for header in ('Content-Type', 'Cache-Control', 'Content-Security-Policy',
+                               'X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy'):
+                    self.assertEqual(compressed_headers[header], identity_headers[header])
+
+        # Compression is confined to public build files, not the SPA document.
+        for path in ('/index.html', '/documentation', '/assets/nonexistent-compression-check.js'):
+            with self.subTest(path=path):
+                expected_status, _, expected = self.request(path, {'Accept-Encoding': 'identity'})
+                status, headers, body = self.request(path, {'Accept-Encoding': 'gzip'})
+                self.assertEqual(status, expected_status)
+                self.assertNotIn('Content-Encoding', headers)
+                self.assertEqual(body, expected)
 
 
 if __name__ == '__main__':

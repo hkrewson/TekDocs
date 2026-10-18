@@ -1,6 +1,19 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { clearTimeout, setTimeout } from 'node:timers'
 import type { CDPSession, Page, Request } from '@playwright/test'
+
+async function boundedProbe<T>(operation: Promise<T>): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation.catch(() => null),
+      new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), 1_000) }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 // Only fixed labels, counters and timing values leave this synthetic rehearsal.
 // Never retain URLs, console/error text, request bodies, headers or DOM content.
@@ -35,11 +48,11 @@ export function performanceDiagnostics(page: Page, session: CDPSession) {
       const directory = process.env.TEKDOCS_PERFORMANCE_DIAGNOSTICS
       if (!directory) return
       const metricNames = new Set(['TaskDuration', 'ScriptDuration', 'LayoutDuration', 'RecalcStyleDuration', 'JSHeapUsedSize'])
-      const metrics = await session.send('Performance.getMetrics').catch(() => null)
-      const editorState = await page.evaluate(() => ({
+      const metrics = await boundedProbe(session.send('Performance.getMetrics'))
+      const editorState = await boundedProbe(page.evaluate(() => ({
         hostCount: document.querySelectorAll('.milkdown-host').length,
         editableCount: document.querySelectorAll('.milkdown-host [contenteditable="true"]').length,
-      })).catch(() => null)
+      })))
       mkdirSync(directory, { recursive: true })
       writeFileSync(join(directory, `${editor}-${width}-${repetition}.json`), `${JSON.stringify({
         schema_version: 1, editor, width, repetition, phases, scripts, elapsedMs: Date.now() - started,

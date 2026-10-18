@@ -1708,6 +1708,11 @@ Evidence: `docs/releases/0.8.46.md`.
 
 ### `0.9.8` acceptance checklist
 
+The October 18 performance follow-up is tracked in
+`planning/releases/0.9.8-performance-diagnostics.md`: failure-safe diagnostics and
+a reproduced static-bundle compression gap. Candidate acceptance remains open
+until the changed image has complete matched hosted evidence.
+
 This is a stabilization checkpoint for the Git-backed 1.0 candidate, not a
 version bump, deployment authorization, or release tag. Historical evidence is
 reusable only when it exercises the current candidate and its Git-backed

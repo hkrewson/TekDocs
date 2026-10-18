@@ -13,14 +13,14 @@ afterEach(() => {
   directory = undefined
 })
 
-function fixture(crashed = false) {
+function fixture(crashed: boolean | 'hung' = false) {
   directory = mkdtempSync(join(tmpdir(), 'tekdocs-performance-diagnostics-'))
   vi.stubEnv('TEKDOCS_PERFORMANCE_DIAGNOSTICS', directory)
   const page = Object.assign(new EventEmitter(), {
-    evaluate: vi.fn(() => crashed ? Promise.reject(new Error('synthetic private error'))
+    evaluate: vi.fn(() => crashed === 'hung' ? new Promise<never>(() => undefined) : crashed ? Promise.reject(new Error('synthetic private error'))
       : Promise.resolve({ hostCount: 1, editableCount: 0 })),
   })
-  const session = { send: vi.fn(() => crashed ? Promise.reject(new Error('synthetic private error'))
+  const session = { send: vi.fn(() => crashed === 'hung' ? new Promise<never>(() => undefined) : crashed ? Promise.reject(new Error('synthetic private error'))
     : Promise.resolve({ metrics: [{ name: 'TaskDuration', value: 2 }, { name: 'unapproved', value: 42 }] })) }
   return { page, diagnostics: performanceDiagnostics(page as unknown as Page, session as unknown as CDPSession) }
 }
@@ -51,5 +51,14 @@ test('retains pending-request counts even when the browser can no longer answer'
   await diagnostics.save('legacy', 390)
   expect(JSON.parse(readFileSync(join(directory!, 'legacy-390-0.json'), 'utf8'))).toMatchObject({
     pendingScripts: 1, browserMetrics: null, editorState: null,
+  })
+})
+
+
+test('writes diagnostics when both browser probes hang', async () => {
+  const { diagnostics } = fixture('hung')
+  await diagnostics.save('legacy', 390)
+  expect(JSON.parse(readFileSync(join(directory!, 'legacy-390-0.json'), 'utf8'))).toMatchObject({
+    browserMetrics: null, editorState: null,
   })
 })

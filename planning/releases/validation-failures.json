@@ -342,6 +342,16 @@
       "next_action": "Final b6d65fe Extended 39170977036 passed completely, including performance report upload. Downloaded reports verified. Retain this original failed workflow as historical evidence.",
       "fix_commit": null,
       "retest_run": "39170977036"
+    },
+    {
+      "run_id": "local-267e068-release-gate-composition",
+      "job": "Full Docker browser matrix / test-e2e-all",
+      "owner": "TekDocs maintainer",
+      "reproduction": "After the release-gate composition correction, make release-gate passed static, all ten PostgreSQL shards, performance, Compose and routing, then six-worker full browser matrix completed 1176 passed, 12 expected skips and 20 failures in 12.4 minutes. Firefox/WebKit failures include timeouts and absent elements.",
+      "cause": "unknown; local concurrency is a hypothesis, not a diagnosis. This tooling-only change did not modify runtime code or browser assertions.",
+      "next_action": "Retain full aggregate as failed. Reproduce named browser cases under controlled concurrency before changing assertions; successful earlier hosted b6d65fe results do not relabel this local run. Operational prerequisites after test-e2e-all were not reached.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

@@ -42,6 +42,38 @@ other hosted categories verify run/attempt/category identity, not artifact bytes
 Review dispositions and broader artifact provenance
 remain review work, not assertions inferred from green workflow execution.
 
+## Local release-gate composition
+
+`make release-gate` runs current-destination validation, including the supported
+minor-version upgrade matrix, file/diagram upgrade, supported encrypted recovery,
+repository-foundation acceptance and recurring-invoice restore. Existing current
+feature rehearsals, security, browser, production-image and clean-install checks
+remain part of the aggregate.
+
+Seven historical checkpoint targets remain available separately, with their
+original destination guards. They are excluded from the current aggregate:
+
+| Historical target prefix | Required destination |
+| --- | --- |
+| `client-portal` | 0.5.2 |
+| `outbox` | 0.5.4 |
+| `notification` | 0.5.7 |
+| `publication-control` | 0.5.1 |
+| `key-publication` | 0.9.0 |
+| `placement-audience` | 0.9.0 |
+| `monitoring` | 0.7.13 |
+
+Each is still invoked as `make <prefix>-upgrade-rehearsal` at its appropriate
+historical checkout. Their precise historical fixtures are not claimed as current
+migration coverage. Current support is defined by the retained supported matrix
+and current feature rehearsals, plus PostgreSQL migration and isolation tests.
+The aggregate's command-plan regression rejects reintroducing these incompatible
+targets and requires the current upgrade/recovery boundaries.
+
+A passing command plan proves composition, not runtime success. Record actual
+Docker gate outcomes separately. Publication attestations and security-risk
+acceptance remain independent release requirements.
+
 ## Failed validation
 
 Run `python3 scripts/ci_status.py --run-id RUN_ID` for a compact read-only summary.

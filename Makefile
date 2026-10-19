@@ -373,7 +373,9 @@ security:
 dast:
 	TEKDOCS_RUN_DAST=true sh ./tests/rehearsals/rehearse-production-image.sh
 
-release-gate: check test-postgres-matrix test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal notification-upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal placement-audience-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal repository-foundation-acceptance supported-upgrade-matrix recurring-invoice-backup-rehearsal
+# Current-destination rehearsals only. Fixed-destination historical checkpoints
+# remain standalone targets; see planning/releases/README.md.
+release-gate: check test-postgres-matrix test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal repository-foundation-acceptance supported-upgrade-matrix recurring-invoice-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

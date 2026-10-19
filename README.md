@@ -299,6 +299,9 @@ Run the complete release gate:
 make release-gate
 ```
 
+The aggregate uses current-destination rehearsals; fixed-version historical
+checkpoint targets remain standalone. See [release-gate composition](planning/releases/README.md#local-release-gate-composition).
+
 Docker Compose results are authoritative for runtime claims.
 
 `make test-worker-boundaries` checks integration and monitoring task scope

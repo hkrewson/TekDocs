@@ -883,6 +883,9 @@ legacy authority handoff remain open.
 - Reconcile Wiki, OpenAPI, product contract, roadmap, release notes and known
   risks.
 
+Local gate composition follow-up and its verification status are recorded in
+[release-gate composition](releases/0.9.8-release-gate-composition.md).
+
 Exit condition: a frozen candidate satisfies the 1.0 release record.
 
 ### `1.0.0` — contract freeze

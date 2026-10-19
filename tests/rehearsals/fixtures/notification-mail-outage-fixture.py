@@ -1,4 +1,18 @@
 import os
+import secrets
+
+
+def bind_fixture_owner(tenant, owner):  # type: ignore[no-untyped-def]
+    from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
+    from apps.core.scoping import DataScope
+
+    # This rehearsal runs against current runtime RLS, as the bootstrap owner.
+    bind_local_rls_scope(
+        DataScope.tenant(tenant),
+        organization_mode=OrganizationRLSMode.MSP_ONLY,
+        actor_user_id=owner.id,
+        principal_mode=RLSPrincipalMode.USER,
+    )
 
 
 def load_state():  # type: ignore[no-untyped-def]
@@ -17,7 +31,7 @@ def create_fixture() -> None:
 
     from apps.accounts.bootstrap import bootstrap_owner
     from apps.accounts.models import BuiltInRole, Invitation
-    from apps.core.models import NotificationEmailDelivery
+    from apps.core.models import NotificationEmailDelivery, Organization
     from apps.core.organizations import create_organization
     from apps.core.outbox import OutboxTopic, dispatch_due_outbox_events, enqueue_outbox_event
     from apps.core.rls import OrganizationRLSMode, rls_scope
@@ -38,12 +52,20 @@ def create_fixture() -> None:
             website="",
             classifications=["client"],
         )
+        visible_client = Organization.scoped.for_tenant(result.tenant).filter(
+            pk=organization.pk, entity__archived_at__isnull=True, classifications__kind="client"
+        )
+        assert not visible_client.exists(), (
+            "Runtime organization reads must fail closed without an explicit principal"
+        )
+        bind_fixture_owner(result.tenant, result.owner)
+        assert visible_client.exists()
         invitation = Invitation.objects.create(
             tenant=result.tenant,
             organization=organization,
             role=BuiltInRole.CLIENT_USER,
             email="outage-client@example.invalid",
-            token_digest=Invitation.digest_token("outage-fixture-token"),
+            token_digest=Invitation.digest_token(secrets.token_urlsafe(32)),
             invited_by=result.owner,
             expires_at=timezone.now() + timedelta(days=7),
         )
@@ -68,6 +90,7 @@ def observe_outage() -> None:
 
     state = load_state()
     with rls_scope(DataScope.tenant(state.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        bind_fixture_owner(state.tenant, state.owner)
         assert dispatch_due_notification_emails(tenant=state.tenant) == 0
         delivery = NotificationEmailDelivery.scoped.for_tenant(state.tenant).get()
         assert delivery.state == NotificationEmailState.PENDING
@@ -87,6 +110,7 @@ def recover() -> None:
 
     state = load_state()
     with rls_scope(DataScope.tenant(state.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        bind_fixture_owner(state.tenant, state.owner)
         assert dispatch_due_notification_emails(
             tenant=state.tenant,
             now=timezone.now() + timedelta(hours=1),

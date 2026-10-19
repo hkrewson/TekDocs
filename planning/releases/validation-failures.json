@@ -362,6 +362,16 @@
       "next_action": "Attempt 2 passed on unchanged 05abb13, including downstream Build jobs. Exact-seed Docker replay passed. Retain original intermittent failure with unknown cause; no health check or assertion was changed.",
       "fix_commit": null,
       "retest_run": "39190971440 (attempt 2)"
+    },
+    {
+      "run_id": "local-05abb13-mail-outage",
+      "job": "notification-mail-outage-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "make notification-mail-outage-rehearsal, reached by resumed release-gate: invitation fixture creation failed with client invitation organization must be an active tenant client. Isolated Docker probe found zero matching active-client joins without an actor and one after binding the fixture owner; invitation/outbox setup then passed.",
+      "cause": "Current runtime RLS requires an explicit principal for the linked protected records checked by the invitation guard; the current-only mail-outage fixture supplied tenant scope without its owner identity.",
+      "next_action": "Retain the passing full Docker SMTP outage/recovery rehearsal and anonymous-deny/owner-allow regression assertions. Application policies and retry assertions are unchanged. Continue remaining release gates.",
+      "fix_commit": null,
+      "retest_run": "local-mail-outage-owner-scope-pass-2026-10-19"
     }
   ]
 }

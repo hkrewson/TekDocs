@@ -349,9 +349,19 @@
       "owner": "TekDocs maintainer",
       "reproduction": "After the release-gate composition correction, make release-gate passed static, all ten PostgreSQL shards, performance, Compose and routing, then six-worker full browser matrix completed 1176 passed, 12 expected skips and 20 failures in 12.4 minutes. Firefox/WebKit failures include timeouts and absent elements.",
       "cause": "unknown; local concurrency is a hypothesis, not a diagnosis. This tooling-only change did not modify runtime code or browser assertions.",
-      "next_action": "Retain full aggregate as failed. Reproduce named browser cases under controlled concurrency before changing assertions; successful earlier hosted b6d65fe results do not relabel this local run. Operational prerequisites after test-e2e-all were not reached.",
+      "next_action": "Controlled 05abb13 replay with two workers passed all 50 focused cases (including all 20 failed identities), then the full matrix passed 1196 with 12 expected skips, zero retries and artifact hygiene passed. Source, assertions and timeouts unchanged. Concurrency/resource pressure is supported but not proven as the precise cause; retain original failed aggregate. Later operational prerequisites still require separate completion.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "local-05abb13-two-workers"
+    },
+    {
+      "run_id": "39190971440",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Attempt 1: test_canonical_host_property failed Hypothesis input-generation health check after two valid inputs; slowest draw 1.001 seconds. Exact seed 289363990209137831425627396888260549396 replayed in Docker and passed. Shard otherwise reported 458 passed and two skipped.",
+      "cause": "unknown; recurring timing-based input generation failure, not a failing canonicalization assertion. Exact-seed replay did not reproduce the hosted symptom.",
+      "next_action": "Attempt 2 passed on unchanged 05abb13, including downstream Build jobs. Exact-seed Docker replay passed. Retain original intermittent failure with unknown cause; no health check or assertion was changed.",
+      "fix_commit": null,
+      "retest_run": "39190971440 (attempt 2)"
     }
   ]
 }

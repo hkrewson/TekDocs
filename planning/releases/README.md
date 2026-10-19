@@ -11,9 +11,9 @@ Start with [0.9.8 operational closeout](0.9.8-operational-closeout.md) for the
 current 05abb13 hosted results, later rehearsal fixes, accepted header risks and
 remaining publication decisions. [Access candidate validation](0.9.8-access-candidate-validation.md)
 retains the earlier access/compression and browser chronology.
-The pinned manifest still describes the earlier accepted candidate; it must not
-be used as evidence for this changed application. Promotion remains pending the
-new candidate's release closeout.
+The pinned manifest now names 05abb13, published as v0.9.8. All three image aliases
+and signed provenance/SBOMs were verified; see the publication security closeout.
+Deployment and Wiki publication remain separate decisions.
 
 ## Status and evidence
 
@@ -38,8 +38,10 @@ the manifest's `security_record`, not that placeholder, for the current candidat
 The existing strict validator and ten-category assembler remain authoritative
 for record structure. The status verifier adds reference checks; it does not
 prove the reviewer was correct or independently authenticate every hosted artifact.
-Only production-image evidence is downloaded for digest-identity comparison; the
-other hosted categories verify run/attempt/category identity, not artifact bytes.
+Production-image evidence is downloaded for identity comparison. A dependency scan
+retained from an earlier partial-run attempt additionally requires its exact-source
+successful job and original artifact bytes. Other hosted categories verify
+run/attempt/category identity, not artifact bytes.
 Review dispositions and broader artifact provenance
 remain review work, not assertions inferred from green workflow execution.
 

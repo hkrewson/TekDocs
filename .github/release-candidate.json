@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
   "repository": "hkrewson/TekDocs",
-  "candidate_commit": "da198027dbfce44f926ffafd518387a84e587431",
-  "security_record": "planning/releases/0.9.8-security-review.json",
+  "candidate_commit": "05abb130625ae875c58253e309ba6821ee89ed66",
+  "security_record": "planning/releases/0.9.8-publication-security-review.json",
   "workflows": {
-    "Build, test, and secure": 38516198438,
-    "CodeQL": 38516198437,
-    "Extended validation": 38516229558
+    "Build, test, and secure": 39208816214,
+    "CodeQL": 39202253758,
+    "Extended validation": 39190978887
   },
   "operator_acceptance": {
     "decision": "accepted",
-    "date": "2026-10-14",
-    "reference": "planning/responsive-layouts/0.9.8-operator-acceptance.md",
-    "scope": "Current state accepted; unperformed individual manual profiles remain unverified."
+    "date": "2026-10-19",
+    "reference": "planning/releases/0.9.8-operational-closeout.md",
+    "scope": "Operator reported corrected Session 3 passing October 18 and explicitly authorized exact-candidate tag/image publication October 19. Unperformed individual manual profiles remain unverified."
   },
   "remaining_release_actions": [
-    "Commit the evidence and process-tooling changes separately from the frozen application candidate.",
-    "Obtain explicit approval to tag v0.9.8 at da198027dbfce44f926ffafd518387a84e587431.",
-    "Deployment, Wiki publication and authority handoff remain separate decisions."
+    "Deployment and authority handoff remain separate decisions.",
+    "Review and authorize accumulated Wiki history before Wiki publication.",
+    "Confirm unauthenticated GHCR access or configure deployment registry credentials; anonymous pulls returned 403 locally."
   ]
 }

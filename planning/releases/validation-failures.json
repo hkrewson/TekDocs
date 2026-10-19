@@ -412,6 +412,26 @@
       "next_action": "Complete Docker backup/restore passed with the owner principal, anonymous-deny assertion, original monitoring evidence assertions and repository archive verification. Retain this as rehearsal-only evidence.",
       "fix_commit": "986973fc0a1b0626f8b823043081d58e2a1ae624",
       "retest_run": "local-monitoring-backup-owner-and-repository-pass-2026-10-19"
+    },
+    {
+      "run_id": "39208816214",
+      "job": "PostgreSQL shard (core-c), attempt 1",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted test_canonical_host_property failed input-generation health check: eight valid addresses, one draw 1.708 seconds; 458 other tests passed and two skipped. Isolated Docker replay of seed 85147791332242467344845969897770945049 passed in 0.59 seconds without changes.",
+      "cause": "unknown; the observed failure is Hypothesis HealthCheck.too_slow, not a failed canonical-address assertion.",
+      "next_action": "Unchanged attempt-2 core-c passed: 459 passed, two expected skips. Release workflow and publication then passed; signed image evidence verified. Original cause remains unknown; retain failed attempt.",
+      "fix_commit": null,
+      "retest_run": "39208816214 attempt 2, core-c job 117925723880 passed; local exact-seed Docker replay passed"
+    },
+    {
+      "run_id": "local-v0.9.8-publication-status",
+      "job": "make release-status retained-attempt evidence",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Online make release-status reproduced security evidence rejection after successful tag Build attempt 2; dependency evidence remained correctly identified as 39208816214:1:security.",
+      "cause": "The verifier required every evidence category to match the latest overall run attempt, rejecting an already-successful dependency job retained by GitHub failed-job rerun.",
+      "next_action": "Verify retained dependency evidence against the unique successful exact-source original-attempt job and exact hosted artifact bytes; all other attempt rules retained. Online status now passes with zero blockers; 89 tooling tests pass with three expected skips.",
+      "fix_commit": null,
+      "retest_run": "local-online-release-status-and-89-tooling-tests-2026-10-19"
     }
   ]
 }

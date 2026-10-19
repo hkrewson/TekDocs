@@ -95,6 +95,43 @@ def verify_production_evidence(
     expected = (
         f"tekdocs-security-evidence-production-images-{candidate}-{run['run_attempt']}"
     )
+    verify_hosted_artifact(entry, run, repository, expected)
+
+
+def verify_retained_dependency(
+    entry: dict, run: dict, repository: str, candidate: str, attempt: int
+) -> None:
+    # Partial reruns retain successful jobs. Accept only this explicitly supported
+    # category, with its successful exact-source job and original artifact bytes.
+    if (
+        entry["category"] != "dependency_license_secret"
+        or not 1 <= attempt < run["run_attempt"]
+    ):
+        raise ValueError("unsupported retained evidence attempt")
+    jobs, page = [], 1
+    while True:
+        batch = gh_json(
+            f"repos/{repository}/actions/runs/{run['id']}/attempts/{attempt}/jobs?per_page=100&page={page}"
+        )["jobs"]
+        jobs.extend(
+            job for job in batch
+            if job.get("name") == "Dependency, license, code, and secret policy"
+        )
+        if len(batch) < 100:
+            break
+        page += 1
+    expected_job = {
+        "head_sha": candidate, "status": "completed", "conclusion": "success"
+    }
+    if len(jobs) != 1 or any(
+        jobs[0].get(key) != value for key, value in expected_job.items()
+    ):
+        raise ValueError("retained dependency job missing, ambiguous, failed or wrong source")
+    expected = f"tekdocs-security-evidence-dependency-license-secret-{candidate}-{attempt}"
+    verify_hosted_artifact(entry, run, repository, expected)
+
+
+def verify_hosted_artifact(entry: dict, run: dict, repository: str, expected: str) -> None:
     artifacts, page = [], 1
     while True:
         batch = gh_json(
@@ -131,9 +168,8 @@ def verify_production_evidence(
         raise ValueError("invalid evidence archive") from error
     if not isinstance(hosted, dict):
         raise ValueError("invalid production evidence record")
-    for key in ("category", "scope_commit", "reference", "immutable_identifier"):
-        if hosted.get(key) != entry.get(key):
-            raise ValueError("production evidence identity mismatch")
+    if hosted != entry:
+        raise ValueError("hosted evidence identity mismatch")
 
 
 def inspect(manifest: dict, root: Path, online: bool) -> dict:
@@ -198,7 +234,9 @@ def inspect(manifest: dict, root: Path, online: bool) -> dict:
                         online
                         and int(identity[2]) != verified_runs[match[1]]["run_attempt"]
                     ):
-                        raise ValueError("hosted evidence identifier has wrong attempt")
+                        verify_retained_dependency(
+                            entry, verified_runs[match[1]], repository, candidate, int(identity[2])
+                        )
                 elif online:
                     verify_production_evidence(
                         entry, verified_runs[match[1]], repository, candidate
@@ -241,7 +279,7 @@ def inspect(manifest: dict, root: Path, online: bool) -> dict:
         if record
         else [],
         "scope": "Status only; evidence is not an independent audit or permission to release.",
-        "artifact_provenance": "Production image digests compared with hosted evidence when online; other artifact contents are not independently authenticated.",
+        "artifact_provenance": "Production evidence and retained earlier-attempt dependency evidence compared with hosted artifact bytes when online; other artifact contents are not independently authenticated.",
     }
 
 

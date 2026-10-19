@@ -72,9 +72,15 @@ class ReleaseStatusTests(unittest.TestCase):
                 release_status.ROOT / "planning/releases/0.9.8-security-review.json"
             ).read_text()
         )
-        manifest = json.loads(
-            (release_status.ROOT / ".github/release-candidate.json").read_text()
-        )
+        manifest = {
+            "schema_version": 1, "repository": "hkrewson/TekDocs",
+            "candidate_commit": record["candidate_commit"],
+            "security_record": "planning/releases/0.9.8-security-review.json",
+            "workflows": {"Build, test, and secure": 38516198438,
+                          "CodeQL": 38516198437, "Extended validation": 38516229558},
+            "operator_acceptance": {"decision": "accepted",
+                "reference": "planning/responsive-layouts/0.9.8-operator-acceptance.md"},
+        }
         original_loads = json.loads
 
         def replacement(raw, *args, **kwargs):
@@ -136,6 +142,27 @@ class ReleaseStatusTests(unittest.TestCase):
                             "blockers"
                         ],
                     )
+
+    def test_retained_dependency_scan_requires_successful_job_and_exact_artifact(self):
+        entry = {"category": "dependency_license_secret", "immutable_identifier": "42:1:security"}
+        run = {"id": 42, "run_attempt": 2}
+        job = {"name": "Dependency, license, code, and secret policy", "head_sha": "a" * 40,
+               "status": "completed", "conclusion": "success"}
+        with patch.object(release_status, "gh_json", return_value={"jobs": [job]}), patch.object(
+            release_status, "verify_hosted_artifact", create=True
+        ) as artifact:
+            release_status.verify_retained_dependency(entry, run, "owner/repo", "a" * 40, 1)
+            self.assertEqual(artifact.call_args.args[-1],
+                "tekdocs-security-evidence-dependency-license-secret-" + "a" * 40 + "-1")
+        for jobs in ([], [job, job], [{**job, "conclusion": "failure"}],
+                     [{**job, "head_sha": "b" * 40}], [{**job, "status": "in_progress"}]):
+            with self.subTest(jobs=jobs), patch.object(release_status, "gh_json", return_value={"jobs": jobs}):
+                with self.assertRaises(ValueError):
+                    release_status.verify_retained_dependency(entry, run, "owner/repo", "a" * 40, 1)
+        with self.assertRaises(ValueError):
+            release_status.verify_retained_dependency(entry, run, "owner/repo", "a" * 40, 3)
+        with self.assertRaises(ValueError):
+            release_status.verify_retained_dependency({**entry, "category": "dast"}, run, "owner/repo", "a" * 40, 1)
 
     def test_status_keeps_candidate_pinned_and_offline_runs_unverified(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -372,6 +372,16 @@
       "next_action": "Retain the passing full Docker SMTP outage/recovery rehearsal and anonymous-deny/owner-allow regression assertions. Application policies and retry assertions are unchanged. Continue remaining release gates.",
       "fix_commit": null,
       "retest_run": "local-mail-outage-owner-scope-pass-2026-10-19"
+    },
+    {
+      "run_id": "local-05abb13-portal-backup",
+      "job": "portal-notification-backup-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Resumed make release-gate failed starting the restored system. Isolated replay of rehearse-portal-notification-backup.sh with failure log capture reproduced RepositoryReconciliationError: Accepted repository content is unavailable.",
+      "cause": "The older rehearsal backed up PostgreSQL and media but omitted accepted Git repository storage referenced by the restored database.",
+      "next_action": "Retain passing Docker rehearsal with repository_recovery create, restore and verify alongside the original publication/notification assertions. Continue remaining gates; inspect other legacy backup scripts separately if they fail.",
+      "fix_commit": null,
+      "retest_run": "local-portal-backup-repository-custody-pass-2026-10-19"
     }
   ]
 }

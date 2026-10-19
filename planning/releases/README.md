@@ -7,9 +7,10 @@ the checkout's HEAD may be a later evidence/tooling commit.
 
 ## Active access-fix candidate
 
-The assigned-organization follow-up is tracked in
-[0.9.8 access candidate validation](0.9.8-access-candidate-validation.md), with
-its exact application commit, hosted runs, reproduced fixes and remaining gates.
+Start with [0.9.8 operational closeout](0.9.8-operational-closeout.md) for the
+current 05abb13 hosted results, later rehearsal fixes, accepted header risks and
+remaining publication decisions. [Access candidate validation](0.9.8-access-candidate-validation.md)
+retains the earlier access/compression and browser chronology.
 The pinned manifest still describes the earlier accepted candidate; it must not
 be used as evidence for this changed application. Promotion remains pending the
 new candidate's release closeout.
@@ -94,6 +95,12 @@ before provisioning. It tests an unrelated service UID reading one read-only
 synthetic key beneath a private host directory, plus a 2 GiB minimum of Docker
 filesystem space. This catches basic custody/capacity failures; it does not
 estimate the full rehearsal's peak space or prune anything.
+
+## Wiki publication
+
+See [Wiki publication contract](wiki-publication.md) for the current draft,
+validation and approval workflow. Local page/link validation does not publish the
+Wiki or enable application links.
 
 ## Operator acceptance
 

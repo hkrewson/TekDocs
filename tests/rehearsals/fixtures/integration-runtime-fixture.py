@@ -39,6 +39,7 @@ def fixture_scope(scope, *, organization_mode):
 class FixtureAdapter:
     key = "netbox"
     label = NetBoxProvider.label
+    # Prefix observations are supported by both the 0.6.9 and current adapters.
     # The 0.6.9 provider protocol predates explicit provider contracts. Keep
     # this fixture runnable on both sides of the supported upgrade boundary.
     contract = getattr(NetBoxProvider, "contract", None)
@@ -46,7 +47,7 @@ class FixtureAdapter:
     def fetch_page(self, connection, *, secret, cursor):
         assert secret == provider_token
         assert cursor == ""
-        return ProviderPage((ProviderObservation("ipam.vlan", "619", "6" * 64),), "")
+        return ProviderPage((ProviderObservation("ipam.prefix", "619", "6" * 64),), "")
 
 
 if mode == "create":
@@ -98,6 +99,9 @@ if mode == "create":
     )
     job = enqueue_sync(connection=provider, trigger="manual", idempotency_key="rehearsal:provider-page:0001")
     process_sync_job(job_id=job.id, adapter=FixtureAdapter())
+    job.refresh_from_db()
+    assert job.state == IntegrationJobState.SUCCEEDED, job.last_error_code
+    assert IntegrationObservation.objects.filter(job=job, remote_type="ipam.prefix", remote_id="619").count() == 1
     document = create_document(
         tenant=installed.tenant,
         organization=organization,

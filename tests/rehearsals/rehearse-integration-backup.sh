@@ -10,6 +10,8 @@ restore_project="tekdocs_integration_restore_$$"
 fixture_password=$(openssl rand -base64 36 | tr -d '\n')
 provider_token=$(openssl rand -base64 48 | tr -d '\n')
 mkdir -p "$backup_directory"
+# Container archive writes remain inside the private per-run parent directory.
+chmod 0777 "$backup_directory"
 
 compose_for() {
   project_name=$1
@@ -18,9 +20,15 @@ compose_for() {
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" "$@"
 }
 cleanup() {
+  exit_status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$exit_status" -ne 0 ]; then
+    compose_for "$restore_project" logs --no-color --tail 80 migrate backend >&2 || true
+  fi
   compose_for "$source_project" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   compose_for "$restore_project" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
+  exit "$exit_status"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -33,6 +41,10 @@ compose_for "$source_project" up -d --build --wait backend
 compose_for "$source_project" exec -T -e TEKDOCS_FIXTURE_MODE=create -e TEKDOCS_FIXTURE_PASSWORD="$fixture_password" \
   -e TEKDOCS_FIXTURE_PROVIDER_TOKEN="$provider_token" backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/integration-runtime-fixture.py"
+# Capture accepted Git history before the matching database snapshot.
+compose_for "$source_project" stop backend
+compose_for "$source_project" run --rm --no-deps -v "$backup_directory:/recovery" \
+  backend python manage.py repository_recovery create --archive /recovery/repositories.tar
 compose_for "$source_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > "$backup_directory/postgres.dump"
 docker run --rm -v "${source_project}_media_data:/source:ro" -v "$backup_directory:/backup" \
@@ -40,16 +52,20 @@ docker run --rm -v "${source_project}_media_data:/source:ro" -v "$backup_directo
   tar -czf /backup/media.tar.gz -C /source .
 test -s "$backup_directory/postgres.dump"
 test -s "$backup_directory/media.tar.gz"
+test -s "$backup_directory/repositories.tar"
 compose_for "$source_project" down --volumes --remove-orphans
 
 compose_for "$restore_project" up -d --wait db
 compose_for "$restore_project" run --rm migrate
-compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
+compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' \
   < "$backup_directory/postgres.dump"
 # Create the application image and its media volume without asking Compose to
 # resolve service dependencies before their restore-side images exist.
-compose_for "$restore_project" build backend
+compose_for "$restore_project" build --with-dependencies backend
 compose_for "$restore_project" up --no-start --no-deps backend >/dev/null
+compose_for "$restore_project" run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false \
+  -v "$backup_directory:/recovery:ro" backend \
+  python manage.py repository_recovery restore --archive /recovery/repositories.tar
 docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_directory:/backup:ro" \
   postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 \
   tar -xzf /backup/media.tar.gz -C /restore
@@ -58,7 +74,10 @@ docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_director
 # renderer out of a multi-service Compose build, so give it the exact local tag
 # that Compose will resolve for the restore project.
 docker build -t "${restore_project}-diagram-renderer" "$repository_root/renderer" >/dev/null
-compose_for "$restore_project" up -d --wait backend worker scheduler
+compose_for "$restore_project" up -d --wait backend
+compose_for "$restore_project" run --rm --no-deps -v "$backup_directory:/recovery:ro" \
+  backend python manage.py repository_recovery verify --archive /recovery/repositories.tar
+compose_for "$restore_project" up -d --wait worker scheduler
 compose_for "$restore_project" exec -T -e TEKDOCS_FIXTURE_MODE=verify \
   -e TEKDOCS_FIXTURE_PROVIDER_TOKEN="$provider_token" backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/integration-runtime-fixture.py"

@@ -370,7 +370,7 @@
       "reproduction": "make notification-mail-outage-rehearsal, reached by resumed release-gate: invitation fixture creation failed with client invitation organization must be an active tenant client. Isolated Docker probe found zero matching active-client joins without an actor and one after binding the fixture owner; invitation/outbox setup then passed.",
       "cause": "Current runtime RLS requires an explicit principal for the linked protected records checked by the invitation guard; the current-only mail-outage fixture supplied tenant scope without its owner identity.",
       "next_action": "Retain the passing full Docker SMTP outage/recovery rehearsal and anonymous-deny/owner-allow regression assertions. Application policies and retry assertions are unchanged. Continue remaining release gates.",
-      "fix_commit": null,
+      "fix_commit": "6a6e2e800c31b3d4939d950c439ac4d494acc03f",
       "retest_run": "local-mail-outage-owner-scope-pass-2026-10-19"
     },
     {
@@ -380,8 +380,38 @@
       "reproduction": "Resumed make release-gate failed starting the restored system. Isolated replay of rehearse-portal-notification-backup.sh with failure log capture reproduced RepositoryReconciliationError: Accepted repository content is unavailable.",
       "cause": "The older rehearsal backed up PostgreSQL and media but omitted accepted Git repository storage referenced by the restored database.",
       "next_action": "Retain passing Docker rehearsal with repository_recovery create, restore and verify alongside the original publication/notification assertions. Continue remaining gates; inspect other legacy backup scripts separately if they fail.",
-      "fix_commit": null,
+      "fix_commit": "833d881fb49ed9844161659468c94d46cdf7c87f",
       "retest_run": "local-portal-backup-repository-custody-pass-2026-10-19"
+    },
+    {
+      "run_id": "local-05abb13-documentation-backup",
+      "job": "documentation-backup-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Resumed release-gate failed at restored startup; original migration log was removed by cleanup. With repository archive restoration added, startup and archive verification passed, then the fixture reproduced ExportConflict: One or more selected or referenced files are unavailable.",
+      "cause": "Original startup cause inferred from the omitted repository archive and passing corrected startup, not a captured exception. Verified export-call mismatch: primary-file versions were submitted as ordinary attachments, which resolve_export_snapshot filters to ATTACHMENT purpose.",
+      "next_action": "Complete Docker documentation recovery passed with repository verification, negative primary-as-attachment assertion and positive primary-chain checksum coverage. All six aligned feature backup rehearsals passed. Retain the historical failure and inferred original-startup cause.",
+      "fix_commit": null,
+      "retest_run": "local-documentation-backup-archive-and-export-pass-2026-10-19"
+    },
+    {
+      "run_id": "local-05abb13-integration-backup",
+      "job": "integration-backup-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Full Docker restore passed repository verification, then failed the retained sync-job SUCCEEDED assertion. A source-only Docker probe reproduced pending/provider_response_invalid before any backup; safe exception tracing located validate_provider_page.",
+      "cause": "The fixture emitted ipam.vlan while borrowing the current NetBox adapter contract, whose object types are ipam.prefix and dcim.device. The invalid synthetic observation failed before backup, and creation did not assert success.",
+      "next_action": "Both 0.6.9-to-current upgrade and current backup passed in Docker with prefix observations, immediate source success/count assertions, unchanged restored success assertions and repository archive verification.",
+      "fix_commit": null,
+      "retest_run": "local-integration-upgrade-and-backup-prefix-pass-2026-10-19"
+    },
+    {
+      "run_id": "local-05abb13-monitoring-backup",
+      "job": "monitoring-backup-rehearsal",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Docker monitoring-backup-rehearsal failed in create_fixture at resolve_organization_workspace with Organization.DoesNotExist / Http404.",
+      "cause": "The legacy fixture used tenant/organization scope without its owner principal, so current runtime RLS hid the organization entity. The fixture now binds the owner in each scope and checks anonymous reads fail closed during verification, retaining old-version compatibility.",
+      "next_action": "Complete Docker backup/restore passed with the owner principal, anonymous-deny assertion, original monitoring evidence assertions and repository archive verification. Retain this as rehearsal-only evidence.",
+      "fix_commit": null,
+      "retest_run": "local-monitoring-backup-owner-and-repository-pass-2026-10-19"
     }
   ]
 }

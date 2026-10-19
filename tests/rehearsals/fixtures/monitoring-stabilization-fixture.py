@@ -32,6 +32,20 @@ def _has_field(model, name):
     return any(field.name == name for field in model._meta.get_fields())
 
 
+def bind_fixture_owner(scope, *, organization_mode, owner):
+    from apps.core import rls as rls_module
+
+    # Historical upgrade sources predate explicit principals.
+    principal_mode = getattr(rls_module, "RLSPrincipalMode", None)
+    if principal_mode is not None:
+        rls_module.bind_local_rls_scope(
+            scope,
+            organization_mode=organization_mode,
+            actor_user_id=owner.id,
+            principal_mode=principal_mode.USER,
+        )
+
+
 def create_fixture():
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     result = bootstrap_owner(
@@ -41,6 +55,9 @@ def create_fixture():
         password=os.environ["TEKDOCS_FIXTURE_PASSWORD"],
     )
     with rls_scope(DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        bind_fixture_owner(
+            DataScope.tenant(result.tenant), organization_mode=OrganizationRLSMode.MSP_ONLY, owner=result.owner
+        )
         organization = create_organization(
             tenant=result.tenant,
             actor_id=result.owner.id,
@@ -52,6 +69,7 @@ def create_fixture():
         workspace = resolve_organization_workspace(result.owner, entity_id=organization.entity_id)
     scope = workspace.data_scope
     with rls_scope(scope, organization_mode=OrganizationRLSMode.ORGANIZATION):
+        bind_fixture_owner(scope, organization_mode=OrganizationRLSMode.ORGANIZATION, owner=result.owner)
         domain = create_domain(
             workspace=workspace,
             actor_id=result.owner.id,
@@ -127,10 +145,16 @@ def verify_fixture():
     owner = User.objects.get(email=OWNER_EMAIL)
     tenant = owner.tenant_memberships.get().tenant
     with rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY):
+        from apps.core import rls as rls_module
+
+        if hasattr(rls_module, "RLSPrincipalMode"):
+            assert not Organization.objects.filter(tenant=tenant, entity__display_name=ORGANIZATION_NAME).exists()
+        bind_fixture_owner(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY, owner=owner)
         organization = Organization.objects.get(tenant=tenant, entity__display_name=ORGANIZATION_NAME)
         workspace = resolve_organization_workspace(owner, entity_id=organization.entity_id)
     scope = workspace.data_scope
     with rls_scope(scope, organization_mode=OrganizationRLSMode.ORGANIZATION):
+        bind_fixture_owner(scope, organization_mode=OrganizationRLSMode.ORGANIZATION, owner=owner)
         domain_run = DomainMonitorRun.objects.get(domain__ascii_name=DOMAIN_NAME, state="succeeded")
         certificate_run = CertificateMonitorRun.objects.get(
             endpoint__domain__ascii_name=DOMAIN_NAME,

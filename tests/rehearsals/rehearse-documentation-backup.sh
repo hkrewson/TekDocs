@@ -8,6 +8,8 @@ backup_directory="$work_directory/backup"
 source_project="tekdocs_docs_backup_$$"
 restore_project="tekdocs_docs_restore_$$"
 mkdir -p "$backup_directory"
+# Container archive writes remain inside the private per-run parent directory.
+chmod 0777 "$backup_directory"
 
 compose_for() {
   project_name=$1
@@ -17,9 +19,15 @@ compose_for() {
 }
 
 cleanup() {
+  exit_status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$exit_status" -ne 0 ]; then
+    compose_for "$restore_project" logs --no-color --tail 80 migrate backend >&2 || true
+  fi
   compose_for "$source_project" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   compose_for "$restore_project" down --volumes --remove-orphans --rmi local >/dev/null 2>&1 || true
   rm -rf "$work_directory"
+  exit "$exit_status"
 }
 trap cleanup EXIT HUP INT TERM
 
@@ -83,25 +91,35 @@ print("Documentation recovery fixture created")
 '
 
 echo "Capturing PostgreSQL and media as separate backup artifacts"
+# Capture accepted Git history before the matching database snapshot.
+compose_for "$source_project" stop backend
+compose_for "$source_project" run --rm --no-deps -v "$backup_directory:/recovery" \
+  backend python manage.py repository_recovery create --archive /recovery/repositories.tar
 compose_for "$source_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$backup_directory/postgres.dump"
 docker run --rm -v "${source_project}_media_data:/source:ro" -v "$backup_directory:/backup" postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 tar -czf /backup/media.tar.gz -C /source .
 test -s "$backup_directory/postgres.dump"
 test -s "$backup_directory/media.tar.gz"
+test -s "$backup_directory/repositories.tar"
 compose_for "$source_project" down --volumes --remove-orphans
 
 echo "Restoring into clean database and media volumes with separately retained deployment keys"
 compose_for "$restore_project" up -d --wait db
 compose_for "$restore_project" run --rm migrate
-compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < "$backup_directory/postgres.dump"
-compose_for "$restore_project" build backend diagram-renderer
+compose_for "$restore_project" exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < "$backup_directory/postgres.dump"
+compose_for "$restore_project" build --with-dependencies backend
 compose_for "$restore_project" create backend >/dev/null
+compose_for "$restore_project" run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false \
+  -v "$backup_directory:/recovery:ro" backend \
+  python manage.py repository_recovery restore --archive /recovery/repositories.tar
 docker run --rm -v "${restore_project}_media_data:/restore" -v "$backup_directory:/backup:ro" postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193 tar -xzf /backup/media.tar.gz -C /restore
 compose_for "$restore_project" up -d --wait backend
+compose_for "$restore_project" run --rm --no-deps -v "$backup_directory:/recovery:ro" \
+  backend python manage.py repository_recovery verify --archive /recovery/repositories.tar
 compose_for "$restore_project" exec -T backend python manage.py shell -c '
 from hashlib import sha256
 from pathlib import Path
 from django.conf import settings
-from apps.core.document_exports import export_bundle, resolve_export_snapshot
+from apps.core.document_exports import ExportConflict, export_bundle, resolve_export_snapshot
 from apps.core.documents import primary_placement, resolve_document
 from apps.core.models import BlockRevision, Document, DocumentAttachment, DocumentAttachmentPurpose, DocumentPublication, DocumentPublicationArtifact, DocumentPublicationControlEvent, InstallationState
 from apps.core.publications import verify_publication
@@ -155,11 +173,28 @@ for kind, expected_prefix in (("diagram_svg", b"<svg"), ("diagram_png", b"\x89PN
     assert content.startswith(expected_prefix)
     assert record.checksum == sha256(content).hexdigest()
 before = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
+try:
+    resolve_export_snapshot(
+        workspace=resolve_msp_workspace(state.owner),
+        document=document,
+        attachment_ids=tuple(record.entity_id for record in [attachment, *primary_versions]),
+    )
+except ExportConflict as exc:
+    assert str(exc) == "One or more selected or referenced files are unavailable."
+else:
+    raise AssertionError("Primary versions must not be accepted as ordinary attachments")
 snapshot = resolve_export_snapshot(
     workspace=resolve_msp_workspace(state.owner),
     document=document,
-    attachment_ids=tuple(record.entity_id for record in [attachment, *primary_versions]),
+    attachment_ids=(attachment.entity_id,),
+    include_primary_files=True,
 )
+assert {record.id for record in snapshot.attachments} == {
+    record.entity_id for record in [attachment, *primary_versions]
+}
+for record in snapshot.attachments:
+    source = next(item for item in [attachment, *primary_versions] if item.entity_id == record.id)
+    assert sha256(record.content).hexdigest() == source.checksum
 assert export_bundle(snapshot).startswith(b"PK")
 after = sorted(path.relative_to(settings.MEDIA_ROOT).as_posix() for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file())
 assert after == before

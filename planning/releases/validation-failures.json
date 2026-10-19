@@ -390,7 +390,7 @@
       "reproduction": "Resumed release-gate failed at restored startup; original migration log was removed by cleanup. With repository archive restoration added, startup and archive verification passed, then the fixture reproduced ExportConflict: One or more selected or referenced files are unavailable.",
       "cause": "Original startup cause inferred from the omitted repository archive and passing corrected startup, not a captured exception. Verified export-call mismatch: primary-file versions were submitted as ordinary attachments, which resolve_export_snapshot filters to ATTACHMENT purpose.",
       "next_action": "Complete Docker documentation recovery passed with repository verification, negative primary-as-attachment assertion and positive primary-chain checksum coverage. All six aligned feature backup rehearsals passed. Retain the historical failure and inferred original-startup cause.",
-      "fix_commit": null,
+      "fix_commit": "986973fc0a1b0626f8b823043081d58e2a1ae624",
       "retest_run": "local-documentation-backup-archive-and-export-pass-2026-10-19"
     },
     {
@@ -400,7 +400,7 @@
       "reproduction": "Full Docker restore passed repository verification, then failed the retained sync-job SUCCEEDED assertion. A source-only Docker probe reproduced pending/provider_response_invalid before any backup; safe exception tracing located validate_provider_page.",
       "cause": "The fixture emitted ipam.vlan while borrowing the current NetBox adapter contract, whose object types are ipam.prefix and dcim.device. The invalid synthetic observation failed before backup, and creation did not assert success.",
       "next_action": "Both 0.6.9-to-current upgrade and current backup passed in Docker with prefix observations, immediate source success/count assertions, unchanged restored success assertions and repository archive verification.",
-      "fix_commit": null,
+      "fix_commit": "986973fc0a1b0626f8b823043081d58e2a1ae624",
       "retest_run": "local-integration-upgrade-and-backup-prefix-pass-2026-10-19"
     },
     {
@@ -410,7 +410,7 @@
       "reproduction": "Docker monitoring-backup-rehearsal failed in create_fixture at resolve_organization_workspace with Organization.DoesNotExist / Http404.",
       "cause": "The legacy fixture used tenant/organization scope without its owner principal, so current runtime RLS hid the organization entity. The fixture now binds the owner in each scope and checks anonymous reads fail closed during verification, retaining old-version compatibility.",
       "next_action": "Complete Docker backup/restore passed with the owner principal, anonymous-deny assertion, original monitoring evidence assertions and repository archive verification. Retain this as rehearsal-only evidence.",
-      "fix_commit": null,
+      "fix_commit": "986973fc0a1b0626f8b823043081d58e2a1ae624",
       "retest_run": "local-monitoring-backup-owner-and-repository-pass-2026-10-19"
     }
   ]

@@ -12,10 +12,10 @@ including the required contextual targets, passed public availability checks.
 See `0.9.8-wiki-review.md` and its publication verification record.
 Uncommitted supplemental drafts are excluded from this published corpus.
 
-`frontend/src/help/topics.ts` keeps `WIKI_PUBLISHED` false. The application uses
-local contextual help and does not enable external Wiki links until publication
-and public-link verification are complete. A locally passing inventory does not
-justify switching that flag.
+`frontend/src/help/topics.ts` now enables the verified Wiki guides in source.
+This post-0.9.8 application change is tracked in `wiki-link-enablement.md`; the
+published 0.9.8 images still have links disabled. A new validated application
+release is needed to deliver the change to production.
 
 ## Page contract
 

@@ -48,6 +48,9 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Help for System status' }).click()
     const help = page.getByRole('dialog', { name: 'System status help' })
     await expect(help).toBeVisible()
+    const guide = help.getByRole('link', { name: 'Open the full guide' })
+    await expect(guide).toBeVisible()
+    await expect(guide).toHaveAttribute('href', 'https://github.com/hkrewson/TekDocs/wiki/Diagrams-in-documents')
     await expect(help.getByRole('heading', { name: 'System status', exact: true })).toBeFocused()
     await expect(page.evaluate(() => document.body.style.overflow)).resolves.toBe('hidden')
     if (width < 768) {

@@ -22,7 +22,11 @@ export function trapOverlayFocus(event: ReactKeyboardEvent, container: RefObject
     event.preventDefault()
     return
   }
-  if (event.shiftKey && (document.activeElement === first || !container.current?.contains(document.activeElement))) {
+  if (!focusable.includes(document.activeElement as HTMLElement)) {
+    event.preventDefault()
+    const destination = event.shiftKey ? last : first
+    destination.focus()
+  } else if (event.shiftKey && document.activeElement === first) {
     event.preventDefault()
     last.focus()
   } else if (!event.shiftKey && document.activeElement === last) {

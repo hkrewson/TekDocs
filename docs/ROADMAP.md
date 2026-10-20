@@ -25,11 +25,12 @@ Production updater follow-up: explicit release selection now binds the tag, comm
 Compose snapshot and all three approved image digests, with final running-service
 identity checks. This is deployment tooling; the frozen 0.9.8 application is unchanged.
 
-The full required Wiki corpus is drafted and checked locally. Authorized tag
+The full required Wiki corpus is published and its public pages verified. Authorized tag
 `v0.9.8` and all three image publications completed; exact image aliases and signed
 provenance/SBOMs verified. The pinned manifest now names 05abb13 and online status
-has zero verification blockers. Deployment, registry-access readiness and Wiki
-publication remain separate work. No uninterrupted local aggregate pass is claimed.
+has zero verification blockers. The operator completed deployment and document/asset smoke checks. Wiki-link
+enablement is the next bounded application change; see
+[implementation and validation](../planning/releases/wiki-link-enablement.md). No uninterrupted local aggregate pass is claimed.
 
 The `0.9.0` commit freezes the database-first runtime after completing the invoice correction boundary, reconciling non-document acceptance, and transferring storage-specific Documentation work into the named `0.9.x` content-graph slices. On 2026-10-02 the maintainer approved the Markdown content graph as the version 1 architecture. `planning/v1-markdown-content-graph.md` is the delivery authority; `planning/v1-transition-work-package.md` records the completed reconciliation and implementation-ready `0.9.1` issue set.
 

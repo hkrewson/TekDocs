@@ -42,9 +42,25 @@ it('keeps keyboard focus inside the open help dialog', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
   const close = screen.getByRole('button', { name: 'Close help' })
-  close.focus()
+  await user.keyboard('{Tab}')
+  expect(close).toHaveFocus()
+  await user.keyboard('{Tab}')
+  const guide = screen.getByRole('link', { name: 'Open the full guide' })
+  expect(guide).toHaveFocus()
   await user.keyboard('{Tab}')
   expect(close).toHaveFocus()
   await user.keyboard('{Shift>}{Tab}{/Shift}')
-  expect(close).toHaveFocus()
+  expect(guide).toHaveFocus()
+})
+
+
+it('offers the published route guide in a separate tab without a referrer', async () => {
+  const user = userEvent.setup()
+  render(<ContextualHelp pathname="/documentation" />)
+  await user.click(screen.getByRole('button', { name: 'Help for Documentation' }))
+  const guide = screen.getByRole('link', { name: 'Open the full guide' })
+  expect(guide).toHaveAttribute('href', 'https://github.com/hkrewson/TekDocs/wiki/Documentation')
+  expect(guide).toHaveAttribute('target', '_blank')
+  expect(guide).toHaveAttribute('rel', 'noreferrer')
+  expect(screen.queryByRole('status')).not.toBeInTheDocument()
 })

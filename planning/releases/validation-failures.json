@@ -442,6 +442,46 @@
       "next_action": "Explicit reviewed release selection implemented and covered by seven Linux Docker contract tests, actual Compose snapshot validation, 96 tooling tests and existing setup checks. Install the corrected tooling before running --release; production rollout remains operator work.",
       "fix_commit": null,
       "retest_run": "local-production-release-contract-and-compose-2026-10-19"
+    },
+    {
+      "run_id": "local-wiki-help-browser-existing-server",
+      "job": "contextual help browser checks",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Three browser projects showed the unpublished-guide state against reused localhost:3200; rerun against isolated production frontend image at 3329.",
+      "cause": "Existing server served the previous application; new source flag was not present in that server.",
+      "next_action": "Use isolated production image for this slice; do not weaken published-link assertions.",
+      "fix_commit": null,
+      "retest_run": "local-wiki-help-production-image: 24 passed"
+    },
+    {
+      "run_id": "local-wiki-help-browser-focus",
+      "job": "contextual help keyboard checks",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Production-image browser run: old heading-focus expectation failed with enabled links; corrected expected link traversal reproduced WebKit skipping the link on first Tab from heading.",
+      "cause": "The focus trap handled endpoints but left initial non-tabbable heading traversal to browser defaults; WebKit skipped the link.",
+      "next_action": "Explicitly focus first/last eligible control from non-tabbable initial focus; retain forward/backward containment assertions.",
+      "fix_commit": "wiki-link enablement slice",
+      "retest_run": "local-wiki-help-production-image: 24 passed"
+    },
+    {
+      "run_id": "local-wiki-help-frontend-initial",
+      "job": "make check-frontend",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Full unit gate: 770 passed, old App unpublished-status assertion and Stock off-page Edit lookup failed. Stock unchanged focused retry passed.",
+      "cause": "App assertion described intentionally retired unpublished state. Stock cause unknown; no stock implementation or assertion changed.",
+      "next_action": "Update App to assert published destination and repeat complete frontend gate; retain Stock failure as unexplained if repeat passes.",
+      "fix_commit": "wiki-link enablement slice (App assertion only)",
+      "retest_run": "local-wiki-help-frontend-clean: make check-frontend passed; 772 tests and all verify stages"
+    },
+    {
+      "run_id": "local-wiki-help-frontend-temporary-config",
+      "job": "frontend lint",
+      "owner": "TekDocs maintainer",
+      "reproduction": "After 772 unit tests passed, lint rejected temporary playwright.wiki-review.config.ts because it was outside the TypeScript project.",
+      "cause": "Disposable browser configuration was still inside frontend during lint.",
+      "next_action": "Remove temporary configuration after browser checks and rerun the full frontend gate.",
+      "fix_commit": null,
+      "retest_run": "local-wiki-help-frontend-clean: make check-frontend passed; 772 tests and all verify stages"
     }
   ]
 }

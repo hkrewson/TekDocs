@@ -5,7 +5,8 @@ export type HelpTopic = {
 }
 
 export const WIKI_BASE_URL = 'https://github.com/hkrewson/TekDocs/wiki'
-export const WIKI_PUBLISHED = false
+// Public corpus verified at Wiki commit dec75e1; see planning/releases/0.9.8-wiki-review.md.
+export const WIKI_PUBLISHED = true
 
 const topics: Record<string, HelpTopic> = {
   overview: { title: 'Workspace overview', summary: 'Understand MSP and organization ownership, navigation, and workspace boundaries.', slug: 'Workspaces-and-organizations' },

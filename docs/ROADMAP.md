@@ -21,6 +21,10 @@ the next runtime candidate or November 12, 2026. Later rehearsal-only correction
 identify the fixture owner and retain accepted Git storage during recovery.
 Passing local and hosted operational boundaries and their limits are tracked in
 [operational closeout](../planning/releases/0.9.8-operational-closeout.md).
+Production updater follow-up: explicit release selection now binds the tag, commit,
+Compose snapshot and all three approved image digests, with final running-service
+identity checks. This is deployment tooling; the frozen 0.9.8 application is unchanged.
+
 The full required Wiki corpus is drafted and checked locally. Authorized tag
 `v0.9.8` and all three image publications completed; exact image aliases and signed
 provenance/SBOMs verified. The pinned manifest now names 05abb13 and online status

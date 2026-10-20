@@ -432,6 +432,16 @@
       "next_action": "Verify retained dependency evidence against the unique successful exact-source original-attempt job and exact hosted artifact bytes; all other attempt rules retained. Online status now passes with zero blockers; 89 tooling tests pass with three expected skips.",
       "fix_commit": null,
       "retest_run": "local-online-release-status-and-89-tooling-tests-2026-10-19"
+    },
+    {
+      "run_id": "local-production-release-option",
+      "job": "production updater release selection",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Original bash scripts/update-production.sh --release v0.9.8 reproduced exit 2: unknown argument --release. Operator production output showed main 5c9a64f and older digests after upstream update.",
+      "cause": "The updater had no release-selection option; its only target was the upstream branch HEAD. The assistant prematurely presented an unimplemented command.",
+      "next_action": "Explicit reviewed release selection implemented and covered by seven Linux Docker contract tests, actual Compose snapshot validation, 96 tooling tests and existing setup checks. Install the corrected tooling before running --release; production rollout remains operator work.",
+      "fix_commit": null,
+      "retest_run": "local-production-release-contract-and-compose-2026-10-19"
     }
   ]
 }

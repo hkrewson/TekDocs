@@ -434,7 +434,7 @@ The repository uses three primary workflows:
 
 Dependabot submits grouped weekly updates for Python, npm, Docker, and GitHub Actions dependencies.
 
-Production updates pull the three images for the checked-out Git commit, verify their embedded revision labels, resolve them to immutable registry digests, and persist the deployed digests only after the public readiness check passes.
+Production updates support explicit release selection with `scripts/update-production.sh --release v0.9.8` once this updater is installed. Release mode checks the tag against a reviewed commit/image receipt, uses the tagged Compose configuration, and verifies the running application services against the approved digests. The tooling checkout stays unchanged; `.env` records `TEKDOCS_DEPLOYED_COMMIT` and image digests only after readiness and identity checks pass. Existing backup settings remain required. Without `--release`, the legacy upstream-branch update behavior remains. See the Wiki upgrade procedure for deployment instructions.
 
 ## Documentation
 

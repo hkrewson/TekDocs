@@ -4,6 +4,8 @@ set -Eeuo pipefail
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
 # shellcheck source=scripts/lib/production-images.sh
 source "$repository_root/scripts/lib/production-images.sh"
+# shellcheck source=scripts/lib/production-release.sh
+source "$repository_root/scripts/lib/production-release.sh"
 invocation_directory=$PWD
 environment_file="$repository_root/.env"
 operator_config_file="$repository_root/.tekdocs-update.env"
@@ -24,6 +26,8 @@ use_traefik=true
 use_bootstrap_secret=false
 skip_backup=false
 application_stopped=false
+release=
+release_directory=
 
 usage() {
   cat <<'EOF'
@@ -49,7 +53,15 @@ If no recovery key exists, create one once and retain a separate copy:
 Update after creating a verified external VM or volume snapshot:
   scripts/update-production.sh --skip-backup
 
+Select an approved published release (recommended):
+  scripts/update-production.sh --release v0.9.8
+
+Release mode requires a reviewed image receipt and checks the exact tag commit,
+image revisions and digests. It uses the release Compose files without changing
+the tooling checkout. Existing backup settings still apply.
+
 Optional arguments:
+    [--release vMAJOR.MINOR.PATCH] \
     [--env-file FILE] \
     [--secret-directory DIRECTORY] \
     [--without-traefik] \
@@ -77,6 +89,12 @@ argument_error() {
 
 while (($#)); do
   case "$1" in
+    --release)
+      (($# >= 2)) || argument_error "--release requires a version tag"
+      [[ -n "$2" ]] || argument_error "--release requires a version tag"
+      release=$2
+      shift 2
+      ;;
     --backup-root)
       (($# >= 2)) || argument_error "--backup-root must be followed by a directory path"
       backup_root=${2:-}
@@ -118,6 +136,10 @@ while (($#)); do
       ;;
   esac
 done
+
+if [[ -n "$release" ]]; then
+  tekdocs_load_release_receipt "$repository_root" "$release" || argument_error "release has no valid reviewed image receipt: $release"
+fi
 
 if [[ "$skip_backup" != true ]]; then
   if [[ -z "$backup_root" && -z "$recovery_key" ]]; then
@@ -178,6 +200,7 @@ fi
 
 compose=(
   docker compose
+  --project-directory "$repository_root"
   --env-file "$environment_file"
   -f "$repository_root/compose.yml"
   -f "$repository_root/compose.production.yml"
@@ -201,16 +224,24 @@ on_error() {
   status=$?
   echo "TekDocs production update failed." >&2
   if [[ "$application_stopped" == true ]]; then
-    echo "Application services are stopped. Inspect the migration and runtime logs before recovery." >&2
+    echo "The application update did not complete. Inspect migration and runtime logs before recovery." >&2
     "${compose[@]}" logs --no-color --tail=120 migrate backend worker scheduler >&2 || true
   fi
   exit "$status"
 }
 trap on_error ERR
+cleanup_release() {
+  if [[ -n "$release_directory" ]]; then
+    rm -rf -- "$release_directory"
+  fi
+}
+trap cleanup_release EXIT
 
 cd "$repository_root"
 [[ -z "$(git status --porcelain)" ]] || fail "the Git working tree is not clean"
-git rev-parse --verify '@{upstream}' >/dev/null 2>&1 || fail "the current branch has no upstream"
+if [[ -z "$release" ]]; then
+  git rev-parse --verify '@{upstream}' >/dev/null 2>&1 || fail "the current branch has no upstream"
+fi
 
 "${compose[@]}" config --quiet
 [[ -n "$("${compose[@]}" ps -q db)" ]] || fail "the production database is not running"
@@ -232,17 +263,41 @@ else
     --output "$backup_output"
 fi
 
-echo "Fetching the configured upstream branch"
-git fetch --prune
-git merge --ff-only '@{upstream}'
-
-current_commit=$(git rev-parse HEAD)
-tekdocs_resolve_production_images "$current_commit"
+if [[ -n "$release" ]]; then
+  echo "Fetching approved release $release"
+  git fetch origin "refs/tags/$release:refs/tags/$release"
+  current_commit=$(git rev-parse --verify "refs/tags/$release^{commit}")
+  [[ "$current_commit" == "$TEKDOCS_RELEASE_COMMIT" ]] || fail "release tag does not match its reviewed commit"
+  running_backend=$("${compose[@]}" ps -q backend)
+  running_commit=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$running_backend")
+  [[ "$running_commit" =~ ^[0-9a-f]{40}$ ]] || fail "running backend has no verifiable revision"
+  git merge-base --is-ancestor "$running_commit" "$current_commit" || fail "release is not a forward update from the running backend; use the recovery procedure"
+  release_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-release.XXXXXX")
+  git archive "$current_commit" | tar -x -C "$release_directory"
+  [[ "$(tr -d '[:space:]' < "$release_directory/VERSION")" == "${release#v}" ]] || fail "release version metadata does not match its tag"
+  tekdocs_resolve_production_images "$current_commit"
+  tekdocs_verify_release_images || fail "pulled images do not match the reviewed release digests"
+  for index in "${!compose[@]}"; do
+    case "${compose[$index]}" in
+      "$repository_root"/compose*.yml)
+        compose[$index]="$release_directory/${compose[$index]##*/}"
+        ;;
+    esac
+  done
+  image_compose="$release_directory/compose.images.yml"
+else
+  echo "Fetching the configured upstream branch"
+  git fetch --prune
+  git merge --ff-only '@{upstream}'
+  current_commit=$(git rev-parse HEAD)
+  tekdocs_resolve_production_images "$current_commit"
+  image_compose="$repository_root/compose.images.yml"
+fi
 TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
 TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
 TEKDOCS_RENDERER_IMAGE=$TEKDOCS_RESOLVED_RENDERER_IMAGE
 export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
-compose+=(-f "$repository_root/compose.images.yml")
+compose+=(-f "$image_compose")
 
 "${compose[@]}" config --quiet
 echo "Resolved backend image: $TEKDOCS_BACKEND_IMAGE"
@@ -281,12 +336,27 @@ if [[ "$ready" != true ]]; then
   false
 fi
 
+if [[ -n "$release" ]]; then
+  for service in backend worker scheduler frontend diagram-renderer; do
+    case "$service" in
+      frontend) expected_image=$TEKDOCS_FRONTEND_IMAGE ;;
+      diagram-renderer) expected_image=$TEKDOCS_RENDERER_IMAGE ;;
+      *) expected_image=$TEKDOCS_BACKEND_IMAGE ;;
+    esac
+    container_id=$("${compose[@]}" ps -q "$service")
+    [[ -n "$container_id" ]] || fail "updated service is not running: $service"
+    actual_image=$(docker inspect --format '{{.Config.Image}}' "$container_id")
+    [[ "$actual_image" == "$expected_image" ]] || fail "running service does not use the reviewed image: $service"
+  done
+fi
+
 "${compose[@]}" ps
-current_version=$(tr -d '[:space:]' < VERSION)
+current_version=$(tr -d '[:space:]' < "${release_directory:-$repository_root}/VERSION")
 application_stopped=false
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_RENDERER_IMAGE "$TEKDOCS_RENDERER_IMAGE"
+tekdocs_persist_environment_value "$environment_file" TEKDOCS_DEPLOYED_COMMIT "$current_commit"
 trap - ERR
 
 echo "TekDocs production update passed: $previous_version ($previous_commit) -> $current_version ($current_commit)"

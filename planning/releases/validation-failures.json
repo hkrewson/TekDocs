@@ -502,6 +502,16 @@
       "next_action": "Regenerated schema with make schema; frontend API generation has no contract change. Fresh-image OpenAPI drift check passes. New commit-bound hosted validation required.",
       "fix_commit": "0.9.9 schema metadata correction",
       "retest_run": "fresh Docker OpenAPI checker passed; hosted pending"
+    },
+    {
+      "run_id": "local-0.9.9-release-gate",
+      "job": "PostgreSQL matrix environment provisioning",
+      "owner": "TekDocs maintainer",
+      "reproduction": "make release-gate passed static checks then core-a isolated Compose network creation failed: all predefined address pools have been fully subnetted.",
+      "cause": "Docker host address-pool exhaustion prevented test-stack provisioning; not evidence of an application assertion failure.",
+      "next_action": "Leave existing environments intact. Exact-candidate Build 39369318399 must confirm PostgreSQL matrix, and Extended 39369348946 must confirm maintained browser/upgrade/recovery/DAST gates. Remaining local aggregate targets are not passed by this invocation.",
+      "fix_commit": null,
+      "retest_run": "hosted checks pending"
     }
   ]
 }

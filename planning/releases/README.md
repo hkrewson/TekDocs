@@ -14,7 +14,8 @@ retains the earlier access/compression and browser chronology.
 The pinned manifest now names 05abb13, published as v0.9.8. All three image aliases
 and signed provenance/SBOMs were verified; see the publication security closeout.
 The operator completed production deployment and reported successful document/asset
-smoke checks; see [production closeout](0.9.8-production-update.md). Wiki publication
+smoke checks; see [production closeout](0.9.8-production-update.md). The reviewed Wiki is now published and its public pages verified; see
+[Wiki review and publication](0.9.8-wiki-review.md). Application Wiki-link enablement
 and authority handoff remain separate decisions.
 
 ## Status and evidence

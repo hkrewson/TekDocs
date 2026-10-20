@@ -15,7 +15,7 @@
     "scope": "Operator reported corrected Session 3 passing October 18 and explicitly authorized exact-candidate tag/image publication October 19. Unperformed individual manual profiles remain unverified."
   },
   "remaining_release_actions": [
-    "Review and authorize accumulated Wiki history before Wiki publication.",
-    "Authority handoff remains a separate decision."
+    "Authority handoff remains a separate decision.",
+    "Application Wiki-link enablement requires a separately reviewed change and frontend/browser validation."
   ]
 }

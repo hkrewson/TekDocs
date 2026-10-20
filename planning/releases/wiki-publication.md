@@ -5,10 +5,12 @@ files remain engineering and operational source records, not a second user manua
 
 ## Current status
 
-The repository and Wiki exist publicly. The public Wiki is incomplete against
-`.github/wiki-pages.json`. The local sibling Wiki checkout contains candidate
-page drafts, including the missing task and operator pages, but these have not
-been published. Consult the current release follow-up record for verification.
+The reviewed Wiki was published October 19, 2026 at
+`dec75e1e91b5da35458809e05de75cef3da48d07`. All 46 content pages and the sidebar
+match the published Git tree through public raw URLs; all 46 rendered pages,
+including the required contextual targets, passed public availability checks.
+See `0.9.8-wiki-review.md` and its publication verification record.
+Uncommitted supplemental drafts are excluded from this published corpus.
 
 `frontend/src/help/topics.ts` keeps `WIKI_PUBLISHED` false. The application uses
 local contextual help and does not enable external Wiki links until publication

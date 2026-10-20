@@ -500,8 +500,8 @@
       "reproduction": "Freshly rebuilt 0.9.9 backend: scripts/check-openapi.sh failed with only info.version 0.9.8 versus 0.9.9. Old local installed-package image had misleadingly passed.",
       "cause": "Version bump omitted generated backend/openapi.yml metadata. API operations and fields are unchanged.",
       "next_action": "Regenerated schema with make schema; frontend API generation has no contract change. Fresh-image OpenAPI drift check passes. New commit-bound hosted validation required.",
-      "fix_commit": "0.9.9 schema metadata correction",
-      "retest_run": "fresh Docker OpenAPI checker passed; hosted pending"
+      "fix_commit": "f52b210b852249f033dfd895dbb5eee96eb89865",
+      "retest_run": "fresh Docker OpenAPI checker passed; exact-candidate Build 39369859511 attempt 1 Backend static validation passed"
     },
     {
       "run_id": "local-0.9.9-release-gate",
@@ -509,9 +509,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "make release-gate passed static checks then core-a isolated Compose network creation failed: all predefined address pools have been fully subnetted.",
       "cause": "Docker host address-pool exhaustion prevented test-stack provisioning; not evidence of an application assertion failure.",
-      "next_action": "Leave existing environments intact. Exact-candidate Build 39369318399 must confirm PostgreSQL matrix, and Extended 39369348946 must confirm maintained browser/upgrade/recovery/DAST gates. Remaining local aggregate targets are not passed by this invocation.",
+      "next_action": "Recovery complete without pruning existing environments. Exact-candidate dispatched Build 39369859511 and Extended 39369348946 passed. PR Build 39369318399 used a synthetic merge checkout and is not exact-candidate evidence. Retain the original failed aggregate; local sequential continuations and hosted results compose the closeout.",
       "fix_commit": null,
-      "retest_run": "hosted checks pending"
+      "retest_run": "Local sequential core-a passed 546 tests and route-access passed 548 tests. All hosted shards and combined coverage passed in Build 39369859511 attempt 2. Local recovered combined coverage also passed; both reports show 89%."
     },
     {
       "run_id": "39369859511",
@@ -519,9 +519,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted job 118456669424 stopped while pulling db/valkey/mailpit, before tests, with HTTP 502. Local pull replay did not reproduce 502; local Docker instead refused an existing Mailpit digest overwrite.",
       "cause": "Hosted image retrieval returned 502; upstream cause unknown. No test assertion ran. Local replay has a separate Docker image-store limitation.",
-      "next_action": "Retry only the unchanged failed core-b job when GitHub permits it after current run completion. No code, assertions or limits changed.",
+      "next_action": "Unchanged failed core-b retry passed as attempt 2, job 118463168839; dependent coverage/image checks and the full Build passed. No code, assertions or limits changed; retain unknown upstream cause of the first attempt.",
       "fix_commit": null,
-      "retest_run": "retry queued after run completion"
+      "retest_run": "39369859511 attempt 2: core-b passed 446 tests in 512.70 seconds"
     },
     {
       "run_id": "local-0.9.9-release-gate",
@@ -529,9 +529,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Local matrix migration setup completed, then the one-shot test container exited without test output. Sequential isolated replay queued after address-pool pressure cleared.",
       "cause": "unknown; no captured assertion or exception establishes an application defect.",
-      "next_action": "Run isolated sequential migration-foundation replay and compare exact-candidate hosted job; retain original failure.",
+      "next_action": "Local sequential replay and exact-candidate hosted job passed unchanged. Retain original failure without inferring an unproven cause.",
       "fix_commit": null,
-      "retest_run": "sequential replay pending"
+      "retest_run": "Exact-candidate hosted migration-foundation passed in Build 39369859511 attempt 1; local sequential replay passed 4 tests in 429.21 seconds"
     }
   ]
 }

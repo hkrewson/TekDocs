@@ -489,9 +489,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Exact seed 198291304214764600854504176683018738811 replayed in an isolated Docker container with current backend source, no network, and the unchanged test_canonical_host_property; passed. Hosted attempt 1 reported 458 passed, 2 skipped, and this one generation-health-check failure.",
       "cause": "unknown; Hypothesis generated two valid IP-address inputs in 1.64 seconds, with one draw taking 1.642 seconds. The timing failure did not reproduce locally.",
-      "next_action": "Failed-job retry requested on unchanged commit 1d2e5bb838459e83227fa8134f63746d06c62896. Confirm hosted result before declaring CI green; retain original failure. No assertion or health-check limit changed.",
+      "next_action": "Unchanged hosted retry passed. Retain original timing failure with unknown cause; do not carry this run forward as validation of the 0.9.9 version commit.",
       "fix_commit": null,
-      "retest_run": "39364130590 attempt 2 pending"
+      "retest_run": "39364130590 attempt 2: success on unchanged 1d2e5bb838459e83227fa8134f63746d06c62896"
     }
   ]
 }

@@ -512,6 +512,26 @@
       "next_action": "Leave existing environments intact. Exact-candidate Build 39369318399 must confirm PostgreSQL matrix, and Extended 39369348946 must confirm maintained browser/upgrade/recovery/DAST gates. Remaining local aggregate targets are not passed by this invocation.",
       "fix_commit": null,
       "retest_run": "hosted checks pending"
+    },
+    {
+      "run_id": "39369859511",
+      "job": "PostgreSQL shard (core-b), attempt 1",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted job 118456669424 stopped while pulling db/valkey/mailpit, before tests, with HTTP 502. Local pull replay did not reproduce 502; local Docker instead refused an existing Mailpit digest overwrite.",
+      "cause": "Hosted image retrieval returned 502; upstream cause unknown. No test assertion ran. Local replay has a separate Docker image-store limitation.",
+      "next_action": "Retry only the unchanged failed core-b job when GitHub permits it after current run completion. No code, assertions or limits changed.",
+      "fix_commit": null,
+      "retest_run": "retry queued after run completion"
+    },
+    {
+      "run_id": "local-0.9.9-release-gate",
+      "job": "PostgreSQL shard (migration-foundation)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Local matrix migration setup completed, then the one-shot test container exited without test output. Sequential isolated replay queued after address-pool pressure cleared.",
+      "cause": "unknown; no captured assertion or exception establishes an application defect.",
+      "next_action": "Run isolated sequential migration-foundation replay and compare exact-candidate hosted job; retain original failure.",
+      "fix_commit": null,
+      "retest_run": "sequential replay pending"
     }
   ]
 }

@@ -1,0 +1,39 @@
+{
+  "candidate_commit": "f52b210b852249f033dfd895dbb5eee96eb89865",
+  "codeql_run": 39369861428,
+  "open_alerts": 287,
+  "severity_counts": {
+    "high": 10,
+    "unrated": 150,
+    "medium": 127
+  },
+  "unchanged_alert_identities": 286,
+  "added": [
+    {
+      "commit": "f52b210b852249f033dfd895dbb5eee96eb89865",
+      "created_at": "2026-10-20T02:49:44Z",
+      "location": {
+        "end_column": 106,
+        "end_line": 53,
+        "path": "scripts/tests/test_production_release.py",
+        "start_column": 13,
+        "start_line": 53
+      },
+      "number": 320,
+      "rule": "py/clear-text-storage-sensitive-data",
+      "severity": "high"
+    }
+  ],
+  "absent": [
+    {
+      "commit": "05abb130625ae875c58253e309ba6821ee89ed66",
+      "number": 197,
+      "path": "frontend/src/help/ContextualHelp.tsx",
+      "rule": "js/trivial-conditional",
+      "severity": null
+    }
+  ],
+  "baseline_snapshot_sha256": "2fa43ad8bc411847710c82e441c93288ba1715adfd10c67c3561ee97463b1a7f",
+  "candidate_snapshot_sha256": "dbc6347c395354965374d20fd8ad4ef33c8810b50826af9f03d45ab56c080ff6",
+  "disposition": "Alert 320 is a bounded false positive: test writes only a temporary path and an example.invalid URL, not credential values. Scanner alert remains open; no global suppression or independent audit claimed."
+}

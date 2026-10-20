@@ -1,0 +1,4 @@
+commit=f52b210b852249f033dfd895dbb5eee96eb89865
+backend=ghcr.io/hkrewson/tekdocs-backend@sha256:9e33f39a92d2fb1ef3308214f02f1a04e0da37c86d709bd0b50a00b6e5cdb3f4
+frontend=ghcr.io/hkrewson/tekdocs-frontend@sha256:5a1347f3a2551a4740a8c1d1d4a150c79af7d87ed89aa0b6a7f0d7ddf921cad1
+renderer=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:633933a7b172099282a464fbf2e58cdb392d66c3fee761463b5763ccb302038f

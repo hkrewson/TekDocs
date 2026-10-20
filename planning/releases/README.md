@@ -5,19 +5,18 @@ start here. Historical review narratives are supporting evidence, not the live
 work queue. `.github/release-candidate.json` names the application candidate;
 the checkout's HEAD may be a later evidence/tooling commit.
 
-## 0.9.9 preparation
+## Published 0.9.9
 
-The next candidate enables published Wiki guides and corrects initial keyboard
-focus in overlays. See [0.9.9 candidate](0.9.9-candidate.md) for scope and current
-validation. The pinned manifest below still identifies released 0.9.8; its green
-status does not validate 0.9.9. New commit-bound runs and fresh security decisions
-are required before replacing that evidence record.
+The pinned manifest identifies f52b210, published as v0.9.9. All three image
+aliases and signed provenance/SBOMs were verified; all security and diagram
+categories assembled. See [publication closeout](0.9.9-publication-security-closeout.md),
+[operational validation](0.9.9-operational-closeout.md), and the
+[accepted security decision packet](0.9.9-security-decision-packet.md).
+Production deployment remains an operator action; use the
+[update instructions](0.9.9-production-update.md).
 
-Candidate f52b210 has completed validation; see the
-[0.9.9 operational closeout](0.9.9-operational-closeout.md) and
-[current security decision packet](0.9.9-security-decision-packet.md).
-The maintainer accepted the two bounded header risks on October 20. Publication
-authorization remains pending.
+The following 0.9.8 records describe the preceding production release and its
+historical manifest; they do not replace the current 0.9.9 manifest.
 
 ## Released 0.9.8 access-fix candidate
 

@@ -1,21 +1,22 @@
 {
   "schema_version": 1,
   "repository": "hkrewson/TekDocs",
-  "candidate_commit": "05abb130625ae875c58253e309ba6821ee89ed66",
-  "security_record": "planning/releases/0.9.8-publication-security-review.json",
+  "candidate_commit": "f52b210b852249f033dfd895dbb5eee96eb89865",
+  "security_record": "planning/releases/0.9.9-publication-security-review.json",
   "workflows": {
-    "Build, test, and secure": 39208816214,
-    "CodeQL": 39202253758,
-    "Extended validation": 39190978887
+    "Build, test, and secure": 39423316088,
+    "CodeQL": 39369861428,
+    "Extended validation": 39369348946
   },
   "operator_acceptance": {
     "decision": "accepted",
-    "date": "2026-10-19",
-    "reference": "planning/releases/0.9.8-operational-closeout.md",
-    "scope": "Operator reported corrected Session 3 passing October 18 and explicitly authorized exact-candidate tag/image publication October 19. Unperformed individual manual profiles remain unverified."
+    "date": "2026-10-20",
+    "reference": "planning/releases/0.9.9-operational-closeout.md",
+    "scope": "Maintainer explicitly accepted current-candidate bounded CSP/COEP risks and authorized exact-candidate tag/image publication. No new manual walkthrough or production smoke is claimed."
   },
   "remaining_release_actions": [
-    "Authority handoff remains a separate decision.",
-    "Application Wiki-link enablement requires a separately reviewed change and frontend/browser validation."
+    "Production deployment and post-update smoke checks remain operator actions.",
+    "Public Wiki upgrade guidance for v0.9.9 remains to be published.",
+    "Authority handoff remains a separate decision."
   ]
 }

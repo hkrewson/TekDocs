@@ -13,7 +13,9 @@ remaining publication decisions. [Access candidate validation](0.9.8-access-cand
 retains the earlier access/compression and browser chronology.
 The pinned manifest now names 05abb13, published as v0.9.8. All three image aliases
 and signed provenance/SBOMs were verified; see the publication security closeout.
-Deployment and Wiki publication remain separate decisions.
+The operator completed production deployment and reported successful document/asset
+smoke checks; see [production closeout](0.9.8-production-update.md). Wiki publication
+and authority handoff remain separate decisions.
 
 ## Status and evidence
 

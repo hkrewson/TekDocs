@@ -492,6 +492,16 @@
       "next_action": "Unchanged hosted retry passed. Retain original timing failure with unknown cause; do not carry this run forward as validation of the 0.9.9 version commit.",
       "fix_commit": null,
       "retest_run": "39364130590 attempt 2: success on unchanged 1d2e5bb838459e83227fa8134f63746d06c62896"
+    },
+    {
+      "run_id": "39368945868",
+      "job": "Backend static validation",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Freshly rebuilt 0.9.9 backend: scripts/check-openapi.sh failed with only info.version 0.9.8 versus 0.9.9. Old local installed-package image had misleadingly passed.",
+      "cause": "Version bump omitted generated backend/openapi.yml metadata. API operations and fields are unchanged.",
+      "next_action": "Regenerated schema with make schema; frontend API generation has no contract change. Fresh-image OpenAPI drift check passes. New commit-bound hosted validation required.",
+      "fix_commit": "0.9.9 schema metadata correction",
+      "retest_run": "fresh Docker OpenAPI checker passed; hosted pending"
     }
   ]
 }

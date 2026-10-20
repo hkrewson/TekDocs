@@ -1,5 +1,9 @@
 # Release Roadmap
 
+0.9.9 candidate preparation covers published contextual Wiki guides and initial
+overlay keyboard focus. See [candidate scope and evidence](../planning/releases/0.9.9-candidate.md).
+Production remains on the separately approved 0.9.8 release.
+
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 
 Most patch slices should fit one to three focused engineering sessions. A slice that grows beyond its stated exit condition must be split rather than silently expanded. Dates follow demonstrated velocity; security, migration, isolation, backup, and upgrade gates never compress to preserve a date.

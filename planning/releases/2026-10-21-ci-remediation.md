@@ -68,7 +68,26 @@ for the production license checker, not grounds to weaken its policy.
 
 A full local `make security` image rebuild and `make test-public-beta-performance`
 are not certified by these focused results. Docker storage exhaustion remains a
-constraint on fresh image/stack provisioning. The corrected commit needs hosted
-Build (including image scans), CodeQL and performance diagnostics; a release
-candidate also needs Extended validation and current security disposition.
-No push, publication or deployment is performed by this local correction.
+constraint on fresh image/stack provisioning. The corrected commit passed hosted Build (including image scans), CodeQL and
+performance diagnostics as recorded below. A release candidate still needs
+Extended validation and current security disposition. The maintainer authorized
+the push and hosted runs; no image publication or deployment occurred.
+
+
+## Hosted closeout — 2026-10-21
+
+Verified through the GitHub run/job API: all three manually dispatched runs used
+exact source `9c7e9046469cc86346c7663e2ac7ad3634fad620`, attempt 1, and concluded
+success:
+
+| Workflow | Run | Result |
+| --- | --- | --- |
+| Build, test, and secure | [39548663486](https://github.com/hkrewson/TekDocs/actions/runs/39548663486) | All validation jobs passed, including dependency policy, PostgreSQL shards/coverage, browser journeys, production containers, SBOMs and vulnerability scans. Publication was skipped as expected. |
+| CodeQL | [39548665549](https://github.com/hkrewson/TekDocs/actions/runs/39548665549) | Both language analyses and evidence job passed. |
+| Performance diagnostics | [39548667639](https://github.com/hkrewson/TekDocs/actions/runs/39548667639) | Constrained browser performance diagnostics passed. |
+
+This closes the two CI failures on a4918b2. It does not certify Extended
+validation, publication provenance, or deployment of the preview fix. The live
+release manifest remains v0.9.9/f52b210; the next runtime candidate requires its
+own release evidence and bounded security decisions. Artifact contents were not
+independently re-audited during this status check.

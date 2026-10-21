@@ -559,9 +559,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Docker pip-audit reproduced nine findings in Certifi 2026.7.22 and Pillow 12.3.0 before lock changes.",
       "cause": "Pinned transitive dependencies are now flagged by the vulnerability database; fixed versions reported as Certifi 2026.10.19 and Pillow 13.0.0.",
-      "next_action": "Both hash-locked dependency sets updated only for these packages. Hosted Build and image scans required on corrected commit; production remains unchanged.",
-      "fix_commit": null,
-      "retest_run": "Docker runtime/development pip-audit: no known vulnerabilities; pip check passed; clean production licenses and CA store passed; rendering/PDF 29 passed, 2 DB cases deselected; Bandit zero findings."
+      "next_action": "CI failure resolved. Preserve original failure; full release-candidate evidence and authorized publication/deployment remain separate.",
+      "fix_commit": "9c7e9046469cc86346c7663e2ac7ad3634fad620",
+      "retest_run": "Docker runtime/development pip-audit: no known vulnerabilities; pip check passed; clean production licenses and CA store passed; rendering/PDF 29 passed, 2 DB cases deselected; Bandit zero findings. Exact-source hosted Build 39548663486 attempt 1 passed all validation jobs including dependency policy and production-image scans."
     },
     {
       "run_id": "39545208607",
@@ -569,9 +569,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Unchanged Stock suite passed locally. Delaying the permission-bearing list response by 200 ms reproduced the exact missing Edit error at Stock.test.tsx:77 (1 failed, 4 passed).",
       "cause": "Test assumed record-title readiness also meant management permission had loaded; independent retrieve and list responses can arrive in either order. Performance measurements never ran; missing artifacts followed from the prerequisite failure.",
-      "next_action": "Test explicitly controls the list response and checks Edit is absent until permission arrives, then preserves dirty-draft assertions. Rerun full hosted diagnostics on corrected commit.",
-      "fix_commit": null,
-      "retest_run": "Focused deterministic Stock suite: 5 passed. Final make check-frontend passed: 772 tests in 168.30 seconds, API, lint, types, production build and bundle budgets. Hosted performance rerun still required."
+      "next_action": "CI failure resolved. Preserve deterministic permission-response regression and original failure; release-candidate validation remains separate.",
+      "fix_commit": "9c7e9046469cc86346c7663e2ac7ad3634fad620",
+      "retest_run": "Final make check-frontend passed (772 tests). Exact-source hosted Performance diagnostics 39548667639 attempt 1 passed."
     },
     {
       "run_id": "local-2026-10-21-check-frontend",
@@ -580,7 +580,7 @@
       "reproduction": "make check-frontend: 772 tests passed, then require-await rejected the new async act callback without an await.",
       "cause": "The test callback resolved the deferred list response but did not explicitly await it.",
       "next_action": "Added await pendingList inside act and reran tests and frontend verification. No lint suppression or weakened assertion.",
-      "fix_commit": null,
+      "fix_commit": "9c7e9046469cc86346c7663e2ac7ad3634fad620",
       "retest_run": "Final make check-frontend passed: 772 tests in 168.30 seconds plus API, lint, types, production build and bundle budgets."
     }
   ]

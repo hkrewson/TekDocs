@@ -15,7 +15,7 @@
     "scope": "Maintainer explicitly accepted current-candidate bounded CSP/COEP risks and authorized exact-candidate tag/image publication. No new manual walkthrough or production smoke is claimed."
   },
   "remaining_release_actions": [
-    "Production deployment and post-update smoke checks remain operator actions.",
+    "Production update completed October 20; documents/assets and keyboard navigation passed operator smoke. Help link is present; guide destination and diagram smoke remain unconfirmed. See planning/releases/0.9.9-production-update.md.",
     "Public Wiki upgrade guidance for v0.9.9 remains to be published.",
     "Authority handoff remains a separate decision."
   ]

@@ -874,8 +874,9 @@ legacy authority handoff remain open.
 
 - Complete transferred responsive Documentation/Files work and issue #60
   interface review against the new authoring model.
-- Run issue #39 technician and multi-installation pilots against the migrated
-  system, not the superseded database authoring model.
+- Complete issue #39 maintainer-led installation, onboarding, daily-work and
+  recovery acceptance against the migrated system. External pilots are not a
+  release requirement (maintainer decision, October 20, 2026).
 - Run issue #38 commit-matched automated security review and disposition all
   Critical and untriaged High findings.
 - Complete maintained-browser, keyboard, screen-reader, zoom, performance,
@@ -885,6 +886,15 @@ legacy authority handoff remain open.
 
 Local gate composition follow-up and its verification status are recorded in
 [release-gate composition](releases/0.9.8-release-gate-composition.md).
+
+External validation scope decision — October 20, 2026: the maintainer explicitly
+removed external pilots because no independent operators are available. Do not
+require three pilots, two independent restores, recruitment, or an external pilot
+report, and do not describe these activities as performed. This is removal from
+the release scope, not an automatic post-1.0 commitment. Independent operator
+usability and recovery validation remain unverified. Fresh-install, supported
+upgrade, isolated recovery, authorization/security, maintained-browser and
+applicable maintainer acceptance requirements remain in force.
 
 Exit condition: a frozen candidate satisfies the 1.0 release record.
 
@@ -904,7 +914,7 @@ release, hosted service, external certification or independent security audit.
 | #32 taxonomy governance | Taxonomy definitions remain database canonical; file selections and projections move to `0.9.2` and migration to `0.9.6`. |
 | #33 invoice boundary | Complete in `0.9.0`: privileged void-before-delivery, separately numbered immutable credit notes, supported recovery and the composed repository gate. It is independent of the document persistence change. |
 | #38 security assurance | Final candidate work in `0.9.8`; focused security tests recur in every slice. |
-| #39 pilots | Run in `0.9.8` against the final content model. Early usability checks may inform `0.9.3`–`0.9.5`. |
+| #39 operator acceptance | Maintainer-led acceptance against the final content model. External pilots and independent-restore participant counts were removed by explicit maintainer decision October 20, 2026; no recruitment obligation is deferred to 1.x. |
 | #40 hotspot decomposition | Preserve completed seams; replace remaining old-document model extraction with repository, parser, graph-index and storage-adapter boundaries in `0.9.1`–`0.9.6`. |
 | #60 interface review | Final review in `0.9.8`; do not complete the Documentation review against an interface scheduled for replacement. |
 | #75–#76 recurring invoices | Evidence reconciliation and reproduced gaps in `0.9.0`. |
@@ -925,7 +935,7 @@ release, hosted service, external certification or independent security audit.
 | #43 hierarchical document keys | Preserve current key bindings in migration and publication; broader hierarchical scope is post-1.0. |
 | #44 entity-linked diagrams/topology | The authorized content/entity graph foundation moves into `0.9.2`/`0.9.4`; additional diagram families remain post-1.0. |
 | TD-BACKLOG-MSP-001 / #67 | First value slice after the graph foundation: build the client operational brief as a saved authorized content-graph view. Target 1.1 unless explicitly promoted without delaying 1.0. |
-| TD-BACKLOG-MSP-002 / #68 | Define procedures as versioned documents/fragments and runs against exact Git objects. Target after 1.0 unless needed as a `0.9.8` pilot fixture. |
+| TD-BACKLOG-MSP-002 / #68 | Define procedures as versioned documents/fragments and runs against exact Git objects. Target after 1.0 unless needed as a final operator-acceptance fixture. |
 | TD-BACKLOG-MSP-003 / #69 | Build the portfolio overview from permission-filtered derived signals after 1.0. |
 | TD-BACKLOG-MSP-004 / #70 | Reuse entity/content relationships for the business-service catalog after 1.0. |
 | TD-BACKLOG-MSP-005 / #71 | Reconsider as Git-backed correction proposals or review branches after managed authoring is stable. |

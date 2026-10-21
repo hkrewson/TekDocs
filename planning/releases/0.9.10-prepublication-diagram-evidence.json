@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "candidate_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+  "status": "prepublication_partial",
+  "missing_categories": [
+    "supply_chain"
+  ],
+  "evidence": [
+    {
+      "category": "authoring_and_failures",
+      "checks": [
+        "accessible_title_and_description_required",
+        "guided_markdown_round_trip",
+        "oversized_output_failure",
+        "oversized_source_failure",
+        "parse_error_failure",
+        "raster_failure",
+        "renderer_timeout_failure",
+        "renderer_unavailable_failure",
+        "unsafe_svg_failure",
+        "unsupported_directive_failure",
+        "unsupported_mermaid_preserved"
+      ],
+      "completed_at": "2026-10-21T06:34:12.631977Z",
+      "immutable_identifier": "39553157005:1:diagram-authoring",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553157005",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs diagram authoring and failure regression",
+      "tool_version": "TekDocs 0.9.10"
+    },
+    {
+      "category": "browser_accessibility",
+      "checks": [
+        "axe_wcag_2_2_scan",
+        "diagram_download",
+        "forced_colors",
+        "keyboard_source_fallback",
+        "print_rendering",
+        "saved_document_graphic",
+        "screen_reader_semantics",
+        "source_edit_round_trip",
+        "wrapped_labels_and_accessible_description",
+        "zoom_and_reflow"
+      ],
+      "completed_at": "2026-10-21T06:39:59.097888Z",
+      "immutable_identifier": "39553157005:1:chromium-diagrams",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553157005",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs Chromium diagram authoring and accessibility regression",
+      "tool_version": "TekDocs 0.9.10"
+    },
+    {
+      "category": "dependency_contract",
+      "checks": [
+        "chromium_build_assertion",
+        "contract_file_checksums",
+        "exact_dependency_pins",
+        "preview_renderer_version_alignment"
+      ],
+      "completed_at": "2026-10-21T06:17:22.821813Z",
+      "immutable_identifier": "sha256:106bd0537f76b5c7c5c9325bd41b7fc440ae4df7ff650426d23aa073f267adc1",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553157005",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs renderer dependency contract",
+      "tool_version": "schema v1"
+    },
+    {
+      "category": "production_image",
+      "checks": [
+        "actual_diagram_export",
+        "browser_version_matches_image_record",
+        "nonroot_readonly_runtime",
+        "production_renderer_health",
+        "renderer_version_attribution"
+      ],
+      "completed_at": "2026-10-21T07:40:28.617248Z",
+      "immutable_identifier": "39553157005:3:production-diagram-image",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553157005",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs production-target image rehearsal",
+      "tool_version": "TekDocs 0.9.10"
+    },
+    {
+      "category": "renderer_and_exports",
+      "checks": [
+        "accessible_source_fallback",
+        "bounded_concurrency_and_capacity",
+        "deterministic_svg_and_png",
+        "html_pdf_docx_zip_carry_through",
+        "network_disabled_sandbox",
+        "renderer_job_cleanup",
+        "retained_artifact_integrity",
+        "static_fail_before_promotion",
+        "supported_mermaid_families"
+      ],
+      "completed_at": "2026-10-21T06:34:12.689924Z",
+      "immutable_identifier": "39553157005:1:renderer-exports",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553157005",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs isolated renderer and export regression",
+      "tool_version": "TekDocs 0.9.10"
+    },
+    {
+      "category": "upgrade_and_restore",
+      "checks": [
+        "restored_diagram_artifact_checksums",
+        "restored_signed_publication",
+        "separate_database_and_media_restore",
+        "versioned_diagram_source_upgrade"
+      ],
+      "completed_at": "2026-10-21T06:46:40.076315Z",
+      "immutable_identifier": "39553163359:1:diagram-upgrade+restore",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39553163359",
+      "schema_version": 1,
+      "scope_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+      "status": "passed",
+      "tool": "TekDocs supported upgrade and encrypted recovery rehearsals",
+      "tool_version": "rehearsal scripts at f325bdc3a6fb612c21c404ad4e113653ca046f1b"
+    }
+  ]
+}

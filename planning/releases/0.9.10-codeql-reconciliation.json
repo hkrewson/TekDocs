@@ -1,0 +1,33 @@
+{
+  "candidate_commit": "f325bdc3a6fb612c21c404ad4e113653ca046f1b",
+  "codeql_run": 39553160247,
+  "attempt": 1,
+  "open_alerts": 287,
+  "all_instances_match_candidate": true,
+  "severity_counts": {
+    "high": 10,
+    "unrated": 150,
+    "medium": 127
+  },
+  "candidate_snapshot_sha256": "7f7b92e6326a9f6d53e471ebfaf3b17b596573ae869b5a9573c27bf43ce4a35b",
+  "comparison_snapshot_commit": "61afca35caa439292b9089878ccf56ffc1e57ae5",
+  "comparison_snapshot_sha256": "99a53f862bd0e462083f68d56139b1d3c681d028d94e315b9f53c91a8e6dbe11",
+  "unchanged_identities_from_comparison": 286,
+  "added_from_comparison": [
+    [
+      320,
+      "py/clear-text-storage-sensitive-data",
+      "high",
+      "scripts/tests/test_production_release.py"
+    ]
+  ],
+  "absent_from_comparison": [
+    [
+      197,
+      "js/trivial-conditional",
+      null,
+      "frontend/src/help/ContextualHelp.tsx"
+    ]
+  ],
+  "limitation": "The retained comparison snapshot predates v0.9.9. Its differences (+320, -197) and current counts match the recorded v0.9.9 reconciliation, but the raw f52b210 snapshot was not available for a direct identity comparison. Alert 320 remains the previously reviewed synthetic test fixture; no scanner dismissals or blanket suppressions."
+}

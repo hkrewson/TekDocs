@@ -612,6 +612,13 @@ GitHub access.
 
 #### Open `0.9.7` file-ownership and authority gates
 
+October 20 readiness reconciliation: limited authority transition and body-edit
+rollback code already exists in the released source. Full handoff remains open,
+particularly reversibility after structural/metadata edits. See
+[first MSP document readiness](migrations/first-msp-document-handoff.md) before
+interpreting the historical sequence below as absent implementation.
+
+
 The managed-file record previously required a legacy `Document` owner. That
 schema requirement is now optional for an indexed Git document. A scoped staff
 API can now upload an ordinary file for that owner through the existing scanner

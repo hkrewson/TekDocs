@@ -221,9 +221,12 @@ def _template_change_preview(pinned: ParsedContent, current: ParsedContent | Non
 
 
 class _HistoricalSnapshots:
-    def __init__(self, *, repository: WorkspaceRepository, accepted_object_id: str) -> None:
+    def __init__(
+        self, *, repository: WorkspaceRepository, accepted_object_id: str, record_reconciliation: bool = True
+    ) -> None:
         self.repository = repository
         self.accepted_object_id = accepted_object_id
+        self.record_reconciliation = record_reconciliation
         self.cache: dict[str, dict[uuid.UUID, ParsedContent]] = {}
         self.loaded_bytes = 0
 
@@ -236,6 +239,7 @@ class _HistoricalSnapshots:
             _commit, files = read_repository_markdown_files_at_commit(
                 repository_id=self.repository.id,
                 object_id=object_id,
+                record_reconciliation=self.record_reconciliation,
             )
         except RepositoryServiceError as exc:
             raise ContentCompositionError(
@@ -270,6 +274,7 @@ def _resolve_compositions(
     repository: WorkspaceRepository,
     accepted_object_id: str,
     parsed_by_path: dict[str, ParsedContent],
+    record_reconciliation: bool = True,
 ) -> tuple[
     dict[uuid.UUID, dict[str, dict[str, Any]]],
     dict[tuple[uuid.UUID, int], ResolvedDirectInclude],
@@ -277,7 +282,9 @@ def _resolve_compositions(
     tuple[dict[str, str], ...],
 ]:
     accepted = _identity_map(parsed_by_path)
-    snapshots = _HistoricalSnapshots(repository=repository, accepted_object_id=accepted_object_id)
+    snapshots = _HistoricalSnapshots(
+        repository=repository, accepted_object_id=accepted_object_id, record_reconciliation=record_reconciliation
+    )
     snapshots.cache[accepted_object_id] = accepted
     resolver = ContentCompositionResolver(
         accepted_object_id=accepted_object_id,
@@ -463,6 +470,7 @@ def validate_candidate_snapshot(*, repository: WorkspaceRepository, files: tuple
             repository=repository,
             accepted_object_id="candidate:uncommitted",
             parsed_by_path=parsed_by_path,
+            record_reconciliation=False,
         )
     if diagnostics:
         raise ContentIndexValidationError(diagnostics)

@@ -873,7 +873,9 @@ def read_accepted_repository_markdown_files(
         return commit, tuple(files)
 
 
-def list_accepted_repository_history(*, repository_id: uuid.UUID, limit: int = 32) -> tuple[str, ...]:
+def list_accepted_repository_history(
+    *, repository_id: uuid.UUID, limit: int = 32, record_reconciliation: bool = True
+) -> tuple[str, ...]:
     """Return a bounded first-parent chain from the exact accepted Git head."""
 
     if limit < 1 or limit > 32:
@@ -886,7 +888,8 @@ def list_accepted_repository_history(*, repository_id: uuid.UUID, limit: int = 3
             raise RepositoryInputError("Repository has no accepted content")
         git = _GitRepository(repository.id, repository_path, object_format)
         reconciliation, accepted_usable = _classify_reconciliation(git, accepted)
-        _record_reconciliation(repository, reconciliation)
+        if record_reconciliation:
+            _record_reconciliation(repository, reconciliation)
         if not accepted_usable:
             raise RepositoryReconciliationError("Accepted repository content is unavailable")
         return git.first_parent_history(accepted, limit=limit)

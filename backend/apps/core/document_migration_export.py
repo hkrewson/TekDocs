@@ -161,7 +161,9 @@ def _existing_references(
         or repository.accepted_commit_id != repository.indexed_commit_id
     ):
         raise DocumentMigrationReferenceError("cross_document_source_unavailable")
-    _accepted, files = read_accepted_repository_markdown_files(repository_id=repository.id)
+    _accepted, files = read_accepted_repository_markdown_files(
+        repository_id=repository.id, record_reconciliation=False
+    )
     current_files = dict(files)
     accepted_commit = repository.accepted_commit
     if accepted_commit is None:
@@ -187,7 +189,7 @@ def _existing_references(
             raise DocumentMigrationReferenceError("pinned_history_limit_exceeded")
         try:
             _commit, historical_files = read_repository_markdown_files_at_commit(
-                repository_id=repository.id, object_id=commit
+                repository_id=repository.id, object_id=commit, record_reconciliation=False
             )
         except RepositoryServiceError as exc:
             raise DocumentMigrationReferenceError("pinned_source_snapshot_required") from exc
@@ -273,7 +275,9 @@ def _existing_references(
                     if history is None:
                         try:
                             history = list_accepted_repository_history(
-                                repository_id=repository.id, limit=MAX_MIGRATION_PIN_HISTORY_COMMITS
+                                repository_id=repository.id,
+                                limit=MAX_MIGRATION_PIN_HISTORY_COMMITS,
+                                record_reconciliation=False,
                             )
                         except RepositoryServiceError as exc:
                             raise DocumentMigrationReferenceError("pinned_source_snapshot_required") from exc

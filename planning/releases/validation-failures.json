@@ -532,6 +532,26 @@
       "next_action": "Local sequential replay and exact-candidate hosted job passed unchanged. Retain original failure without inferring an unproven cause.",
       "fix_commit": null,
       "retest_run": "Exact-candidate hosted migration-foundation passed in Build 39369859511 attempt 1; local sequential replay passed 4 tests in 429.21 seconds"
+    },
+    {
+      "run_id": "production-v0.9.9-migration-preview",
+      "job": "Read-only document migration preview",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing test_inventory_is_repeatable_read_only_and_exact_workspace preview wrapped in SET TRANSACTION READ ONLY; isolated Docker PostgreSQL reproduced ReadOnlySqlTransaction at _record_reconciliation before runtime changes (1 failed in 82.64 seconds).",
+      "cause": "Migration preview snapshot reads persisted repository reconciliation metadata inside the read-only transaction.",
+      "next_action": "Freeze and fully validate a new runtime candidate before authorized publication/deployment. Keep the production read-only guard; see planning/migrations/read-only-preview-correction.md.",
+      "fix_commit": null,
+      "retest_run": "Focused Docker replay: 1 passed in 88.72 seconds. Broader regression: 180 passed, 51 storage-related errors; fresh repository-service rerun: 32 passed in 95.27 seconds. Docker Ruff and mypy passed. Original combined run remains failed."
+    },
+    {
+      "run_id": "local-read-only-preview-regression",
+      "job": "Combined migration, content and repository regression",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Combined isolated PostgreSQL run: 180 passed, 51 setup/teardown errors in repository-service tests, 327.44 seconds; database reported DiskFull (No space left on device).",
+      "cause": "Docker database storage exhausted during the combined run.",
+      "next_action": "Runner removed its disposable stack; unchanged repository-service selection passed in a fresh isolated stack. Preserve original failure and require full candidate release checks before publication. No unrelated environments or caches pruned.",
+      "fix_commit": null,
+      "retest_run": "Fresh isolated Docker repository-service rerun: 32 passed in 95.27 seconds; Ruff and mypy passed."
     }
   ]
 }

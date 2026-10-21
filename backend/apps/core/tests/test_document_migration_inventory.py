@@ -95,6 +95,15 @@ from apps.core.workspaces import resolve_msp_workspace
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
+def _preview_document_migration(**options):
+    """Exercise every preview shape with PostgreSQL refusing database writes."""
+    with transaction.atomic():
+        if connection.vendor == "postgresql":
+            with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION READ ONLY")
+        return call_command("preview_document_migration", **options)
+
+
 def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path):
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"), MEDIA_ROOT=str(tmp_path / "media")):
         InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
@@ -1286,8 +1295,7 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
         assert parsed_document.includes[0].target_content_id == first_export.block_id
         assert parsed_fragment.markdown == "Legacy body\n"
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(msp.id),
             document=str(simple.id),
             stdout=preview_output,
@@ -1301,8 +1309,7 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
         assert msp.repository.accepted_commit.object_id == preview["base_commit"]
 
         blocked_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(msp.id),
             document=str(template.id),
             stdout=blocked_output,
@@ -1492,8 +1499,7 @@ def test_wikilink_projection_parity_tracks_resolved_and_unresolved_backlinks(tmp
         index_repository_content(repository_id=workspace.repository.id)
         assert inventory_legacy_documents(workspace)["documents"][0]["disposition"] == "simple_candidate"
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=preview_output,
@@ -1578,8 +1584,7 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
 
         index_repository_content(repository_id=workspace.repository.id)
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=preview_output,
@@ -1760,8 +1765,7 @@ def test_owned_sections_preserve_flat_and_nested_order_and_roll_back_as_one_copy
         assert [item.target_content_id for item in nested_second.includes] == [grandchild.block_id]
 
         nested_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=nested_preview_output,
@@ -1859,8 +1863,7 @@ def test_live_same_workspace_reuse_requires_indexed_source_and_never_deletes_it(
         assert rows[str(source.id)]["disposition"] == "simple_candidate"
         assert rows[str(target.id)]["reasons"] == ["cross_document_source_unavailable"]
         blocked_preview = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(target.id),
             stdout=blocked_preview,
@@ -1868,8 +1871,7 @@ def test_live_same_workspace_reuse_requires_indexed_source_and_never_deletes_it(
         assert json.loads(blocked_preview.getvalue())["blockers"] == ["cross_document_source_unavailable"]
 
         source_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(source.id),
             stdout=source_preview_output,
@@ -1892,8 +1894,7 @@ def test_live_same_workspace_reuse_requires_indexed_source_and_never_deletes_it(
         rows = {row["document_id"]: row for row in inventory_legacy_documents(workspace)["documents"]}
         assert rows[str(target.id)]["disposition"] == "simple_candidate"
         target_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(target.id),
             stdout=target_preview_output,
@@ -1962,8 +1963,7 @@ def test_live_same_workspace_reuse_requires_indexed_source_and_never_deletes_it(
             base_revision_id=source.placements.get().block.current_revision_id,
         )
         drift_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(target.id),
             stdout=drift_preview_output,
@@ -2010,8 +2010,7 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
         )
         index_repository_content(repository_id=workspace.repository.id)
         source_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(source.id),
             stdout=source_preview_output,
@@ -2030,8 +2029,7 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
         )
         source_commit = json.loads(source_import_output.getvalue())["commit"]
         target_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(target.id),
             stdout=target_preview_output,
@@ -2102,8 +2100,7 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
             position=1,
         )
         unmatched_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(unmatched.id),
             stdout=unmatched_output,
@@ -2126,8 +2123,7 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
             position=1,
         )
         historical_preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(historical.id),
             stdout=historical_preview_output,
@@ -2224,8 +2220,7 @@ def test_current_taxonomy_keys_migrate_and_stale_selection_is_deferred(tmp_path)
         assert root.taxonomies == {"technology": ["endpoint"]}
         index_repository_content(repository_id=workspace.repository.id)
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=preview_output,
@@ -2278,8 +2273,7 @@ def test_current_taxonomy_keys_migrate_and_stale_selection_is_deferred(tmp_path)
         )
         assert inventory_legacy_documents(workspace)["documents"][0]["reasons"] == ["taxonomy_mapping_required"]
         stale_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=stale_output,
@@ -2340,8 +2334,7 @@ def test_client_local_taxonomy_key_stays_in_exact_workspace(tmp_path):
         assert root.taxonomies == {"service-area": ["onsite"]}
         index_repository_content(repository_id=workspace.repository.id)
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=preview_output,
@@ -2432,8 +2425,7 @@ def test_exact_workspace_entity_references_map_to_neutral_mentions_only(tmp_path
         )
         index_repository_content(repository_id=workspace.repository.id)
         preview_output = io.StringIO()
-        call_command(
-            "preview_document_migration",
+        _preview_document_migration(
             workspace=str(workspace.id),
             document=str(document.id),
             stdout=preview_output,

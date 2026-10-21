@@ -76,7 +76,9 @@ class Command(BaseCommand):
                 export = build_simple_document_export(document, verify_attachments=True)
                 if repository.accepted_commit_id is None:
                     raise DocumentMigrationExportError("Repository has no accepted commit")
-                accepted, current = read_accepted_repository_markdown_files(repository_id=repository.id)
+                accepted, current = read_accepted_repository_markdown_files(
+                    repository_id=repository.id, record_reconciliation=False
+                )
                 if export.reference_commit is not None and export.reference_commit != accepted.object_id:
                     raise DocumentMigrationReferenceError("repository_changed")
                 candidate = dict(current)

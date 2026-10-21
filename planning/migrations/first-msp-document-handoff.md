@@ -97,13 +97,19 @@ multiple matches, stop and identify the intended document locally.
 
 ## Evidence
 
-Source inspection is verified against the current checkout, whose runtime matches
-published f52b210. The existing `make test-document-migration-inventory` test selection was run
+Initial source inspection was verified against published f52b210. The existing `make test-document-migration-inventory` test selection was run
 through the repository shard runner with a temporary isolated-project adapter:
 `test_document_migration_inventory.py` and `test_runtime_rls.py`, 28 passed in
 122.02 seconds. The adapter used the existing Compose/migration/cleanup flow
 without changing assertions or application source. Docker evidence is retained
 locally in `/tmp/tekdocs-authority-readiness.log`. This validates the bounded
 existing behavior, not completion of the broader handoff or recovery promise.
-The production inventory command has not been executed against production and
-production document eligibility remains unknown.
+The operator subsequently confirmed one ordinary-document match, one placement,
+`simple_candidate`, no reasons and no repository blockers. The earlier template
+classification was corrected through the normal UI. Inventory eligibility is
+verified by the operator's sanitized output; copy and promotion remain unapproved.
+
+The next production preview failed because it attempted to save repository health
+metadata inside the explicitly read-only transaction. No successful preview is
+claimed. See [read-only preview correction](read-only-preview-correction.md).
+Do not remove the read-only guard or retry the preview on unchanged v0.9.9.

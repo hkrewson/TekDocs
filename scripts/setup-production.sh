@@ -193,10 +193,12 @@ if [[ "$mode" == finalize ]]; then
   TEKDOCS_BACKEND_IMAGE=$(read_environment_value TEKDOCS_BACKEND_IMAGE)
   TEKDOCS_FRONTEND_IMAGE=$(read_environment_value TEKDOCS_FRONTEND_IMAGE)
   TEKDOCS_RENDERER_IMAGE=$(read_environment_value TEKDOCS_RENDERER_IMAGE)
-  export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
+  TEKDOCS_MAILPIT_IMAGE=$(read_environment_value TEKDOCS_MAILPIT_IMAGE)
+  export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE TEKDOCS_MAILPIT_IMAGE
   [[ "$TEKDOCS_BACKEND_IMAGE" == "$TEKDOCS_BACKEND_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_BACKEND_IMAGE is not pinned"
   [[ "$TEKDOCS_FRONTEND_IMAGE" == "$TEKDOCS_FRONTEND_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_FRONTEND_IMAGE is not pinned"
   [[ "$TEKDOCS_RENDERER_IMAGE" == "$TEKDOCS_RENDERER_REPOSITORY@sha256:"* ]] || fail "TEKDOCS_RENDERER_IMAGE is not pinned"
+  [[ "$TEKDOCS_MAILPIT_IMAGE" =~ ^ghcr\.io/hkrewson/tekdocs-mailpit@sha256:[0-9a-f]{64}$ ]] || fail "TEKDOCS_MAILPIT_IMAGE is not pinned"
   verify_secret_set
   build_compose false
 
@@ -290,14 +292,18 @@ if [[ "$use_traefik" == true ]]; then
 fi
 
 current_commit=$(git -C "$repository_root" rev-parse HEAD)
-tekdocs_resolve_production_images "$current_commit"
+tekdocs_resolve_production_images "$current_commit" true
 TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
 TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
 TEKDOCS_RENDERER_IMAGE=$TEKDOCS_RESOLVED_RENDERER_IMAGE
-export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
+TEKDOCS_MAILPIT_IMAGE=${TEKDOCS_RESOLVED_MAILPIT_IMAGE:-}
+export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE TEKDOCS_MAILPIT_IMAGE
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_RENDERER_IMAGE "$TEKDOCS_RENDERER_IMAGE"
+if [[ -n "$TEKDOCS_MAILPIT_IMAGE" ]]; then
+  tekdocs_persist_environment_value "$environment_file" TEKDOCS_MAILPIT_IMAGE "$TEKDOCS_MAILPIT_IMAGE"
+fi
 
 build_compose true
 "${compose[@]}" config --quiet

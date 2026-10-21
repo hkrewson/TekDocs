@@ -67,16 +67,16 @@ elif args[0]=='inspect':
  else:
   receipt=dict(line.strip().split('=',1) for line in open(os.environ['TEST_RECEIPT']))
   service=args[-1].removeprefix('synthetic-')
-  key={'frontend':'frontend','diagram-renderer':'renderer'}.get(service,'backend')
+  key={'frontend':'frontend','diagram-renderer':'renderer','mailpit':'mailpit'}.get(service,'backend')
   print('wrong-image' if os.environ.get('TEST_WRONG_RUNNING_IMAGE') else receipt[key])
 elif args[:2]==['image','inspect']:
  if 'org.opencontainers.image.revision' in args[3]:
-  print('0'*40 if os.environ.get('TEST_BAD_REVISION') else os.environ['TEST_RELEASE_COMMIT'])
+  print('0'*40 if os.environ.get('TEST_BAD_REVISION') or (os.environ.get('TEST_BAD_MAILPIT_REVISION') and 'tekdocs-mailpit' in args[-1]) else os.environ['TEST_RELEASE_COMMIT'])
  else:
   repo=args[-1].split(':')[0]
   receipt=dict(line.strip().split('=',1) for line in open(os.environ['TEST_RECEIPT']))
-  name={'tekdocs-backend':'backend','tekdocs-frontend':'frontend','tekdocs-diagram-renderer':'renderer'}[repo.rsplit('/',1)[1]]
-  print(repo+'@sha256:'+'0'*64 if os.environ.get('TEST_BAD_DIGEST') else receipt[name])
+  name={'tekdocs-backend':'backend','tekdocs-frontend':'frontend','tekdocs-diagram-renderer':'renderer','tekdocs-mailpit':'mailpit'}[repo.rsplit('/',1)[1]]
+  print(repo+'@sha256:'+'0'*64 if os.environ.get('TEST_BAD_DIGEST') or (os.environ.get('TEST_BAD_MAILPIT_DIGEST') and name=='mailpit') else receipt[name])
 elif args[0]!='pull': sys.exit(9)
 ''')
         docker.chmod(0o755)
@@ -96,6 +96,61 @@ elif args[0]!='pull': sys.exit(9)
                                '--backup-root', str(Path(self.temp.name)/'backups'),
                                '--recovery-key', str(self.key)], cwd=self.root, env=self.env,
                               text=True, capture_output=True)
+
+    def enable_mailpit_release(self):
+        (self.root / 'compose.images.yml').write_text('services: {}\n# TEKDOCS_MAILPIT_IMAGE\n')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'four-image application fixture')
+        self.commit = self.git('rev-parse', 'HEAD').strip()
+        self.git('tag', '-f', 'v0.9.8')
+        receipt = self.root / 'scripts/releases/v0.9.8.images'
+        lines = receipt.read_text().splitlines()
+        lines[0] = 'commit=' + self.commit
+        lines.append('mailpit=ghcr.io/hkrewson/tekdocs-mailpit@sha256:' + 'a' * 64)
+        receipt.write_text('\n'.join(lines) + '\n')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'four-image receipt fixture')
+        self.env.update(TEST_RELEASE_COMMIT=self.commit, TEST_RUNNING_COMMIT=self.commit)
+
+    def test_four_image_release_verifies_and_persists_mailpit(self):
+        self.enable_mailpit_release()
+        result = self.run_update()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('TEKDOCS_MAILPIT_IMAGE=ghcr.io/hkrewson/tekdocs-mailpit@sha256:',
+                      (self.root / '.env').read_text())
+        self.assertIn('synthetic-mailpit', self.events.read_text())
+
+    def test_four_image_release_rejects_missing_mailpit_receipt_before_stop(self):
+        self.enable_mailpit_release()
+        receipt = self.root / 'scripts/releases/v0.9.8.images'
+        receipt.write_text('\n'.join(line for line in receipt.read_text().splitlines()
+                                    if not line.startswith('mailpit=')) + '\n')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'missing mailpit receipt fixture')
+        result = self.run_update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('requires a reviewed Mailpit digest', result.stderr)
+        self.assert_no_stop()
+
+    def test_four_image_release_rejects_wrong_mailpit_identity_before_stop(self):
+        self.enable_mailpit_release()
+        for flag in ('TEST_BAD_MAILPIT_REVISION', 'TEST_BAD_MAILPIT_DIGEST'):
+            with self.subTest(flag=flag):
+                self.env[flag] = '1'
+                result = self.run_update()
+                self.assertNotEqual(result.returncode, 0)
+                self.assert_no_stop()
+                self.env.pop(flag)
+
+    def test_four_image_receipt_rejects_duplicate_mailpit(self):
+        self.enable_mailpit_release()
+        receipt = self.root / 'scripts/releases/v0.9.8.images'
+        receipt.write_text(receipt.read_text() + receipt.read_text().splitlines()[-1] + '\n')
+        self.git('add', '.')
+        self.git('commit', '-qm', 'duplicate mailpit fixture')
+        result = self.run_update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assert_no_stop()
 
     def assert_no_stop(self):
         events = self.events.read_text() if self.events.exists() else ''

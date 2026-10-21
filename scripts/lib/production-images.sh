@@ -3,6 +3,7 @@
 TEKDOCS_BACKEND_REPOSITORY=ghcr.io/hkrewson/tekdocs-backend
 TEKDOCS_FRONTEND_REPOSITORY=ghcr.io/hkrewson/tekdocs-frontend
 TEKDOCS_RENDERER_REPOSITORY=ghcr.io/hkrewson/tekdocs-diagram-renderer
+TEKDOCS_MAILPIT_REPOSITORY=ghcr.io/hkrewson/tekdocs-mailpit
 
 tekdocs_resolve_digest_reference() {
   local repository=$1
@@ -24,7 +25,8 @@ tekdocs_resolve_digest_reference() {
 }
 
 tekdocs_resolve_production_images() {
-  local commit=$1
+  local commit=$1 include_mailpit=${2:-false}
+  TEKDOCS_RESOLVED_MAILPIT_IMAGE=
   local commit_tag backend_tagged_reference frontend_tagged_reference renderer_tagged_reference
   local backend_revision frontend_revision renderer_revision
 
@@ -61,6 +63,14 @@ tekdocs_resolve_production_images() {
   TEKDOCS_RESOLVED_BACKEND_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_BACKEND_REPOSITORY" "$backend_tagged_reference")
   TEKDOCS_RESOLVED_FRONTEND_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_FRONTEND_REPOSITORY" "$frontend_tagged_reference")
   TEKDOCS_RESOLVED_RENDERER_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_RENDERER_REPOSITORY" "$renderer_tagged_reference")
+  if [[ "$include_mailpit" == true ]]; then
+    local mailpit_reference="$TEKDOCS_MAILPIT_REPOSITORY:$commit_tag" mailpit_revision
+    docker pull "$mailpit_reference"
+    mailpit_revision=$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$mailpit_reference")
+    [[ "$mailpit_revision" == "$commit" ]] || { echo "Mailpit image revision mismatch" >&2; return 1; }
+    TEKDOCS_RESOLVED_MAILPIT_IMAGE=$(tekdocs_resolve_digest_reference "$TEKDOCS_MAILPIT_REPOSITORY" "$mailpit_reference")
+  fi
+  export TEKDOCS_RESOLVED_MAILPIT_IMAGE
   export TEKDOCS_RESOLVED_BACKEND_IMAGE TEKDOCS_RESOLVED_FRONTEND_IMAGE TEKDOCS_RESOLVED_RENDERER_IMAGE
 }
 

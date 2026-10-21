@@ -380,3 +380,13 @@ The controlled Networks cleanup adds only lossless supported-model projections. 
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.
+
+### TD-RISK-062 update — October 21, 2026
+
+The v0.9.10 release scan failed on CVE-2026-111943 in Mailpit's Go 1.27.2
+runtime. v0.9.11 prepares an unmodified v1.31.6 source rebuild with Go 1.27.3
+and x/net v0.61.0, removing the temporary x/net suppression. The local rebuilt
+image scan passes without exceptions. Hosted validation and publication remain
+required; existing production is not remediated by this source change.
+The maintainer accepted responsibility for the temporary rebuild and requested
+an upstream return path; see [Mailpit maintenance](../mailpit/README.md).

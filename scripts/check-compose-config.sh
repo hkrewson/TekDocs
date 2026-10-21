@@ -20,6 +20,7 @@ python3 "$repository_root/tests/rehearsals/test-restore-project.py"
 TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 TEKDOCS_RENDERER_IMAGE=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+TEKDOCS_MAILPIT_IMAGE=ghcr.io/hkrewson/tekdocs-mailpit@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
 docker compose \
   --env-file "$repository_root/.env.production.example" \
   -f "$repository_root/compose.yml" \
@@ -32,6 +33,7 @@ docker compose \
 rendered=$(TEKDOCS_BACKEND_IMAGE=ghcr.io/hkrewson/tekdocs-backend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
   TEKDOCS_FRONTEND_IMAGE=ghcr.io/hkrewson/tekdocs-frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
   TEKDOCS_RENDERER_IMAGE=ghcr.io/hkrewson/tekdocs-diagram-renderer@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
+  TEKDOCS_MAILPIT_IMAGE=ghcr.io/hkrewson/tekdocs-mailpit@sha256:0000000000000000000000000000000000000000000000000000000000000000 \
   docker compose \
   --env-file "$repository_root/.env.production.example" \
   -f "$repository_root/compose.yml" \

@@ -45,6 +45,11 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:28", timezone: America/Chicago }
     rebase-strategy: disabled
     labels: [dependencies, containers]
+  - package-ecosystem: docker
+    directory: /mailpit
+    schedule: { interval: weekly, day: monday, time: "09:29", timezone: America/Chicago }
+    rebase-strategy: disabled
+    labels: [dependencies, containers]
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday, time: "09:30", timezone: America/Chicago }

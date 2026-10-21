@@ -275,7 +275,12 @@ if [[ -n "$release" ]]; then
   release_directory=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-release.XXXXXX")
   git archive "$current_commit" | tar -x -C "$release_directory"
   [[ "$(tr -d '[:space:]' < "$release_directory/VERSION")" == "${release#v}" ]] || fail "release version metadata does not match its tag"
-  tekdocs_resolve_production_images "$current_commit"
+  include_mailpit=false
+  if grep -q TEKDOCS_MAILPIT_IMAGE "$release_directory/compose.images.yml"; then
+    include_mailpit=true
+    [[ -n "$TEKDOCS_RELEASE_MAILPIT" ]] || fail "release requires a reviewed Mailpit digest"
+  fi
+  tekdocs_resolve_production_images "$current_commit" "$include_mailpit"
   tekdocs_verify_release_images || fail "pulled images do not match the reviewed release digests"
   for index in "${!compose[@]}"; do
     case "${compose[$index]}" in
@@ -290,13 +295,16 @@ else
   git fetch --prune
   git merge --ff-only '@{upstream}'
   current_commit=$(git rev-parse HEAD)
-  tekdocs_resolve_production_images "$current_commit"
+  include_mailpit=false
+  grep -q TEKDOCS_MAILPIT_IMAGE "$repository_root/compose.images.yml" && include_mailpit=true
+  tekdocs_resolve_production_images "$current_commit" "$include_mailpit"
   image_compose="$repository_root/compose.images.yml"
 fi
 TEKDOCS_BACKEND_IMAGE=$TEKDOCS_RESOLVED_BACKEND_IMAGE
 TEKDOCS_FRONTEND_IMAGE=$TEKDOCS_RESOLVED_FRONTEND_IMAGE
 TEKDOCS_RENDERER_IMAGE=$TEKDOCS_RESOLVED_RENDERER_IMAGE
-export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE
+TEKDOCS_MAILPIT_IMAGE=${TEKDOCS_RESOLVED_MAILPIT_IMAGE:-}
+export TEKDOCS_BACKEND_IMAGE TEKDOCS_FRONTEND_IMAGE TEKDOCS_RENDERER_IMAGE TEKDOCS_MAILPIT_IMAGE
 compose+=(-f "$image_compose")
 
 "${compose[@]}" config --quiet
@@ -337,8 +345,11 @@ if [[ "$ready" != true ]]; then
 fi
 
 if [[ -n "$release" ]]; then
-  for service in backend worker scheduler frontend diagram-renderer; do
+  release_services=(backend worker scheduler frontend diagram-renderer)
+  [[ -z "$TEKDOCS_MAILPIT_IMAGE" ]] || release_services+=(mailpit)
+  for service in "${release_services[@]}"; do
     case "$service" in
+      mailpit) expected_image=$TEKDOCS_MAILPIT_IMAGE ;;
       frontend) expected_image=$TEKDOCS_FRONTEND_IMAGE ;;
       diagram-renderer) expected_image=$TEKDOCS_RENDERER_IMAGE ;;
       *) expected_image=$TEKDOCS_BACKEND_IMAGE ;;
@@ -356,6 +367,9 @@ application_stopped=false
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_BACKEND_IMAGE "$TEKDOCS_BACKEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_FRONTEND_IMAGE "$TEKDOCS_FRONTEND_IMAGE"
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_RENDERER_IMAGE "$TEKDOCS_RENDERER_IMAGE"
+if [[ -n "$TEKDOCS_MAILPIT_IMAGE" ]]; then
+  tekdocs_persist_environment_value "$environment_file" TEKDOCS_MAILPIT_IMAGE "$TEKDOCS_MAILPIT_IMAGE"
+fi
 tekdocs_persist_environment_value "$environment_file" TEKDOCS_DEPLOYED_COMMIT "$current_commit"
 trap - ERR
 

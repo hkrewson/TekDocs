@@ -602,6 +602,16 @@
       "next_action": "Maintainer authorized unused build-cache cleanup, which reclaimed 7.15 GB. Unchanged clean-install and frontend-routing targets then passed. No containers, images or data volumes were pruned. Continue serial operational gates.",
       "fix_commit": null,
       "retest_run": "Unchanged make clean-install-rehearsal passed for 0.9.10 after cache cleanup; make test-frontend-routing and baseline upgrade-rehearsal also passed."
+    },
+    {
+      "run_id": "39613160416",
+      "job": "Production containers, SBOMs, and vulnerability scan",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Local Docker Trivy scan of the exact pinned Mailpit digest 0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a reproduces CVE-2026-111943 in Go stdlib v1.27.2. Latest stable v1.31.6 and edge digest adc8921f also retain v1.27.2 and the finding.",
+      "cause": "Pinned Mailpit binary was built with Go 1.27.2; the scanner reports CVE-2026-111943 fixed in Go 1.27.3 or 1.26.10.",
+      "next_action": "v0.9.11 rebuilds pinned unmodified Mailpit v1.31.6 with Go 1.27.3 and x/net v0.61.0; local scan passes without exceptions. Hosted Build must confirm the new candidate. Keep v0.9.10 tag as historical failed release attempt.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

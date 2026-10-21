@@ -27,6 +27,8 @@ BACKEND_IMAGE_GATES := check security test-recovery-archive test-repository-reco
 .PHONY: test-compliance-catalogs test-compliance-monitoring-validation compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal repository-foundation-acceptance supported-upgrade-matrix test-localization check-ui-language check-responsive-route-inventory check-responsive-acceptance test-public-beta-performance test-browser-artifact-hygiene test-automated-security-review-gate assemble-security-evidence assemble-diagram-release-evidence automated-security-review-gate external-security-review-gate wiki-check check-renderer-dependency-contract test-diagram-exports diagram-export-release-gate
 .PHONY: backend-test-images $(BACKEND_IMAGE_GATES) test-restore-project
 
+.PHONY: mailpit-image-rehearsal
+
 .PHONY: bootstrap build up down logs check check-frontend test test-frontend test-api-contracts test-api-tokens test-webhooks test-integrations test-integration-stabilization test-integration-validation test-monitoring-stabilization test-auth-abuse test-client-portal-boundary test-outbox test-policy test-isolation test-rls test-runtime-authorization test-organizations test-workspaces test-people test-sites test-custom-fields test-relationships test-recovery test-stabilization test-entity-rbac-validation test-documentation-validation test-file-export-stabilization test-content-index test-content-composition test-content-read test-content-authoring file-export-release-gate test-publication-control test-credential-references test-catalogs test-inventory test-inventory-validation test-commercial test-billing-foundation test-invoice-drafts test-invoice-delivery test-networks test-network-stabilization test-network-validation test-secret-files test-markdown test-compose test-e2e test-e2e-all test-e2e-live security dast release-gate schema migrations mail-test compose-doctor production-image-rehearsal clean-install-rehearsal upgrade-rehearsal client-portal-upgrade-rehearsal outbox-upgrade-rehearsal documentation-backup-rehearsal documentation-upgrade-rehearsal file-export-upgrade-rehearsal publication-control-upgrade-rehearsal key-publication-upgrade-rehearsal inventory-backup-rehearsal inventory-upgrade-rehearsal network-backup-rehearsal network-upgrade-rehearsal integration-upgrade-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-upgrade-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal
 
 bootstrap:
@@ -364,11 +366,12 @@ security:
 	docker build --pull --no-cache --target production -t tekdocs-backend-security ./backend
 	docker build --pull --no-cache --target production -t tekdocs-frontend-security ./frontend
 	docker build --pull --no-cache -t tekdocs-diagram-renderer-security ./renderer
+	docker build --pull --no-cache -t tekdocs-mailpit-security ./mailpit
 	docker run --rm -v "$(CURDIR)/scripts/check-python-licenses.py:/check-python-licenses.py:ro" tekdocs-backend-security python /check-python-licenses.py
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-backend-security
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-frontend-security
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-diagram-renderer-security
-	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$(CURDIR)/.trivyignore.yaml:/.trivyignore.yaml:ro" aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --ignorefile /.trivyignore.yaml --severity HIGH,CRITICAL --exit-code 1 axllent/mailpit:edge@sha256:0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 tekdocs-mailpit-security
 
 dast:
 	TEKDOCS_RUN_DAST=true sh ./tests/rehearsals/rehearse-production-image.sh
@@ -379,6 +382,11 @@ release-gate: check test-postgres-matrix test-public-beta-performance test-compo
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh
+
+mailpit-image-rehearsal:
+	docker build -t tekdocs-mailpit-security ./mailpit
+	python3 tests/rehearsals/test-mailpit-image.py
+	MAILPIT_PREVIOUS_IMAGE=axllent/mailpit:edge@sha256:0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a python3 tests/rehearsals/test-mailpit-image.py
 
 production-image-rehearsal:
 	sh ./tests/rehearsals/rehearse-production-image.sh

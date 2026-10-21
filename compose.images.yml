@@ -1,4 +1,7 @@
 services:
+  mailpit:
+    image: ${TEKDOCS_MAILPIT_IMAGE:?Set TEKDOCS_MAILPIT_IMAGE to the published GHCR digest}
+    build: !reset null
   migrate:
     image: ${TEKDOCS_BACKEND_IMAGE:?Set TEKDOCS_BACKEND_IMAGE to the published GHCR digest}
     build: !reset null

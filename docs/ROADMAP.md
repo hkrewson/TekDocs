@@ -1,8 +1,8 @@
 # Release Roadmap
 
-0.9.9 candidate preparation covers published contextual Wiki guides and initial
-overlay keyboard focus. See [candidate scope and evidence](../planning/releases/0.9.9-candidate.md).
-Production remains on the separately approved 0.9.8 release.
+0.9.11 security maintenance prepares patched Node and a temporary Mailpit
+rebuild. See [scope, acceptance and evidence](../planning/releases/0.9.11-candidate.md).
+Production remains on v0.9.9; v0.9.10 publication was blocked by the Mailpit scan.
 
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 

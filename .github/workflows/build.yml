@@ -83,7 +83,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version: "24.22.1"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install locked frontend dependencies
@@ -119,7 +119,7 @@ jobs:
           cache-dependency-path: backend/requirements-dev.lock
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "24"
+          node-version: "24.22.1"
           cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
@@ -335,8 +335,8 @@ jobs:
       BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
       FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
       RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
+      MAILPIT_IMAGE: ghcr.io/hkrewson/tekdocs-mailpit
       COMMIT_TAG: sha-${{ github.sha }}
-      MAILPIT_IMAGE: axllent/mailpit:edge@sha256:0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a
       TRIVY_IMAGE: aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
       TRIVY_CACHE_DIR: /tmp/tekdocs-trivy-cache
     steps:
@@ -358,7 +358,18 @@ jobs:
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
             --tag "${RENDERER_IMAGE}:${COMMIT_TAG}" ./renderer
-          docker pull "$MAILPIT_IMAGE"
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TEKDOCS_VERSION}" \
+            --tag "${MAILPIT_IMAGE}:${COMMIT_TAG}" ./mailpit
+      - name: Verify Mailpit capture and persistence
+        run: MAILPIT_TEST_IMAGE="${MAILPIT_IMAGE}:${COMMIT_TAG}" python3 tests/rehearsals/test-mailpit-image.py
+      - name: Verify existing Mailpit data upgrade
+        run: >-
+          MAILPIT_TEST_IMAGE="${MAILPIT_IMAGE}:${COMMIT_TAG}"
+          MAILPIT_PREVIOUS_IMAGE="axllent/mailpit:edge@sha256:0b58ee82ee3082a07fa76128337d6e8354b221da726837170eaaa4f789e70b1a"
+          python3 tests/rehearsals/test-mailpit-image.py
       - name: Rehearse the production diagram path
         run: sh ./tests/rehearsals/rehearse-production-image.sh
       - name: Validate Python production licenses
@@ -380,7 +391,7 @@ jobs:
           output-file: renderer-sbom.cdx.json
       - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          image: ${{ env.MAILPIT_IMAGE }}
+          image: ${{ env.MAILPIT_IMAGE }}:${{ env.COMMIT_TAG }}
           format: cyclonedx-json
           output-file: mailpit-sbom.cdx.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -413,11 +424,9 @@ jobs:
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock
           -v "$TRIVY_CACHE_DIR:/root/.cache/trivy"
-          -v "$PWD/.trivyignore.yaml:/.trivyignore.yaml:ro"
           "$TRIVY_IMAGE" image --skip-version-check --scanners vuln --format table
-          --ignorefile /.trivyignore.yaml
           --severity HIGH,CRITICAL --exit-code 1
-          "$MAILPIT_IMAGE"
+          "${MAILPIT_IMAGE}:${COMMIT_TAG}"
       - name: Write production image scan evidence
         run: >-
           python3 scripts/write_security_evidence.py
@@ -452,7 +461,7 @@ jobs:
           if-no-files-found: error
       - name: Preserve tested application images for publication
         if: github.event_name == 'push'
-        run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${COMMIT_TAG}"
+        run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:${COMMIT_TAG}"
       - name: Upload tested application images
         if: github.event_name == 'push'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -477,6 +486,7 @@ jobs:
       BACKEND_IMAGE: ghcr.io/hkrewson/tekdocs-backend
       FRONTEND_IMAGE: ghcr.io/hkrewson/tekdocs-frontend
       RENDERER_IMAGE: ghcr.io/hkrewson/tekdocs-diagram-renderer
+      MAILPIT_IMAGE: ghcr.io/hkrewson/tekdocs-mailpit
       COMMIT_TAG: sha-${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -507,33 +517,41 @@ jobs:
           docker push "${BACKEND_IMAGE}:${COMMIT_TAG}"
           docker push "${FRONTEND_IMAGE}:${COMMIT_TAG}"
           docker push "${RENDERER_IMAGE}:${COMMIT_TAG}"
+          docker push "${MAILPIT_IMAGE}:${COMMIT_TAG}"
 
           if [[ "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == "main" ]]; then
             docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:main"
             docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:main"
             docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:main"
+            docker tag "${MAILPIT_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:main"
             docker push "${BACKEND_IMAGE}:main"
             docker push "${FRONTEND_IMAGE}:main"
             docker push "${RENDERER_IMAGE}:main"
+            docker push "${MAILPIT_IMAGE}:main"
           elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
             docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
             docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
+            docker tag "${MAILPIT_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:${TEKDOCS_VERSION}"
             docker push "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
             docker push "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
             docker push "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
+            docker push "${MAILPIT_IMAGE}:${TEKDOCS_VERSION}"
           fi
 
           backend_digest=$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           frontend_digest=$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           renderer_digest=$(docker buildx imagetools inspect "${RENDERER_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
+          mailpit_digest=$(docker buildx imagetools inspect "${MAILPIT_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           [[ "$backend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid backend registry digest" >&2; exit 1; }
           [[ "$frontend_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid frontend registry digest" >&2; exit 1; }
           [[ "$renderer_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid diagram renderer registry digest" >&2; exit 1; }
+          [[ "$mailpit_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid Mailpit registry digest" >&2; exit 1; }
           {
             echo "backend-digest=$backend_digest"
             echo "frontend-digest=$frontend_digest"
             echo "renderer-digest=$renderer_digest"
+            echo "mailpit-digest=$mailpit_digest"
           } >> "$GITHUB_OUTPUT"
       - name: Attest backend build provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
@@ -574,6 +592,19 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.renderer-digest }}
           sbom-path: renderer-sbom.cdx.json
           push-to-registry: true
+      - name: Attest Mailpit build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.MAILPIT_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.mailpit-digest }}
+          push-to-registry: true
+      - name: Attest Mailpit SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-name: ${{ env.MAILPIT_IMAGE }}
+          subject-digest: ${{ steps.publish.outputs.mailpit-digest }}
+          sbom-path: mailpit-sbom.cdx.json
+          push-to-registry: true
       - name: Write image, SBOM, and provenance evidence
         run: >-
           python3 scripts/write_security_evidence.py
@@ -582,7 +613,7 @@ jobs:
           --tool "GitHub artifact attestations and CycloneDX image SBOMs"
           --tool-version "actions/attest@a1948c3f048ba23858d222213b7c278aabede763"
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-          --immutable-identifier "${{ steps.publish.outputs.backend-digest }}:${{ steps.publish.outputs.frontend-digest }}:${{ steps.publish.outputs.renderer-digest }}"
+          --immutable-identifier "${{ steps.publish.outputs.backend-digest }}:${{ steps.publish.outputs.frontend-digest }}:${{ steps.publish.outputs.renderer-digest }}:${{ steps.publish.outputs.mailpit-digest }}"
           --output artifacts/security-evidence/production-images-sbom-provenance.json
       - name: Record diagram renderer supply-chain evidence
         run: >-
@@ -614,6 +645,7 @@ jobs:
             echo "- \`${BACKEND_IMAGE}:${COMMIT_TAG}\`"
             echo "- \`${FRONTEND_IMAGE}:${COMMIT_TAG}\`"
             echo "- \`${RENDERER_IMAGE}:${COMMIT_TAG}\`"
+            echo "- \`${MAILPIT_IMAGE}:${COMMIT_TAG}\`"
             echo
             echo "Production deployments resolve these commit tags to immutable registry digests."
             echo "The package visibility must be Public in GitHub Packages for unauthenticated production pulls."

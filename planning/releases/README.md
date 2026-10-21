@@ -5,6 +5,12 @@ start here. Historical review narratives are supporting evidence, not the live
 work queue. `.github/release-candidate.json` names the application candidate;
 the checkout's HEAD may be a later evidence/tooling commit.
 
+## Preparing 0.9.11
+
+[Security maintenance](0.9.11-candidate.md) updates Node and rebuilds Mailpit
+with a fixed Go toolchain. v0.9.10 was tagged but its Mailpit scan failed and
+publication was skipped. The manifest remains on the last verified publication.
+
 ## Published 0.9.9
 
 The pinned manifest identifies f52b210, published as v0.9.9. All three image

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { Stock } from './Stock'
@@ -68,13 +68,20 @@ describe('Stock', () => {
 
   it('loads an off-page record from the URL and protects unfinished edits', async () => {
     const retrieve = vi.fn().mockResolvedValue(item)
+    let resolveList!: (result: Awaited<ReturnType<StockClient['list']>>) => void
+    const pendingList = new Promise<Awaited<ReturnType<StockClient['list']>>>((resolve) => { resolveList = resolve })
     renderStock(stockClient({
-      list: vi.fn().mockResolvedValue({ results: [], page: 2, page_size: 25, count: 26, has_more: false, can_manage: true, vendors: [], clients: [] }),
+      list: vi.fn().mockReturnValue(pendingList),
       retrieve,
     }), '/stock?stock=stock-1&stock_page=2')
     expect(await screen.findByRole('heading', { name: 'Cat6 bulk cable' })).toBeInTheDocument()
     expect(retrieve).toHaveBeenCalledWith('stock-1', expect.any(AbortSignal))
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    await act(async () => {
+      resolveList({ results: [], page: 2, page_size: 25, count: 26, has_more: false, can_manage: true, vendors: [], clients: [] })
+      await pendingList
+    })
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
     fireEvent.change(screen.getByLabelText('Item name'), { target: { value: 'Changed cable' } })
     fireEvent(screen.getByRole('dialog'), new Event('cancel', { cancelable: true }))
     expect(screen.getByRole('alertdialog')).toHaveTextContent('Unsaved changes')

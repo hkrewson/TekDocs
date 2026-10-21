@@ -582,6 +582,16 @@
       "next_action": "Added await pendingList inside act and reran tests and frontend verification. No lint suppression or weakened assertion.",
       "fix_commit": "9c7e9046469cc86346c7663e2ac7ad3634fad620",
       "retest_run": "Final make check-frontend passed: 772 tests in 168.30 seconds plus API, lint, types, production build and bundle budgets."
+    },
+    {
+      "run_id": "39553157005",
+      "job": "PostgreSQL shard (core-c), attempt 1",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Unchanged test_canonical_host_property replayed in Docker without network with --hypothesis-seed=34878735013262668768008929350784171313; 1 passed in 0.62 seconds. Hosted shard: 458 passed, 1 failed, 2 skipped.",
+      "cause": "unknown; hosted Hypothesis generation health check reported two valid inputs in 1.71 seconds, one draw 1.705 seconds. Timing failure did not reproduce locally.",
+      "next_action": "Unchanged failed-job retry started as attempt 2. Preserve attempt-1 successful job artifact identities. Do not replace exact-source release evidence with passing synthetic-merge PR checks.",
+      "fix_commit": null,
+      "retest_run": "Local exact-seed replay passed. Hosted attempt 2 running."
     }
   ]
 }

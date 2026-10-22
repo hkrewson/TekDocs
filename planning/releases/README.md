@@ -5,11 +5,15 @@ start here. Historical review narratives are supporting evidence, not the live
 work queue. `.github/release-candidate.json` names the application candidate;
 the checkout's HEAD may be a later evidence/tooling commit.
 
-## Preparing 0.9.11
+## Published 0.9.11; status-record assembly pending
 
 [Security maintenance](0.9.11-candidate.md) updates Node and rebuilds Mailpit
 with a fixed Go toolchain. v0.9.10 was tagged but its Mailpit scan failed and
-publication was skipped. The manifest remains on the last verified publication.
+publication was skipped. The v0.9.11 publication succeeded; all four image
+aliases and eight signed provenance/SBOM checks passed. The reviewed receipt and
+[production update commands](0.9.11-production-guidance.md) are available.
+The full publication-record assembly remains pending, so the pinned status
+manifest still identifies v0.9.9; it does not yet summarize v0.9.11.
 
 ## Published 0.9.9
 

@@ -1,0 +1,68 @@
+{
+  "candidate_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+  "release": "v0.9.11",
+  "verified_date": "2026-10-22",
+  "publication_run": 39723601693,
+  "signer_workflow": "hkrewson/TekDocs/.github/workflows/build.yml",
+  "source_ref": "refs/tags/v0.9.11",
+  "deny_self_hosted_runners": true,
+  "alias_checks": "All four 0.9.11 aliases matched the publication artifact digests.",
+  "checks": [
+    {
+      "image": "backend",
+      "kind": "provenance",
+      "digest": "sha256:2ddf29db44a3e95fd7fb9f647285fe89d7d6396c857850d96e402eb413bd08d6",
+      "verification_output_sha256": "910e1fd98a802693094a0eb9994f9862fa876ebd18cf35207ad7dbaef2410109",
+      "status": "passed"
+    },
+    {
+      "image": "backend",
+      "kind": "sbom",
+      "digest": "sha256:2ddf29db44a3e95fd7fb9f647285fe89d7d6396c857850d96e402eb413bd08d6",
+      "verification_output_sha256": "22bc026c8625dd041e58a53256e59f8e6273772e4297c01cf883e5eb7418ec0e",
+      "status": "passed"
+    },
+    {
+      "image": "frontend",
+      "kind": "provenance",
+      "digest": "sha256:85d19133b15ff91f5bc0a5a22e4f63914304f356794f4444a87678ec456ffb6d",
+      "verification_output_sha256": "37047b0aa976fb3fb25305a7ddd4bec3e750fd8865f996410b55e0d8250ff2cb",
+      "status": "passed"
+    },
+    {
+      "image": "frontend",
+      "kind": "sbom",
+      "digest": "sha256:85d19133b15ff91f5bc0a5a22e4f63914304f356794f4444a87678ec456ffb6d",
+      "verification_output_sha256": "002e51291038f045cefdf5579314329c40f2408602183423a2b3ac7f750cc583",
+      "status": "passed"
+    },
+    {
+      "image": "renderer",
+      "kind": "provenance",
+      "digest": "sha256:eb26560727260de417e8fc274d7f0fa005ff8c52eaf0f05cb9d8afb207d79371",
+      "verification_output_sha256": "53dbec724a9a03ffe305245ed4a426998c9eb9ab07c440efb1682c836ea285a9",
+      "status": "passed"
+    },
+    {
+      "image": "renderer",
+      "kind": "sbom",
+      "digest": "sha256:eb26560727260de417e8fc274d7f0fa005ff8c52eaf0f05cb9d8afb207d79371",
+      "verification_output_sha256": "74808b63298bd8f576a39841b23a67ab4ffd01904d01cce563fc5803e0c2cf53",
+      "status": "passed"
+    },
+    {
+      "image": "mailpit",
+      "kind": "provenance",
+      "digest": "sha256:5a9dd1844f869e7404556b92ba5ec8ff8530e4177006b058f5f88e9ec0db5584",
+      "verification_output_sha256": "7079975466f26ec3c9501fa132190bfa99b96175ef181eb489c2bca575007667",
+      "status": "passed"
+    },
+    {
+      "image": "mailpit",
+      "kind": "sbom",
+      "digest": "sha256:5a9dd1844f869e7404556b92ba5ec8ff8530e4177006b058f5f88e9ec0db5584",
+      "verification_output_sha256": "34e3c79105f2db1f6bce522ca45f3f460f7b5bf0097aefa9e1af4fbb9a61ca96",
+      "status": "passed"
+    }
+  ]
+}

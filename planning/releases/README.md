@@ -5,6 +5,13 @@ start here. Historical review narratives are supporting evidence, not the live
 work queue. `.github/release-candidate.json` names the application candidate;
 the checkout's HEAD may be a later evidence/tooling commit.
 
+## Future release delivery
+
+The [single-push delivery contract](ci-release-delivery.md) makes image verification,
+application tagging and durable updater receipt delivery part of CI for new
+versions on main. It replaces the manual tag/receipt handoff for future releases.
+Existing release records below remain historical evidence.
+
 ## Published 0.9.11; status-record assembly pending
 
 [Security maintenance](0.9.11-candidate.md) updates Node and rebuilds Mailpit

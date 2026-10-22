@@ -54,9 +54,9 @@ Update after creating a verified external VM or volume snapshot:
   scripts/update-production.sh --skip-backup
 
 Select an approved published release (recommended):
-  scripts/update-production.sh --release v0.9.8
+  scripts/update-production.sh --release vMAJOR.MINOR.PATCH
 
-Release mode requires a reviewed image receipt and checks the exact tag commit,
+Release mode retrieves the CI receipt (or uses a historical local receipt), checks the exact tag commit,
 image revisions and digests. It uses the release Compose files without changing
 the tooling checkout. Existing backup settings still apply.
 
@@ -138,7 +138,7 @@ while (($#)); do
 done
 
 if [[ -n "$release" ]]; then
-  tekdocs_load_release_receipt "$repository_root" "$release" || argument_error "release has no valid reviewed image receipt: $release"
+  tekdocs_load_published_release "$repository_root" "$release" || argument_error "release has no valid reviewed image receipt: $release"
 fi
 
 if [[ "$skip_backup" != true ]]; then

@@ -92,6 +92,10 @@ external-security-review-gate: automated-security-review-gate
 wiki-check:
 	./scripts/check-wiki.py $(if $(WIKI_CHECKOUT),--checkout "$(WIKI_CHECKOUT)")
 
+.PHONY: test-release-delivery
+test-release-delivery:
+	python3 -m unittest scripts.tests.test_finalize_ci_release scripts.tests.test_production_release -v
+
 release-status:
 	python3 scripts/release_status.py --online
 

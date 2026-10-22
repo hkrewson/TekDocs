@@ -1,6 +1,7 @@
 name: Extended validation
 
 on:
+  workflow_call:
   workflow_dispatch:
   schedule:
     - cron: "29 8 * * 1"
@@ -10,8 +11,8 @@ permissions:
   actions: read
 
 concurrency:
-  group: extended-validation-${{ github.ref }}
-  cancel-in-progress: true
+  group: extended-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   failure-triage:

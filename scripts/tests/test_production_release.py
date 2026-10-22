@@ -112,6 +112,38 @@ elif args[0]!='pull': sys.exit(9)
         self.git('commit', '-qm', 'four-image receipt fixture')
         self.env.update(TEST_RELEASE_COMMIT=self.commit, TEST_RUNNING_COMMIT=self.commit)
 
+    def enable_remote_receipt(self):
+        self.enable_mailpit_release()
+        self.git('tag', 'receipts/v0.9.8')
+        saved = Path(self.temp.name) / 'verified.images'
+        shutil.copyfile(self.root / 'scripts/releases/v0.9.8.images', saved)
+        self.env['TEST_RECEIPT'] = str(saved)
+        self.git('rm', 'scripts/releases/v0.9.8.images')
+        self.git('commit', '-qm', 'tooling without local receipt')
+
+    def test_ci_receipt_is_fetched_without_changing_checkout(self):
+        self.enable_remote_receipt()
+        before = self.git('rev-parse', 'HEAD')
+        result = self.run_update()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.git('rev-parse', 'HEAD'), before)
+        self.assertEqual(self.git('status', '--porcelain'), '')
+        self.assertIn('TEKDOCS_MAILPIT_IMAGE=', (self.root / '.env').read_text())
+
+    def test_ci_receipt_with_wrong_parent_is_rejected_before_backup(self):
+        self.enable_remote_receipt()
+        self.git('tag', '-f', 'receipts/v0.9.8')
+        result = self.run_update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.events.exists())
+
+    def test_missing_ci_receipt_is_rejected_before_backup(self):
+        self.enable_remote_receipt()
+        self.git('tag', '-d', 'receipts/v0.9.8')
+        result = self.run_update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.events.exists())
+
     def test_four_image_release_verifies_and_persists_mailpit(self):
         self.enable_mailpit_release()
         result = self.run_update()

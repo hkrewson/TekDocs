@@ -28,3 +28,41 @@ tekdocs_verify_release_images() {
      "$TEKDOCS_RESOLVED_RENDERER_IMAGE" == "$TEKDOCS_RELEASE_RENDERER" &&
      "${TEKDOCS_RESOLVED_MAILPIT_IMAGE:-}" == "${TEKDOCS_RELEASE_MAILPIT:-}" ]]
 }
+
+# CI publishes this companion ref atomically with the application tag. Fetch into
+# FETCH_HEAD only: do not modify the operator's branch, index, or working tree.
+tekdocs_fetch_release_receipt() (
+  local root=$1 release=$2 temporary receipt_commit parent
+  [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  temporary=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-receipt.XXXXXX") || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  git -C "$root" fetch origin "refs/tags/receipts/$release" >&2 || return 1
+  receipt_commit=$(git -C "$root" rev-parse --verify 'FETCH_HEAD^{commit}') || return 1
+  parent=$(git -C "$root" show -s --format=%P "$receipt_commit") || return 1
+  [[ "$parent" =~ ^[0-9a-f]{40}$ ]] || return 1
+  mkdir -p "$temporary/scripts/releases" || return 1
+  git -C "$root" show "$receipt_commit:scripts/releases/$release.images" > "$temporary/scripts/releases/$release.images" || return 1
+  tekdocs_load_release_receipt "$temporary" "$release" || return 1
+  [[ "$TEKDOCS_RELEASE_COMMIT" == "$parent" && -n "$TEKDOCS_RELEASE_MAILPIT" ]] || return 1
+  [[ "$(git -C "$root" diff-tree --no-commit-id --name-only -r "$receipt_commit")" == "scripts/releases/$release.images" ]] || return 1
+  cat "$temporary/scripts/releases/$release.images"
+)
+
+# Keep historical checked-in receipts; obtain future receipts from CI when absent.
+tekdocs_load_published_release() {
+  local root=$1 release=$2 temporary status=0
+  [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  if [[ -e "$root/scripts/releases/$release.images" || -L "$root/scripts/releases/$release.images" ]]; then
+    tekdocs_load_release_receipt "$root" "$release"
+    return $?
+  fi
+  temporary=$(mktemp -d "${TMPDIR:-/tmp}/tekdocs-load-receipt.XXXXXX") || return 1
+  mkdir -p "$temporary/scripts/releases" || { rm -rf -- "$temporary"; return 1; }
+  if tekdocs_fetch_release_receipt "$root" "$release" > "$temporary/scripts/releases/$release.images"; then
+    tekdocs_load_release_receipt "$temporary" "$release" || status=1
+  else
+    status=1
+  fi
+  rm -rf -- "$temporary"
+  return "$status"
+}

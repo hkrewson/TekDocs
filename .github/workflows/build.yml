@@ -5,7 +5,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ["v*"]
 
 permissions:
   contents: read
@@ -13,14 +12,31 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  release-codeql:
+    needs: prepare
+    if: needs.prepare.outputs.release == 'true'
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+
+  release-extended:
+    needs: prepare
+    if: needs.prepare.outputs.release == 'true'
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/extended-validation.yml
+
   prepare:
     name: Prepare and validate workflow policy
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.release.outputs.release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - id: version
@@ -28,10 +44,25 @@ jobs:
         run: |
           ./scripts/check-version.sh
           echo "version=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_OUTPUT"
+      - id: release
+        name: Select unpublished version for main-push release
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          release=false
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
+            [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+            existing=$(git ls-remote --tags origin "refs/tags/v$VERSION" | cut -f1)
+            if [[ -z "$existing" || "$existing" == "$GITHUB_SHA" ]]; then
+              release=true
+            fi
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
       - name: Validate pinned supply chain
         run: |
           ./scripts/check-supply-chain-pins.sh
           make test-automated-security-review-gate
+          make test-release-delivery
           ./scripts/check-wiki.py
           ./scripts/check-compose-config.sh
       - name: Validate workflow syntax
@@ -45,9 +76,9 @@ jobs:
             echo "2. PostgreSQL shard coverage is merged and enforced after every shard passes."
             echo "3. Browser and authorization failures are reported without waiting for the complete backend suite."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
-            echo "5. Trusted main or version-tag pushes publish those exact tested images to GHCR."
+            echo "5. New versions on main publish verified images, application and receipt tags in this run."
             echo
-            echo "CodeQL and scheduled extended browser/performance/DAST checks remain separate workflows."
+            echo "CodeQL and extended validation are required release dependencies; schedules remain available."
           } >> "$GITHUB_STEP_SUMMARY"
 
   backend:
@@ -269,7 +300,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always()
         with:
-          name: playwright-chromium-summary
+          name: build-playwright-chromium-summary
           path: artifacts/playwright-safe/chromium.json
           retention-days: 7
           if-no-files-found: warn
@@ -460,10 +491,10 @@ jobs:
           retention-days: 90
           if-no-files-found: error
       - name: Preserve tested application images for publication
-        if: github.event_name == 'push'
+        if: needs.prepare.outputs.release == 'true'
         run: docker save --output production-images.tar "${BACKEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:${COMMIT_TAG}"
       - name: Upload tested application images
-        if: github.event_name == 'push'
+        if: needs.prepare.outputs.release == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: production-images-${{ github.sha }}
@@ -473,11 +504,11 @@ jobs:
 
   publish-containers:
     name: Publish tested production images
-    if: github.event_name == 'push'
-    needs: [prepare, production-containers]
+    if: needs.prepare.outputs.release == 'true'
+    needs: [prepare, production-containers, release-codeql, release-extended]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
       attestations: write
@@ -500,13 +531,6 @@ jobs:
           name: production-image-sboms-${{ env.TEKDOCS_VERSION }}
       - name: Load tested application images
         run: docker load --input production-images.tar
-      - name: Validate release tag
-        if: github.ref_type == 'tag'
-        run: |
-          if [[ "$GITHUB_REF_NAME" != "v${TEKDOCS_VERSION}" ]]; then
-            echo "Release tag must equal v${TEKDOCS_VERSION}; received ${GITHUB_REF_NAME}." >&2
-            exit 1
-          fi
       - name: Authenticate to GitHub Container Registry
         run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
         env:
@@ -514,30 +538,7 @@ jobs:
       - id: publish
         name: Publish commit-addressed production images
         run: |
-          docker push "${BACKEND_IMAGE}:${COMMIT_TAG}"
-          docker push "${FRONTEND_IMAGE}:${COMMIT_TAG}"
-          docker push "${RENDERER_IMAGE}:${COMMIT_TAG}"
-          docker push "${MAILPIT_IMAGE}:${COMMIT_TAG}"
-
-          if [[ "$GITHUB_REF_TYPE" == "branch" && "$GITHUB_REF_NAME" == "main" ]]; then
-            docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:main"
-            docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:main"
-            docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:main"
-            docker tag "${MAILPIT_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:main"
-            docker push "${BACKEND_IMAGE}:main"
-            docker push "${FRONTEND_IMAGE}:main"
-            docker push "${RENDERER_IMAGE}:main"
-            docker push "${MAILPIT_IMAGE}:main"
-          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            docker tag "${BACKEND_IMAGE}:${COMMIT_TAG}" "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
-            docker tag "${FRONTEND_IMAGE}:${COMMIT_TAG}" "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
-            docker tag "${RENDERER_IMAGE}:${COMMIT_TAG}" "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
-            docker tag "${MAILPIT_IMAGE}:${COMMIT_TAG}" "${MAILPIT_IMAGE}:${TEKDOCS_VERSION}"
-            docker push "${BACKEND_IMAGE}:${TEKDOCS_VERSION}"
-            docker push "${FRONTEND_IMAGE}:${TEKDOCS_VERSION}"
-            docker push "${RENDERER_IMAGE}:${TEKDOCS_VERSION}"
-            docker push "${MAILPIT_IMAGE}:${TEKDOCS_VERSION}"
-          fi
+          python3 scripts/finalize_ci_release.py --publish-images
 
           backend_digest=$(docker buildx imagetools inspect "${BACKEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
           frontend_digest=$(docker buildx imagetools inspect "${FRONTEND_IMAGE}:${COMMIT_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')
@@ -605,6 +606,21 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.mailpit-digest }}
           sbom-path: mailpit-sbom.cdx.json
           push-to-registry: true
+      - name: Verify publication and atomically deliver release tags and receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKEND_DIGEST: ${{ steps.publish.outputs.backend-digest }}
+          FRONTEND_DIGEST: ${{ steps.publish.outputs.frontend-digest }}
+          RENDERER_DIGEST: ${{ steps.publish.outputs.renderer-digest }}
+          MAILPIT_DIGEST: ${{ steps.publish.outputs.mailpit-digest }}
+        run: python3 scripts/finalize_ci_release.py
+      - name: Retain verified receipt and publication verification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: verified-release-${{ needs.prepare.outputs.version }}
+          path: artifacts/release/
+          retention-days: 90
+          if-no-files-found: error
       - name: Write image, SBOM, and provenance evidence
         run: >-
           python3 scripts/write_security_evidence.py

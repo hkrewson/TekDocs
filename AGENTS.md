@@ -19,6 +19,7 @@ For release status, evidence, CI failures, or operator acceptance, read `plannin
 - Suspect the harness when a failure names a column, table, or fixture that the change under review never touched. Schema and privilege state leaking between tests presents as a missing migration.
 - Never put real credentials, fixed access tokens, customer identifiers, or private data in source, fixtures, logs, screenshots, commands, or uploaded artifacts.
 - Do not push, publish, tag, deploy, or alter external systems without explicit authorization.
+- Explicit authorization to push a versioned release to `main` covers the single-push CI pipeline's image publication, application/receipt tags, verification and evidence delivery. Do not request separate approval for those stages of the same release. Production deployment remains separate. Complete receipt delivery in CI; never leave it as an operator-requested follow-up. Required source review and risk decisions precede the release push. See `planning/releases/ci-release-delivery.md`.
 - A completed roadmap slice should be one descriptive commit. Do not commit incomplete or unrelated work merely to make the tree clean.
 - Security and data-integrity work may preempt feature work. Dates never justify skipping authorization, backup, migration, or release gates.
 

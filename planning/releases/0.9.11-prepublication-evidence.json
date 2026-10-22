@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "candidate_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+  "status": "prepublication_partial",
+  "missing_categories": [
+    "production_images_sbom_provenance"
+  ],
+  "evidence": [
+    {
+      "category": "authorization_and_rls",
+      "completed_at": "2026-10-22T04:06:53.057054Z",
+      "immutable_identifier": "39718123067:1:runtime+postgres-shards",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718123067",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "TekDocs PostgreSQL authorization, IDOR, and forced-RLS suites",
+      "tool_version": "TekDocs 0.9.11"
+    },
+    {
+      "category": "backup_and_restore",
+      "completed_at": "2026-10-22T04:06:03.145688Z",
+      "immutable_identifier": "39718128027:1:supported-recovery",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718128027",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "TekDocs encrypted recovery and repository-foundation acceptance rehearsals",
+      "tool_version": "recovery scripts at bec54d0c294820599db6028116a83d11d5c28f82"
+    },
+    {
+      "category": "browser_security",
+      "completed_at": "2026-10-22T03:58:34.548623Z",
+      "immutable_identifier": "39718128027:1:chromium+firefox+webkit+mobile",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718128027",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "TekDocs Playwright desktop and mobile browser matrix",
+      "tool_version": "frontend lockfile at bec54d0c294820599db6028116a83d11d5c28f82"
+    },
+    {
+      "category": "codeql",
+      "completed_at": "2026-10-22T03:45:48.954463Z",
+      "immutable_identifier": "39718125641:1:python+javascript-typescript",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718125641",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "GitHub CodeQL security-extended and security-and-quality",
+      "tool_version": "github/codeql-action@5595ccaf912efad79be6eef63a5619ff05969be3"
+    },
+    {
+      "category": "dast",
+      "completed_at": "2026-10-22T03:45:38.887810Z",
+      "immutable_identifier": "39718128027:1:dast",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718128027",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "OWASP ZAP passive baseline against production-shaped TekDocs",
+      "tool_version": "zaproxy/zap-stable@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
+    },
+    {
+      "category": "dependency_license_secret",
+      "completed_at": "2026-10-22T03:42:32.277601Z",
+      "immutable_identifier": "39718123067:1:security",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718123067",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "TekDocs locked dependency, license, Bandit, and Gitleaks gate",
+      "tool_version": "repository lockfiles and pinned actions at bec54d0c294820599db6028116a83d11d5c28f82"
+    },
+    {
+      "category": "image_scan",
+      "completed_at": "2026-10-22T04:15:43.918223Z",
+      "immutable_identifier": "39718123067:1:backend+frontend+renderer+mailpit",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718123067",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "Trivy production image vulnerability scan",
+      "tool_version": "aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c"
+    },
+    {
+      "schema_version": 1,
+      "category": "source_review",
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "completed_at": "2026-10-22T04:21:23.121341+00:00",
+      "tool": "Maintainer-directed AI-assisted bounded source and security review",
+      "tool_version": "0.9.11 review 2026-10-21",
+      "reference": "planning/releases/0.9.11-source-review.md",
+      "immutable_identifier": "sha256:1b60671ca195535d0457ffd6cda39b034530707a134886576da770356d452066"
+    },
+    {
+      "category": "upgrade",
+      "completed_at": "2026-10-22T04:18:06.995266Z",
+      "immutable_identifier": "39718128027:1:supported-upgrades",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/39718128027",
+      "schema_version": 1,
+      "scope_commit": "bec54d0c294820599db6028116a83d11d5c28f82",
+      "status": "passed",
+      "tool": "TekDocs supported-minor production upgrade rehearsals",
+      "tool_version": "upgrade matrix at bec54d0c294820599db6028116a83d11d5c28f82"
+    }
+  ]
+}

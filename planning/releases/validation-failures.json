@@ -722,6 +722,16 @@
       "next_action": "Keep production upgrade unmerged; review these updates separately. No budget increase or eager-chunk workaround.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "40100951448",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Docker Playwright 1.64.1 / Chromium 156 loopback HTTP probe: fetch-to-Blob downloads correct HTML while response.text() returns an empty string. See 2026-10-24-export-download-ci.md.",
+      "cause": "The test inspects the browser automation response body instead of the completed downloaded file; reproduced independently of Django and PostgreSQL.",
+      "next_action": "Read the actual download, preserving content/header/filename assertions. Focused positive and negative Docker probes, lint and types pass. Full make test-e2e-live blocked by renderer build ENOSPC; hosted live journey must confirm.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

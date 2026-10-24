@@ -1,4 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
+import { readFile } from 'node:fs/promises'
 import { expect, type Page } from '@playwright/test'
 import type { RepositorySource } from '../src/documentation/repositoryApi'
 
@@ -96,12 +97,20 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   expect(exported.status()).toBe(200)
   expect(exported.headers()['x-tekdocs-repository-commit']).toBe(saved.accepted_commit)
   expect(exported.headers()['cache-control']).toBe('private, no-store')
-  const html = await exported.text()
-  expect(html).toContain('Reviewed repair instructions.')
-  expect(html).not.toContain('Unsaved browser-only text.')
   const download = await downloadPromise
-  expect(download.suggestedFilename()).toBe('repository-document.html')
-  await download.delete()
+  try {
+    expect(download.suggestedFilename()).toBe('repository-document.html')
+    expect(await download.failure()).toBeNull()
+    // Chromium can expose an empty response.text() for a fetch consumed as a
+    // Blob. Verify the actual file delivered to the user instead.
+    const downloadPath = await download.path()
+    expect(downloadPath).not.toBeNull()
+    const html = await readFile(downloadPath, 'utf8')
+    expect(html).toContain('Reviewed repair instructions.')
+    expect(html).not.toContain('Unsaved browser-only text.')
+  } finally {
+    await download.delete()
+  }
   await page.getByLabel('Markdown body').fill(linkedBody)
 
   // The same authenticated owner cannot resolve an organization document in MSP scope.

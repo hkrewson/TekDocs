@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
-FROM node:24.22.1-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d AS assets
+FROM node:26.12.0-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS assets
 ADD --checksum=sha256:634a578430c7b3c94d33e34f9bec8d1ca91d0fd20201e31b03cbb27803fb0443 https://codeload.github.com/axllent/mailpit/tar.gz/a028b01f4a24b4b36bdad95b8e09e070ebf2bad4 /source.tar.gz
 RUN mkdir /src && tar -xzf /source.tar.gz -C /src --strip-components=1
 WORKDIR /src

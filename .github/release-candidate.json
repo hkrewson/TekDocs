@@ -1,22 +1,23 @@
 {
   "schema_version": 1,
   "repository": "hkrewson/TekDocs",
-  "candidate_commit": "f52b210b852249f033dfd895dbb5eee96eb89865",
-  "security_record": "planning/releases/0.9.9-publication-security-review.json",
+  "candidate_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+  "pipeline": "single_push",
+  "security_record": "planning/releases/0.9.12-publication-security-review.json",
   "workflows": {
-    "Build, test, and secure": 39423316088,
-    "CodeQL": 39369861428,
-    "Extended validation": 39369348946
+    "Build, test, and secure": 40055908733,
+    "CodeQL": 40055908733,
+    "Extended validation": 40055908733
   },
   "operator_acceptance": {
     "decision": "accepted",
-    "date": "2026-10-20",
-    "reference": "planning/releases/0.9.9-operational-closeout.md",
-    "scope": "Maintainer explicitly accepted current-candidate bounded CSP/COEP risks and authorized exact-candidate tag/image publication. No new manual walkthrough or production smoke is claimed."
+    "date": "2026-10-23",
+    "reference": "planning/releases/0.9.12-operational-closeout.md",
+    "scope": "Explicit bounded CSP/COEP/KaTeX risk acceptance and main release authorization. No production deployment or new manual walkthrough claimed."
   },
   "remaining_release_actions": [
-    "Production update completed October 20; documents/assets and keyboard navigation passed operator smoke. Help link is present; guide destination and diagram smoke remain unconfirmed. See planning/releases/0.9.9-production-update.md.",
-    "Public Wiki upgrade guidance for v0.9.9 remains to be published.",
-    "Authority handoff remains a separate decision."
+    "Operator deployment and document/asset/diagram smoke remain unconfirmed.",
+    "Publish updated Wiki production guidance.",
+    "Complete reversible first MSP document authority handoff; production mutation requires its own approval."
   ]
 }

@@ -1,0 +1,472 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "candidate_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+  "completed_at": "2026-10-24T05:53:29.767820+00:00",
+  "reviewer": {
+    "kind": "automated_or_ai_assisted",
+    "name": "Codex",
+    "version": "Codex review session October 24, 2026; model build identifier not recorded",
+    "operator": "TekDocs sole maintainer",
+    "method": "Bounded 0.9.12 delta review, inherited historical dispositions, exact-source main release gates, explicit candidate risk acceptance and CI publication verification.",
+    "limitations": [
+      "Not an independent human assessment, penetration test, compliance audit, certification or exhaustive audit.",
+      "287 open main-ref CodeQL entries include 9 high scanner classifications with inherited dispositions; one instance is historical. See operational closeout.",
+      "Production deployment, real SMTP/provider behavior and unperformed manual accessibility checks are unverified.",
+      "Historical resolved findings retain historical evidence; current gates do not imply fresh reproduction of each defect.",
+      "CSP, COEP and KaTeX accepted for b45a543 only; review before next runtime candidate or November 12, 2026.",
+      "Runtime-role arbitrary SQL remains outside the claimed boundary; TD-RISK-073 remains 1.x work."
+    ]
+  },
+  "private_report_reference": "planning/releases/0.9.12-operational-closeout.md (sha256:d0b9e9cc5c25f9825f93d4cc620c382019838de78b73c3aee193cf9065e93e50)",
+  "evidence": [
+    {
+      "category": "authorization_and_rls",
+      "completed_at": "2026-10-24T03:34:29.473622Z",
+      "immutable_identifier": "40055908733:1:runtime+postgres-shards",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "TekDocs PostgreSQL authorization, IDOR, and forced-RLS suites",
+      "tool_version": "TekDocs 0.9.12"
+    },
+    {
+      "category": "backup_and_restore",
+      "completed_at": "2026-10-24T03:31:20.967083Z",
+      "immutable_identifier": "40055908733:1:supported-recovery",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "TekDocs encrypted recovery and repository-foundation acceptance rehearsals",
+      "tool_version": "recovery scripts at b45a5439dbf54252cbab5b6f7ace1a51027f5126"
+    },
+    {
+      "category": "browser_security",
+      "completed_at": "2026-10-24T03:32:12.436899Z",
+      "immutable_identifier": "40055908733:1:chromium+firefox+webkit+mobile",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "TekDocs Playwright desktop and mobile browser matrix",
+      "tool_version": "frontend lockfile at b45a5439dbf54252cbab5b6f7ace1a51027f5126"
+    },
+    {
+      "category": "codeql",
+      "completed_at": "2026-10-24T02:56:18.345924Z",
+      "immutable_identifier": "40055908733:1:python+javascript-typescript",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "GitHub CodeQL security-extended and security-and-quality",
+      "tool_version": "github/codeql-action@5595ccaf912efad79be6eef63a5619ff05969be3"
+    },
+    {
+      "category": "dast",
+      "completed_at": "2026-10-24T03:00:34.061279Z",
+      "immutable_identifier": "40055908733:1:dast",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "OWASP ZAP passive baseline against production-shaped TekDocs",
+      "tool_version": "zaproxy/zap-stable@sha256:781a2bdaea47324e7bab583e2263f21d257b0aee61ed51521a5be45f5f5081ef"
+    },
+    {
+      "category": "dependency_license_secret",
+      "completed_at": "2026-10-24T02:53:14.629943Z",
+      "immutable_identifier": "40055908733:1:security",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "TekDocs locked dependency, license, Bandit, and Gitleaks gate",
+      "tool_version": "repository lockfiles and pinned actions at b45a5439dbf54252cbab5b6f7ace1a51027f5126"
+    },
+    {
+      "category": "image_scan",
+      "completed_at": "2026-10-24T03:44:59.646056Z",
+      "immutable_identifier": "40055908733:1:backend+frontend+renderer+mailpit",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "Trivy production image vulnerability scan",
+      "tool_version": "aquasec/trivy:latest@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c"
+    },
+    {
+      "category": "production_images_sbom_provenance",
+      "completed_at": "2026-10-24T03:59:41.318694Z",
+      "immutable_identifier": "sha256:87caf870d5448599260103046751ed73b8cf500ae4c2ff32577e151b178d2600:sha256:9cc2f38b9250a389f7bdb137c2da35cbf75c40809e186352cc1a29b916a980b6:sha256:f32c76e64c1e2db0339358d7a343c4af191b1022dee76719ae3ed517f4407e29:sha256:6df6905d7359fabe1d027804e859132f64ff434e935351bace47f86f2400f3c8",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "GitHub artifact attestations and CycloneDX image SBOMs",
+      "tool_version": "actions/attest@a1948c3f048ba23858d222213b7c278aabede763"
+    },
+    {
+      "schema_version": 1,
+      "category": "source_review",
+      "status": "passed",
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "completed_at": "2026-10-24T05:53:29.767820+00:00",
+      "tool": "Maintainer-directed Codex bounded source review",
+      "tool_version": "Codex session October 24, 2026; model build identifier not recorded",
+      "reference": "planning/releases/0.9.12-candidate.md",
+      "immutable_identifier": "sha256:d5fbb8f60fd0db8818cd1ed3214b21459e9395115c25a0b535637b664ea96dc4"
+    },
+    {
+      "category": "upgrade",
+      "completed_at": "2026-10-24T03:34:21.078199Z",
+      "immutable_identifier": "40055908733:1:supported-upgrades",
+      "reference": "https://github.com/hkrewson/TekDocs/actions/runs/40055908733",
+      "schema_version": 1,
+      "scope_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+      "status": "passed",
+      "tool": "TekDocs supported-minor production upgrade rehearsals",
+      "tool_version": "upgrade matrix at b45a5439dbf54252cbab5b6f7ace1a51027f5126"
+    }
+  ],
+  "findings": [
+    {
+      "id": "TD-SOURCE-DELIVERY-FRESHNESS",
+      "severity": "medium",
+      "title": "Final publication delivery session freshness",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Scoped final delivery requires recent interactive authentication; actor and audience controls retained.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-SVG-REFERENCES",
+      "severity": "medium",
+      "title": "Nonlocal SVG resource references",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Filtered renderer output allows fragment-local references only; unsafe output falls back.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-BEARER-BROWSER",
+      "severity": "medium",
+      "title": "Bearer credentials on browser account routes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Bearer authentication is limited to the API boundary; browser/admin paths reject bearer headers.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-TOKEN-PROFILE",
+      "severity": "medium",
+      "title": "Token-driven browser profile changes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Profile mutation requires browser session and CSRF; tokens cannot substitute.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-TOKEN-HEADER",
+      "severity": "low",
+      "title": "Mixed credential token management",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Token management rejects bearer headers instead of falling back to a browser session.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-OIDC-EGRESS",
+      "severity": "medium",
+      "title": "OIDC requests outside approved egress",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Allauth outbound transport uses bounded approved HTTPS; provider traffic is mocked in tests.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-IMPORT-PARSER",
+      "severity": "low",
+      "title": "Malformed import container and parser handling",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Damaged and duplicate archive entries and CSV parser failures reject safely before staging.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-INTEGRATION-DESTINATION",
+      "severity": "medium",
+      "title": "Credentialed destination change without session freshness",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Changing saved API destination requires recent interactive authentication; ordinary edits preserve prior behavior.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-IMPORT-REJECTION",
+      "severity": "low",
+      "title": "Malformed import identities retained in rejected rows",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Rejected rows use safe labels and prevent batch application.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-INTEGRATION-RESPONSE",
+      "severity": "low",
+      "title": "Provider response lifecycle",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Bounded response cleanup runs on successful and failing provider reads.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-CLEANUP",
+      "severity": "low",
+      "title": "Handled Git init failure obstructed recovery retry",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "New restore destination is registered for cleanup before Git initialization.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-PROJECT",
+      "severity": "medium",
+      "title": "Inherited project name could redirect restore",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Both wrappers bind the explicitly confirmed project; regression uses read-only Compose configuration.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-SECRET-MEMBERS",
+      "severity": "medium",
+      "title": "Incomplete secret archive member validation",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Authenticated archive is structurally validated before extraction or destructive replacement.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-DATABASE-DIAGNOSTICS",
+      "severity": "medium",
+      "title": "Raw database diagnostics in API errors",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Inspected database branches use fixed errors; controlled domain validation remains distinct.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-REMOTE-DOCUMENT-CLEANUP",
+      "severity": "low",
+      "title": "Remote document timeout response cleanup",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Nested finalization closes response and pool even on failed reads.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-RESTORE-MEDIA-MEMBERS",
+      "severity": "medium",
+      "title": "Missing media archive structural preflight",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Links, special entries, unsafe paths, collisions and truncated content reject before volume replacement.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-NETBOX-DIAGNOSTICS",
+      "severity": "medium",
+      "title": "Broad NetBox ValueError disclosure",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Controlled NetBoxReferenceError guidance remains; arbitrary ValueError details are replaced.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-RETAINED-FILE-READ",
+      "severity": "medium",
+      "title": "Unavailable retained file mistaken for empty bytes",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Unavailable stream produces conflict; valid empty attachment remains valid.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-SOURCE-CSV-SURPLUS",
+      "severity": "low",
+      "title": "Surplus CSV cells silently lost",
+      "status": "resolved",
+      "owner": "Maintainer / #38",
+      "disposition": "Surplus nonempty or trailing empty cells reject before staging; quoted commas remain valid.",
+      "evidence": [
+        "https://github.com/hkrewson/TekDocs/blob/da198027dbfce44f926ffafd518387a84e587431/planning/responsive-layouts/phase-8-security-review.md",
+        "https://github.com/hkrewson/TekDocs/actions/runs/38516198438",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39208816214",
+        "https://github.com/hkrewson/TekDocs/actions/runs/39423316088"
+      ],
+      "retest": "Historical remediation and reproduction are retained in the original cited reports, not newly reproduced here. Current f52b210 regression: Build 39423316088 and Extended 39369348946 passed; bounded delta reviewed in 0.9.9-source-review.md."
+    },
+    {
+      "id": "TD-DAST-INLINE-STYLE",
+      "severity": "medium",
+      "title": "Inline-style CSP compatibility allowance",
+      "disposition": "Maintainer explicitly accepted for b45a543 only; review before next runtime candidate or November 12, 2026, whichever is earlier. See planning/releases/0.9.12-operational-closeout.md",
+      "status": "accepted",
+      "owner": "Maintainer / #38",
+      "acceptance": {
+        "rationale": "Existing layout and generated diagrams require compatibility; retain only for the reviewed candidate, not a permanent waiver.",
+        "mitigation": "Same-origin script CSP, sanitized Markdown and strict diagram rendering remain. Investigate narrower generated-style hashes/nonces under #38; review before the next runtime candidate or November 12, whichever is earlier.",
+        "owner_issue": "#38",
+        "review_at": "2026-11-12T00:00:00Z"
+      }
+    },
+    {
+      "id": "TD-DAST-COEP",
+      "severity": "low",
+      "title": "Cross-Origin-Embedder-Policy absent",
+      "disposition": "Maintainer explicitly accepted for b45a543 only; review before next runtime candidate or November 12, 2026, whichever is earlier. See planning/releases/0.9.12-operational-closeout.md",
+      "status": "accepted",
+      "owner": "Maintainer / #38",
+      "acceptance": {
+        "rationale": "A header change requires compatibility checks across OIDC navigation, PDF workers, diagrams, fonts and maintained browsers.",
+        "mitigation": "Retain existing same-origin CSP and frame restrictions, without claiming equivalence to COEP. Review before the next runtime candidate or November 12, whichever is earlier.",
+        "owner_issue": "#38",
+        "review_at": "2026-11-12T00:00:00Z"
+      }
+    },
+    {
+      "id": "TD-DEPENDENCY-KATEX",
+      "title": "Low-severity KaTeX dependency-chain findings",
+      "severity": "low",
+      "status": "accepted",
+      "owner": "Maintainer / #38",
+      "disposition": "Explicitly accepted for b45a543; coordinate the Mermaid major update rather than applying an incompatible automatic fix.",
+      "acceptance": {
+        "rationale": "Bounded low-severity dependency findings; current high/critical gates pass.",
+        "mitigation": "Sanitized Markdown and isolated renderer remain; review before next runtime candidate or November 12, 2026, whichever is earlier.",
+        "owner_issue": "#38",
+        "review_at": "2026-11-12T00:00:00Z"
+      }
+    }
+  ],
+  "exceptions": [],
+  "public_claims": {
+    "independent_human_security_assessment": false,
+    "penetration_test": false,
+    "compliance_audit": false,
+    "certification": false,
+    "independent_assurance": false,
+    "statement": "TekDocs has not received an independent human security assessment, penetration test, compliance audit, certification, or independent assurance. Automated and AI-assisted checks provide evidence only for their tested scope."
+  }
+}

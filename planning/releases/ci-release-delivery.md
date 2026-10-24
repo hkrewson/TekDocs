@@ -116,3 +116,10 @@ readiness function with failing HTTP requests confirmed exactly 60 attempts
 followed by RuntimeError. Comments now explain that intentional bounded retry.
 No assertion, retry limit, scanner rule or alert was disabled. Local CodeQL CLI
 is unavailable; hosted CodeQL must confirm these source clarifications.
+
+## First hosted completion — 0.9.12
+
+Build 40055908733 completed all required release jobs at b45a543 and delivered
+four images, eight attestation verifications, v0.9.12 and receipts/v0.9.12.
+See `0.9.12-operational-closeout.md`. This supersedes the pending first-hosted-run
+limitation above. Production deployment remains separate.

@@ -12,26 +12,29 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Preparing 0.9.12
+## Published 0.9.12
 
-[Release preparation and source review](0.9.12-candidate.md) covers the dependency
-security fixes and single-push delivery. PR validation passed at `9814ab8`;
-version metadata is being advanced to 0.9.12. This version is not published.
-The historical pinned manifest below is not a readiness claim for 0.9.12.
+The pinned manifest now identifies `b45a543`, published as v0.9.12 by
+[Build 40055908733](https://github.com/hkrewson/TekDocs/actions/runs/40055908733).
+All four images, eight signed provenance/SBOM verifications, application and
+receipt tags were delivered by that single run. See
+[publication closeout and update commands](0.9.12-operational-closeout.md).
+Production deployment remains unconfirmed. The historical 0.9.11 and 0.9.9
+records below do not describe the current release.
 
-## Published 0.9.11; status-record assembly pending
+## Historical 0.9.11 publication
 
 [Security maintenance](0.9.11-candidate.md) updates Node and rebuilds Mailpit
 with a fixed Go toolchain. v0.9.10 was tagged but its Mailpit scan failed and
 publication was skipped. The v0.9.11 publication succeeded; all four image
 aliases and eight signed provenance/SBOM checks passed. The reviewed receipt and
 [production update commands](0.9.11-production-guidance.md) are available.
-The full publication-record assembly remains pending, so the pinned status
-manifest still identifies v0.9.9; it does not yet summarize v0.9.11.
+Its standalone full publication-record assembly was superseded by the current
+0.9.12 record. Retained 0.9.11 evidence remains historical.
 
 ## Published 0.9.9
 
-The pinned manifest identifies f52b210, published as v0.9.9. All three image
+The historical 0.9.9 candidate was f52b210. All three image
 aliases and signed provenance/SBOMs were verified; all security and diagram
 categories assembled. See [publication closeout](0.9.9-publication-security-closeout.md),
 [operational validation](0.9.9-operational-closeout.md), and the
@@ -48,7 +51,7 @@ Start with [0.9.8 operational closeout](0.9.8-operational-closeout.md) for the
 current 05abb13 hosted results, later rehearsal fixes, accepted header risks and
 remaining publication decisions. [Access candidate validation](0.9.8-access-candidate-validation.md)
 retains the earlier access/compression and browser chronology.
-The pinned manifest now names 05abb13, published as v0.9.8. All three image aliases
+The historical 0.9.8 candidate was 05abb13. All three image aliases
 and signed provenance/SBOMs were verified; see the publication security closeout.
 The operator completed production deployment and reported successful document/asset
 smoke checks; see [production closeout](0.9.8-production-update.md). The reviewed Wiki is now published and its public pages verified; see
@@ -57,20 +60,23 @@ and authority handoff remain separate decisions.
 
 ## Status and evidence
 
-1. Run `make release-status`. This performs read-only GitHub checks for the three
-   pinned runs, checks their repository/workflow/commit and successful conclusion,
+1. Run `make release-status`. This performs read-only GitHub checks for the
+   pinned workflow identities, checks their repository/workflow/commit and successful conclusion,
    validates the security record and expiry dates, and hashes local source reports.
    Hosted run identifiers must match the run attempt and evidence category.
    Production-image digests are compared with the exact run/attempt's downloaded
    evidence artifact; a missing, expired or mismatched artifact blocks verification.
+   For single-push releases, all three identities name the same main-push run;
+   successful CodeQL, extended and publication jobs are required explicitly.
    Offline `python3 scripts/release_status.py` deliberately reports hosted checks
    unverified and returns nonzero. An unavailable API is not a cached pass.
 2. Read `blockers` and `remaining_release_actions` separately. Zero verification
    blockers does not mean tagged, deployed, or independently audited. Operator
    acceptance records the decision, not individual unperformed manual tests.
 3. Freeze the tested application SHA. Record evidence in a later documentation
-   commit without relabeling it as evidence for HEAD. Tag the tested SHA only
-   after explicit approval. Runtime changes require a new candidate and fresh
+   commit without relabeling it as evidence for HEAD. For the current pipeline, authorize the versioned main push; CI tags its
+   successfully tested SHA and delivers the receipt. Historical manual tagging
+   is not the normal release path. Runtime changes require a new candidate and fresh
    complete validation; documentation alone does not manufacture a new tested SHA.
 
 The historical `.github/automated-security-review.json` remains a template. Use

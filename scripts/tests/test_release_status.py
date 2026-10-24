@@ -17,6 +17,20 @@ import release_status
 
 
 class ReleaseStatusTests(unittest.TestCase):
+    def test_single_push_requires_each_successful_exact_source_job(self):
+        candidate = "a" * 40
+        for workflow, names in release_status.SINGLE_PUSH_JOBS.items():
+            jobs = [dict(name=name, head_sha=candidate, status="completed", conclusion="success")
+                    for name in names]
+            release_status.verify_single_push_jobs(jobs, candidate, workflow)
+            for change in ({"conclusion": "skipped"}, {"conclusion": "failure"},
+                           {"head_sha": "b" * 40}, {"status": "queued"}):
+                with self.assertRaises(ValueError):
+                    release_status.verify_single_push_jobs([dict(jobs[0], **change), *jobs[1:]], candidate, workflow)
+            for invalid in (jobs[1:], [*jobs, jobs[0]]):
+                with self.assertRaises(ValueError):
+                    release_status.verify_single_push_jobs(invalid, candidate, workflow)
+
     def test_production_digests_match_exact_attempt_artifact(self):
         manifest = json.loads(
             (release_status.ROOT / ".github/release-candidate.json").read_text()

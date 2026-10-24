@@ -15,6 +15,32 @@ from check_automated_security_review import COMMIT_PATTERN, validate_record
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = {"Build, test, and secure", "CodeQL", "Extended validation"}
+SINGLE_PUSH_JOBS = {
+    "CodeQL": {"release-codeql / analyze (python)",
+               "release-codeql / analyze (javascript-typescript)",
+               "release-codeql / CodeQL evidence"},
+    "Extended validation": {
+        "release-extended / Supported upgrade matrix",
+        "release-extended / Supported backup and restore",
+        "release-extended / Dynamic application security test",
+        "release-extended / Public-beta performance reference",
+        "release-extended / Browser security evidence",
+        "release-extended / Diagram upgrade and restore evidence",
+        *{f"release-extended / Browser ({browser})" for browser in
+          ("chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit")},
+    },
+    "Build, test, and secure": {"Publish tested production images",
+                                "Production containers, SBOMs, and vulnerability scan"},
+}
+
+
+def verify_single_push_jobs(jobs: list[dict], candidate: str, workflow: str) -> None:
+    for name in SINGLE_PUSH_JOBS[workflow]:
+        matching = [job for job in jobs if job.get("name") == name]
+        if len(matching) != 1 or any(matching[0].get(key) != value for key, value in {
+            "head_sha": candidate, "status": "completed", "conclusion": "success",
+        }.items()):
+            raise ValueError("required release job missing, skipped, failed or wrong source")
 EVIDENCE_SCOPES = {
     "authorization_and_rls": "runtime+postgres-shards",
     "backup_and_restore": "supported-recovery",
@@ -184,7 +210,13 @@ def inspect(manifest: dict, root: Path, online: bool) -> dict:
     workflows = manifest["workflows"]
     if set(workflows) != WORKFLOWS:
         raise ValueError("manifest must name all three required workflows")
+    pipeline = manifest.get("pipeline", "separate_workflows")
+    if pipeline not in {"separate_workflows", "single_push"}:
+        raise ValueError("unsupported release pipeline")
+    if pipeline == "single_push" and len(set(workflows.values())) != 1:
+        raise ValueError("single-push evidence must use one release run")
     blockers, checks, verified_runs = [], {}, {}
+    release_jobs = None
     for name, run_id in workflows.items():
         if type(run_id) is not int or run_id <= 0:
             raise ValueError("workflow run IDs must be positive integers")
@@ -192,7 +224,19 @@ def inspect(manifest: dict, root: Path, online: bool) -> dict:
         if online:
             try:
                 run = gh_json(f"repos/{repository}/actions/runs/{run_id}")
-                verify_run(run, candidate, name, repository)
+                verify_run(run, candidate, "Build, test, and secure" if pipeline == "single_push" else name, repository)
+                if pipeline == "single_push":
+                    if run.get("event") != "push" or run.get("head_branch") != "main":
+                        raise ValueError("release must be a main push")
+                    if release_jobs is None:
+                        release_jobs, page = [], 1
+                        while True:
+                            batch = gh_json(f"repos/{repository}/actions/runs/{run_id}/attempts/{run['run_attempt']}/jobs?per_page=100&page={page}")["jobs"]
+                            release_jobs.extend(batch)
+                            if len(batch) < 100:
+                                break
+                            page += 1
+                    verify_single_push_jobs(release_jobs, candidate, name)
                 verified_runs[str(run_id)] = run
                 checks[name] = "passed"
             except (ValueError, subprocess.TimeoutExpired):

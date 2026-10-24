@@ -14,8 +14,15 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:10", timezone: America/Chicago }
     rebase-strategy: disabled
     groups:
-      frontend-production: { dependency-type: production, update-types: [minor, patch], exclude-patterns: [mermaid] }
-      frontend-development: { dependency-type: development, update-types: [minor, patch] }
+      # These packages require exactly matching versions, including major updates.
+      frontend-vitest:
+        patterns: [vitest, "@vitest/coverage-v8"]
+      frontend-react:
+        patterns: [react, react-dom]
+      frontend-production: { dependency-type: production, update-types: [minor, patch], exclude-patterns: [mermaid, react-router, lucide-react] }
+      frontend-development: { dependency-type: development, update-types: [minor, patch], exclude-patterns: ["@playwright/test"] }
+    # Playwright requires a matching, digest-pinned browser image and rehearsals.
+    # Keep its proposal separate so it can be completed as a coordinated update.
     ignore:
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]

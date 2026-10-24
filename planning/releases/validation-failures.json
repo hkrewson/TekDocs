@@ -672,6 +672,56 @@
       "next_action": "Keep incompatible PR unmerged; apply dependency-update-policy.md and validate a coordinated replacement. Policy changes do not fix this old run.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "40068404406",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Seeded exact pure-function/property replay in Hypothesis 6.165.2 Docker passed at 0.25 and 0.05 CPU. Full local module replay was blocked by Docker ENOSPC. Failed hosted jobs retried as attempt 2.",
+      "cause": "unknown; one IP-strategy draw took 1.668 seconds in hosted run. Resource contention is unconfirmed.",
+      "next_action": "Retain assertion and health check. Inspect attempt 2; if recurrent, capture full-shard generator profiling before changing the strategy.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40068566103",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Same health-check failure as main; isolated seeded main reproduction passed, not a reproduction of this full shard.",
+      "cause": "unknown; Hypothesis input-generation timing failure, not an application assertion failure.",
+      "next_action": "Track with 40068404406; do not attribute this to React-plugin code without evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40068588143",
+      "job": "Frontend code and tests; Dependency, license, code, and secret policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Docker npm ci against exact PR 126 manifests/lock reproduced ERESOLVE.",
+      "cause": "Vitest 5.0.5 conflicts with coverage-v8 4.1.10.",
+      "next_action": "Publish paired 5.0.5 update and fast toolchain check; fresh Docker frontend gate passed 772 tests.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40068558674",
+      "job": "Chromium regression; Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Both unchanged preflight snippets failed against exact PR 122 lock: Playwright 1.64.1 versus pinned 1.62.1.",
+      "cause": "Package, browser image and rehearsal assertions were updated independently.",
+      "next_action": "Publish synchronized 1.64.1 update. Browser image and all three engine smoke checks pass; full hosted browser journeys must confirm because local disk capacity blocked the complete rehearsal.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40068554614",
+      "job": "Frontend code and tests",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Fresh Docker exact PR build reproduced 141582-byte compressed shell; baseline 130376. Sequential React/router/Lucide reversions yielded 130392 and passed unchanged limits.",
+      "cause": "Combined React, router and icon updates exceed the existing shell budget.",
+      "next_action": "Keep production upgrade unmerged; review these updates separately. No budget increase or eager-chunk workaround.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

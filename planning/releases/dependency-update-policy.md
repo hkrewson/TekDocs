@@ -38,3 +38,13 @@ Existing PRs may need replacement after the policy is published; unchanged old
 red runs remain historical evidence.
 
 Reference: [GitHub Dependabot options](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
+
+## Coupled tools and size review follow-up
+
+See `2026-10-24-ci-follow-up.md` for the next round's reproductions. Vitest and
+coverage-v8 are now a single group across all version levels. Playwright is
+proposed separately and must include the pinned browser image and rehearsals.
+React/React DOM remain paired; React Router and Lucide are separate size-review
+proposals after measured shell-budget regressions. Early CI checks enforce the
+frontend test-toolchain version relationships. Production bundle limits remain
+unchanged.

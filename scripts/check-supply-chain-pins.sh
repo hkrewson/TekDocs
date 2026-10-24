@@ -46,4 +46,6 @@ if awk '/^FROM[[:space:]]+(python|node|nginx|golang|alpine|mcr\.microsoft\.com)/
   exit 1
 fi
 
+python3 scripts/check_frontend_toolchain.py
+
 echo "Supply-chain pin contract passed."

@@ -41,8 +41,8 @@ esac
   echo "MAILPIT_UI_PORT=0"
 } >> "$environment_file"
 
-playwright_version=1.62.1
-if ! grep -A 3 '"node_modules/@playwright/test"' "$repository_root/frontend/package-lock.json" | grep -q '"version": "1.62.1"'; then
+playwright_version=1.64.1
+if ! grep -A 3 '"node_modules/@playwright/test"' "$repository_root/frontend/package-lock.json" | grep -q '"version": "1.64.1"'; then
   echo "Update the browser Playwright image version to match package-lock.json." >&2
   exit 1
 fi

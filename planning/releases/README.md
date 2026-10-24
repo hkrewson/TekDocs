@@ -12,6 +12,13 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Preparing 0.9.12
+
+[Release preparation and source review](0.9.12-candidate.md) covers the dependency
+security fixes and single-push delivery. PR validation passed at `9814ab8`;
+version metadata is being advanced to 0.9.12. This version is not published.
+The historical pinned manifest below is not a readiness claim for 0.9.12.
+
 ## Published 0.9.11; status-record assembly pending
 
 [Security maintenance](0.9.11-candidate.md) updates Node and rebuilds Mailpit

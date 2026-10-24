@@ -71,3 +71,15 @@ deterministic bytes, sandboxing and cleanup. Two renderer-runtime tests are
 intentionally skipped in its first non-runtime phase and executed in the
 second phase. Hosted dependency review, image vulnerability scans and browser
 journeys remain required before merge; no new published release is claimed.
+
+## Hosted confirmation
+
+Build [40049911922](https://github.com/hkrewson/TekDocs/actions/runs/40049911922),
+CodeQL [40049911846](https://github.com/hkrewson/TekDocs/actions/runs/40049911846)
+and performance diagnostics
+[40049911842](https://github.com/hkrewson/TekDocs/actions/runs/40049911842)
+passed for source `9814ab8adb46492f19f1316a157dc026f6990ab3`.
+Build includes all PostgreSQL shards, runtime authorization, Chromium, live
+Workspace and diagram journeys, coverage, and all four production image scans.
+This supersedes the pending PR confirmation above. Release-only extended checks
+and publication were correctly skipped; they will run on the versioned main push.

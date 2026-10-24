@@ -9,7 +9,7 @@ TekDocs uses the same Mermaid runtime for the editor preview and the isolated ex
 - Both lockfiles must agree with their manifests.
 - The Mermaid version resolved by the renderer must exactly match the frontend Mermaid version. This prevents a saved diagram from previewing one way and exporting another.
 - `renderer/Dockerfile` pins its Node base image by digest. `CHROMIUM_SERIES` records the reviewed Alpine Chromium major version, the image build rejects a different series, and the installed version is retained in `/chromium-version`.
-- Dependabot reports frontend Mermaid, renderer npm, and renderer container updates. It does not authorize or merge them.
+- Dependabot reports Mermaid, Mermaid CLI and Puppeteer separately from routine groups. These proposals require one coordinated update of frontend and renderer pins and locks; do not merge either side alone. Node major updates are maintained manually across all images and browser tooling. Security findings still require triage.
 
 Run the fast contract check with:
 

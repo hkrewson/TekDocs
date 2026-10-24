@@ -632,6 +632,46 @@
       "next_action": "DRF 3.18.3, DOMPurify 3.4.17 and Puppeteer 25.16.0 resolve locally reproduced Python, frontend and renderer blocking audit findings. No audit exceptions. Preserve existing Mermaid/Chromium contract and check compatibility.",
       "fix_commit": null,
       "retest_run": "Python audit clean; frontend and renderer audits pass high/critical threshold with low KaTeX findings retained. Docker runtime authorization: 13 passed. Fresh Docker frontend: 772 tests, lint/types/API/build/budgets passed. License checks passed. Production-image and isolated diagram-export gates passed after authorized unused-cache cleanup for ENOSPC. Hosted security and complete Build must confirm."
+    },
+    {
+      "run_id": "40056145238",
+      "job": "Frontend code and tests; Dependency, license, code, and secret policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Both hosted failed logs report npm ERESOLVE; no local install rerun claimed.",
+      "cause": "Observed dependency conflict: proposed TypeScript 7.0.2 does not satisfy openapi-typescript 7.13.0 peer ^5.x.",
+      "next_action": "Keep incompatible PR unmerged; apply dependency-update-policy.md and validate a coordinated replacement. Policy changes do not fix this old run.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40055976387",
+      "job": "Chromium regression; Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Both hosted logs fail the exact Node 24.22.1 build assertion; no local image rerun claimed.",
+      "cause": "Proposed frontend-only Node 26 image disagrees with the browser toolchain assertion.",
+      "next_action": "Keep incompatible PR unmerged; apply dependency-update-policy.md and validate a coordinated replacement. Policy changes do not fix this old run.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40056011665",
+      "job": "Prepare and validate workflow policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted contract failure: frontend 11.16.1, renderer 12.2.0.",
+      "cause": "Proposed renderer-only Mermaid major update violates preview/export equality.",
+      "next_action": "Keep incompatible PR unmerged; apply dependency-update-policy.md and validate a coordinated replacement. Policy changes do not fix this old run.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40056064222",
+      "job": "Prepare and validate workflow policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Contract checker against actual PR 118 manifests/locks in a temporary directory reproduced exit 2: frontend 12.2.0, renderer 11.16.1.",
+      "cause": "Proposed frontend-only Mermaid major update violates preview/export equality.",
+      "next_action": "Keep incompatible PR unmerged; apply dependency-update-policy.md and validate a coordinated replacement. Policy changes do not fix this old run.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

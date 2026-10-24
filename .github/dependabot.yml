@@ -5,8 +5,8 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:00", timezone: America/Chicago }
     rebase-strategy: disabled
     groups:
-      python-production: { dependency-type: production }
-      python-development: { dependency-type: development }
+      python-production: { dependency-type: production, update-types: [minor, patch] }
+      python-development: { dependency-type: development, update-types: [minor, patch] }
     labels: [dependencies, backend]
     open-pull-requests-limit: 10
   - package-ecosystem: npm
@@ -14,8 +14,11 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:10", timezone: America/Chicago }
     rebase-strategy: disabled
     groups:
-      frontend-production: { dependency-type: production }
-      frontend-development: { dependency-type: development }
+      frontend-production: { dependency-type: production, update-types: [minor, patch], exclude-patterns: [mermaid] }
+      frontend-development: { dependency-type: development, update-types: [minor, patch] }
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     labels: [dependencies, frontend]
     open-pull-requests-limit: 10
   - package-ecosystem: docker
@@ -23,7 +26,7 @@ updates:
     schedule: { interval: weekly, day: monday, time: "09:20", timezone: America/Chicago }
     rebase-strategy: disabled
     ignore:
-      # TekDocs 0.8.x is intentionally constrained to Python 3.13.
+      # The supported backend toolchain remains Python 3.13.
       - dependency-name: python
         versions: [">=3.14"]
     labels: [dependencies, containers]
@@ -31,24 +34,36 @@ updates:
     directory: /frontend
     schedule: { interval: weekly, day: monday, time: "09:25", timezone: America/Chicago }
     rebase-strategy: disabled
+    # Node major upgrades require synchronized images and browser tooling.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     labels: [dependencies, containers]
   - package-ecosystem: npm
     directory: /renderer
     schedule: { interval: weekly, day: monday, time: "09:27", timezone: America/Chicago }
     rebase-strategy: disabled
     groups:
-      renderer-production: { dependency-type: production }
+      renderer-production: { dependency-type: production, update-types: [minor, patch], exclude-patterns: ["@mermaid-js/mermaid-cli", puppeteer] }
     labels: [dependencies, renderer]
     open-pull-requests-limit: 5
   - package-ecosystem: docker
     directory: /renderer
     schedule: { interval: weekly, day: monday, time: "09:28", timezone: America/Chicago }
     rebase-strategy: disabled
+    # Node major upgrades require synchronized images and browser tooling.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     labels: [dependencies, containers]
   - package-ecosystem: docker
     directory: /mailpit
     schedule: { interval: weekly, day: monday, time: "09:29", timezone: America/Chicago }
     rebase-strategy: disabled
+    # Node major upgrades require synchronized images and browser tooling.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     labels: [dependencies, containers]
   - package-ecosystem: github-actions
     directory: /

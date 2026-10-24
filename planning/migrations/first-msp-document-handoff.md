@@ -113,3 +113,45 @@ The next production preview failed because it attempted to save repository healt
 metadata inside the explicitly read-only transaction. No successful preview is
 claimed. See [read-only preview correction](read-only-preview-correction.md).
 Do not remove the read-only guard or retry the preview on unchanged v0.9.9.
+
+## Resumed readiness — October 24, 2026
+
+Published v0.9.12 contains the read-only preview correction. Production deployment
+is unconfirmed, so no production retry, copy or promotion is claimed here.
+
+Verified locally: the complete existing `test-document-migration-inventory`
+selection (migration inventory and runtime RLS modules) passed in a fresh,
+isolated Docker Compose project: 28 passed in 79.37 seconds. A temporary adapter
+of the existing PostgreSQL shard runner selected these two modules and retained
+normal build, migration and cleanup behavior. Log:
+`/tmp/tekdocs-0912-handoff-readiness.log`. No runtime source or assertion changed.
+
+This includes the positive copy/promotion, supported fragment-body edits,
+legacy-write rejection, retained-file behavior and rollback checks, plus the
+negative metadata/structural rollback refusal. The latter is still a limitation,
+not proof of reversible arbitrary editing. Existing exact-workspace and read-only
+preview checks also passed. Hosted 0.9.12 supported recovery remains the release
+recovery evidence; this focused run is not a new production recovery exercise.
+
+### Next bounded implementation slice
+
+Keep first-document migration reversible by enforcing its supported edit shape
+while rollback to legacy authority is promised. Acceptance criteria:
+
+- Owned fragment Markdown body edits remain available and roll back without
+  losing revisions or retained files.
+- Root identity/metadata/body, fragment metadata, placement/include structure,
+  and other edits outside the proven reverse projection reject before accepting
+  a Git commit, with an actionable explanation.
+- The restriction applies only to migrated content under the reversible handoff
+  contract; native Git documents and unrelated Workspaces retain normal behavior.
+- Session/API paths and low-level accepted-write paths share enforcement; allow,
+  deny and cross-workspace tests exercise the actual runtime role.
+- Copy, promotion, allowed edit, reverse projection and isolated recovery are
+  rehearsed together before offering the production promotion plan.
+
+This defines the next implementation, not a completed restriction. A broader
+reverse-projection implementation may later expand the supported shape through
+its own acceptance evidence. Do not promote production while unrestricted edits
+can invalidate the promised rollback. Keep the startup-guide editorial revision
+separate from migration history.

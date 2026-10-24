@@ -61,3 +61,12 @@ public Wiki for the current single-operator deployment.
 
 Do not remove the read-only guard as a workaround. No production retry is needed
 until the corrected runtime has been delivered.
+
+## Delivery update — October 24, 2026
+
+The corrected preview is now included in published v0.9.12 at b45a543.
+Build 40055908733 passed the exact-candidate release gates, including supported
+upgrade and recovery. The earlier delivery blocker above is historical. The
+operator must deploy the published runtime before retrying its read-only preview;
+production deployment is not yet confirmed. The authority rollback limitation
+and separate production copy/promotion approval remain in force.

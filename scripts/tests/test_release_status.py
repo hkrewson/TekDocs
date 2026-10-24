@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime
 import io
 import json
 import zipfile
@@ -81,6 +82,14 @@ class ReleaseStatusTests(unittest.TestCase):
             "operator_acceptance": {"decision": "accepted",
                 "reference": "planning/responsive-layouts/0.9.8-operator-acceptance.md"},
         }
+        # Identity checks use the historical review's clock, not today's date.
+        # Production inspection still uses the live clock and rejects expiry.
+        reviewed_at = datetime.fromisoformat(record["completed_at"].replace("Z", "+00:00"))
+        real_validate = release_status.validate_record
+        self.enterContext(patch.object(
+            release_status, "validate_record",
+            side_effect=lambda data, **kwargs: real_validate(data, now=reviewed_at, **kwargs),
+        ))
         original_loads = json.loads
 
         def replacement(raw, *args, **kwargs):
@@ -142,6 +151,14 @@ class ReleaseStatusTests(unittest.TestCase):
                             "blockers"
                         ],
                     )
+
+    def test_historical_exception_still_fails_at_expiry(self):
+        record = json.loads((release_status.ROOT /
+            "planning/releases/0.9.8-security-review.json").read_text())
+        expires_at = datetime.fromisoformat(record["exceptions"][0]["expires_at"].replace("Z", "+00:00"))
+        with self.assertRaisesRegex(ValueError, "exception TD-MAILPIT-XNET is expired"):
+            release_status.validate_record(record,
+                candidate_commit=record["candidate_commit"], now=expires_at)
 
     def test_retained_dependency_scan_requires_successful_job_and_exact_artifact(self):
         entry = {"category": "dependency_license_secret", "immutable_identifier": "42:1:security"}

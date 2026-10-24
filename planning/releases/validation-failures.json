@@ -612,6 +612,16 @@
       "next_action": "v0.9.11 rebuilds pinned unmodified Mailpit v1.31.6 with Go 1.27.3 and x/net v0.61.0; local scan passes without exceptions. Hosted Build must confirm the new candidate. Keep v0.9.10 tag as historical failed release attempt.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "40044255261",
+      "job": "Prepare and validate workflow policy",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Unchanged test_hosted_identifiers_match_run_attempt_and_category fails locally; direct validation reports exception TD-MAILPIT-XNET is expired. Fixture expiry: 2026-10-24T00:00:00Z.",
+      "cause": "Historical 0.9.8 identity test used the live clock, so its old Mailpit exception expired while the test expected a valid baseline.",
+      "next_action": "Bind identity test to historical review time; retain real validator and add an explicit expiry-boundary regression. Production expiry policy unchanged.",
+      "fix_commit": null,
+      "retest_run": "make test-automated-security-review-gate: 115 tests passed, 3 optional live tests skipped. Hosted retest pending."
     }
   ]
 }

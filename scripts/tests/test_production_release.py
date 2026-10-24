@@ -45,12 +45,13 @@ class ProductionReleaseTests(unittest.TestCase):
         self.git('commit', '-qm', 'release receipt')
         self.tooling_commit = self.git('rev-parse', 'HEAD').strip()
         self.git('remote', 'add', 'origin', str(self.root))
-        self.secrets = Path(self.temp.name) / 'secrets'
-        self.secrets.mkdir()
+        # This fixture stores only the directory path in .env, never key material.
+        self.deployment_directory = Path(self.temp.name) / 'deployment-files'
+        self.deployment_directory.mkdir()
         self.key = Path(self.temp.name) / 'recovery-key'
         self.key.write_bytes(os.urandom(32))
         (self.root / '.env').write_text(
-            f'TEKDOCS_SECRET_DIRECTORY={self.secrets}\nTEKDOCS_PUBLIC_URL=https://docs.example.invalid\n')
+            f'TEKDOCS_SECRET_DIRECTORY={self.deployment_directory}\nTEKDOCS_PUBLIC_URL=https://docs.example.invalid\n')
         self.events = Path(self.temp.name) / 'events'
         bindir = Path(self.temp.name) / 'bin'
         bindir.mkdir()

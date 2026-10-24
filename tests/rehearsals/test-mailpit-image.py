@@ -27,6 +27,8 @@ def start(selected_image=image):
                 if response.status == 200:
                     return base
         except OSError:
+            # A starting container may refuse HTTP; retry within the bounded loop.
+            # Exhaustion below fails the rehearsal rather than accepting unreadiness.
             pass
         time.sleep(0.5)
     raise RuntimeError('Mailpit did not become ready')

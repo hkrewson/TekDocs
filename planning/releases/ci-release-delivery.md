@@ -103,3 +103,16 @@ main release. No production deployment or new image publication is claimed.
 The public Wiki update is drafted separately; publishing it requires its existing
 explicit authorization. The v0.9.11 full security/status record remains separate
 outstanding work and is not marked complete by this delivery change.
+
+## October 23 scanner follow-up
+
+PR 111's CodeQL result flagged the updater fixture's directory-path variable
+as clear-text secret storage and the Mailpit startup poll's empty exception
+handler. Reproduction instantiated the fixture and confirmed `.env` contains
+only an empty-directory path while generated recovery-key bytes remain in their
+separate temporary file. The variable now describes the directory rather than
+calling the path itself a secret. An isolated execution of the unchanged
+readiness function with failing HTTP requests confirmed exactly 60 attempts
+followed by RuntimeError. Comments now explain that intentional bounded retry.
+No assertion, retry limit, scanner rule or alert was disabled. Local CodeQL CLI
+is unavailable; hosted CodeQL must confirm these source clarifications.

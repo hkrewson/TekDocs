@@ -763,6 +763,12 @@ This does not clear the broader authority checklist or authorize production
 copy/promotion. Fresh release validation and a concrete production plan remain
 required before the first operator handoff.
 
+The first production handoff exposed a mixed-authority browse regression:
+empty search omitted remaining legacy documents although text search found
+them. The bounded #105 correction and Docker reproduction are tracked in
+[mixed-authority document listing](migrations/mixed-authority-document-list.md).
+This does not change publication-bearing document eligibility.
+
 The checked custody gate passed the isolated fresh-install rehearsal, the
 PostgreSQL owner-upgrade test, and the supported repository-inclusive,
 network-isolated backup/restore rehearsal. The latter restored native and

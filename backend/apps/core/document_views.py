@@ -440,16 +440,16 @@ def _search_document_records(
         )
         for content_id, node in nodes.items()
     }
-    if not values["q"]:
-        return base_records, canonical_markdown
-
-    folded_query = cast(str, values["q"]).casefold()
-    terms = re.findall(r"\w+", folded_query)[:12] or [folded_query]
     legacy_matches = [
         record
         for record in _filtered_documents(workspace, values)
         if record.id not in repository_ids
     ]
+    if not values["q"]:
+        return legacy_matches + base_records, canonical_markdown
+
+    folded_query = cast(str, values["q"]).casefold()
+    terms = re.findall(r"\w+", folded_query)[:12] or [folded_query]
     repository_matches = []
     for record in base_records:
         if record.id not in repository_ids:

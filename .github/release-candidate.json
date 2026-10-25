@@ -16,8 +16,6 @@
     "scope": "Explicit bounded CSP/COEP/KaTeX risk acceptance and main release authorization. No production deployment or new manual walkthrough claimed."
   },
   "remaining_release_actions": [
-    "Operator deployment and document/asset/diagram smoke remain unconfirmed.",
-    "Publish updated Wiki production guidance.",
-    "Complete reversible first MSP document authority handoff; production mutation requires its own approval."
+    "Complete reversible first MSP document authority handoff as subsequent development; production mutation requires its own approval."
   ]
 }

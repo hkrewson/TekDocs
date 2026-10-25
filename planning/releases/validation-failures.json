@@ -729,9 +729,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Docker Playwright 1.64.1 / Chromium 156 loopback HTTP probe: fetch-to-Blob downloads correct HTML while response.text() returns an empty string. See 2026-10-24-export-download-ci.md.",
       "cause": "The test inspects the browser automation response body instead of the completed downloaded file; reproduced independently of Django and PostgreSQL.",
-      "next_action": "Read the actual download, preserving content/header/filename assertions. Focused positive and negative Docker probes, lint and types pass. Full make test-e2e-live blocked by renderer build ENOSPC; hosted live journey must confirm.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Closed: hosted live journey and full Build passed at 295912a. Original failed run remains historical evidence.",
+      "fix_commit": "295912a98ffb22dc81f9f76e201a683fbb5fd63f",
+      "retest_run": "40132590431"
     }
   ]
 }

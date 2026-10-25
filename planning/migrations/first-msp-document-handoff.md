@@ -155,3 +155,12 @@ reverse-projection implementation may later expand the supported shape through
 its own acceptance evidence. Do not promote production while unrestricted edits
 can invalidate the promised rollback. Keep the startup-guide editorial revision
 separate from migration history.
+
+
+## Operator follow-up — October 25, 2026
+
+The operator reported document/asset success after the v0.9.12 update guidance,
+and supplied valid diagram SVG and PDF exports. See the 0.9.12 operational
+closeout for evidence limits. No production migration-preview retry, copy or
+promotion has been performed or approved by this follow-up. The reversible-edit
+restriction and combined recovery rehearsal remain the next development slice.

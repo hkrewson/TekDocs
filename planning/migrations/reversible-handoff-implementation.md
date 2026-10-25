@@ -126,20 +126,53 @@ eligibility blockers and existing historical corruption are not waived.
   authoring and lock exclusion. Final changed-file Ruff passed. Logs:
   `/tmp/tekdocs-handoff-remaining-gates.log` and
   `/tmp/tekdocs-handoff-final-lint.log`.
-- **Blocked:** fresh/0.8.46 upgrade comparison cannot build its historical
+- **Initial blocker (resolved below):** fresh/0.8.46 comparison could not build its historical
   renderer. Baseline commit `35e93ca` expects Chromium 152, but its current Alpine
   package source supplies Chromium 155.0.8059.84. The version guard correctly
   stopped the build before migration comparison. This is a reproduced baseline
   dependency failure, not evidence of migration success. The aggregate
-  `document-migration-release-gate` is therefore **not green**. Repair the
-  historical rehearsal dependency strategy and rerun
-  `document-migration-upgrade-rehearsal` (locally or in hosted validation) before
-  promoting this runtime candidate. No browser-version check was bypassed.
+  `document-migration-release-gate` stopped at this stage. The follow-up below
+  repairs the rehearsal dependency selection. No browser-version check was bypassed.
 - **Verified:** `make production-image-rehearsal` passed for the current source:
   non-root runtime file access, renderer/browser identity, repository persistence
   after restart, container isolation and file-backed secrets. Log:
   `/tmp/tekdocs-handoff-production-image.log`.
 
-The bounded implementation is ready for review; release readiness remains blocked
-on the historical upgrade rehearsal above. These local results do not replace
-hosted candidate validation, security review or release authorization.
+## Historical rehearsal repair — October 25
+
+Scope: #105 migration-validation follow-up. Acceptance: preserve the original
+0.8.46 Django schema and fixture, upgrade the retained database, compare stable
+identities and fresh/upgraded import/rollback results, and retain current backend
+startup plus production-image checks.
+
+The reproduced failure is recorded in `/tmp/tekdocs-handoff-remaining-gates.log`:
+the historical renderer build requested Chromium 152 and received 155. The legacy
+fixture exclusively invokes Django management commands through `migrate`; it
+never calls the HTTP backend, renders diagrams or publishes PDFs. Starting the
+historical backend unnecessarily pulled in that renderer build.
+
+The rehearsal now builds and executes the unchanged historical `migrate` service
+with its database and SMTP readiness dependencies before creating legacy data.
+It still uses the pinned 0.8.46 Git tree and original migrations. The upgraded
+and fresh phases still start the current backend with renderer readiness. All
+fixture assertions and comparisons are unchanged, including stale-preview denial,
+idempotency, template deferral, historical Git reads and rollback audit counts.
+This does not claim historical renderer or HTTP compatibility, nor does it waive
+those capabilities' dedicated checks. No runtime code, schema, API or public
+operator instructions change; a Wiki update is not required.
+
+**Verified:** `make document-migration-upgrade-rehearsal` passed after this repair.
+Log: `/tmp/tekdocs-handoff-upgrade-repair.log`. Shell syntax and diff checks passed.
+**Verified:** `make document-migration-release-gate` completed successfully after
+this repair (exit 0). It passed 772 frontend tests, 120 tooling tests, backend
+Ruff/mypy (270 source files), schema/API drift checks, 158 authoring/content tests,
+28 migration/runtime-isolation tests, the fresh/0.8.46 upgrade comparison, and the
+production-target image rehearsal. The latter verified non-root file access,
+renderer/browser identity, repository persistence across restart, container
+isolation and file-backed secrets. Log: `/tmp/tekdocs-handoff-complete-gate.log`.
+The earlier aggregate blocker is resolved. The supported encrypted recovery
+rehearsal recorded above remains applicable: this follow-up changes only the
+historical rehearsal startup, not runtime code or the recovery fixture.
+
+These local results do not replace hosted candidate validation, security review
+or release authorization.

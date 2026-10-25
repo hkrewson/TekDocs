@@ -63,7 +63,12 @@ git -C "$repository_root" archive "$baseline_ref" | tar -x -C "$baseline_directo
 } >> "$fresh_environment"
 
 echo "Creating legacy documents on isolated TekDocs 0.8.46"
-compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" up -d --build --wait backend
+# The legacy fixture uses only Django management commands. Build and run the
+# original migration service (including its healthy database/SMTP dependencies)
+# without rebuilding the historical HTTP/renderer stack from mutable packages.
+# Current backend startup and renderer readiness remain checked below.
+compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" build migrate
+compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" run --rm -T migrate
 run_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" create > "$work_directory/baseline-ids.json"
 compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" down --remove-orphans
 

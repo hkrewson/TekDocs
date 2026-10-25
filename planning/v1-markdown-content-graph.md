@@ -755,6 +755,14 @@ deployment; no end-user authority controls or public migration procedure are
 required. It is proposed, not an implemented transition or permission to clear
 this checklist item.
 
+The next bounded #105 implementation adds a shared reversible-shape comparison
+at Git acceptance and rollback, with runtime-role rejection of structural edits
+and an expanded edited-document recovery fixture. See
+[implementation and evidence](migrations/reversible-handoff-implementation.md).
+This does not clear the broader authority checklist or authorize production
+copy/promotion. Fresh release validation and a concrete production plan remain
+required before the first operator handoff.
+
 The checked custody gate passed the isolated fresh-install rehearsal, the
 PostgreSQL owner-upgrade test, and the supported repository-inclusive,
 network-isolated backup/restore rehearsal. The latter restored native and

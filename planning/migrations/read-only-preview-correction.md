@@ -70,3 +70,12 @@ upgrade and recovery. The earlier delivery blocker above is historical. The
 operator must deploy the published runtime before retrying its read-only preview;
 production deployment is not yet confirmed. The authority rollback limitation
 and separate production copy/promotion approval remain in force.
+
+
+## Operator follow-up — October 25, 2026
+
+The operator reported document/asset success after the v0.9.12 update guidance,
+and supplied valid diagram SVG and PDF exports. See the 0.9.12 operational
+closeout for evidence limits. No production migration-preview retry, copy or
+promotion has been performed or approved by this follow-up. The reversible-edit
+restriction and combined recovery rehearsal remain the next development slice.

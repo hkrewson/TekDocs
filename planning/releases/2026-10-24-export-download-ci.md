@@ -57,3 +57,12 @@ stage was never reached and this is neither a full before nor after pass.
 The full hosted live browser-to-PostgreSQL journey must confirm the correction.
 No full runtime pass, upstream browser root cause, publication or deployment is
 claimed. No public Wiki change is required for this internal test correction.
+
+
+## Hosted confirmation — October 25, 2026
+
+Verified: Build 40132590431 completed successfully at
+`295912a98ffb22dc81f9f76e201a683fbb5fd63f`, including the live browser-to-PostgreSQL
+journey and Chromium regression. This satisfies the hosted confirmation above;
+the local disk-blocked attempt remains blocked historical evidence. No runtime
+release or production deployment was performed by this test correction.

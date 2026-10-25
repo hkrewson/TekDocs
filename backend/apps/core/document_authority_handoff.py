@@ -7,9 +7,10 @@ from uuid import UUID
 
 from django.db import connection, transaction
 
-from .content_profile import ContentProfileError, parse_content
+from .content_profile import ContentProfileError
 from .document_migration_coexistence import document_coexistence_status
 from .document_migration_export import build_simple_document_export
+from .document_reversible_writes import ReversibleShapeError, reversible_markdown_projection
 from .documents import _append_block_revision
 from .models import (
     AuditEvent,
@@ -20,7 +21,11 @@ from .models import (
     Workspace,
     WorkspaceRepository,
 )
-from .repository_service import RepositoryServiceError, read_accepted_repository_markdown_files
+from .repository_service import (
+    RepositoryServiceError,
+    pin_accepted_repository_for_publication,
+    read_accepted_repository_markdown_files,
+)
 from .workspaces import ResolvedWorkspace
 
 
@@ -49,31 +54,11 @@ def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Docu
         accepted, files = read_accepted_repository_markdown_files(repository_id=repository.id)
         if accepted.id != repository.accepted_commit_id:
             raise DocumentAuthorityHandoffError("rollback_repository_not_ready")
-        current = dict(files)
-        expected_paths = {path for path, _source in exported.files}
-        parsed_current = {
-            path: parse_content(current[path])
-            for path in expected_paths
-            if path in current
-        }
-        parsed_expected = {path: parse_content(source) for path, source in exported.files}
+        markdown_by_block = reversible_markdown_projection(dict(exported.files), dict(files))
+    except ReversibleShapeError as exc:
+        raise DocumentAuthorityHandoffError(str(exc)) from exc
     except (ContentProfileError, RepositoryServiceError, ValueError) as exc:
         raise DocumentAuthorityHandoffError("rollback_source_unavailable") from exc
-    if set(parsed_current) != expected_paths:
-        raise DocumentAuthorityHandoffError("rollback_file_set_changed")
-    markdown_by_block: dict[UUID, str] = {}
-    for path, expected in parsed_expected.items():
-        actual = parsed_current[path]
-        if actual.content_id != expected.content_id or actual.kind != expected.kind:
-            raise DocumentAuthorityHandoffError("rollback_content_identity_changed")
-        if path.startswith("docs/"):
-            if actual.frontmatter != expected.frontmatter or actual.markdown != expected.markdown:
-                raise DocumentAuthorityHandoffError("rollback_root_metadata_changed")
-            continue
-        if actual.frontmatter != expected.frontmatter:
-            raise DocumentAuthorityHandoffError("rollback_fragment_structure_changed")
-        if actual.markdown != expected.markdown:
-            markdown_by_block[actual.content_id] = actual.markdown
     owned_ids = set(markdown_by_block)
     if not owned_ids:
         return {}
@@ -88,8 +73,27 @@ def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Docu
     return markdown_by_block
 
 
-@transaction.atomic
 def transition_document_authority(
+    *, workspace: Workspace, document_id: UUID, actor_id: UUID, target: str,
+    reader_workspace: ResolvedWorkspace,
+) -> str:
+    repository = WorkspaceRepository.objects.filter(workspace=workspace, tenant_id=workspace.tenant_id).first()
+    if repository is None:
+        raise DocumentAuthorityHandoffError("repository_missing")
+    try:
+        # Same order as writers: Git lock, repository row, then owner rows.
+        # Nested snapshot reads take compatible shared locks while this pin lives.
+        with pin_accepted_repository_for_publication(repository.id):
+            return _transition_document_authority_locked(
+                workspace=workspace, document_id=document_id, actor_id=actor_id,
+                target=target, reader_workspace=reader_workspace,
+            )
+    except RepositoryServiceError as exc:
+        raise DocumentAuthorityHandoffError("rollback_repository_not_ready") from exc
+
+
+@transaction.atomic
+def _transition_document_authority_locked(
     *,
     workspace: Workspace,
     document_id: UUID,

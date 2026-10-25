@@ -19,7 +19,9 @@ The pinned manifest now identifies `b45a543`, published as v0.9.12 by
 All four images, eight signed provenance/SBOM verifications, application and
 receipt tags were delivered by that single run. See
 [publication closeout and update commands](0.9.12-operational-closeout.md).
-Production deployment remains unconfirmed. The historical 0.9.11 and 0.9.9
+The operator reported production document/asset checks on October 25; supplied
+SVG and PDF exports also passed inspection. See the
+[production follow-up](0.9.12-production-smoke-closeout.md) for evidence limits. The historical 0.9.11 and 0.9.9
 records below do not describe the current release.
 
 ## Historical 0.9.11 publication

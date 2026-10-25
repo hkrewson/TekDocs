@@ -114,6 +114,64 @@ def _preview_document_migration(**options):
         return call_command("preview_document_migration", **options)
 
 
+def test_mixed_authority_browse_retains_legacy_documents(tmp_path, django_runtime_role):
+    with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
+        InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+        installation = bootstrap_owner(
+            tenant_name="Mixed Authority MSP",
+            owner_email=f"mixed-{uuid.uuid4()}@example.invalid",
+            owner_display_name="Mixed Owner",
+            password="MigrationPassword-2026!",
+        )
+        workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
+        repository_storage.ensure_workspace_repository(workspace)
+        index_repository_content(repository_id=WorkspaceRepository.objects.get(workspace=workspace).id)
+        documents = [
+            create_document(
+                tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+                title=title, markdown="Synthetic setup instructions.\n",
+            )
+            for title in ("Alpha repository guide", "Zulu legacy guide")
+        ]
+        browser = Client()
+        browser.force_login(installation.owner)
+        url = reverse("msp-document-search")
+        assert browser.get(url).json()["count"] == 2
+        prepared = document_migration_import.prepare_document_import(
+            workspace=workspace, document_id=documents[0].id,
+        )
+        imported = document_migration_import.apply_document_import(
+            workspace=workspace, document_id=documents[0].id,
+            expected_base=prepared.base_commit, plan_sha256=prepared.plan_sha256,
+            actor_id=installation.owner.id,
+        )
+        assert imported.indexed
+        output = io.StringIO()
+        call_command(
+            "transition_document_authority", workspace=str(workspace.id),
+            document=str(documents[0].id), actor=str(installation.owner.id),
+            authority=DocumentAuthorityMode.REPOSITORY, apply=True, stdout=output,
+        )
+        assert json.loads(output.getvalue())["status"] == "transitioned"
+        search = browser.get(url, {"q": "Zulu"}).json()
+        assert search["count"] == 1
+        assert search["results"][0]["id"] == str(documents[1].entity_id)
+        browse = browser.get(url).json()
+        assert browse["count"] == 2
+        assert {item["id"] for item in browse["results"]} == {
+            str(document.entity_id) for document in documents
+        }
+        assert {item["content_authority"] for item in browse["results"]} == {"legacy", "repository"}
+        page = browser.get(url, {"page_size": 1, "page": 2}).json()
+        assert page["count"] == 2
+        assert page["results"][0]["id"] == str(documents[1].entity_id)
+        excluded = browser.get(url, {"exclude_document": str(documents[0].entity_id)}).json()
+        assert excluded["count"] == 1
+        assert excluded["results"][0]["id"] == str(documents[1].entity_id)
+        assert browser.get(url, {"q": "absent phrase"}).json()["count"] == 0
+        assert browser.get(url, {"template": "templates"}).json()["count"] == 0
+
+
 def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path, django_runtime_role):
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"), MEDIA_ROOT=str(tmp_path / "media")):
         InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)

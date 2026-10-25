@@ -12,6 +12,20 @@ For release status, evidence, CI failures, or operator acceptance, read `plannin
 
 ## Delivery rules
 
+- Local Docker is the development environment. Reuse the single `tekdocs`
+  Compose project for development and testing, using `docker compose exec`
+  against existing containers. Rebuild/recreate its services in place when
+  required; do not create parallel projects, per-run containers, acceptance
+  stacks, rehearsal stacks or additional data volumes by default.
+- Before running a Make target or test script locally, inspect whether it uses
+  `docker compose run`, creates a new project, or provisions another database
+  service. Adapt execution to the existing development containers. If a gate
+  genuinely requires a separate environment or would destroy retained data,
+  report that constraint and leave it to hosted CI unless the user explicitly
+  authorizes that specific local exception. Do not silently create disposable
+  stacks even if a script or skill recommends them. Keep test database state
+  separate from retained development records within the existing database service.
+
 - Treat Django migrations as the sole database schema authority. Do not create a parallel initialization schema.
 - Keep implementation, migrations, OpenAPI, tests, architecture documentation, roadmap status, and release notes aligned.
 - Distinguish `verified`, `inferred`, and `blocked` in closeout notes. Docker evidence is required for runtime claims.

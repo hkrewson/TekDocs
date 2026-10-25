@@ -164,3 +164,14 @@ and supplied valid diagram SVG and PDF exports. See the 0.9.12 operational
 closeout for evidence limits. No production migration-preview retry, copy or
 promotion has been performed or approved by this follow-up. The reversible-edit
 restriction and combined recovery rehearsal remain the next development slice.
+
+
+## Reversible-write implementation — October 25, 2026
+
+The subsequent working tree implements the shared write/rollback shape guard.
+The regression reproduced an accepted unsafe root-title edit before the fix;
+owned-body editing, write refusal and recovery now have passing focused Docker
+evidence. See [implementation and verification](reversible-handoff-implementation.md)
+for the exact scope, final gate results and historical-drift limitation. This
+supersedes the earlier statement that the restriction has not been implemented;
+it does not authorize production promotion or declare the broader handoff done.

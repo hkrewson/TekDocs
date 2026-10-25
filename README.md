@@ -183,6 +183,13 @@ If indexing is interrupted after acceptance, the accepted/indexed markers
 show the lag and a scheduled retry rebuilds the projection without rewriting
 Git. This is local managed Git; remote GitHub integration is not required.
 
+Promoted legacy documents retain a reversible editing boundary: owned fragment
+text can change, while root content/metadata, fragment metadata, file paths and
+include structure are protected at Git acceptance. Native Git documents retain
+normal authoring. The internal operator handoff procedure governs authority
+changes; unsupported edits must return to legacy authority first. This guard
+prevents new structural drift and does not repair previously diverged content.
+
 ## Production setup
 
 Use the [TekDocs Setup](https://github.com/hkrewson/TekDocs/wiki/TekDocs-Setup) guide for production Compose, secret files, Traefik, first-owner creation, MFA enrollment, verification, and bootstrap removal.

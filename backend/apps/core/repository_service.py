@@ -761,6 +761,16 @@ def commit_repository_files(
             elif accepted is None and not any(content is not None for content in validated_changes.values()):
                 raise RepositoryInputError("Initial repository commit cannot be empty")
             if not reconciliation_error:
+                from .document_reversible_writes import guard_reversible_migration_write
+
+                def read_source(source_path: str) -> bytes:
+                    if accepted is None:
+                        raise RepositoryInputError("Repository has no accepted content")
+                    return git.read_file(accepted, source_path)
+
+                guard_reversible_migration_write(
+                    repository=locked, changes=validated_changes, read_source=read_source,
+                )
                 stage_directory = Path(tempfile.mkdtemp(prefix=f".{locked.id}.stage-", dir=root))
                 stage_directory.chmod(DIRECTORY_MODE)
                 advanced = False

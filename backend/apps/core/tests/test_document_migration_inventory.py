@@ -7,6 +7,7 @@ import uuid
 import zipfile
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from allauth.mfa.models import Authenticator
@@ -27,7 +28,7 @@ from apps.core import (
     document_migration_import,
     repository_storage,
 )
-from apps.core.content_authoring import author_content, read_authored_content
+from apps.core.content_authoring import _replace_fields, author_content, read_authored_content
 from apps.core.content_index import ContentIndexError, index_repository_content
 from apps.core.content_profile import parse_content
 from apps.core.document_attachments import (
@@ -86,7 +87,16 @@ from apps.core.repository_publication_evidence import (
     retain_repository_publication_evidence,
     verify_repository_publication_evidence,
 )
-from apps.core.repository_service import RepositoryAuditAttribution, RepositoryServiceError, commit_repository_files
+from apps.core.repository_service import (
+    RepositoryAuditAttribution,
+    RepositoryConflictError,
+    RepositoryInputError,
+    RepositoryServiceError,
+    commit_repository_files,
+    pin_accepted_repository_for_publication,
+)
+from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
+from apps.core.scoping import DataScope
 from apps.core.taxonomies import assign_document_terms, create_local_term, create_taxonomy, revise_taxonomy
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.topic_schemas import inspect_markdown
@@ -104,7 +114,7 @@ def _preview_document_migration(**options):
         return call_command("preview_document_migration", **options)
 
 
-def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path):
+def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path, django_runtime_role):
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"), MEDIA_ROOT=str(tmp_path / "media")):
         InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
         installation = bootstrap_owner(
@@ -363,20 +373,125 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
         )
         assert repository_export.manifest["placements"] == []
         fragment = read_authored_content(repository=repository, content_id=export.block_id)
-        authored_fragment = author_content(
-            repository=repository,
-            actor_id=installation.owner.id,
-            request_id=None,
-            operation="update",
-            content_id=export.block_id,
-            base_commit=fragment.accepted_commit,
-            base_blob=fragment.source_blob,
-            kind=None,
-            path=None,
-            title=None,
-            markdown="Git-only repair steps retained on rollback.\n",
-            metadata_patch={},
+        # A migrated owner in this repository must not freeze native Git files.
+        native = author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="create", content_id=uuid.uuid4(), base_commit=fragment.accepted_commit,
+            base_blob=None, kind="document", path="docs/native-during-handoff.md",
+            title="Native guide", markdown="Native body.\n", metadata_patch={},
         )
+        native = author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=native.content_id, base_commit=native.accepted_commit,
+            base_blob=native.source_blob, kind=None, path=None, title="Renamed native guide",
+            markdown="Updated native body.\n", metadata_patch={"properties": {"collection": "Native"}},
+        )
+        assert native.title == "Renamed native guide"
+        assert native.markdown == "Updated native body.\n"
+        sibling = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id, name="Other handoff workspace",
+            legal_name="", website="", classifications=["client"],
+        )
+        sibling_workspace = Workspace.objects.get(tenant=installation.tenant, organization=sibling)
+        sibling_repository = repository_storage.ensure_workspace_repository(sibling_workspace).repository
+        sibling_repository.refresh_from_db()
+        with django_runtime_role(), transaction.atomic():
+            bind_local_rls_scope(
+                DataScope.organization(installation.tenant, sibling),
+                organization_mode=OrganizationRLSMode.ORGANIZATION,
+                actor_user_id=installation.owner.id, principal_mode=RLSPrincipalMode.USER,
+            )
+            sibling_native = author_content(
+                repository=sibling_repository, actor_id=installation.owner.id, request_id=None,
+                operation="create", content_id=uuid.uuid4(),
+                base_commit=(sibling_repository.accepted_commit.object_id
+                             if sibling_repository.accepted_commit else None),
+                base_blob=None, kind="document", path=None, title="Sibling native guide",
+                markdown="Unrelated workspace remains editable.\n", metadata_patch={},
+            )
+            assert sibling_native.markdown == "Unrelated workspace remains editable.\n"
+        # Organization creation updates the MSP directory manifest; index that
+        # accepted commit before exercising the authority transition pin.
+        index_repository_content(repository_id=repository.id)
+        fragment = read_authored_content(repository=repository, content_id=export.block_id)
+        # Unsupported writes must fail before accepting any Git commit.
+        root_source = read_authored_content(repository=repository, content_id=document.id)
+        # A transition pin excludes a writer before it can acquire the row lock
+        # or advance Git; releasing the pin makes normal validation available.
+        with pin_accepted_repository_for_publication(repository.id):
+            with patch("apps.core.repository_service.LOCK_TIMEOUT_SECONDS", 0.01):
+                with pytest.raises(RepositoryConflictError, match="busy"):
+                    commit_repository_files(
+                        repository_id=repository.id, expected_base=root_source.accepted_commit,
+                        changes={f"docs/{document.id}.md": root_source.source.encode()},
+                        message="Writer cannot race a pinned authority transition",
+                    )
+        root_path = f"docs/{document.id}.md"
+        fragment_path = f"fragments/{export.block_id}.md"
+        root_bytes, fragment_bytes = root_source.source.encode(), fragment.source.encode()
+        rejected_changes = [
+            {root_path: _replace_fields(root_bytes, {"title": "Would strand rollback"}, None)},
+            {root_path: _replace_fields(root_bytes, {"id": str(uuid.uuid4())}, None)},
+            {fragment_path: _replace_fields(fragment_bytes, {"id": str(uuid.uuid4())}, None)},
+            {root_path: _replace_fields(root_bytes, {}, "Root body is not reversible.\n")},
+            {root_path: _replace_fields(root_bytes, {"properties": {"collection": "Changed"}}, None)},
+            {root_path: _replace_fields(root_bytes, {"includes": None}, None)},
+            {fragment_path: _replace_fields(fragment_bytes, {"title": "Changed fragment"}, None)},
+            {fragment_path: None},
+            {root_path: None, "docs/moved.md": root_bytes},
+            {"fragments/duplicate.md": fragment_bytes},
+            {"fragments/duplicate.MD": fragment_bytes},
+        ]
+        for changes in rejected_changes:
+            with django_runtime_role(), transaction.atomic():
+                bind_local_rls_scope(
+                    DataScope.tenant(installation.tenant),
+                    organization_mode=OrganizationRLSMode.MSP_ONLY,
+                    actor_user_id=installation.owner.id,
+                    principal_mode=RLSPrincipalMode.USER,
+                )
+                with pytest.raises(RepositoryInputError, match="reversible"):
+                    commit_repository_files(
+                        repository_id=repository.id,
+                        expected_base=root_source.accepted_commit,
+                        changes=changes,
+                        message="Reject unsupported migrated content edit",
+                    )
+            repository.refresh_from_db()
+            assert repository.accepted_commit.object_id == root_source.accepted_commit
+            assert read_authored_content(repository=repository, content_id=document.id).source == root_source.source
+            assert read_authored_content(repository=repository, content_id=export.block_id).source == fragment.source
+
+        # The session route exposes the same actionable denial under runtime RLS.
+        with django_runtime_role():
+            denied = browser.post(reverse("msp-content-authoring"), data=json.dumps({
+                "operation": "update", "content_id": str(document.id),
+                "base_commit": root_source.accepted_commit, "base_blob": root_source.source_blob,
+                "title": "Unsupported root title", "metadata_patch": {},
+            }), content_type="application/json")
+        assert denied.status_code == 400, denied.content
+        assert "reversible" in denied.json()["detail"]
+        with django_runtime_role(), transaction.atomic():
+            bind_local_rls_scope(
+                DataScope.tenant(installation.tenant),
+                organization_mode=OrganizationRLSMode.MSP_ONLY,
+                actor_user_id=installation.owner.id,
+                principal_mode=RLSPrincipalMode.USER,
+            )
+            authored_fragment = author_content(
+                repository=repository,
+                actor_id=installation.owner.id,
+                request_id=None,
+                operation="update",
+                content_id=export.block_id,
+                base_commit=fragment.accepted_commit,
+                base_blob=fragment.source_blob,
+                kind=None,
+                path=None,
+                title=None,
+                markdown="Git-only repair steps retained on rollback.\n",
+                metadata_patch={},
+            )
         assert authored_fragment.accepted_commit != copied.object_id
         legacy_revision_before_rollback = document.placements.get(
             parent__isnull=True, position=0
@@ -438,20 +553,23 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path)
                     markdown="Not canonical.\n",
                     base_revision_id=export.revision_id,
                 )
-            authored = author_content(
-                repository=repository,
-                actor_id=installation.owner.id,
-                request_id=None,
-                operation="update",
-                content_id=document.id,
-                base_commit=source.accepted_commit,
-                base_blob=source.source_blob,
-                kind=None,
-                path=None,
-                title=None,
-                markdown="Git-only repair steps.\n",
-                metadata_patch={"properties": {"collection": "Git collection", "tags": ["Git tag"]}},
-            )
+            # Simulate an already-accepted pre-guard snapshot. Normal writes above
+            # must refuse this; rollback must still fail closed for historical drift.
+            with patch("apps.core.document_reversible_writes.guard_reversible_migration_write"):
+                authored = author_content(
+                    repository=repository,
+                    actor_id=installation.owner.id,
+                    request_id=None,
+                    operation="update",
+                    content_id=document.id,
+                    base_commit=source.accepted_commit,
+                    base_blob=source.source_blob,
+                    kind=None,
+                    path=None,
+                    title=None,
+                    markdown="Git-only repair steps.\n",
+                    metadata_patch={"properties": {"collection": "Git collection", "tags": ["Git tag"]}},
+                )
 
         structural_rollback = io.StringIO()
         call_command(

@@ -21,7 +21,7 @@ from apps.core.document_attachments import (
 )
 from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
-from apps.core.documents import create_document
+from apps.core.documents import create_document, resolve_document
 from apps.core.models import (
     ContentNode,
     Document,
@@ -38,6 +38,7 @@ from apps.core.repository_editable_bundles import export_repository_editable_bun
 from apps.core.repository_manifests import ORGANIZATION_DIRECTORY_PATH
 from apps.core.repository_service import (
     RepositoryFileNotFoundError,
+    RepositoryInputError,
     read_accepted_repository_file,
     read_repository_markdown_files_at_commit,
 )
@@ -69,6 +70,10 @@ LEGACY_PRIMARY_V1_BYTES = b"Client setup primary file, original version.\n"
 LEGACY_PRIMARY_V2_BYTES = b"Client setup primary file, revised version.\n"
 NATIVE_PRIMARY_V1_BYTES = b"Native primary file, original version.\n"
 NATIVE_PRIMARY_V2_BYTES = b"Native primary file, revised version.\n"
+AUTHORITY_EDITED_MARKDOWN = (
+    "# Git-authoritative recovery guide\n\n"
+    "Retain the edited revision through rollback and recovery.\n"
+)
 
 
 def _repository(owner):
@@ -317,6 +322,38 @@ def create_organization_fixture(owner, organization):
         DocumentAuthority.objects.get(workspace=repository.workspace, content_id=authority_document.id).authority
         == DocumentAuthorityMode.REPOSITORY
     )
+    block = authority_document.placements.get(parent__isnull=True, position=0).block
+    original_revision = block.current_revision_id
+    source = read_authored_content(repository=repository, content_id=block.id)
+    edited = author_content(
+        repository=repository, actor_id=owner.id, request_id=None, operation="update",
+        content_id=block.id, base_commit=source.accepted_commit, base_blob=source.source_blob,
+        kind=None, path=None, title=None, markdown=AUTHORITY_EDITED_MARKDOWN, metadata_patch={},
+    )
+    root = read_authored_content(repository=repository, content_id=authority_document.id)
+    try:
+        author_content(
+            repository=repository, actor_id=owner.id, request_id=None, operation="update",
+            content_id=authority_document.id, base_commit=root.accepted_commit, base_blob=root.source_blob,
+            kind=None, path=None, title="Would break rollback", markdown=None, metadata_patch={},
+        )
+    except RepositoryInputError as exc:
+        assert "reversible" in str(exc)
+    else:
+        raise AssertionError("Migrated root metadata edit was accepted")
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == edited.accepted_commit
+    assert transition_document_authority(
+        workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+    ) == "transitioned"
+    block.refresh_from_db()
+    assert block.current_revision.parent_id == original_revision
+    assert resolve_document(authority_document).markdown == AUTHORITY_EDITED_MARKDOWN
+    assert transition_document_authority(
+        workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
+    ) == "transitioned"
     return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
 
 
@@ -392,7 +429,18 @@ def verify_organization_fixture(owner, organization, directory_entry):
     authority_read = document_detail(
         workspace=reader_workspace, content_id=authority_document.id, audience="msp_internal"
     )
-    assert authority_read["markdown"] == "# Git-authoritative recovery guide\n\nRestore the canonical revision.\n"
+    assert authority_read["markdown"] == AUTHORITY_EDITED_MARKDOWN
+    # Verify reverse projection from the recovered repository, then restore the
+    # fixture's authority state without rewriting or resetting its Git history.
+    assert transition_document_authority(
+        workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+    ) == "transitioned"
+    assert resolve_document(authority_document).markdown == AUTHORITY_EDITED_MARKDOWN
+    assert transition_document_authority(
+        workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
+    ) == "transitioned"
     attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
     publication_source = read_authored_content(repository=repository, content_id=legacy_document.id)
     assert publication_source.markdown == ""

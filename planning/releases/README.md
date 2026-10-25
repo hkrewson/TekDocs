@@ -12,6 +12,12 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Prepared 0.9.13
+
+The [0.9.13 candidate](0.9.13-candidate.md) prepares the reversible-document guard
+and merged CI corrections. It is not published; candidate-specific risk and
+release authorization are pending. The pinned manifest still describes 0.9.12.
+
 ## Published 0.9.12
 
 The pinned manifest now identifies `b45a543`, published as v0.9.12 by

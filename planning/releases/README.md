@@ -12,11 +12,25 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Prepared 0.9.13
+## Prepared 0.9.14
 
-The [0.9.13 candidate](0.9.13-candidate.md) prepares the reversible-document guard
-and merged CI corrections. It is not published; candidate-specific risk and
-release authorization are pending. The pinned manifest still describes 0.9.12.
+The [0.9.14 candidate](0.9.14-candidate.md) prepares PR #140's mixed-authority
+document-list correction. It is not published. Candidate-specific risk acceptance
+and release-push authorization remain pending, followed by the full single-push
+release pipeline. The pinned manifest still describes 0.9.12 and must not be used
+as evidence for 0.9.13 or 0.9.14.
+
+## Published 0.9.13
+
+[Build 40221980804](https://github.com/hkrewson/TekDocs/actions/runs/40221980804)
+completed the required release jobs at `352abdc`, including CodeQL, extended
+validation, production-image scans and publication. GitHub has both `v0.9.13`
+and `receipts/v0.9.13`; see the [publication closeout](0.9.13-operational-closeout.md).
+The [production follow-up](0.9.13-production-smoke-closeout.md) records the
+operator's successful update and its evidence limits. The original
+[candidate packet](0.9.13-candidate.md) retains its pre-publication review context.
+The pinned 0.9.12 manifest is historical; no complete 0.9.13 security/status
+manifest is claimed by this reconciliation.
 
 ## Published 0.9.12
 

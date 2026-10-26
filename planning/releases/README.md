@@ -12,6 +12,14 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Prepared 0.9.15
+
+The [0.9.15 candidate](0.9.15-candidate.md) packages the promoted-document reader
+identity correction from `13c05fc`. The maintainer authorized preparation,
+commit and a direct main release push. Candidate risk disposition and
+preparation checks are recorded in the packet; publication must complete the
+full single-push release pipeline. The pinned 0.9.12 manifest remains historical.
+
 ## Published 0.9.14; reader correction pending
 
 PR #141 merged as `cc6a4c075eb0ffc69b1178c71046ad686314e6aa`.

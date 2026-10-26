@@ -39547,6 +39547,10 @@ components:
         id:
           type: string
           format: uuid
+        content_id:
+          type: string
+          format: uuid
+          readOnly: true
         title:
           type: string
         owner_kind:
@@ -39778,6 +39782,7 @@ components:
       - checksum
       - collection
       - content_authority
+      - content_id
       - created_at
       - current_revision_id
       - health_status
@@ -41016,6 +41021,10 @@ components:
         id:
           type: string
           format: uuid
+        content_id:
+          type: string
+          format: uuid
+          readOnly: true
         title:
           type: string
         owner_kind:
@@ -41250,6 +41259,7 @@ components:
       - checksum
       - collection
       - content_authority
+      - content_id
       - created_at
       - current_revision_id
       - health_status

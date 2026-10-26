@@ -230,11 +230,11 @@ it('paginates the library and gives an opened document a focused workspace', asy
   ))
 })
 
-it('reads repository-owned documents from Git and hides legacy content controls', async () => {
+it.each([false, true])('reads repository-owned documents by content identity (organization scope: %s)', async (organizationScope) => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()
-  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
-  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', content_id: 'content-1', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
+  render(<Documentation workspace={organizationScope ? { kind: 'organization', id: 'org-1', name: 'Synthetic client', classifications: ['client'], capabilities: ['documentation'], organization: null } : null} client={documents} workspaceClient={workspaces} />)
 
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
 
@@ -245,13 +245,20 @@ it('reads repository-owned documents from Git and hides legacy content controls'
   expect(screen.queryByText('Legacy database copy')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Document settings' })).not.toBeInTheDocument()
-  expect(Reflect.get(documents, 'getRepositoryContent')).toHaveBeenCalledWith({}, 'doc-1', expect.any(AbortSignal))
+  expect(Reflect.get(documents, 'getRepositoryContent')).toHaveBeenCalledWith(organizationScope ? { organizationId: 'org-1' } : {}, 'content-1', expect.any(AbortSignal))
+  const originalLocation = window.location.href
+  try {
+    await user.click(screen.getByRole('button', { name: 'Open repository editor' }))
+    expect(new URLSearchParams(window.location.search).get('repository')).toBe('content-1')
+  } finally {
+    window.history.replaceState(null, '', originalLocation)
+  }
 })
 
 it('fails closed when repository content cannot be read', async () => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()
-  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', content_id: 'content-1', placements: [{ ...primaryPlacement, resolved_html: '<p>Legacy database copy</p>' }] }], count: 1 })
   vi.spyOn(documents, 'getRepositoryContent').mockRejectedValue(new Error('index is behind'))
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
 
@@ -260,6 +267,17 @@ it('fails closed when repository content cannot be read', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent('Git-backed content is unavailable or its index is not current')
   expect(screen.queryByRole('heading', { name: 'Firewall' })).not.toBeInTheDocument()
   expect(screen.queryByText('Legacy database copy')).not.toBeInTheDocument()
+})
+
+it('fails closed without a content identity instead of trying the public document ID', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository' }], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Git-backed content is unavailable')
+  expect(Reflect.get(documents, 'getRepositoryContent')).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Open repository editor' })).toBeDisabled()
 })
 
 it('exposes document settings and opens them before the document content', async () => {

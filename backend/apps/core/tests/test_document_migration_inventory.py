@@ -123,6 +123,10 @@ def test_mixed_authority_browse_retains_legacy_documents(tmp_path, django_runtim
             owner_display_name="Mixed Owner",
             password="MigrationPassword-2026!",
         )
+        other = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Other client", legal_name="", website="", classifications=[],
+        )
         workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
         repository_storage.ensure_workspace_repository(workspace)
         index_repository_content(repository_id=WorkspaceRepository.objects.get(workspace=workspace).id)
@@ -153,6 +157,34 @@ def test_mixed_authority_browse_retains_legacy_documents(tmp_path, django_runtim
             authority=DocumentAuthorityMode.REPOSITORY, apply=True, stdout=output,
         )
         assert json.loads(output.getvalue())["status"] == "transitioned"
+        # Replay the Documentation client: its public ID comes from the list.
+        listed = browser.get(url).json()["results"]
+        promoted = next(item for item in listed if item["content_authority"] == "repository")
+        assert promoted["content_id"] == str(documents[0].id)
+        assert promoted["content_id"] != promoted["id"]
+        detail = browser.get(f"/api/v1/workspaces/msp/content-graph/documents/{promoted['content_id']}")
+        assert detail.status_code == 200, detail.content
+        assert "Synthetic setup instructions." in detail.json()["sanitized_html"]
+        root = ContentNode.objects.get(repository__workspace=workspace, content_id=documents[0].id)
+        assert root.markdown.strip() == ""
+        assert ContentInclude.objects.filter(source=root).exists()
+        # Raw root Markdown may be empty; the reader must resolve its fragments.
+        assert detail.json()["id"] == str(documents[0].id)
+        assert browser.get(f"/api/v1/workspaces/msp/content-graph/documents/{promoted['id']}").status_code == 404
+        assert browser.get(
+            f"/api/v1/workspaces/organizations/{other.entity_id}/content-graph/documents/{promoted['content_id']}"
+        ).status_code == 404
+        repository = WorkspaceRepository.objects.get(workspace=workspace)
+        indexed_commit = repository.indexed_commit
+        repository.indexed_commit = None
+        repository.save(update_fields=["indexed_commit"])
+        try:
+            stale = browser.get(f"/api/v1/workspaces/msp/content-graph/documents/{promoted['content_id']}")
+            assert stale.status_code == 409
+            assert "Synthetic setup instructions." not in stale.content.decode()
+        finally:
+            repository.indexed_commit = indexed_commit
+            repository.save(update_fields=["indexed_commit"])
         search = browser.get(url, {"q": "Zulu"}).json()
         assert search["count"] == 1
         assert search["results"][0]["id"] == str(documents[1].entity_id)

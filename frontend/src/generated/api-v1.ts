@@ -10874,6 +10874,8 @@ export interface components {
         readonly Document: {
             /** Format: uuid */
             readonly id: string;
+            /** Format: uuid */
+            readonly content_id: string;
             readonly title: string;
             readonly owner_kind: string;
             /** Format: uuid */
@@ -11493,6 +11495,8 @@ export interface components {
         readonly DocumentSearchHit: {
             /** Format: uuid */
             readonly id: string;
+            /** Format: uuid */
+            readonly content_id: string;
             readonly title: string;
             readonly owner_kind: string;
             /** Format: uuid */

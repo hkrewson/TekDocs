@@ -12,13 +12,20 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Prepared 0.9.14
+## Published 0.9.14; reader correction pending
 
-The [0.9.14 candidate](0.9.14-candidate.md) prepares PR #140's mixed-authority
-document-list correction. It is not published. Candidate-specific risk acceptance
-and release-push authorization remain pending, followed by the full single-push
-release pipeline. The pinned manifest still describes 0.9.12 and must not be used
-as evidence for 0.9.13 or 0.9.14.
+PR #141 merged as `cc6a4c075eb0ffc69b1178c71046ad686314e6aa`.
+[Build 40256015056](https://github.com/hkrewson/TekDocs/actions/runs/40256015056)
+passed release CodeQL, extended validation and publication; application and
+receipt tags were delivered. The [candidate packet](0.9.14-candidate.md) retains
+the preparation context and subsequent production report.
+
+The operator reported mostly successful production checks, but opening a
+promoted guide from Documentation failed. The
+[promoted-reader identity correction](../migrations/promoted-document-reader-identity.md)
+is subsequent development, not part of the published images. Production
+verification of that correction remains pending. The pinned manifest still
+records historical 0.9.12 and must not be treated as later-candidate evidence.
 
 ## Published 0.9.13
 

@@ -518,6 +518,7 @@ class EntityMentionResultSerializer(serializers.Serializer):
 
 class DocumentSerializer(serializers.Serializer):
     id = serializers.UUIDField(source="entity_id")
+    content_id = serializers.UUIDField(source="id", read_only=True)
     title = serializers.CharField(source="entity.display_name")
     owner_kind = serializers.SerializerMethodField()
     owner_organization_id = serializers.UUIDField(source="organization.entity_id", allow_null=True)

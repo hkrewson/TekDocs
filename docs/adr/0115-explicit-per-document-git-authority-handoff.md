@@ -30,6 +30,13 @@ authored content. Every legacy content-writing path must refuse the promoted
 document; every repository-writing path must check its authority state.
 Reads, search, exports, and publication must choose the same authority.
 
+Document API `id` remains the public entity UUID. The read-only `content_id` is
+the stable document UUID used by Git roots and content-graph routes. Browser
+readers and repository-editor links must use `content_id` after promotion; they
+must not substitute the public entity UUID or display a legacy database copy
+when Git lookup fails. A root with an empty raw body can still compose nonempty
+content from its reusable fragments.
+
 Rollback is an explicit audited transition, not a Git reset or marker toggle.
 It must verify the current Git revision and project it into a new retained
 legacy revision before legacy writes resume. Until that reverse projection

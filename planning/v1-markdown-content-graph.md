@@ -1004,3 +1004,10 @@ two organization workspaces, prove separate repository roots and runtime ownersh
 make deterministic commits, deny cross-workspace access, survive container
 recreation, and restore from the supported encrypted backup without any remote
 Git service.
+
+### Promoted document reader identity follow-up
+
+The 0.9.14 production smoke found that Documentation passed the public entity
+UUID to a Git route expecting the separate content UUID. Track correction and
+Docker reproduction in [promoted reader identity](migrations/promoted-document-reader-identity.md).
+This follow-up changes neither authority state nor migration eligibility.

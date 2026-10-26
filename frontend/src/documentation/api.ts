@@ -50,6 +50,7 @@ export type DocumentPlacement = {
   is_primary: boolean
 }
 export type DocumentRecord = {
+  content_id?: string
   id: string
   title: string
   content_authority?: 'legacy' | 'repository'

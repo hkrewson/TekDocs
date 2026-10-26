@@ -1011,3 +1011,20 @@ The 0.9.14 production smoke found that Documentation passed the public entity
 UUID to a Git route expecting the separate content UUID. Track correction and
 Docker reproduction in [promoted reader identity](migrations/promoted-document-reader-identity.md).
 This follow-up changes neither authority state nor migration eligibility.
+
+### Publication-bearing migration evidence follow-up
+
+A read-only production assessment found one simple internal-publication case
+with intact signed history and retained PDF custody. The bounded #105/#106
+implementation adds retained-history diagnostics while preserving publication
+import/promotion blockers. See [assessment and implementation](migrations/publication-bearing-document-assessment.md).
+Post-promotion publishing, control history, rollback and recovery parity remain
+open; a verified history does not close the broader authority gate.
+
+### Bounded internal publication after promotion
+
+The local #105/#106 slice supports signed internal snapshots from pinned Git
+content of an already-promoted simple guide and preserves verified v5 history
+through rollback. See [lifecycle implementation](migrations/internal-git-publication-lifecycle.md).
+Hosted independent recovery remains unverified. Legacy publication-bearing
+import, broader shapes, client delivery and interface integration remain open.

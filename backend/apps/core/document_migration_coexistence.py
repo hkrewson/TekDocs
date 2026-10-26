@@ -24,6 +24,7 @@ from .document_migration_export import (
     build_simple_document_export,
 )
 from .document_migration_projection import portable_node_projection_matches, portable_root_entity_links_match
+from .document_migration_publications import assess_retained_publications
 from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
@@ -89,6 +90,7 @@ def document_coexistence_status(
     response["legacy_authoritative"] = (
         authority_state is not None and authority_state.authority == DocumentAuthorityMode.LEGACY
     )
+    response["publication_history"] = assess_retained_publications(workspace=workspace, document=document)
     response["read_projection_state"] = "not_checked"
     if response["content_copy_state"] == "in_sync":
         try:

@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
+from apps.accounts.models import User
 from apps.accounts.policy import DataAudience
 
 from .data_flows import data_flow_projection
@@ -202,6 +203,25 @@ def publish_document(
     retention_review_on: date | None,
     supersedes_entity_id: UUID | None = None,
 ) -> DocumentPublication:
+    if DocumentAuthority.objects.filter(
+        workspace_id=document.entity.workspace_id,
+        content_id=document.id,
+        authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists():
+        from .document_git_publications import publish_internal_git_document
+
+        if audience != PublicationAudience.MSP_INTERNAL or retention != "permanent" or retention_review_on is not None:
+            raise PublicationConflict("Publication parity supports internal permanent Git snapshots only")
+        try:
+            return publish_internal_git_document(
+                workspace=workspace,
+                document=document,
+                actor=User.objects.get(pk=actor_id),
+                reason=reason,
+                supersedes_entity_id=supersedes_entity_id,
+            )
+        except PublicationConflict as exc:
+            raise PublicationConflict(f"Static publication parity: {exc}") from exc
     stored_artifacts: list[tuple[object, str]] = []
     try:
         with transaction.atomic():
@@ -755,6 +775,10 @@ def verify_retained_publication_custody(publication: DocumentPublication) -> boo
     if not verify_publication(publication)["valid"]:
         return False
     manifest = publication.manifest
+    if manifest.get("format") == "tekdocs-static-publication/v5":
+        from .document_git_publications import verify_git_publication_source
+        if not verify_git_publication_source(publication):
+            return False
     if manifest.get("format") == "tekdocs-static-publication/v1":
         # The original format did not attest separate retained file artifacts.
         return "artifacts" not in manifest and not publication.artifacts.exists()

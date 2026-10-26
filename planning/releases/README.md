@@ -12,6 +12,21 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Unreleased bounded internal Git publication
+
+The [internal publication lifecycle](../migrations/internal-git-publication-lifecycle.md)
+adds signed current-Git snapshots and verified-v5-only rollback for an
+already-promoted simple document. Legacy publication-history import/promotion
+remains blocked. Independent recovery and complete release validation require
+hosted evidence before release; nothing has been published or deployed.
+
+## Unreleased publication-history diagnostic
+
+The [read-only publication-history assessment](../migrations/publication-bearing-document-assessment.md)
+adds value-minimized evidence to the existing staff migration-status route.
+It does not clear import/promotion blockers or implement post-promotion
+publication parity. No new release or production deployment is claimed.
+
 ## Prepared 0.9.15
 
 The [0.9.15 candidate](0.9.15-candidate.md) packages the promoted-document reader

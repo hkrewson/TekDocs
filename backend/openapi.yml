@@ -40044,6 +40044,11 @@ components:
     DocumentMigrationStatus:
       type: object
       properties:
+        publication_history:
+          allOf:
+          - $ref: '#/components/schemas/PublicationHistoryAssessment'
+          description: Retained snapshot checks only; does not establish migration
+            or publication lifecycle parity.
         document_id:
           type: string
           format: uuid
@@ -40136,6 +40141,7 @@ components:
       - legacy_revision_id
       - legacy_revision_ids
       - primary_file_state
+      - publication_history
       - read_projection_state
     DocumentOperationsChoice:
       type: object
@@ -49785,6 +49791,37 @@ components:
       required:
       - audience
       - available
+      - state
+    PublicationHistoryAssessment:
+      type: object
+      properties:
+        state:
+          enum:
+          - absent
+          - verified
+          - blocked
+          type: string
+          description: |-
+            * `absent` - absent
+            * `verified` - verified
+            * `blocked` - blocked
+          x-spec-enum-id: 82960e881b90db77
+        publication_count:
+          type: integer
+        artifact_count:
+          type: integer
+        reasons:
+          type: array
+          items:
+            type: string
+        evidence_sha256:
+          type: string
+          nullable: true
+      required:
+      - artifact_count
+      - evidence_sha256
+      - publication_count
+      - reasons
       - state
     PublicationVerification:
       type: object

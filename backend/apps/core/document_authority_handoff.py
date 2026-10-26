@@ -132,6 +132,22 @@ def _transition_document_authority_locked(
             for blocker in blockers
             if blocker not in {"content_copy_not_in_sync", "repository_read_projection_not_matched"}
         ]
+        if "legacy_publication_history_present" in blockers:
+            from .document_git_publications import verify_internal_git_publication
+            from .models import DocumentPublication
+
+            publications = list(
+                DocumentPublication.objects.filter(
+                    document=document,
+                    tenant_id=locked_workspace.tenant_id,
+                    organization=locked_workspace.organization,
+                )
+            )
+            if (
+                cast(dict[str, object], status["publication_history"])["state"] == "verified"
+                and publications and all(verify_internal_git_publication(item) for item in publications)
+            ):
+                blockers.remove("legacy_publication_history_present")
     if blockers:
         raise DocumentAuthorityHandoffError(*blockers)
     authority = DocumentAuthority.objects.select_for_update().filter(

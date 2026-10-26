@@ -11068,6 +11068,8 @@ export interface components {
             readonly unresolved_count: number;
         };
         readonly DocumentMigrationStatus: {
+            /** @description Retained snapshot checks only; does not establish migration or publication lifecycle parity. */
+            readonly publication_history: components["schemas"]["PublicationHistoryAssessment"];
             /** Format: uuid */
             readonly document_id: string;
             readonly legacy_authoritative: boolean;
@@ -15361,6 +15363,19 @@ export interface components {
             readonly audience: string;
             readonly available: boolean;
             readonly state: string;
+        };
+        readonly PublicationHistoryAssessment: {
+            /**
+             * @description * `absent` - absent
+             *     * `verified` - verified
+             *     * `blocked` - blocked
+             * @enum {string}
+             */
+            readonly state: "absent" | "verified" | "blocked";
+            readonly publication_count: number;
+            readonly artifact_count: number;
+            readonly reasons: readonly string[];
+            readonly evidence_sha256: string | null;
         };
         readonly PublicationVerification: {
             readonly valid: boolean;

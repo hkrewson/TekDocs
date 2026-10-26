@@ -30,6 +30,14 @@ authored content. Every legacy content-writing path must refuse the promoted
 document; every repository-writing path must check its authority state.
 Reads, search, exports, and publication must choose the same authority.
 
+Publication-history assessment is read-only diagnostic evidence. It verifies
+supported retained internal snapshots and their PDF custody independently of
+today's draft, and fingerprints publication/control identities for comparison.
+A verified history is not publication lifecycle parity or permission to import
+or promote: existing publication-history blockers remain until post-promotion
+publishing, controls, rollback and recovery have their own acceptance evidence.
+
+
 Document API `id` remains the public entity UUID. The read-only `content_id` is
 the stable document UUID used by Git roots and content-graph routes. Browser
 readers and repository-editor links must use `content_id` after promotion; they
@@ -68,3 +76,13 @@ publication, and independent recovery tests before activation. Unsupported
 shapes remain legacy-authoritative with named blockers. Operators need a
 local procedure for reviewing eligibility and recovery; end users need no new
 authority-management interface.
+
+## Bounded internal publication lifecycle
+
+The local implementation supports STATIC v5 internal/permanent snapshots of
+already-promoted, single-owned-fragment documents without managed files or
+unfrozen dependencies. The snapshot signs current Git source proof rather than
+legacy revision IDs. A rollback exception applies only to verified v5-only
+history with intact custody and controls; legacy/mixed history remains blocked.
+This does not authorize publication-bearing import or broad handoff completion.
+See the [lifecycle evidence and remaining gates](../../planning/migrations/internal-git-publication-lifecycle.md).

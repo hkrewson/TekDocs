@@ -19,7 +19,18 @@ from .models import workspace_for_owner
 from .workspaces import ResolvedWorkspace
 
 
+class PublicationHistoryAssessmentSerializer(serializers.Serializer):
+    state = serializers.ChoiceField(choices=("absent", "verified", "blocked"))
+    publication_count = serializers.IntegerField()
+    artifact_count = serializers.IntegerField()
+    reasons = serializers.ListField(child=serializers.CharField())
+    evidence_sha256 = serializers.CharField(allow_null=True)
+
+
 class DocumentMigrationStatusSerializer(serializers.Serializer):
+    publication_history = PublicationHistoryAssessmentSerializer(
+        help_text="Retained snapshot checks only; does not establish migration or publication lifecycle parity."
+    )
     document_id = serializers.UUIDField()
     legacy_authoritative = serializers.BooleanField()
     authority_state = serializers.ChoiceField(choices=("legacy", "repository", "unavailable"))

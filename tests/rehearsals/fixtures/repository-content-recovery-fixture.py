@@ -12,6 +12,7 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_read import document_detail
+from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_attachments import (
     append_repository_primary_document_file,
     copy_attachment_content,
@@ -354,6 +355,25 @@ def create_organization_fixture(owner, organization):
         workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
         target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
     ) == "transitioned"
+    # Retain a snapshot created after promotion, separately from the existing
+    # reversible-edit fixture so repeatable restore checks need not re-promote it.
+    published_guide = create_document(
+        tenant=repository.tenant, organization=repository.workspace.organization, actor_id=owner.id,
+        title="Published Git recovery guide", markdown="Recovered Git publication body.\n",
+    )
+    plan = prepare_document_import(workspace=repository.workspace, document_id=published_guide.id)
+    apply_document_import(
+        workspace=repository.workspace, document_id=published_guide.id, expected_base=plan.base_commit,
+        plan_sha256=plan.plan_sha256, actor_id=owner.id,
+    )
+    transition_document_authority(
+        workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
+    )
+    retained = publish_internal_git_document(
+        workspace=reader_workspace, document=published_guide, actor=owner, reason="Recovery fixture Git snapshot",
+    )
+    assert verify_internal_git_publication(retained)
     return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
 
 
@@ -441,6 +461,24 @@ def verify_organization_fixture(owner, organization, directory_entry):
         workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
         target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
     ) == "transitioned"
+    published_guide = Document.objects.get(
+        tenant=repository.tenant, organization=organization, entity__display_name="Published Git recovery guide",
+    )
+    retained = published_guide.publications.get()
+    assert retained.canonical_markdown == "Recovered Git publication body.\n"
+    assert verify_internal_git_publication(retained)
+    retained_digest = retained.content_digest
+    state = DocumentAuthority.objects.get(workspace=repository.workspace, content_id=published_guide.id)
+    if state.authority == DocumentAuthorityMode.REPOSITORY:
+        assert transition_document_authority(
+            workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
+            target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+        ) == "transitioned"
+    published_guide.refresh_from_db()
+    assert resolve_document(published_guide).markdown == retained.canonical_markdown
+    retained.refresh_from_db()
+    assert retained.content_digest == retained_digest
+    assert verify_internal_git_publication(retained)
     attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
     publication_source = read_authored_content(repository=repository, content_id=legacy_document.id)
     assert publication_source.markdown == ""

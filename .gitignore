@@ -34,6 +34,9 @@ frontend/.vite/
 *.tsbuildinfo
 .eslintcache
 
+# Local agent instructions may contain machine-specific information
+AGENTS.md
+
 # Local secret injection and recovery output
 /secrets/
 /.secrets/

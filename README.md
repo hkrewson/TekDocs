@@ -449,7 +449,7 @@ The [TekDocs Wiki](https://github.com/hkrewson/TekDocs/wiki) is the public produ
 
 Markdown documents support Mermaid diagrams for network maps, flows, and other relationships kept directly beside the documentation they explain.
 
-Before contributing, read `AGENTS.md`, the applicable backend or frontend instructions, the [interface-language contract](docs/UI_LANGUAGE.md), and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization.
+Before contributing, read `CONTRIBUTING.md`, the [interface-language contract](docs/UI_LANGUAGE.md), the public GitHub Wiki, and the current milestone or issue. Do not push, publish, tag, or deploy without explicit authorization. Keep machine-specific agent instructions local; they are excluded from version control.
 
 ## License
 

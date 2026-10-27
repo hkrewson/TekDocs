@@ -6,9 +6,10 @@ import base64
 import hashlib
 import uuid
 from datetime import timedelta
+from typing import Any
 
 from cryptography.hazmat.primitives import serialization
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
@@ -29,6 +30,7 @@ from .models import (
     Entity,
     WorkspaceRepository,
 )
+from .preflight import FINDING_CATALOG
 from .publications import (
     PendingArtifact,
     PublicationConflict,
@@ -86,6 +88,122 @@ def verify_internal_git_publication(publication: DocumentPublication) -> bool:
     )
 
 
+def _validated_git_publication_content(
+    *, document: Document, repository: WorkspaceRepository, source: dict[str, Any]
+) -> tuple[ContentNode, str, dict[str, Any]]:
+    """Share the publisher's exact content and custody gates with readiness checks."""
+    if (
+        not DocumentAuthority.objects.filter(
+            workspace=document.entity.workspace,
+            content_id=document.id,
+            authority="repository",
+        ).exists()
+        or document.archived_at
+        or document.is_template
+        or document.review_state in {"pending", "changes_requested"}
+    ):
+        raise PublicationConflict("An active promoted ordinary document is required")
+    placements = list(document.placements.select_related("block"))
+    if len(placements) != 1 or placements[0].block.source_document_id != document.id:
+        raise PublicationConflict("Publication shape is not supported")
+    if {item["id"] for item in source["sources"]} != {str(document.id), str(placements[0].block_id)}:
+        raise PublicationConflict("Publication dependencies exceed the supported shape")
+    node = ContentNode.objects.get(repository=repository, content_id=document.id)
+    variant = node.composition_variants.get("msp_internal", {})
+    markdown = variant.get("markdown")
+    if not isinstance(markdown, str) or (
+        variant.get("digest") != source["composition_digest"]
+        or hashlib.sha256(markdown.encode()).hexdigest() != source["markdown_sha256"]
+    ):
+        raise PublicationConflict("Indexed composition does not match the pinned Git source")
+    if document.review_state == "approved" and document.review_content_sha256 != source["markdown_sha256"]:
+        raise PublicationConflict("Approved review does not match the pinned Git content")
+    if DocumentAttachment.objects.filter(
+        owner_workspace=document.entity.workspace, owner_content_id=document.id
+    ).exists():
+        raise PublicationConflict("Managed files are outside this publication slice")
+    preflight = repository_publication_preflight(
+        markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured"
+    )
+    if preflight["blockers"] or not markdown.strip() or len(markdown.encode()) > 2 * 1024 * 1024:
+        raise PublicationConflict("Publication contains unsupported or unavailable dependencies")
+    from .document_migration_publications import publication_migration_evidence
+
+    if (
+        DocumentPublication.objects.filter(document=document).exists()
+        and publication_migration_evidence(workspace=document.entity.workspace, document=document) is None
+    ):
+        raise PublicationConflict("Retained publication history is unavailable or unsupported")
+    return node, markdown, preflight
+
+
+def preflight_internal_git_document(*, document: Document, audience: str) -> dict[str, Any]:
+    """Readiness only: callers authorize document visibility; publishing rechecks all gates."""
+    findings = []
+    digest = ""
+    try:
+        if audience != "msp_internal":
+            raise PublicationConflict("Only internal snapshots are supported")
+        repository = WorkspaceRepository.objects.get(workspace=document.entity.workspace, tenant_id=document.tenant_id)
+        with pinned_git_document_dependencies(
+            repository_id=repository.id, content_id=document.id, audience=audience
+        ) as source:
+            locked = (
+                Document.objects.select_for_update(of=("self",))
+                .select_related("entity")
+                .get(pk=document.pk, tenant_id=document.tenant_id, organization=document.organization)
+            )
+            _node, _markdown, report = _validated_git_publication_content(
+                document=locked, repository=repository, source=source
+            )
+            digest = source["composition_digest"]
+            for code in report["warnings"]:
+                severity, summary, remediation = FINDING_CATALOG.get(
+                    code,
+                    (
+                        "warning",
+                        "The Git document has a topic warning.",
+                        "Review the document's topic sections in the repository editor.",
+                    ),
+                )
+                findings.append(
+                    {
+                        "code": code,
+                        "severity": severity,
+                        "summary": summary,
+                        "remediation": remediation,
+                        "target": "document",
+                        "section_id": None,
+                        "line": None,
+                    }
+                )
+    except (ContentPublicationSourceError, PublicationConflict, ObjectDoesNotExist, OSError):
+        severity, summary, remediation = FINDING_CATALOG["repository.publication.unavailable"]
+        findings = [
+            {
+                "code": "repository.publication.unavailable",
+                "severity": severity,
+                "summary": summary,
+                "remediation": remediation,
+                "target": "document",
+                "section_id": None,
+                "line": None,
+            }
+        ]
+    return {
+        "version": "tekdocs-preflight/v1",
+        "scope": "document",
+        "scope_id": str(document.entity_id),
+        "composition_digest": digest,
+        "audience": audience,
+        "valid": not any(item["severity"] == "blocker" for item in findings),
+        "counts": {
+            level: sum(item["severity"] == level for item in findings) for level in ("blocker", "warning", "info")
+        },
+        "findings": findings,
+    }
+
+
 def publish_internal_git_document(
     *,
     workspace: ResolvedWorkspace,
@@ -124,59 +242,19 @@ def publish_internal_git_document(
                     organization=workspace.organization,
                 )
             )
-            if (
-                not DocumentAuthority.objects.filter(
-                    workspace=owner,
-                    content_id=locked.id,
-                    authority="repository",
-                ).exists()
-                or locked.archived_at
-                or locked.is_template
-                or locked.review_state in {"pending", "changes_requested"}
-            ):
-                raise PublicationConflict("An active promoted ordinary document is required")
-            placements = list(locked.placements.select_related("block"))
-            if len(placements) != 1 or placements[0].block.source_document_id != locked.id:
-                raise PublicationConflict("Publication shape is not supported")
-            if {item["id"] for item in source["sources"]} != {str(locked.id), str(placements[0].block_id)}:
-                raise PublicationConflict("Publication dependencies exceed the supported shape")
-            node = ContentNode.objects.get(repository=repository, content_id=locked.id)
-            variant = node.composition_variants.get("msp_internal", {})
-            markdown = variant.get("markdown")
-            if not isinstance(markdown, str) or (
-                variant.get("digest") != source["composition_digest"]
-                or hashlib.sha256(markdown.encode()).hexdigest() != source["markdown_sha256"]
-            ):
-                raise PublicationConflict("Indexed composition does not match the pinned Git source")
-            if locked.review_state == "approved" and locked.review_content_sha256 != source["markdown_sha256"]:
-                raise PublicationConflict("Approved review does not match the pinned Git content")
-            if DocumentAttachment.objects.filter(owner_workspace=owner, owner_content_id=locked.id).exists():
-                raise PublicationConflict("Managed files are outside this publication slice")
-            preflight = repository_publication_preflight(
-                markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured"
+            node, markdown, _preflight = _validated_git_publication_content(
+                document=locked, repository=repository, source=source
             )
-            if preflight["blockers"] or not markdown.strip() or len(markdown.encode()) > 2 * 1024 * 1024:
-                raise PublicationConflict("Publication contains unsupported or unavailable dependencies")
-            from .document_migration_publications import publication_migration_evidence
-
-            if (
-                DocumentPublication.objects.filter(document=locked).exists()
-                and publication_migration_evidence(workspace=owner, document=locked) is None
-            ):
-                raise PublicationConflict("Retained publication history is unavailable or unsupported")
             predecessor = None
             if supersedes_entity_id is not None:
                 # Snapshots are immutable. FOR UPDATE hides them under runtime
                 # RLS; existing approval guards serialize successor controls.
-                predecessor = (
-                    DocumentPublication.objects.filter(
-                        document=locked,
-                        tenant_id=member.tenant.id,
-                        organization=workspace.organization,
-                        entity_id=supersedes_entity_id,
-                    )
-                    .first()
-                )
+                predecessor = DocumentPublication.objects.filter(
+                    document=locked,
+                    tenant_id=member.tenant.id,
+                    organization=workspace.organization,
+                    entity_id=supersedes_entity_id,
+                ).first()
                 if (
                     predecessor is None
                     or predecessor.lifecycle_state not in {"published", "review_due", "withdrawn"}

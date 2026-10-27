@@ -94,3 +94,10 @@ history may roll back and be promoted again; unsupported shapes remain blocked.
 No broad migration or production handoff completion is implied. See the
 [preceding lifecycle evidence](../../planning/migrations/internal-git-publication-lifecycle.md)
 and the new slice's independent validation disposition.
+
+The [publication interface follow-up](../../planning/migrations/git-publication-interface.md)
+exposes this bounded internal/permanent lifecycle in Documentation. Readiness
+uses the same pinned-source, review, supported-shape and custody gates as the
+publisher, with the existing preflight contract. Publication rechecks all gates.
+Retained history includes original and Git snapshots without rewriting either.
+This does not expose authority transitions or broaden migration eligibility.

@@ -164,6 +164,13 @@ independent release and delivery approval; portal access fails closed if any
 retained version is missing or altered. This does not complete the document
 authority handoff.
 
+For supported promoted ordinary documents, Documentation now connects
+**Publish document** to a current-Git readiness check and permanent internal
+snapshots. **Publication history** opens retained legacy and Git versions for
+correction, withdrawal, decisions and PDF downloads. See the
+[bounded interface acceptance](planning/migrations/git-publication-interface.md)
+for limitations and validation; this is unreleased work after 0.9.15.
+
 ### Managed repository authoring
 
 The `0.9.5` checkpoint adds a separate **Repository content** editor under

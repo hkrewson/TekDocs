@@ -1042,3 +1042,12 @@ supports rollback/re-promotion. Existing authorization/MFA, review, source parit
 and unsupported-shape gates remain. See the [implementation and validation
 record](migrations/publication-history-migration.md). This local slice does not
 claim a new release, production migration, interface parity or broad 1.0 acceptance.
+
+### Promoted-document publication interface — October 27, 2026
+
+The bounded #106 [publication interface slice](migrations/git-publication-interface.md)
+connects the supported internal/permanent workflow to Documentation: Git-aware
+readiness, publishing, correction, withdrawal, retained legacy/Git history and
+PDF downloads. Browser coverage exercises responsive operation and safe failures;
+API coverage verifies source, permissions and retained signed/PDF bytes. Broader
+files/templates/keys, client delivery, release and production migration remain open.

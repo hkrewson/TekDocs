@@ -4,9 +4,12 @@ import uuid
 
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
-from django.test import override_settings
+from django.test import Client, override_settings
+from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import document_migration_import, repository_storage
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_index import index_repository_content
@@ -14,7 +17,15 @@ from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_migration_publications import assess_retained_publications
 from apps.core.documents import create_document, resolve_document
-from apps.core.models import InstallationState, Workspace, WorkspaceKind
+from apps.core.models import (
+    Entity,
+    InstallationState,
+    Organization,
+    OrganizationClassification,
+    Tenant,
+    Workspace,
+    WorkspaceKind,
+)
 from apps.core.publications import (
     PublicationConflict,
     publish_document,
@@ -83,6 +94,152 @@ def edit_fragment(context, markdown):
         title=None,
         markdown=markdown,
         metadata_patch={},
+    )
+
+
+def test_promoted_document_preflight_reads_current_git_content(promoted):
+    installation, _workspace, _repository, document, _reader = promoted
+    edit_fragment(promoted, "Current Git instructions.\n")
+    client = Client()
+    client.force_login(installation.owner)
+    url = reverse("msp-document-preflight", kwargs={"document_entity_id": document.entity_id})
+    response = client.get(url, {"audience": "msp_internal"})
+    assert response.status_code == 200
+    report = response.json()
+    assert report["valid"] is True
+    assert report["scope_id"] == str(document.entity_id)
+    assert report["composition_digest"]
+    assert report["counts"]["blocker"] == 0
+    # The same endpoint must never fall back to the still-valid legacy draft.
+    edit_fragment(promoted, "[Unavailable](tekdocs://key/missing)\n")
+    response = client.get(url, {"audience": "msp_internal"})
+    assert response.status_code == 200
+    assert response.json()["valid"] is False
+    assert response.json()["counts"]["blocker"] > 0
+
+
+@pytest.mark.parametrize("mode", ["stale", "client", "pending", "approved_stale", "template"])
+def test_git_preflight_blocks_unsupported_or_unavailable_sources(promoted, mode):
+    installation, _workspace, repository, document, _reader = promoted
+    if mode == "stale":
+        repository.indexed_commit = None
+        repository.save(update_fields=["indexed_commit"])
+    elif mode == "pending":
+        document.review_state = "pending"
+        document.review_requested_by = installation.owner
+        document.reviewer = installation.owner
+        document.review_requested_at = timezone.now()
+        document.save(update_fields=["review_state", "review_requested_by", "reviewer", "review_requested_at"])
+    elif mode == "approved_stale":
+        document.review_state = "approved"
+        document.review_content_sha256 = "0" * 64
+        document.save(update_fields=["review_state", "review_content_sha256"])
+    elif mode == "template":
+        document.is_template = True
+        document.save(update_fields=["is_template"])
+    client = Client()
+    client.force_login(installation.owner)
+    response = client.get(
+        reverse("msp-document-preflight", kwargs={"document_entity_id": document.entity_id}),
+        {"audience": "client_visible" if mode == "client" else "msp_internal"},
+    )
+    assert response.status_code == 200
+    assert response.json()["valid"] is False
+    assert response.json()["counts"]["blocker"] == 1
+    assert not document.publications.exists()
+
+
+def test_git_publication_api_lifecycle_and_retained_pdf(promoted):
+    installation, _workspace, _repository, document, _reader = promoted
+    edit_fragment(promoted, "First Git release.\n")
+    client = Client()
+    client.force_login(installation.owner)
+    source = {"document_entity_id": document.entity_id}
+    collection = reverse("msp-document-publication-list-create", kwargs=source)
+    payload = {"reason": "Internal operations", "audience": "msp_internal", "retention": "permanent"}
+    published = client.post(collection, payload, content_type="application/json")
+    assert published.status_code == 201
+    original = published.json()
+    assert original["manifest"]["format"] == "tekdocs-static-publication/v5"
+    assert original["canonical_markdown"] == "First Git release.\n"
+    identity = {**source, "publication_entity_id": original["id"]}
+    pdf_url = reverse("msp-document-publication-export", kwargs=identity)
+    pdf = client.get(pdf_url, {"export_format": "pdf"})
+    assert pdf.status_code == 200
+    assert pdf.content.startswith(b"%PDF-")
+    edit_fragment(promoted, "Corrected Git release.\n")
+    corrected = client.post(collection, {**payload, "supersedes_id": original["id"]}, content_type="application/json")
+    assert corrected.status_code == 201
+    correction = corrected.json()
+    assert correction["supersedes_id"] == original["id"]
+    withdrawn = client.post(
+        reverse("msp-document-publication-withdraw", kwargs={**source, "publication_entity_id": correction["id"]}),
+        {"reason": "Stop distributing this correction"},
+        content_type="application/json",
+    )
+    assert withdrawn.status_code == 200
+    assert withdrawn.json()["lifecycle_state"] == "withdrawn"
+    history = client.get(collection).json()
+    assert history["count"] == 2
+    retained = client.get(reverse("msp-document-publication-detail", kwargs=identity)).json()
+    assert retained["canonical_markdown"] == original["canonical_markdown"]
+    assert retained["signature"] == original["signature"]
+    assert client.get(pdf_url, {"export_format": "pdf"}).content == pdf.content
+
+
+def test_git_publication_http_permissions_and_tenant_boundary(promoted):
+    installation, _workspace, _repository, document, reader = promoted
+    publication = publish_internal_git_document(
+        workspace=reader, document=document, actor=installation.owner, reason="Retained permission fixture"
+    )
+    identity = {"document_entity_id": document.entity_id, "publication_entity_id": publication.entity_id}
+    preflight = reverse("msp-document-preflight", kwargs={"document_entity_id": document.entity_id})
+    collection = reverse("msp-document-publication-list-create", kwargs={"document_entity_id": document.entity_id})
+    pdf = reverse("msp-document-publication-export", kwargs=identity)
+    payload = {"reason": "Unauthorized publication", "audience": "msp_internal", "retention": "permanent"}
+    viewer = User.objects.create_user(email=f"viewer-{uuid.uuid4()}@example.invalid", display_name="Fixture reader")
+    TenantMembership.objects.create(tenant=installation.tenant, user=viewer, role=BuiltInRole.READ_ONLY)
+    client = Client()
+    client.force_login(viewer)
+    assert client.get(preflight).status_code == 200
+    assert client.post(collection, payload, content_type="application/json").status_code == 403
+    assert (
+        client.post(
+            reverse("msp-document-publication-withdraw", kwargs=identity),
+            {"reason": "Unauthorized withdrawal"},
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
+    other_tenant = Tenant.objects.create(name="Other synthetic workspace", slug=f"other-{uuid.uuid4()}")
+    outsider = User.objects.create_user(
+        email=f"other-{uuid.uuid4()}@example.invalid", display_name="Other fixture reader"
+    )
+    TenantMembership.objects.create(tenant=other_tenant, user=outsider, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(outsider, generate_totp_secret())
+    client.force_login(outsider)
+    assert client.get(preflight).status_code == 403
+    assert client.get(collection).status_code == 403
+    assert client.get(pdf, {"export_format": "pdf"}).status_code == 403
+    # An authorized installation publisher still cannot address this private
+    # MSP guide through a different client Workspace.
+    entity = Entity.objects.create_owned(
+        tenant=installation.tenant, entity_type="organization", display_name="Other client"
+    )
+    organization = Organization.objects.create(tenant=installation.tenant, entity=entity)
+    OrganizationClassification.objects.create(tenant=installation.tenant, organization=organization, kind="client")
+    client.force_login(installation.owner)
+    wrong_client = {"organization_entity_id": organization.entity_id, "document_entity_id": document.entity_id}
+    assert client.get(reverse("organization-document-preflight", kwargs=wrong_client)).status_code == 404
+    assert (
+        client.get(
+            reverse(
+                "organization-document-publication-export",
+                kwargs={**wrong_client, "publication_entity_id": publication.entity_id},
+            ),
+            {"export_format": "pdf"},
+        ).status_code
+        == 404
     )
 
 
@@ -331,6 +488,13 @@ def test_runtime_role_can_publish_only_in_its_bound_scope(promoted, django_runti
     from apps.core.scoping import DataScope
 
     installation, _workspace, _repository, document, reader = promoted
+    browser = Client()
+    browser.force_login(installation.owner)
+    viewer = User.objects.create_user(email=f"runtime-viewer-{uuid.uuid4()}@example.invalid")
+    TenantMembership.objects.create(tenant=installation.tenant, user=viewer, role=BuiltInRole.READ_ONLY)
+    viewer_browser = Client()
+    viewer_browser.force_login(viewer)
+    preflight_url = reverse("msp-document-preflight", kwargs={"document_entity_id": document.entity_id})
     with django_runtime_role(), transaction.atomic():
         bind_local_rls_scope(
             DataScope.tenant(installation.tenant),
@@ -338,6 +502,9 @@ def test_runtime_role_can_publish_only_in_its_bound_scope(promoted, django_runti
             actor_user_id=installation.owner.id,
             principal_mode=RLSPrincipalMode.USER,
         )
+        readiness = browser.get(preflight_url)
+        assert readiness.status_code == 200
+        assert readiness.json()["valid"] is True
         publication = publish_document(
             workspace=reader,
             document=document,
@@ -348,6 +515,32 @@ def test_runtime_role_can_publish_only_in_its_bound_scope(promoted, django_runti
             retention_review_on=None,
         )
         assert verify_internal_git_publication(publication)
+        readiness = browser.get(preflight_url)
+        assert readiness.status_code == 200
+        assert readiness.json()["valid"] is True
+
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope.tenant(installation.tenant),
+            organization_mode=OrganizationRLSMode.MSP_ONLY,
+            actor_user_id=viewer.id,
+            principal_mode=RLSPrincipalMode.USER,
+        )
+        readiness = viewer_browser.get(preflight_url)
+        assert readiness.status_code == 200
+        assert readiness.json()["valid"] is True
+        pdf = viewer_browser.get(
+            reverse(
+                "msp-document-publication-export",
+                kwargs={
+                    "document_entity_id": document.entity_id,
+                    "publication_entity_id": publication.entity_id,
+                },
+            ),
+            {"export_format": "pdf"},
+        )
+        assert pdf.status_code == 200
+        assert pdf.content.startswith(b"%PDF-")
 
 
 def test_stale_approved_review_cannot_publish_changed_git(promoted):

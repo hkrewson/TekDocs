@@ -35,6 +35,12 @@ class Finding:
 
 
 FINDING_CATALOG = {
+    "repository.publication.unavailable": (
+        "blocker",
+        "This Git-backed document is not ready for an internal publication.",
+        "Use an active, reviewed simple document with a current Git index and verified retained history. "
+        "Files, templates, references and client delivery are not supported here.",
+    ),
     "document.empty": ("blocker", "The document has no publishable content.", "Add content before publishing."),
     "document.archived": ("blocker", "The document is archived.", "Restore the document or choose an active document."),
     "document.unowned": ("warning", "The document has no owner.", "Assign an accountable owner in Document settings."),

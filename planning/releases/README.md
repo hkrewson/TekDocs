@@ -14,6 +14,11 @@ Existing release records below remain historical evidence.
 
 ## Unreleased bounded internal Git publication
 
+The [publication interface slice](../migrations/git-publication-interface.md)
+connects supported promoted documents to internal publishing, corrections,
+withdrawal, retained history and PDF downloads. It adds Git-aware readiness and
+browser coverage without changing the version or production authority.
+
 The subsequent [publication-history migration slice](../migrations/publication-history-migration.md)
 adds guarded import/promotion of intact internal history, legacy-to-Git
 supersession and mixed-history rollback/re-promotion. Source `aa2cd43` passed [main CI](https://github.com/hkrewson/TekDocs/actions/runs/40460675424)

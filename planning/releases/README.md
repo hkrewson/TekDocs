@@ -16,8 +16,11 @@ Existing release records below remain historical evidence.
 
 The subsequent [publication-history migration slice](../migrations/publication-history-migration.md)
 adds guarded import/promotion of intact internal history, legacy-to-Git
-supersession and mixed-history rollback/re-promotion. The maintainer authorized its direct main commit/push and hosted validation;
-new source-matched recovery/release evidence is pending. Production remains on 0.9.15.
+supersession and mixed-history rollback/re-promotion. Source `aa2cd43` passed [main CI](https://github.com/hkrewson/TekDocs/actions/runs/40460675424)
+and [Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/40460698493),
+including independent encrypted recovery and supported upgrades. The linked
+closeout distinguishes those results from aggregate release acceptance.
+Production remains on 0.9.15; no release or live migration is claimed.
 
 The [CI follow-up](2026-10-26-publication-ci-follow-up.md) repairs synthetic-owner
 MFA setup in recovery and resource-sensitive network property generation.

@@ -2,8 +2,9 @@
 
 October 27, 2026. Bounded #105/#106 follow-up. The maintainer authorized
 implementation that preserves signed publications/PDFs and verifies rollback
-and recovery. This is local development; no production document, release,
-repository authority or external system has been changed by this work.
+and recovery. The maintainer subsequently authorized the direct main commit/push
+and hosted validation recorded below. No production data or authority changed;
+no new release or deployment occurred.
 
 ## Acceptance boundary
 
@@ -133,9 +134,10 @@ exactly. No frontend contract regeneration is necessary. All 120 tooling tests
 passed (three optional skips), including shard discovery and Wiki/link contracts.
 Shell/fixture syntax, version consistency (still 0.9.15) and diff checks passed.
 
-Verified locally: signed-history/PDF preservation, supported source handoff,
-rollback, repeatable recovery-fixture verification, and runtime authorization.
-Inferred, not verified: this new source will pass the full independent encrypted
+At the local verification checkpoint (superseded by the hosted results below),
+verified: signed-history/PDF preservation, supported source handoff, rollback,
+repeatable recovery-fixture verification, and runtime authorization.
+At that checkpoint, inferred but not yet verified: this new source will pass the full independent encrypted
 archive/restore path. Blocked pending authorized source push and hosted execution:
 complete recovery, supported upgrades, production-image and aggregate release
 validation for this slice. Prior green runs do not attest to these new changes.
@@ -143,3 +145,40 @@ At that local checkpoint no production mutation, release, branch, PR, commit
 or push had occurred. The maintainer subsequently authorized committing and
 pushing this slice directly to main and running hosted validation. Production
 migration/deployment remains separately authorized work.
+
+
+## Hosted closeout — October 27, 2026
+
+Validated application source: `aa2cd4338be6d54219196f975e1c49b3deca77ed`.
+
+- [Build, test, and secure 40460675424](https://github.com/hkrewson/TekDocs/actions/runs/40460675424)
+  passed: frontend/static/dependency policy, every PostgreSQL group, restricted
+  runtime/RLS tests, combined coverage, browser journeys, diagram exports,
+  production containers, SBOMs and vulnerability scanning. Release-only CodeQL,
+  embedded release-Extended and image-publication stages were skipped because
+  0.9.15 was already published; the standalone Extended run below was requested.
+- [Extended validation 40460698493](https://github.com/hkrewson/TekDocs/actions/runs/40460698493)
+  passed: independent encrypted backup/restore, repository-foundation acceptance,
+  recurring-invoice history after restore, supported upgrades, diagram-source
+  upgrade/restore evidence, all browser engines, performance and DAST.
+
+The recovery job verifies this slice's source-emitted history fingerprint in
+an independently restored installation, both legacy and Git snapshot text and
+signed PDF custody, rollback, and unchanged retained history afterward. Hosted
+real-cache integration passed; the unavailable local cache was not repaired or
+replaced to obtain that result.
+
+Verified: the new history migration/lifecycle and encrypted recovery at the named
+source, with the local and hosted evidence above. The full aggregate
+`make document-migration-release-gate` was not invoked as one command, and its
+standalone historical document-migration upgrade rehearsal was not run by these
+workflows. Its authoring/inventory selections ran locally in the existing project;
+current supported upgrade/recovery and production-image gates ran in CI. Complete
+aggregate release acceptance remains a future candidate gate; these results do
+not declare 1.0 or authorize a production migration.
+
+Remaining scope: unsupported files/templates/client-visible history and retention
+modes, interface integration, versioned release review and separately authorized
+production preview/backup/handoff. No new risk exception was accepted. Later
+instruction-file tracking and evidence commits contain no application changes and
+do not relabel these runs as validation of a different runtime source.

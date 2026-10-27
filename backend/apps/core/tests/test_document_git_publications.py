@@ -219,6 +219,29 @@ def test_publication_permission_and_workspace_are_enforced(promoted):
         )
 
 
+def test_internal_git_publication_requires_mfa_before_creating_snapshot(promoted):
+    from allauth.mfa.models import Authenticator
+
+    from apps.accounts.policy import PrivilegedMFARequired
+    from apps.core.models import DocumentAuthority, DocumentPublication, DocumentPublicationArtifact
+
+    installation, workspace, _repository, document, reader = promoted
+    Authenticator.objects.filter(user=installation.owner).delete()
+    with pytest.raises(PrivilegedMFARequired):
+        publish_document(
+            workspace=reader,
+            document=document,
+            actor_id=installation.owner.id,
+            reason="MFA must precede publication",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+    assert not DocumentPublication.objects.filter(document=document).exists()
+    assert not DocumentPublicationArtifact.objects.exists()
+    assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == "repository"
+
+
 def test_guard_upgrade_cycle_retains_snapshots_and_restores_head(promoted):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor

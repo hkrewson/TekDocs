@@ -1,3 +1,4 @@
+import ipaddress
 import secrets
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -7,7 +8,7 @@ from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.db import DatabaseError, close_old_connections, connection, transaction
 from django.test import Client
 from django.urls import reverse
-from hypothesis import given
+from hypothesis import example, given
 from hypothesis import strategies as st
 
 from apps.accounts.bootstrap import bootstrap_owner
@@ -470,7 +471,21 @@ def test_postgres_guard_rejects_direct_duplicate_ip_write(installation):
         )
 
 
-@given(st.ip_addresses(v=4) | st.ip_addresses(v=6))
+# Explicit networks retain every address without constructing per-special-range
+# generators during a draw. Keep important boundary forms as mandatory examples.
+@given(st.ip_addresses(network="0.0.0.0/0") | st.ip_addresses(network="::/0"))
+@example(ipaddress.IPv4Address(0))
+@example(ipaddress.ip_address("255.255.255.255"))
+@example(ipaddress.ip_address("127.0.0.1"))
+@example(ipaddress.ip_address("169.254.0.1"))
+@example(ipaddress.ip_address("192.0.2.1"))
+@example(ipaddress.ip_address("224.0.0.1"))
+@example(ipaddress.ip_address("::"))
+@example(ipaddress.ip_address("::1"))
+@example(ipaddress.ip_address("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"))
+@example(ipaddress.ip_address("fe80::1"))
+@example(ipaddress.ip_address("ff02::1"))
+@example(ipaddress.ip_address("::ffff:192.0.2.1"))
 def test_canonical_host_property(address):  # type: ignore[no-untyped-def]
     assert canonical_host(address.compressed) == address
 

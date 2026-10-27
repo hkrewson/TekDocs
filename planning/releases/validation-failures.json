@@ -732,6 +732,26 @@
       "next_action": "Closed: hosted live journey and full Build passed at 295912a. Original failed run remains historical evidence.",
       "fix_commit": "295912a98ffb22dc81f9f76e201a683fbb5fd63f",
       "retest_run": "40132590431"
+    },
+    {
+      "run_id": "40323914894",
+      "job": "PostgreSQL shard (core-b)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Exact CI seed passed alone. Unchanged committed property reproduced FailedHealthCheck at 0.1 CPU in existing tekdocs migrate: two inputs in 3.09 seconds; replacement full-space strategy passed the same probe. See 2026-10-26-publication-ci-follow-up.md.",
+      "cause": "Verified resource sensitivity in dynamic special-range IP generation; hosted delay source remains unconfirmed. No canonical-host assertion failure.",
+      "next_action": "Local production-profile core-b plus real recovery fixture replay passed 460 tests; lint/types/tooling passed. Await complete hosted Build and Extended validation on the pushed fix. No deployment.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40323924826",
+      "job": "Supported backup and restore",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Complete repository-content-recovery-fixture create replay in existing Docker services with a separate pytest database reproduced PrivilegedMFARequired at the new Git publication.",
+      "cause": "Synthetic owner MFA enrollment occurred only in the following publication fixture, after the new content fixture needed publication permission.",
+      "next_action": "Local production-profile core-b plus real recovery fixture replay passed 460 tests; lint/types/tooling passed. Await complete hosted Build and Extended validation on the pushed fix. No deployment.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

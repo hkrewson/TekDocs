@@ -5,6 +5,8 @@ import os
 import uuid
 
 import yaml
+from allauth.mfa.models import Authenticator
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
@@ -12,7 +14,6 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_read import document_detail
-from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_attachments import (
     append_repository_primary_document_file,
     copy_attachment_content,
@@ -21,6 +22,7 @@ from apps.core.document_attachments import (
     replace_primary_document_file,
 )
 from apps.core.document_authority_handoff import transition_document_authority
+from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
 from apps.core.documents import create_document, resolve_document
 from apps.core.models import (
@@ -510,6 +512,8 @@ def verify_organization_fixture(owner, organization, directory_entry):
 owner = User.objects.get(email=OWNER_EMAIL)
 tenant = owner.tenant_memberships.get(organization__isnull=True).tenant
 mode = os.environ.get("TEKDOCS_RECOVERY_CONTENT_MODE")
+if mode == "create" and not Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).exists():
+    TOTP.activate(owner, generate_totp_secret())
 with transaction.atomic():
     bind_local_rls_scope(
         DataScope.tenant(tenant),

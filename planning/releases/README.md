@@ -14,6 +14,10 @@ Existing release records below remain historical evidence.
 
 ## Unreleased bounded internal Git publication
 
+The [CI follow-up](2026-10-26-publication-ci-follow-up.md) repairs synthetic-owner
+MFA setup in recovery and resource-sensitive network property generation.
+Original failed runs remain recorded; this is subsequent validation work.
+
 The [internal publication lifecycle](../migrations/internal-git-publication-lifecycle.md)
 adds signed current-Git snapshots and verified-v5-only rollback for an
 already-promoted simple document. Legacy publication-history import/promotion

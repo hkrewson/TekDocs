@@ -7,7 +7,7 @@ import secrets
 import uuid
 
 from allauth.mfa.models import Authenticator
-from allauth.mfa.totp.internal.auth import generate_totp_secret
+from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.test import Client
@@ -170,9 +170,8 @@ if mode == "create":
             tenant=tenant, user=client, role=BuiltInRole.CLIENT_USER, organization=organization
         )
         for actor in (owner, *actors):
-            Authenticator.objects.create(
-                user=actor, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
-            )
+            if not Authenticator.objects.filter(user=actor, type=Authenticator.Type.TOTP).exists():
+                TOTP.activate(actor, generate_totp_secret())
     reviewer, authorizer = actors
     evidence_url = reverse("organization-repository-publication-evidence", args=[organization.entity_id])
     browser.force_login(owner)

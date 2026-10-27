@@ -73,5 +73,28 @@ and later-fixture MFA reuse probe passed **460 tests** with coverage, CI's
 production settings, a fresh test database and the original Hypothesis seed.
 The initial focused selection passed 31 checks. Backend Ruff and mypy (272 source
 files), fixture syntax, version consistency and diff checks passed. Tooling ran
-120 tests successfully (three optional skips). Hosted Build and Extended
-validation still need to confirm the pushed source and complete encrypted restore.
+120 tests successfully (three optional skips). Hosted results below bind subsequent validation to the pushed source.
+
+## Hosted source evidence
+
+Tested source: `bef8c902a0beb8402865272255cd7fe196bbdc17`.
+[Build 40448068023](https://github.com/hkrewson/TekDocs/actions/runs/40448068023)
+passed, including core-b, all other database/migration groups, browser journeys,
+coverage, production containers, SBOMs and vulnerability scanning. Release-only
+publication stages were skipped: this is a same-version validation push.
+
+[Extended 40448072399](https://github.com/hkrewson/TekDocs/actions/runs/40448072399)
+passed completely: backup/restore, repository-foundation acceptance,
+recurring-invoice restore checks, all browser engines, performance, DAST, the
+supported upgrade matrix, versioned diagram-source upgrade and evidence upload.
+A later old-source run `40348604958` repeated the same MFA fixture failure and
+is tracked against this fix as well.
+
+Verified: both complete hosted workflows and the local Docker checks passed for
+the named source. Inferred: runner resource contention contributed to the old
+generator timing failure; hosted contention was not independently measured.
+No remaining validation blocker for this repair is identified. The broader
+publication-history import/promotion and 1.0 acceptance work remain separate.
+No version bump, image publication, tag, Wiki publication or deployment occurred.
+The later evidence commit does not relabel these runs as validation of a new
+runtime source.

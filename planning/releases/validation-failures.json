@@ -739,9 +739,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Exact CI seed passed alone. Unchanged committed property reproduced FailedHealthCheck at 0.1 CPU in existing tekdocs migrate: two inputs in 3.09 seconds; replacement full-space strategy passed the same probe. See 2026-10-26-publication-ci-follow-up.md.",
       "cause": "Verified resource sensitivity in dynamic special-range IP generation; hosted delay source remains unconfirmed. No canonical-host assertion failure.",
-      "next_action": "Local production-profile core-b plus real recovery fixture replay passed 460 tests; lint/types/tooling passed. Await complete hosted Build and Extended validation on the pushed fix. No deployment.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Resolved: complete hosted Build 40448068023 passed at bef8c902a0beb8402865272255cd7fe196bbdc17, including core-b, coverage and production-container scanning. Original failed run retained. No deployment.",
+      "fix_commit": "bef8c902a0beb8402865272255cd7fe196bbdc17",
+      "retest_run": "40448068023"
     },
     {
       "run_id": "40323924826",
@@ -749,9 +749,19 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Complete repository-content-recovery-fixture create replay in existing Docker services with a separate pytest database reproduced PrivilegedMFARequired at the new Git publication.",
       "cause": "Synthetic owner MFA enrollment occurred only in the following publication fixture, after the new content fixture needed publication permission.",
-      "next_action": "Local production-profile core-b plus real recovery fixture replay passed 460 tests; lint/types/tooling passed. Await complete hosted Build and Extended validation on the pushed fix. No deployment.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Resolved: complete Extended validation 40448072399 passed at bef8c902a0beb8402865272255cd7fe196bbdc17, including backup/restore, repository foundation, recurring-invoice restore, upgrade matrix and diagram upgrade/restore evidence. Original failed run retained. No deployment.",
+      "fix_commit": "bef8c902a0beb8402865272255cd7fe196bbdc17",
+      "retest_run": "40448072399"
+    },
+    {
+      "run_id": "40348604958",
+      "job": "Supported backup and restore",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Later run on the same original cd81e5d source repeated PrivilegedMFARequired at create_organization_fixture publication; confirmed from the named failed job log.",
+      "cause": "Same synthetic owner enrollment ordering as 40323924826; the failure-follow-up job also reports the failed validation by design.",
+      "next_action": "Resolved: complete Extended validation 40448072399 passed at bef8c902a0beb8402865272255cd7fe196bbdc17, including backup/restore, repository foundation, recurring-invoice restore, upgrade matrix and diagram upgrade/restore evidence. Original failed run retained. No deployment.",
+      "fix_commit": "bef8c902a0beb8402865272255cd7fe196bbdc17",
+      "retest_run": "40448072399"
     }
   ]
 }

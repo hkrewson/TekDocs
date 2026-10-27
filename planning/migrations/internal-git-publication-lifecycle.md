@@ -1,5 +1,11 @@
 # Internal publication after promotion: bounded lifecycle implementation
 
+This records the preceding v5-only implementation. Its hosted validation passed
+at `bef8c90`, as recorded in the [CI closeout](../releases/2026-10-26-publication-ci-follow-up.md).
+The subsequent [publication-history migration slice](publication-history-migration.md)
+supersedes the legacy/mixed-history refusal described below for its narrow
+verified internal/permanent boundary; it requires new source-matched evidence.
+
 October 26, 2026. #105/#106 follow-up to the retained-history assessment.
 Authorized scope: local implementation and validation. No commit, push, release,
 production update or production authority transition is authorized by this work.

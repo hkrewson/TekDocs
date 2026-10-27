@@ -271,9 +271,10 @@ def publish_document(
 
             supersedes = None
             if supersedes_entity_id is not None:
+                # Retained snapshots are immutable and have no runtime UPDATE
+                # visibility. Successor controls use their existing advisory locks.
                 supersedes = (
-                    DocumentPublication.objects.select_for_update()
-                    .select_related("entity", "document")
+                    DocumentPublication.objects.select_related("entity", "document")
                     .filter(entity_id=supersedes_entity_id)
                     .first()
                 )

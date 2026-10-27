@@ -157,11 +157,19 @@ def publish_internal_git_document(
             )
             if preflight["blockers"] or not markdown.strip() or len(markdown.encode()) > 2 * 1024 * 1024:
                 raise PublicationConflict("Publication contains unsupported or unavailable dependencies")
+            from .document_migration_publications import publication_migration_evidence
+
+            if (
+                DocumentPublication.objects.filter(document=locked).exists()
+                and publication_migration_evidence(workspace=owner, document=locked) is None
+            ):
+                raise PublicationConflict("Retained publication history is unavailable or unsupported")
             predecessor = None
             if supersedes_entity_id is not None:
+                # Snapshots are immutable. FOR UPDATE hides them under runtime
+                # RLS; existing approval guards serialize successor controls.
                 predecessor = (
-                    DocumentPublication.objects.select_for_update()
-                    .filter(
+                    DocumentPublication.objects.filter(
                         document=locked,
                         tenant_id=member.tenant.id,
                         organization=workspace.organization,
@@ -172,7 +180,8 @@ def publish_internal_git_document(
                 if (
                     predecessor is None
                     or predecessor.lifecycle_state not in {"published", "review_due", "withdrawn"}
-                    or not verify_internal_git_publication(predecessor)
+                    or not verify_publication(predecessor)["valid"]
+                    or not verify_retained_publication_custody(predecessor)
                 ):
                     raise PublicationConflict("The selected Git publication cannot be superseded")
             created_at = timezone.now()

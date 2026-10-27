@@ -24,7 +24,9 @@ from apps.core.document_attachments import (
 from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
-from apps.core.documents import create_document, resolve_document
+from apps.core.document_migration_publications import assess_retained_publications
+from apps.core.documents import create_document, resolve_document, update_document
+from apps.core.publications import publish_document, verify_retained_publication_custody
 from apps.core.models import (
     ContentNode,
     Document,
@@ -357,11 +359,20 @@ def create_organization_fixture(owner, organization):
         workspace=repository.workspace, document_id=authority_document.id, actor_id=owner.id,
         target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
     ) == "transitioned"
-    # Retain a snapshot created after promotion, separately from the existing
-    # reversible-edit fixture so repeatable restore checks need not re-promote it.
+    # Retain both a legacy snapshot and its Git-authored successor across backup.
     published_guide = create_document(
         tenant=repository.tenant, organization=repository.workspace.organization, actor_id=owner.id,
-        title="Published Git recovery guide", markdown="Recovered Git publication body.\n",
+        title="Published Git recovery guide", markdown="Retained legacy recovery instructions.\n",
+    )
+    legacy_snapshot = publish_document(
+        workspace=reader_workspace, document=published_guide, actor_id=owner.id,
+        reason="Recovery fixture legacy snapshot", audience="msp_internal", retention="permanent",
+        retention_review_on=None,
+    )
+    update_document(
+        document=published_guide, actor_id=owner.id, title="Published Git recovery guide",
+        markdown="Pre-promotion recovery draft.\n",
+        base_revision_id=published_guide.placements.get().block.current_revision_id,
     )
     plan = prepare_document_import(workspace=repository.workspace, document_id=published_guide.id)
     apply_document_import(
@@ -372,8 +383,15 @@ def create_organization_fixture(owner, organization):
         workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
         target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
     )
+    fragment = read_authored_content(repository=repository, content_id=published_guide.placements.get().block_id)
+    author_content(
+        repository=repository, actor_id=owner.id, request_id=None, operation="update",
+        content_id=fragment.content_id, base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
+        kind=None, path=None, title=None, markdown="Recovered Git publication body.\n", metadata_patch={},
+    )
     retained = publish_internal_git_document(
         workspace=reader_workspace, document=published_guide, actor=owner, reason="Recovery fixture Git snapshot",
+        supersedes_entity_id=legacy_snapshot.entity_id,
     )
     assert verify_internal_git_publication(retained)
     return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
@@ -466,21 +484,33 @@ def verify_organization_fixture(owner, organization, directory_entry):
     published_guide = Document.objects.get(
         tenant=repository.tenant, organization=organization, entity__display_name="Published Git recovery guide",
     )
-    retained = published_guide.publications.get()
+    legacy_snapshot, retained = published_guide.publications.order_by("published_at", "id")
+    assert legacy_snapshot.canonical_markdown == "Retained legacy recovery instructions.\n"
+    assert retained.supersedes_id == legacy_snapshot.id
+    assert legacy_snapshot.lifecycle_state == "superseded"
+    assert verify_retained_publication_custody(legacy_snapshot)
     assert retained.canonical_markdown == "Recovered Git publication body.\n"
     assert verify_internal_git_publication(retained)
+    history = assess_retained_publications(workspace=repository.workspace, document=published_guide)
+    assert history["state"] == "verified"
+    assert history["evidence_sha256"] == os.environ["TEKDOCS_RECOVERY_HISTORY_SHA256"]
     retained_digest = retained.content_digest
     state = DocumentAuthority.objects.get(workspace=repository.workspace, content_id=published_guide.id)
-    if state.authority == DocumentAuthorityMode.REPOSITORY:
+    if state.authority == DocumentAuthorityMode.LEGACY:
         assert transition_document_authority(
             workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
-            target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+            target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
         ) == "transitioned"
+    assert transition_document_authority(
+        workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
+        target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+    ) == "transitioned"
     published_guide.refresh_from_db()
     assert resolve_document(published_guide).markdown == retained.canonical_markdown
     retained.refresh_from_db()
     assert retained.content_digest == retained_digest
     assert verify_internal_git_publication(retained)
+    assert assess_retained_publications(workspace=repository.workspace, document=published_guide) == history
     attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
     publication_source = read_authored_content(repository=repository, content_id=legacy_document.id)
     assert publication_source.markdown == ""
@@ -556,6 +586,12 @@ with transaction.atomic():
         print(f"MSP_SOURCE_SHA256={msp_snapshot_digest}")
         print(f"ORGANIZATION_SOURCE_SHA256={organization_snapshot_digest}")
         print(f"ORGANIZATION_EDITABLE_SHA256={organization_editable_digest}")
+        published_guide = Document.objects.get(
+            tenant=tenant, organization=organization, entity__display_name="Published Git recovery guide",
+        )
+        history = assess_retained_publications(workspace=organization_repository.workspace, document=published_guide)
+        assert history["state"] == "verified"
+        print(f"PUBLICATION_HISTORY_SHA256={history['evidence_sha256']}")
         print("MSP and client repository Markdown and managed-file recovery fixtures created")
     else:
         legacy_document = Document.objects.get(

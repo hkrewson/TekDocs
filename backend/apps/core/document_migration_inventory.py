@@ -10,6 +10,7 @@ from typing import Any
 
 from django.db.models import Prefetch
 
+from .document_migration_publications import publication_migration_evidence
 from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
@@ -30,7 +31,7 @@ from .topic_schemas import SCHEMA_VERSION, SCHEMAS
 
 
 def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
-    """Classify exact-owner records without reading Markdown or changing state."""
+    """Classify exact-owner records, verifying publication-bearing candidates read-only."""
 
     owner = {"tenant_id": workspace.tenant_id, "organization_id": workspace.organization_id}
     repository = WorkspaceRepository.objects.filter(workspace=workspace).first()
@@ -88,7 +89,9 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
             portable_document_entity_references(document)
         except DocumentMigrationRelationshipError:
             reasons.append("relationship_mapping_required")
-        if DocumentPublication.objects.filter(document=document).exists():
+        if DocumentPublication.objects.filter(document=document).exists() and publication_migration_evidence(
+            workspace=workspace, document=document
+        ) is None:
             reasons.append("publication_parity_required")
         if Block.objects.filter(**owner, source_document=document).exclude(id__in=owned_block_ids).exists():
             reasons.append("unplaced_owned_block")

@@ -1268,14 +1268,15 @@ def test_migration_status_identifies_retained_legacy_publication_history(tmp_pat
             for item in inventory_legacy_documents(workspace)["documents"]
             if item["document_id"] == str(document.id)
         )
-        assert "publication_parity_required" in inventory_row["reasons"]
+        assert "publication_parity_required" not in inventory_row["reasons"]
         browser = Client()
         browser.force_login(installation.owner)
         status = browser.get(
             reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id})
         )
         assert status.status_code == 200, status.content
-        assert "legacy_publication_history_present" in status.json()["handoff_blockers"]
+        assert "legacy_publication_history_present" not in status.json()["handoff_blockers"]
+        assert status.json()["publication_history"]["state"] == "verified"
         assert status.json()["authority_state"] == "legacy"
         assert status.json()["legacy_authoritative"] is True
         assert status.json()["cutover_ready"] is False

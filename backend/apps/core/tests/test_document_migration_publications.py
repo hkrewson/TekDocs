@@ -64,7 +64,9 @@ def published_context(tmp_path):
         yield installation, workspace, document, publication
 
 
-def test_history_assessment_is_read_only_and_does_not_enable_import(published_context, django_runtime_role):
+def test_supported_history_can_be_previewed_read_only_without_changing_authority(
+    published_context, django_runtime_role
+):
     installation, workspace, document, publication = published_context
     before = publication.manifest.copy()
     with django_runtime_role(), transaction.atomic():
@@ -82,8 +84,8 @@ def test_history_assessment_is_read_only_and_does_not_enable_import(published_co
         assert first["reasons"] == []
         assert len(first["evidence_sha256"]) == 64
         assert assess_retained_publications(workspace=workspace, document=document) == first
-        with pytest.raises(DocumentMigrationBlocked, match="publication_parity_required"):
-            prepare_document_import(workspace=workspace, document_id=document.id)
+        prepared = prepare_document_import(workspace=workspace, document_id=document.id)
+        assert prepared.publication_evidence_sha256 == first["evidence_sha256"]
     publication.refresh_from_db()
     assert publication.manifest == before
     assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == "legacy"
@@ -92,7 +94,7 @@ def test_history_assessment_is_read_only_and_does_not_enable_import(published_co
     result = browser.get(reverse("msp-document-migration-status", kwargs={"document_entity_id": document.entity_id}))
     assert result.status_code == 200
     assert result.json()["publication_history"] == first
-    assert "legacy_publication_history_present" in result.json()["handoff_blockers"]
+    assert "legacy_publication_history_present" not in result.json()["handoff_blockers"]
     assert result.json()["cutover_ready"] is False
 
 
@@ -113,6 +115,8 @@ def test_history_assessment_rejects_bad_retained_bytes(published_context, mode):
         assert result["state"] == "blocked"
         assert "publication_custody_invalid" in result["reasons"]
         assert result["evidence_sha256"] is None
+        with pytest.raises(DocumentMigrationBlocked, match="publication_parity_required"):
+            prepare_document_import(workspace=workspace, document_id=document.id)
     finally:
         with storage.open(name, "wb") as stream:
             stream.write(original)

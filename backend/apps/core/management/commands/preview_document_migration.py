@@ -21,6 +21,7 @@ from apps.core.document_migration_export import (
 )
 from apps.core.document_migration_import import fingerprint_document_import
 from apps.core.document_migration_inventory import inventory_legacy_documents
+from apps.core.document_migration_publications import publication_migration_evidence
 from apps.core.models import Document, InstallationState, Workspace, WorkspaceRepository
 from apps.core.repository_service import RepositoryServiceError, read_accepted_repository_markdown_files
 from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
@@ -110,7 +111,13 @@ class Command(BaseCommand):
                     {
                         "eligible": True,
                         "base_commit": accepted.object_id,
-                        "plan_sha256": fingerprint_document_import(base_commit=accepted.object_id, export=export),
+                        "plan_sha256": fingerprint_document_import(
+                            base_commit=accepted.object_id,
+                            export=export,
+                            publication_evidence_sha256=publication_migration_evidence(
+                                workspace=workspace, document=document
+                            ),
+                        ),
                         "block_id": str(export.block_id),
                         "revision_id": str(export.revision_id),
                         "blocks": [

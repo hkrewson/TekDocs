@@ -64,9 +64,7 @@ def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Docu
         return {}
     blocks = {
         block.id: block
-        for block in Block.objects.select_related("current_revision").filter(
-            id__in=owned_ids, source_document=document
-        )
+        for block in Block.objects.select_related("current_revision").filter(id__in=owned_ids, source_document=document)
     }
     if set(blocks) != owned_ids or any(block.current_revision_id is None for block in blocks.values()):
         raise DocumentAuthorityHandoffError("rollback_legacy_block_unavailable")
@@ -74,7 +72,11 @@ def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Docu
 
 
 def transition_document_authority(
-    *, workspace: Workspace, document_id: UUID, actor_id: UUID, target: str,
+    *,
+    workspace: Workspace,
+    document_id: UUID,
+    actor_id: UUID,
+    target: str,
     reader_workspace: ResolvedWorkspace,
 ) -> str:
     repository = WorkspaceRepository.objects.filter(workspace=workspace, tenant_id=workspace.tenant_id).first()
@@ -85,8 +87,11 @@ def transition_document_authority(
         # Nested snapshot reads take compatible shared locks while this pin lives.
         with pin_accepted_repository_for_publication(repository.id):
             return _transition_document_authority_locked(
-                workspace=workspace, document_id=document_id, actor_id=actor_id,
-                target=target, reader_workspace=reader_workspace,
+                workspace=workspace,
+                document_id=document_id,
+                actor_id=actor_id,
+                target=target,
+                reader_workspace=reader_workspace,
             )
     except RepositoryServiceError as exc:
         raise DocumentAuthorityHandoffError("rollback_repository_not_ready") from exc
@@ -120,6 +125,17 @@ def _transition_document_authority_locked(
     )
     if document is None:
         raise DocumentAuthorityHandoffError("document_unavailable")
+    from .document_migration_publications import publication_migration_actor_allowed
+    from .models import DocumentPublication
+
+    if DocumentPublication.objects.filter(document=document).exists() and (
+        not publication_migration_actor_allowed(workspace=locked_workspace, actor_id=actor_id)
+        or reader_workspace.member.user.id != actor_id
+        or reader_workspace.member.tenant.id != locked_workspace.tenant_id
+        or (reader_workspace.organization.id if reader_workspace.organization else None)
+        != locked_workspace.organization_id
+    ):
+        raise DocumentAuthorityHandoffError("publication_migration_not_authorized")
     status = document_coexistence_status(
         workspace=locked_workspace, document=document, reader_workspace=reader_workspace
     )
@@ -132,27 +148,11 @@ def _transition_document_authority_locked(
             for blocker in blockers
             if blocker not in {"content_copy_not_in_sync", "repository_read_projection_not_matched"}
         ]
-        if "legacy_publication_history_present" in blockers:
-            from .document_git_publications import verify_internal_git_publication
-            from .models import DocumentPublication
-
-            publications = list(
-                DocumentPublication.objects.filter(
-                    document=document,
-                    tenant_id=locked_workspace.tenant_id,
-                    organization=locked_workspace.organization,
-                )
-            )
-            if (
-                cast(dict[str, object], status["publication_history"])["state"] == "verified"
-                and publications and all(verify_internal_git_publication(item) for item in publications)
-            ):
-                blockers.remove("legacy_publication_history_present")
     if blockers:
         raise DocumentAuthorityHandoffError(*blockers)
-    authority = DocumentAuthority.objects.select_for_update().filter(
-        workspace=locked_workspace, content_id=document.id
-    ).first()
+    authority = (
+        DocumentAuthority.objects.select_for_update().filter(workspace=locked_workspace, content_id=document.id).first()
+    )
     if authority is None:
         raise DocumentAuthorityHandoffError("document_authority_state_unavailable")
     if authority.authority == target:
@@ -161,9 +161,7 @@ def _transition_document_authority_locked(
         raise DocumentAuthorityHandoffError("unexpected_current_authority")
 
     exported = build_simple_document_export(document, verify_attachments=True)
-    owned_fragment_ids = tuple(
-        content_id for content_id in exported.copied_content_ids if content_id != document.id
-    )
+    owned_fragment_ids = tuple(content_id for content_id in exported.copied_content_ids if content_id != document.id)
     fragment_states = list(
         DocumentAuthority.objects.select_for_update().filter(
             workspace=locked_workspace, content_id__in=owned_fragment_ids
@@ -184,14 +182,18 @@ def _transition_document_authority_locked(
             fragment = by_id[fragment_id]
             if fragment.authority != DocumentAuthorityMode.LEGACY:
                 raise DocumentAuthorityHandoffError("unexpected_fragment_authority")
-            other_legacy_consumers = Document.objects.filter(
-                placements__block_id=fragment_id,
-                tenant_id=locked_workspace.tenant_id,
-                organization_id=cast(UUID, locked_workspace.organization_id),
-            ).exclude(id=document.id).exclude(
-                id__in=DocumentAuthority.objects.filter(
-                    workspace=locked_workspace, authority=DocumentAuthorityMode.REPOSITORY
-                ).values("content_id")
+            other_legacy_consumers = (
+                Document.objects.filter(
+                    placements__block_id=fragment_id,
+                    tenant_id=locked_workspace.tenant_id,
+                    organization_id=cast(UUID, locked_workspace.organization_id),
+                )
+                .exclude(id=document.id)
+                .exclude(
+                    id__in=DocumentAuthority.objects.filter(
+                        workspace=locked_workspace, authority=DocumentAuthorityMode.REPOSITORY
+                    ).values("content_id")
+                )
             )
             if other_legacy_consumers.exists():
                 raise DocumentAuthorityHandoffError("fragment_has_legacy_consumers")
@@ -237,11 +239,16 @@ def _transition_document_authority_locked(
         authority.authority = DocumentAuthorityMode.LEGACY
         authority.save(update_fields=("authority", "updated_at"))
 
+    from .document_migration_publications import assess_retained_publications
+
+    history_before = cast(dict[str, object], status["publication_history"])["evidence_sha256"]
+    if assess_retained_publications(workspace=locked_workspace, document=document)["evidence_sha256"] != history_before:
+        raise DocumentAuthorityHandoffError("publication_history_changed")
     AuditEvent.objects.create(
         tenant=locked_workspace.tenant,
         actor_id=actor_id,
         action="document.authority_transitioned",
         entity_id=document.entity_id,
-        metadata={"from": status["authority_state"], "to": target},
+        metadata={"from": status["authority_state"], "to": target, "publication_history_sha256": history_before},
     )
     return "transitioned"

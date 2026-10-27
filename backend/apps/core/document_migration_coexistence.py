@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from typing import cast
 
 from django.http import Http404
 
@@ -24,7 +25,7 @@ from .document_migration_export import (
     build_simple_document_export,
 )
 from .document_migration_projection import portable_node_projection_matches, portable_root_entity_links_match
-from .document_migration_publications import assess_retained_publications
+from .document_migration_publications import assess_retained_publications, publication_migration_evidence
 from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
@@ -138,9 +139,9 @@ def document_coexistence_status(
     ):
         blockers.append("template_parity_not_verified")
     primary_versions = list(
-        DocumentAttachment.objects.filter(
-            document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
-        ).order_by("version_number", "id")
+        DocumentAttachment.objects.filter(document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE).order_by(
+            "version_number", "id"
+        )
     )
     response["primary_file_state"] = "absent"
     if primary_versions:
@@ -151,7 +152,13 @@ def document_coexistence_status(
             blockers.append("primary_file_storage_unavailable")
         else:
             response["primary_file_state"] = "retained_bytes_verified"
-    if DocumentPublication.objects.filter(document=document).exists():
+    if (
+        DocumentPublication.objects.filter(document=document).exists()
+        and publication_migration_evidence(
+        workspace=workspace, document=document, assessment=cast(dict[str, object], response["publication_history"])
+        )
+        is None
+    ):
         blockers.append("legacy_publication_history_present")
     review_record_present = (
         document.review_state != DocumentReviewState.UNREVIEWED

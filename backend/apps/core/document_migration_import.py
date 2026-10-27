@@ -20,7 +20,16 @@ from .document_migration_export import (
 )
 from .document_migration_inventory import inventory_legacy_documents
 from .document_migration_projection import portable_node_projection_matches, portable_root_entity_links_match
-from .models import ContentInclude, ContentLink, ContentNode, Document, Workspace, WorkspaceRepository
+from .document_migration_publications import publication_migration_actor_allowed, publication_migration_evidence
+from .models import (
+    ContentInclude,
+    ContentLink,
+    ContentNode,
+    Document,
+    DocumentPublication,
+    Workspace,
+    WorkspaceRepository,
+)
 from .repository_service import (
     RepositoryAuditAttribution,
     RepositoryConflictError,
@@ -42,6 +51,7 @@ class PreparedDocumentImport:
     base_commit: str
     plan_sha256: str
     already_present: bool
+    publication_evidence_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +61,9 @@ class DocumentImportResult:
     indexed: bool
 
 
-def fingerprint_document_import(*, base_commit: str, export: SimpleDocumentExport) -> str:
+def fingerprint_document_import(
+    *, base_commit: str, export: SimpleDocumentExport, publication_evidence_sha256: str | None = None
+) -> str:
     payload = {
         "base_commit": base_commit,
         "document_id": str(export.document_id),
@@ -66,6 +78,8 @@ def fingerprint_document_import(*, base_commit: str, export: SimpleDocumentExpor
         "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in export.files],
         "resolved_entity_links": export.resolved_entity_links,
     }
+    if publication_evidence_sha256 is not None:
+        payload["publication_evidence_sha256"] = publication_evidence_sha256
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -85,6 +99,9 @@ def prepare_document_import(*, workspace: Workspace, document_id: uuid.UUID) -> 
     document = Document.objects.select_related("entity").get(
         id=document_id, tenant_id=workspace.tenant_id, organization=workspace.organization
     )
+    publication_evidence = publication_migration_evidence(workspace=workspace, document=document)
+    if DocumentPublication.objects.filter(document=document).exists() and publication_evidence is None:
+        raise DocumentMigrationBlocked("publication_parity_required")
     try:
         export = build_simple_document_export(document, verify_attachments=True)
     except (
@@ -96,7 +113,9 @@ def prepare_document_import(*, workspace: Workspace, document_id: uuid.UUID) -> 
         raise DocumentMigrationBlocked(exc.code) from exc
     if repository.accepted_commit_id is None:
         raise DocumentMigrationBlocked("repository_no_accepted_commit")
-    accepted, current_files = read_accepted_repository_markdown_files(repository_id=repository.id)
+    accepted, current_files = read_accepted_repository_markdown_files(
+        repository_id=repository.id, record_reconciliation=False
+    )
     if export.reference_commit is not None and export.reference_commit != accepted.object_id:
         raise DocumentMigrationBlocked("repository_changed")
     current = dict(current_files)
@@ -117,8 +136,11 @@ def prepare_document_import(*, workspace: Workspace, document_id: uuid.UUID) -> 
         repository=repository,
         export=export,
         base_commit=accepted.object_id,
-        plan_sha256=fingerprint_document_import(base_commit=accepted.object_id, export=export),
+        plan_sha256=fingerprint_document_import(
+            base_commit=accepted.object_id, export=export, publication_evidence_sha256=publication_evidence
+        ),
         already_present=already_present,
+        publication_evidence_sha256=publication_evidence,
     )
 
 
@@ -182,6 +204,14 @@ def apply_document_import(
     """Copy only; legacy remains authoritative until a later explicit cutover."""
 
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
+    if prepared.publication_evidence_sha256 is not None and not publication_migration_actor_allowed(
+        workspace=workspace, actor_id=actor_id
+    ):
+        raise DocumentMigrationBlocked("publication_migration_not_authorized")
+    if prepared.publication_evidence_sha256 is not None and (
+        expected_base != prepared.base_commit or plan_sha256 != prepared.plan_sha256
+    ):
+        raise DocumentMigrationBlocked("preview_changed")
     if prepared.already_present:
         commit = prepared.base_commit
         try:
@@ -216,6 +246,8 @@ def apply_document_import(
         return DocumentImportResult("source_changed", committed.object_id, verified)
     if current_export != replace(prepared.export, reference_commit=current_export.reference_commit):
         return DocumentImportResult("source_changed", committed.object_id, verified)
+    if publication_migration_evidence(workspace=workspace, document=current) != prepared.publication_evidence_sha256:
+        return DocumentImportResult("source_changed", committed.object_id, verified)
     return DocumentImportResult("imported" if verified else "verification_pending", committed.object_id, verified)
 
 
@@ -225,6 +257,10 @@ def rollback_document_import(
     """Remove only unchanged copied files, never a referenced source fragment."""
 
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
+    if prepared.publication_evidence_sha256 is not None and not publication_migration_actor_allowed(
+        workspace=workspace, actor_id=actor_id
+    ):
+        raise DocumentMigrationBlocked("publication_migration_not_authorized")
     if not prepared.already_present:
         raise DocumentMigrationBlocked("import_not_present")
     if prepared.base_commit != expected_commit:

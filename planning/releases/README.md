@@ -14,15 +14,21 @@ Existing release records below remain historical evidence.
 
 ## Unreleased bounded internal Git publication
 
+The subsequent [publication-history migration slice](../migrations/publication-history-migration.md)
+adds guarded import/promotion of intact internal history, legacy-to-Git
+supersession and mixed-history rollback/re-promotion. The maintainer authorized its direct main commit/push and hosted validation;
+new source-matched recovery/release evidence is pending. Production remains on 0.9.15.
+
 The [CI follow-up](2026-10-26-publication-ci-follow-up.md) repairs synthetic-owner
 MFA setup in recovery and resource-sensitive network property generation.
 Original failed runs remain recorded; this is subsequent validation work.
 
 The [internal publication lifecycle](../migrations/internal-git-publication-lifecycle.md)
 adds signed current-Git snapshots and verified-v5-only rollback for an
-already-promoted simple document. Legacy publication-history import/promotion
-remains blocked. Independent recovery and complete release validation require
-hosted evidence before release; nothing has been published or deployed.
+already-promoted simple document. That preceding implementation kept legacy publication-history import/promotion
+blocked; its hosted checks passed at `bef8c90`. The subsequent extension above
+has its own validation boundary. Nothing from either slice has been released
+or deployed.
 
 ## Unreleased publication-history diagnostic
 

@@ -1,13 +1,31 @@
-"""Read-only evidence assessment; never authorizes publication-bearing handoff."""
+"""Retained-history verification and bounded publication-bearing migration eligibility."""
 
 from __future__ import annotations
 
 import hashlib
+from uuid import UUID
 
 from django.core.exceptions import ImproperlyConfigured
 
 from .models import Document, DocumentPublication, Workspace
 from .publications import _timestamp, canonical_json, verify_publication, verify_retained_publication_custody
+
+
+def publication_migration_actor_allowed(*, workspace: Workspace, actor_id: UUID) -> bool:
+    """Keep the new history-bearing mutation path behind existing edit/MFA policy."""
+    from rest_framework.exceptions import APIException
+
+    from apps.accounts.models import User
+    from apps.accounts.policy import PermissionKey, require_permission
+
+    actor = User.objects.filter(pk=actor_id, is_active=True).first()
+    if actor is None:
+        return False
+    try:
+        member = require_permission(actor, PermissionKey.DOCUMENTS_EDIT, organization=workspace.organization)
+    except APIException:
+        return False
+    return member.tenant.id == workspace.tenant_id
 
 
 def assess_retained_publications(*, workspace: Workspace, document: Document) -> dict[str, object]:
@@ -162,3 +180,53 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
         if publications and not reasons
         else None,
     }
+
+
+def publication_migration_evidence(
+    *, workspace: Workspace, document: Document, assessment: dict[str, object] | None = None
+) -> str | None:
+    """Verify the internal, permanent, single-owned-fragment migration boundary.
+
+    The fingerprint binds a preview to retained history; it is neither permission
+    to change authority nor a substitute for rechecking custody at execution.
+    """
+    from .document_migration_export import build_simple_document_export
+    from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
+    from .documents import resolve_document
+    from .models import DocumentAttachment, PlacementResolutionMode
+    from .repository_publication_preflight import repository_publication_preflight
+
+    report = (
+        assessment if assessment is not None else assess_retained_publications(workspace=workspace, document=document)
+    )
+    if report["state"] != "verified" or not isinstance(report["evidence_sha256"], str):
+        return None
+    if (
+        document.is_template
+        or document.archived_at is not None
+        or DocumentTemplateRevision.objects.filter(template=document).exists()
+        or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
+        or DocumentPublication.objects.filter(document=document).exclude(retention="permanent").exists()
+        or document.placements.exclude(resolution_mode=PlacementResolutionMode.LIVE).exists()
+        or DocumentAttachment.objects.filter(document=document).exists()
+        or DocumentAttachment.objects.filter(owner_workspace=workspace, owner_content_id=document.id).exists()
+    ):
+        return None
+    try:
+        exported = build_simple_document_export(document, allow_repository_divergence=True)
+        if (
+            len(exported.blocks) != 1
+            or exported.referenced_digests
+            or exported.attachment_digests
+            or exported.key_binding_ids
+            or exported.resolved_entity_links
+            or repository_publication_preflight(
+                markdown=resolve_document(document).markdown,
+                audience="msp_internal",
+                topic_type=document.topic_type,
+            )["blockers"]
+        ):
+            return None
+    except (OSError, ValueError, ImproperlyConfigured):
+        return None
+    return report["evidence_sha256"]

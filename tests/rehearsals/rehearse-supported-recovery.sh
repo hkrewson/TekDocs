@@ -101,9 +101,11 @@ compose_for "$source_environment" "$source_secrets" exec -T \
 msp_snapshot_sha=$(sed -n 's/^MSP_SOURCE_SHA256=//p' "$source_snapshot_log")
 organization_snapshot_sha=$(sed -n 's/^ORGANIZATION_SOURCE_SHA256=//p' "$source_snapshot_log")
 organization_editable_sha=$(sed -n 's/^ORGANIZATION_EDITABLE_SHA256=//p' "$source_snapshot_log")
+publication_history_sha=$(sed -n 's/^PUBLICATION_HISTORY_SHA256=//p' "$source_snapshot_log")
 printf '%s\n' "$msp_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$organization_snapshot_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$organization_editable_sha" | grep -Eq '^[0-9a-f]{64}$'
+printf '%s\n' "$publication_history_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/repository Markdown and managed-file recovery fixtures created/p' "$source_snapshot_log"
 publication_log="$work_directory/repository-publication.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
@@ -341,6 +343,7 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_MSP_SOURCE_SHA256="$msp_snapshot_sha" \
   -e TEKDOCS_RECOVERY_ORG_SOURCE_SHA256="$organization_snapshot_sha" \
   -e TEKDOCS_RECOVERY_ORG_EDITABLE_SHA256="$organization_editable_sha" \
+  -e TEKDOCS_RECOVERY_HISTORY_SHA256="$publication_history_sha" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \

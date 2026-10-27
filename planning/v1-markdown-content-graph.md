@@ -1026,5 +1026,19 @@ open; a verified history does not close the broader authority gate.
 The local #105/#106 slice supports signed internal snapshots from pinned Git
 content of an already-promoted simple guide and preserves verified v5 history
 through rollback. See [lifecycle implementation](migrations/internal-git-publication-lifecycle.md).
-Hosted independent recovery remains unverified. Legacy publication-bearing
-import, broader shapes, client delivery and interface integration remain open.
+Hosted validation for that preceding slice passed at `bef8c90`; see its
+[CI closeout](releases/2026-10-26-publication-ci-follow-up.md). Broader shapes,
+client delivery and interface integration remain open. Legacy-history migration
+is the subsequent slice below and needs its own source-matched validation.
+
+### Publication-bearing ordinary migration — October 27, 2026
+
+The next bounded #105/#106 implementation permits existing verified internal,
+permanent publication history on a simple single-owned-fragment document.
+Import previews bind the retained-history fingerprint; promotion and rollback
+recheck signatures/PDF custody and preserve the original immutable records.
+New Git snapshots may supersede legacy snapshots, and verified mixed history
+supports rollback/re-promotion. Existing authorization/MFA, review, source parity
+and unsupported-shape gates remain. See the [implementation and validation
+record](migrations/publication-history-migration.md). This local slice does not
+claim a new release, production migration, interface parity or broad 1.0 acceptance.

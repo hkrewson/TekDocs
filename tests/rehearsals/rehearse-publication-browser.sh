@@ -93,6 +93,10 @@ acceptance_compose up -d --no-deps --build migrate frontend
 # only the image's service group access; secret session inputs still use 0600.
 acceptance_compose exec -T --user 0:0 migrate sh -c \
   'chgrp "$(id -g tekdocs)" /acceptance; chmod 2770 /acceptance'
+# Test database migrations require the same constrained login as normal startup.
+# Provision against the existing base database before pytest creates its own.
+acceptance_compose exec -T migrate sh -c \
+  'POSTGRES_DB="$TEKDOCS_PUBLICATION_ACCEPTANCE_BASE_DATABASE" python manage.py provision_runtime_role'
 acceptance_compose exec -T migrate sh -c \
   'printf "%s\n" "$$" > /acceptance/server.pid; exec pytest "$@"' sh apps/core/tests/test_publication_browser_acceptance.py \
   --liveserver=0.0.0.0:8081 --tb=short -q > "$work_directory/server.log" 2>&1 &

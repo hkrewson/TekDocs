@@ -762,6 +762,16 @@
       "next_action": "Resolved: complete Extended validation 40448072399 passed at bef8c902a0beb8402865272255cd7fe196bbdc17, including backup/restore, repository foundation, recurring-invoice restore, upgrade matrix and diagram upgrade/restore evidence. Original failed run retained. No deployment.",
       "fix_commit": "bef8c902a0beb8402865272255cd7fe196bbdc17",
       "retest_run": "40448072399"
+    },
+    {
+      "run_id": "40635810767",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted original workspace journey passed; new publication phase failed in migration 0019. Docker replay called the unchanged migration guard against a deliberately absent role name in the existing PostgreSQL service, reproducing the exact RuntimeError without changing the retained runtime role.",
+      "cause": "The new harness overrides normal startup and omitted provision_runtime_role. The retained local cluster already had that role; the fresh hosted cluster did not.",
+      "next_action": "Run the existing provisioning command against the configured base database before pytest creates its generated test database. Complete the unchanged real browser journey and a fresh hosted release pipeline; original failure remains recorded.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

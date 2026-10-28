@@ -270,7 +270,7 @@ document-migration-upgrade-rehearsal:
 	sh tests/rehearsals/rehearse-document-migration-upgrade.sh
 
 .PHONY: document-migration-release-gate
-document-migration-release-gate: check test-content-authoring test-document-migration-inventory document-migration-upgrade-rehearsal production-image-rehearsal
+document-migration-release-gate: check test-publication-browser-live test-content-authoring test-document-migration-inventory document-migration-upgrade-rehearsal production-image-rehearsal
 
 file-export-release-gate: check test-file-export-stabilization test-e2e-all test-e2e-live file-export-upgrade-rehearsal documentation-backup-rehearsal production-image-rehearsal security
 
@@ -361,6 +361,10 @@ test-production-setup:
 test-e2e-live:
 	./tests/rehearsals/rehearse-live-workspace-e2e.sh
 
+.PHONY: test-publication-browser-live
+test-publication-browser-live:
+	./tests/rehearsals/rehearse-publication-browser.sh
+
 security:
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend pip-audit
 	docker compose run --rm --no-deps -e TEKDOCS_VALIDATE_RUNTIME_DATABASE=false backend bandit -c pyproject.toml -r apps tekdocs
@@ -382,7 +386,7 @@ dast:
 
 # Current-destination rehearsals only. Fixed-destination historical checkpoints
 # remain standalone targets; see planning/releases/README.md.
-release-gate: check test-postgres-matrix test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal repository-foundation-acceptance supported-upgrade-matrix recurring-invoice-backup-rehearsal
+release-gate: check test-publication-browser-live test-postgres-matrix test-public-beta-performance test-compose test-frontend-routing test-e2e-all test-e2e-live security production-image-rehearsal clean-install-rehearsal upgrade-rehearsal notification-mail-outage-rehearsal portal-notification-upgrade-rehearsal portal-notification-backup-rehearsal documentation-upgrade-rehearsal documentation-backup-rehearsal file-export-upgrade-rehearsal inventory-upgrade-rehearsal inventory-backup-rehearsal network-upgrade-rehearsal network-backup-rehearsal integration-validation-upgrade-rehearsal integration-backup-rehearsal monitoring-backup-rehearsal compliance-monitoring-upgrade-rehearsal compliance-monitoring-backup-rehearsal supported-recovery-rehearsal repository-foundation-acceptance supported-upgrade-matrix recurring-invoice-backup-rehearsal
 
 compose-doctor:
 	./scripts/check-compose-provenance.sh

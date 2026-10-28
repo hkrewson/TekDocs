@@ -42,6 +42,7 @@ export function useDocumentCollection({
   onError,
 }: UseDocumentCollectionOptions) {
   const [loaded, setLoaded] = useState<LoadedDocumentCollection | null>(null)
+  const [focused, setFocused] = useState<{ key: string; document: DocumentRecord } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const openedDeepLink = useRef<string | null>(null)
   const onDeepLinkLoadedRef = useRef(onDeepLinkLoaded)
@@ -82,6 +83,7 @@ export function useDocumentCollection({
           }
           if (controller.signal.aborted) return
           openedDeepLink.current = deepLinkKey
+          setFocused({ key: scopeKey, document: deepLinked })
           onDeepLinkLoadedRef.current(deepLinked)
         }
         onErrorRef.current(null)
@@ -108,7 +110,8 @@ export function useDocumentCollection({
       ...current,
       results: current.results.map((document) => document.id === documentId ? update(document) : document),
     } : current)
+    setFocused((current) => current?.document.id === documentId ? { ...current, document: update(current.document) } : current)
   }, [])
 
-  return { loaded, phase, rememberDeepLink, updateLoadedDocument }
+  return { loaded, phase, rememberDeepLink, updateLoadedDocument, focusedDocument: focused?.key === scopeKey ? focused.document : null }
 }

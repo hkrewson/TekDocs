@@ -1,0 +1,29 @@
+# Reuse the standard project's migrate/frontend services and PostgreSQL service.
+# Only the private IPC directory is shared; no extra service or named volume.
+services:
+  migrate:
+    entrypoint: []
+    command: ["sleep", "infinity"]
+    environment:
+      DJANGO_SETTINGS_MODULE: tekdocs.settings.test
+      POSTGRES_DB: ${TEKDOCS_PUBLICATION_ACCEPTANCE_DATABASE:?Acceptance harness required}
+      TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY: /acceptance
+    volumes:
+      - ./backend/apps:/app/apps
+      - ./backend/tekdocs:/app/tekdocs
+      - ./backend/pyproject.toml:/app/pyproject.toml:ro
+      - ${TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY:?Acceptance harness required}:/acceptance
+  frontend:
+    image: tekdocs-publication-browser
+    build:
+      dockerfile: Dockerfile.e2e
+      target: browser
+    entrypoint: []
+    command: ["npm", "run", "dev", "--", "--config", "vite.publication-live.config.ts", "--port", "8080"]
+    environment:
+      TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY: /acceptance
+      PLAYWRIGHT_SAFE_SUMMARY: /acceptance/browser-summary.json
+    volumes:
+      - ${TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY:?Acceptance harness required}:/acceptance
+    healthcheck:
+      disable: true

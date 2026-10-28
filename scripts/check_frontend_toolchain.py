@@ -34,7 +34,7 @@ def validate(root: Path) -> None:
     dockerfile = (root / "frontend/Dockerfile.e2e").read_text()
     if not re.search(r"^ARG PLAYWRIGHT_VERSION=" + re.escape(playwright) + r"$", dockerfile, re.M):
         raise ValueError("Playwright browser image version must match its package")
-    if not re.search(r"^FROM mcr.microsoft.com/playwright:v\$\{PLAYWRIGHT_VERSION\}-noble@sha256:[0-9a-f]{64}$", dockerfile, re.M):
+    if not re.search(r"^FROM mcr.microsoft.com/playwright:v\$\{PLAYWRIGHT_VERSION\}-noble@sha256:[0-9a-f]{64}(?: AS browser)?$", dockerfile, re.M):
         raise ValueError("Playwright browser image must retain its reviewed digest pin")
     for name in REHEARSALS:
         source = (root / "tests/rehearsals" / name).read_text()

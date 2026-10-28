@@ -327,7 +327,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     page: documentPage,
     page_size: 25,
   }), [categoryFilter, collectionFilter, documentOrdering, documentPage, documentQuery, healthFilter, indexMode, tagFilter, templateFilter])
-  const { loaded, phase, rememberDeepLink, updateLoadedDocument } = useDocumentCollection({
+  const { loaded, phase, rememberDeepLink, updateLoadedDocument, focusedDocument } = useDocumentCollection({
     client,
     filters: collectionFilters,
     requestedDocumentId,
@@ -1081,6 +1081,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
       onChange: (value) => { setTemplateFilter(value as typeof templateFilter); setDocumentPage(1) },
     },
   ]
+  const publicationSource = results.find((document) => document.id === publicationView?.sourceId) ?? (focusedDocument?.id === publicationView?.sourceId ? focusedDocument : null)
   const showLibrary = !selected && !publicationView
 
   return repositoryOpen || routeParameters.has('repository') ? <RepositoryContentPanel key={scopeKey} organizationId={workspace?.kind === 'organization' ? workspace.id : undefined} initialContentId={routeParameters.get('repository') ?? undefined} onClose={() => { setRepositoryOpen(false); const parameters = new URLSearchParams(location.search); parameters.delete('repository'); void navigate(`${location.pathname}${parameters.size ? `?${parameters}` : ''}`, { replace: true }); window.requestAnimationFrame(() => repositoryButtonRef.current?.focus()) }} /> : <>
@@ -1102,7 +1103,7 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
     {publicationView && !publicationForm && <PublicationViewer key={publicationView.publicationId} view={publicationView} scope={scope} client={client} section={visiblePublicationSection} onSectionChange={changePublicationSection} onClose={close} onRetry={() => { void openPublication({ id: publicationView.sourceId }, { id: publicationView.publicationId }, false, visiblePublicationSection) }}>
       {publicationView.record && <>
         <div className="document-actions">
-          {['published', 'review_due', 'withdrawn'].includes(publicationView.record.lifecycle_state) && !publicationView.record.superseded_by_id && results.find((document) => document.id === publicationView.sourceId) && <button className="secondary-button" type="button" disabled={saving} ref={publicationTrigger} onClick={() => attemptNavigation(() => beginPublication(results.find((document) => document.id === publicationView.sourceId)!, publicationView.record))}><FileCheck2 size={15} />{translate('documentation.publishCorrection')}</button>}
+          {['published', 'review_due', 'withdrawn'].includes(publicationView.record.lifecycle_state) && !publicationView.record.superseded_by_id && publicationSource && <button className="secondary-button" type="button" disabled={saving} ref={publicationTrigger} onClick={() => attemptNavigation(() => beginPublication(publicationSource, publicationView.record))}><FileCheck2 size={15} />{translate('documentation.publishCorrection')}</button>}
           {publicationView.record.lifecycle_state === 'pending_approval' && <button className="secondary-button" type="button" disabled={saving} onClick={() => attemptNavigation(() => setPublicationControl({ action: 'approve', reason: '' }))}>{translate('documentation.approvePublication')}</button>}
           {['pending_approval', 'published', 'review_due'].includes(publicationView.record.lifecycle_state) && <button className="danger-button" type="button" disabled={saving} onClick={() => attemptNavigation(() => setPublicationControl({ action: 'withdraw', reason: '' }))}>{translate('documentation.withdrawPublication')}</button>}
         </div>

@@ -40,6 +40,13 @@ class FrontendToolchainTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "image version"):
             validate(self.root)
 
+    def test_unpinned_named_browser_stage_is_rejected(self):
+        import re
+        path = self.root / "frontend/Dockerfile.e2e"
+        path.write_text(re.sub(r"@sha256:[0-9a-f]{64}(?= AS browser)", "", path.read_text()))
+        with self.assertRaisesRegex(ValueError, "digest pin"):
+            validate(self.root)
+
     def test_each_stale_rehearsal_is_rejected(self):
         for name in REHEARSALS:
             path = self.root / "tests/rehearsals" / name

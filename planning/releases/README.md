@@ -14,6 +14,11 @@ Existing release records below remain historical evidence.
 
 ## Unreleased bounded internal Git publication
 
+The [0.9.16 candidate packet](0.9.16-candidate.md) prepares this work with a real
+migrated-document browser journey and a correction for filtered publication
+links. See its separate [source review](0.9.16-source-review.md). Preparation is
+not yet release publication or production deployment.
+
 The [publication interface slice](../migrations/git-publication-interface.md)
 connects supported promoted documents to internal publishing, corrections,
 withdrawal, retained history and PDF downloads. It adds Git-aware readiness and

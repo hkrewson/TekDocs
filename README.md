@@ -169,7 +169,8 @@ For supported promoted ordinary documents, Documentation now connects
 snapshots. **Publication history** opens retained legacy and Git versions for
 correction, withdrawal, decisions and PDF downloads. See the
 [bounded interface acceptance](planning/migrations/git-publication-interface.md)
-for limitations and validation; this is unreleased work after 0.9.15.
+for limitations and validation. The 0.9.16 candidate adds a real browser-to-database
+acceptance journey for this workflow; production deployment remains separate.
 
 ### Managed repository authoring
 

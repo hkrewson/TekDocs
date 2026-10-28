@@ -1051,3 +1051,13 @@ readiness, publishing, correction, withdrawal, retained legacy/Git history and
 PDF downloads. Browser coverage exercises responsive operation and safe failures;
 API coverage verifies source, permissions and retained signed/PDF bytes. Broader
 files/templates/keys, client delivery, release and production migration remain open.
+
+### Real migrated-publication acceptance and 0.9.16
+
+The [0.9.16 candidate](releases/0.9.16-candidate.md) adds an unmocked browser
+journey through an actually migrated document under the constrained database
+role. It verifies legacy and Git corrections, withdrawal, retained PDF bytes,
+read-only/anonymous boundaries, filtered publication links and operator
+rollback/re-promotion. The filtered-link reproduction corrected the interface's
+dependency on the visible collection. This does not close broader managed-file,
+template, key/reference or client-delivery parity, or final 1.0 acceptance.

@@ -769,9 +769,21 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted original workspace journey passed; new publication phase failed in migration 0019. Docker replay called the unchanged migration guard against a deliberately absent role name in the existing PostgreSQL service, reproducing the exact RuntimeError without changing the retained runtime role.",
       "cause": "The new harness overrides normal startup and omitted provision_runtime_role. The retained local cluster already had that role; the fresh hosted cluster did not.",
-      "next_action": "Run the existing provisioning command against the configured base database before pytest creates its generated test database. Complete the unchanged real browser journey and a fresh hosted release pipeline; original failure remains recorded.",
+      "next_action": "Resolved: the unchanged full live publication journey passed on fresh hosted PostgreSQL at 0ebb981 in run 40637961760 attempt 1. The superseded original run was cancelled after its failed live job to allow the corrected main release run to start. Original failure retained; release image/receipt delivery is tracked separately.",
+      "fix_commit": "0ebb98193f3f855b863d7878f9897d4671fd9a33",
+      "retest_run": "40637961760"
+    },
+    {
+      "run_id": "40637961760",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (route-session)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "GitHub annotation confirms the 30-minute execution limit; the job ended cancelled after cleanup. Both log download interfaces returned unavailable. Exact two parametrized tests with coverage passed 715 cases in 123.75 seconds in the existing Docker migrate/database services using a separate generated test database.",
+      "cause": "Unknown. A hosted timeout is verified; no failing assertion or local slowdown was reproduced.",
+      "next_action": "The unchanged hosted route-session retry passed 715 cases in 581.31 seconds on attempt 2. No code, assertion or timeout change was made; the original timeout cause remains unknown. Dependent coverage and release stages resume in the same run.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "40637961760",
+      "retest_attempt": 2
     }
   ]
 }

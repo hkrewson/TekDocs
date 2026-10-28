@@ -2,8 +2,9 @@
 
 For release status, evidence closeout, CI failure triage or operator acceptance,
 start here. Historical review narratives are supporting evidence, not the live
-work queue. `.github/release-candidate.json` names the application candidate;
-the checkout's HEAD may be a later evidence/tooling commit.
+work queue. `.github/release-candidate.json` still names the historical 0.9.12
+security/status packet. The latest exact-source publication record below names
+the later release; the checkout's HEAD may be an evidence/tooling commit.
 
 ## Future release delivery
 
@@ -12,12 +13,15 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Unreleased bounded internal Git publication
+## Published 0.9.16: bounded internal Git publication
 
-The [0.9.16 candidate packet](0.9.16-candidate.md) prepares this work with a real
-migrated-document browser journey and a correction for filtered publication
-links. See its separate [source review](0.9.16-source-review.md). Preparation is
-not yet release publication or production deployment.
+The [0.9.16 publication closeout](0.9.16-operational-closeout.md) records successful
+[Build 40637961760](https://github.com/hkrewson/TekDocs/actions/runs/40637961760)
+at `0ebb981`, four images, eight attestation verifications and both application
+and receipt tags. It retains the bootstrap correction and unchanged timeout
+retry. The [candidate packet](0.9.16-candidate.md) contains release notes and the
+maintainer's risk decision; the [source review](0.9.16-source-review.md) is separate.
+Production remains on 0.9.15; Wiki publication and live migration remain separate.
 
 The [publication interface slice](../migrations/git-publication-interface.md)
 connects supported promoted documents to internal publishing, corrections,
@@ -30,7 +34,8 @@ supersession and mixed-history rollback/re-promotion. Source `aa2cd43` passed [m
 and [Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/40460698493),
 including independent encrypted recovery and supported upgrades. The linked
 closeout distinguishes those results from aggregate release acceptance.
-Production remains on 0.9.15; no release or live migration is claimed.
+These earlier slice records precede the aggregate 0.9.16 publication above;
+they do not claim a live migration.
 
 The [CI follow-up](2026-10-26-publication-ci-follow-up.md) repairs synthetic-owner
 MFA setup in recovery and resource-sensitive network property generation.
@@ -40,15 +45,16 @@ The [internal publication lifecycle](../migrations/internal-git-publication-life
 adds signed current-Git snapshots and verified-v5-only rollback for an
 already-promoted simple document. That preceding implementation kept legacy publication-history import/promotion
 blocked; its hosted checks passed at `bef8c90`. The subsequent extension above
-has its own validation boundary. Nothing from either slice has been released
-or deployed.
+has its own validation boundary. The bounded work is now included in 0.9.16;
+neither record establishes a production deployment.
 
-## Unreleased publication-history diagnostic
+## Publication-history diagnostic included in 0.9.16
 
 The [read-only publication-history assessment](../migrations/publication-bearing-document-assessment.md)
 adds value-minimized evidence to the existing staff migration-status route.
-It does not clear import/promotion blockers or implement post-promotion
-publication parity. No new release or production deployment is claimed.
+The diagnostic itself does not clear import/promotion blockers or implement
+post-promotion publication parity. The subsequent slices and 0.9.16 release
+above have their own evidence; no production migration is claimed.
 
 ## Prepared 0.9.15
 

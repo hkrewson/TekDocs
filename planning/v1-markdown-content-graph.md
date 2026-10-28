@@ -1061,3 +1061,9 @@ read-only/anonymous boundaries, filtered publication links and operator
 rollback/re-promotion. The filtered-link reproduction corrected the interface's
 dependency on the visible collection. This does not close broader managed-file,
 template, key/reference or client-delivery parity, or final 1.0 acceptance.
+
+The [0.9.16 publication closeout](releases/0.9.16-operational-closeout.md) records
+successful exact-source CI at `0ebb981`, all four published images, eight verified
+attestations and atomic application/updater-receipt tags. Hosted upgrade/recovery
+and the real publication journey pass. Production deployment and live document
+migration remain separate operator actions.

@@ -118,6 +118,8 @@ jobs:
         with:
           fetch-depth: 0
       - run: make supported-upgrade-matrix
+      - name: Rehearse document migration on fresh and upgraded data
+        run: make document-migration-upgrade-rehearsal
       - name: Rehearse versioned diagram source upgrade
         run: make file-export-upgrade-rehearsal
       - name: Write commit-bound evidence

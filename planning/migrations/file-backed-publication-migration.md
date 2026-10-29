@@ -167,7 +167,25 @@ or claimed by this development slice.
 
 ### Pending verification
 
-Exact-source hosted Build/CodeQL/Extended validation remains pending. No hosted
-acceptance is inferred from source review or earlier release runs. Independent
-encrypted backup/restore, supported upgrades and production-image checks must
-confirm the pushed source. Production and public Wiki remain unchanged.
+Implementation was committed and pushed directly to main as
+`ade9dbbda56acb6eddd10153c8f5732ab90cd6de`. No branch, PR, version or tag was
+created; private ignored AGENTS files were not staged.
+
+Exact-source hosted checks are running:
+
+- [Build 40813776462](https://github.com/hkrewson/TekDocs/actions/runs/40813776462).
+- [CodeQL 40813798595](https://github.com/hkrewson/TekDocs/actions/runs/40813798595).
+- [Extended validation 40813797244](https://github.com/hkrewson/TekDocs/actions/runs/40813797244).
+
+No hosted acceptance is inferred from source review or earlier release runs.
+Independent encrypted backup/restore, supported upgrades and production-image
+checks must confirm the pushed source. Production and public Wiki remain
+unchanged. Subsequent evidence-only commits do not change this runtime source.
+
+Hosted coverage correction: inspection found that the existing supported-upgrade
+matrix omitted `document-migration-upgrade-rehearsal`, a constituent of the
+strongest relevant aggregate gate. Extended validation now runs that existing
+fresh/0.8.46-upgrade rehearsal before publishing upgrade evidence. Its script
+creates isolated projects/volumes and is therefore hosted-only under the local
+container rule. This is validation wiring; application source remains `ade9dbb`.
+The earlier Extended run does not establish this omitted constituent.

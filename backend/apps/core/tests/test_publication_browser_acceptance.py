@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.db.backends.signals import connection_created
 from django.test import Client, override_settings
@@ -26,11 +27,22 @@ from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import document_migration_import, repository_storage
 from apps.core.content_index import index_repository_content
+from apps.core.document_attachments import (
+    copy_attachment_content,
+    create_document_attachment,
+    replace_primary_document_file,
+)
 from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_migration_publications import assess_retained_publications
 from apps.core.documents import create_document, resolve_document, update_document
 from apps.core.models import DocumentAuthority, DocumentPublication, InstallationState, Workspace, WorkspaceKind
-from apps.core.publications import publish_document, read_publication_artifact, verify_publication
+from apps.core.publications import (
+    publish_document,
+    read_publication_artifact,
+    verify_publication,
+    verify_retained_publication_custody,
+)
+from apps.core.rendering import render_pdf
 from apps.core.rls_contract import RUNTIME_ROLE
 from apps.core.workspaces import resolve_msp_workspace
 
@@ -86,6 +98,34 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             title="Migrated publication acceptance guide",
             markdown="Original signed browser instructions.\n",
         )
+        first_bytes = render_pdf("Original primary browser document.")
+        second_bytes = render_pdf("Revised primary browser document.")
+        first_file = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("primary-v1.pdf", first_bytes),
+            purpose="primary_file",
+            version_number=1,
+        )
+        second_file = replace_primary_document_file(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("primary-v2.pdf", second_bytes),
+        )
+        checklist_bytes = b"Retained browser checklist.\n"
+        checklist = create_document_attachment(
+            document=document,
+            actor_id=installation.owner.id,
+            upload=SimpleUploadedFile("checklist.txt", checklist_bytes),
+        )
+        file_link = f"\n[Checklist](tekdocs://attachment/{checklist.entity_id})\n"
+        update_document(
+            document=document,
+            actor_id=installation.owner.id,
+            title=document.entity.display_name,
+            markdown="Original signed browser instructions.\n" + file_link,
+            base_revision_id=document.placements.get().block.current_revision_id,
+        )
         original = publish_document(
             workspace=reader,
             document=document,
@@ -96,12 +136,12 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             retention_review_on=None,
         )
         retained = (deepcopy(original.manifest), original.signature, original.content_digest)
-        original_pdf = read_publication_artifact(original.artifacts.get())
+        original_pdf = read_publication_artifact(original.artifacts.get(kind="pdf"))
         update_document(
             document=document,
             actor_id=installation.owner.id,
             title=document.entity.display_name,
-            markdown="Current migrated browser instructions.\n",
+            markdown="Current migrated browser instructions.\n" + file_link,
             base_revision_id=document.placements.get().block.current_revision_id,
         )
         plan = document_migration_import.prepare_document_import(workspace=workspace, document_id=document.id)
@@ -141,6 +181,14 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             "original_pdf_sha256": hashlib.sha256(original_pdf).hexdigest(),
             "session_name": settings.SESSION_COOKIE_NAME,
             "sessions": sessions,
+            "files": [
+                {"filename": file.original_filename, "sha256": hashlib.sha256(content).hexdigest()}
+                for file, content in (
+                    (first_file, first_bytes),
+                    (second_file, second_bytes),
+                    (checklist, checklist_bytes),
+                )
+            ],
         }
         # The live server opens its own connections through the constrained role.
         # Fixture metadata is collected beforehand, outside the request RLS scope.
@@ -167,12 +215,13 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         original.refresh_from_db()
         assert (original.manifest, original.signature, original.content_digest) == retained
-        assert read_publication_artifact(original.artifacts.get()) == original_pdf
+        assert read_publication_artifact(original.artifacts.get(kind="pdf")) == original_pdf
         assert original.lifecycle_state == "superseded"
         snapshots = list(DocumentPublication.objects.filter(document=document).order_by("published_at"))
         assert len(snapshots) == 4
         assert [item.lifecycle_state for item in snapshots] == ["superseded", "superseded", "published", "withdrawn"]
         assert all(verify_publication(item)["valid"] for item in snapshots)
+        assert all(verify_retained_publication_custody(item) for item in snapshots)
         assessment = assess_retained_publications(workspace=workspace, document=document)
         assert assessment["state"] == "verified"
         for target in ("legacy", "repository"):
@@ -190,3 +239,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             if target == "legacy":
                 assert "Browser-corrected Git instructions." in resolve_document(document).markdown
         assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == "repository"
+        for file, content in ((first_file, first_bytes), (second_file, second_bytes), (checklist, checklist_bytes)):
+            file.refresh_from_db()
+            assert file.document_id == document.id
+            assert copy_attachment_content(file) == content

@@ -172,6 +172,14 @@ correction, withdrawal, decisions and PDF downloads. See the
 for limitations and validation. The 0.9.16 candidate adds a real browser-to-database
 acceptance journey for this workflow; production deployment remains separate.
 
+The subsequent [file-backed migration slice](planning/migrations/file-backed-publication-migration.md)
+extends this supported shape to clean managed files and every primary-file
+version. File-bearing Git snapshots retain independent copies of those files
+alongside their signed manifest and PDF. Migration leaves existing signatures,
+PDFs, file identities and private storage unchanged; rollback retains files
+uploaded under Git authority. Templates, unresolved references and client
+delivery remain outside this boundary.
+
 ### Managed repository authoring
 
 The `0.9.5` checkpoint adds a separate **Repository content** editor under

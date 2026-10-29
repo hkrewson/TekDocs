@@ -27,12 +27,13 @@ def repository_publication_preflight(
     frozen_attachment_ids: set[UUID] | None = None,
     frozen_entity_ids: set[UUID] | None = None,
     frozen_key_targets: set[str] | None = None,
+    frozen_primary_file: bool = False,
 ) -> dict[str, Any]:
     """Return deterministic, content-free blocker and warning codes."""
 
     blockers: set[str] = set()
     warnings: set[str] = set()
-    if not markdown.strip():
+    if not markdown.strip() and not frozen_primary_file:
         blockers.add("document.empty")
     if topic_type:
         for item in inspect_markdown(topic_type, markdown):

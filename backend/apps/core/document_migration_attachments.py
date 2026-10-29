@@ -20,6 +20,18 @@ class DocumentMigrationAttachmentError(ValueError):
         super().__init__(code)
 
 
+def publication_file_limits_satisfied(document: Document) -> bool:
+    """Read-only eligibility: never truncate the files needed by a later snapshot."""
+    from django.db.models import Count, Sum
+
+    from .publications import MAX_RETAINED_ATTACHMENT_BYTES, MAX_RETAINED_ATTACHMENTS
+
+    totals = DocumentAttachment.objects.filter(document=document, archived_at__isnull=True).aggregate(
+        count=Count("id"), size=Sum("size", default=0)
+    )
+    return bool(totals["count"] <= MAX_RETAINED_ATTACHMENTS and totals["size"] <= MAX_RETAINED_ATTACHMENT_BYTES)
+
+
 def portable_primary_file_versions(
     document: Document, *, verify_content: bool = False
 ) -> tuple[tuple[uuid.UUID, str], ...]:
@@ -67,7 +79,7 @@ def portable_document_attachments(
 
     records = list(DocumentAttachment.objects.filter(document=document, archived_at__isnull=True).order_by("entity_id"))
     primary = portable_primary_file_versions(document, verify_content=verify_content)
-    available: set[uuid.UUID] = set()
+    available = {entity_id for entity_id, _digest in primary}
     manifest: list[tuple[uuid.UUID, str]] = []
     for record in records:
         if record.purpose != DocumentAttachmentPurpose.ATTACHMENT:
@@ -75,6 +87,8 @@ def portable_document_attachments(
         if (
             record.tenant_id != document.tenant_id
             or record.organization_id != document.organization_id
+            or record.owner_workspace_id != document.entity.workspace_id
+            or record.owner_content_id != document.id
             or record.scan_status != "clean"
             or not record.file.name
         ):

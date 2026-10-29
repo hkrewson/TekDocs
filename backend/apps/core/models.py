@@ -4898,6 +4898,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v3",
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
+            "tekdocs-static-publication/v6",
         }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
@@ -4934,6 +4935,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v3",
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
+            "tekdocs-static-publication/v6",
         }:
             expected_lifecycle = {
                 "reason": self.reason,
@@ -4948,6 +4950,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v3",
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
+            "tekdocs-static-publication/v6",
         }:
             key_resolutions = self.manifest.get("key_resolutions")
             if not isinstance(key_resolutions, list):

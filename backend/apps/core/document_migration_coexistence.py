@@ -16,6 +16,7 @@ from .document_migration_attachments import (
     DocumentMigrationAttachmentError,
     portable_document_attachments,
     portable_primary_file_versions,
+    publication_file_limits_satisfied,
 )
 from .document_migration_export import (
     DocumentMigrationBindingError,
@@ -144,6 +145,8 @@ def document_coexistence_status(
         )
     )
     response["primary_file_state"] = "absent"
+    if not publication_file_limits_satisfied(document):
+        blockers.append("managed_file_retention_limit")
     if primary_versions:
         try:
             portable_primary_file_versions(document, verify_content=True)

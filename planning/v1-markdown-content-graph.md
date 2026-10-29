@@ -1067,3 +1067,16 @@ successful exact-source CI at `0ebb981`, all four published images, eight verifi
 attestations and atomic application/updater-receipt tags. Hosted upgrade/recovery
 and the real publication journey pass. Production deployment and live document
 migration remain separate operator actions.
+
+### File-backed publication migration — October 28, 2026
+
+The next bounded #105/#106 [file-backed slice](migrations/file-backed-publication-migration.md)
+supports existing managed attachments and complete primary-file version chains
+on the already supported single-owned-fragment internal/permanent shape. New
+signed v6 snapshots retain every file plus the PDF; existing signed history and
+private file ownership remain unchanged. Rollback preserves Git body edits and
+subsequent uploads, with missing/foreign file links refused before acceptance.
+The expanded live browser and recovery fixtures check exact retained bytes.
+Templates, key/entity dependencies, diagrams, client delivery, broader structural
+editing and final 1.0 acceptance remain open. Version stays 0.9.16; deployment
+and live document migration require separate authorization.

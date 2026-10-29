@@ -10,6 +10,7 @@ from typing import Any
 
 from django.db.models import Prefetch
 
+from .document_migration_attachments import publication_file_limits_satisfied
 from .document_migration_publications import publication_migration_evidence
 from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
@@ -57,6 +58,8 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
         }
         referenced_block_ids = block_ids - owned_block_ids
         reasons: list[str] = []
+        if not publication_file_limits_satisfied(document):
+            reasons.append("managed_file_retention_limit")
         if document.id in nodes or owned_block_ids.intersection(nodes):
             reasons.append("git_identity_collision")
         if referenced_block_ids - nodes:

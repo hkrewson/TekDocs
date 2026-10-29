@@ -776,7 +776,7 @@ def verify_retained_publication_custody(publication: DocumentPublication) -> boo
     if not verify_publication(publication)["valid"]:
         return False
     manifest = publication.manifest
-    if manifest.get("format") == "tekdocs-static-publication/v5":
+    if manifest.get("format") in {"tekdocs-static-publication/v5", "tekdocs-static-publication/v6"}:
         from .document_git_publications import verify_git_publication_source
         if not verify_git_publication_source(publication):
             return False

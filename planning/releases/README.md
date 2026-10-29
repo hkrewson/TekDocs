@@ -15,6 +15,14 @@ Existing release records below remain historical evidence.
 
 ## Published 0.9.16: bounded internal Git publication
 
+Subsequent development: the [file-backed migration slice](../migrations/file-backed-publication-migration.md)
+adds managed files and all primary versions to the bounded internal workflow,
+with immutable signed history, retained PDFs, rollback and recovery validation.
+It does not change the 0.9.16 release images or production authority. Its own
+validation record distinguishes local runtime checks from hosted recovery.
+The [development release notes](file-backed-migration-notes.md) describe the user
+behavior without relabeling the published version.
+
 The [0.9.16 publication closeout](0.9.16-operational-closeout.md) records successful
 [Build 40637961760](https://github.com/hkrewson/TekDocs/actions/runs/40637961760)
 at `0ebb981`, four images, eight attestation verifications and both application

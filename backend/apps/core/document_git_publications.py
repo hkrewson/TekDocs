@@ -18,11 +18,16 @@ from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
+from .document_publication_files import (
+    FILE_GIT_STATIC_FORMAT,
+    PublicationFile,
+    prepare_publication_files,
+    verify_publication_file_manifest,
+)
 from .models import (
     AuditEvent,
     ContentNode,
     Document,
-    DocumentAttachment,
     DocumentAuthority,
     DocumentPublication,
     DocumentPublicationArtifact,
@@ -41,7 +46,7 @@ from .publications import (
     verify_publication,
     verify_retained_publication_custody,
 )
-from .rendering import render_markdown, render_pdf
+from .rendering import RenderedAttachment, render_markdown, render_pdf
 from .repository_publication_preflight import repository_publication_preflight
 from .workspaces import ResolvedWorkspace
 
@@ -55,7 +60,11 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         source = manifest["git_source"]
         sources = source["sources"]
         return bool(
-            manifest["format"] == GIT_STATIC_FORMAT
+            manifest["format"] in {GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT}
+            and (
+                manifest["format"] != FILE_GIT_STATIC_FORMAT
+                or verify_publication_file_manifest(manifest, publication.document_id)
+            )
             and publication.audience == manifest["audience"] == "msp_internal"
             and manifest["source_document_id"] == str(publication.document.entity_id)
             and source["format"] == "tekdocs.git-dependencies/v1"
@@ -90,7 +99,7 @@ def verify_internal_git_publication(publication: DocumentPublication) -> bool:
 
 def _validated_git_publication_content(
     *, document: Document, repository: WorkspaceRepository, source: dict[str, Any]
-) -> tuple[ContentNode, str, dict[str, Any]]:
+) -> tuple[ContentNode, str, dict[str, Any], tuple[PublicationFile, ...]]:
     """Share the publisher's exact content and custody gates with readiness checks."""
     if (
         not DocumentAuthority.objects.filter(
@@ -118,14 +127,16 @@ def _validated_git_publication_content(
         raise PublicationConflict("Indexed composition does not match the pinned Git source")
     if document.review_state == "approved" and document.review_content_sha256 != source["markdown_sha256"]:
         raise PublicationConflict("Approved review does not match the pinned Git content")
-    if DocumentAttachment.objects.filter(
-        owner_workspace=document.entity.workspace, owner_content_id=document.id
-    ).exists():
-        raise PublicationConflict("Managed files are outside this publication slice")
+    try:
+        files = prepare_publication_files(document=document, markdown=markdown)
+    except (ValueError, OSError) as exc:
+        raise PublicationConflict("Managed file custody is unavailable") from exc
     preflight = repository_publication_preflight(
-        markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured"
+        markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
+        frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},
+        frozen_primary_file=any(item.descriptor["purpose"] == "primary_file" for item in files),
     )
-    if preflight["blockers"] or not markdown.strip() or len(markdown.encode()) > 2 * 1024 * 1024:
+    if preflight["blockers"] or len(markdown.encode()) > 2 * 1024 * 1024:
         raise PublicationConflict("Publication contains unsupported or unavailable dependencies")
     from .document_migration_publications import publication_migration_evidence
 
@@ -134,7 +145,7 @@ def _validated_git_publication_content(
         and publication_migration_evidence(workspace=document.entity.workspace, document=document) is None
     ):
         raise PublicationConflict("Retained publication history is unavailable or unsupported")
-    return node, markdown, preflight
+    return node, markdown, preflight, files
 
 
 def preflight_internal_git_document(*, document: Document, audience: str) -> dict[str, Any]:
@@ -153,7 +164,7 @@ def preflight_internal_git_document(*, document: Document, audience: str) -> dic
                 .select_related("entity")
                 .get(pk=document.pk, tenant_id=document.tenant_id, organization=document.organization)
             )
-            _node, _markdown, report = _validated_git_publication_content(
+            _node, _markdown, report, _files = _validated_git_publication_content(
                 document=locked, repository=repository, source=source
             )
             digest = source["composition_digest"]
@@ -242,7 +253,7 @@ def publish_internal_git_document(
                     organization=workspace.organization,
                 )
             )
-            node, markdown, _preflight = _validated_git_publication_content(
+            node, markdown, _preflight, files = _validated_git_publication_content(
                 document=locked, repository=repository, source=source
             )
             predecessor = None
@@ -264,7 +275,15 @@ def publish_internal_git_document(
                     raise PublicationConflict("The selected Git publication cannot be superseded")
             created_at = timezone.now()
             publication_id, entity_id = uuid.uuid4(), uuid.uuid4()
-            pdf = render_pdf(markdown, title=node.title)
+            rendered_files: dict[str, RenderedAttachment] = {f.descriptor["id"]: {
+                "id": f.descriptor["id"], "filename": f.descriptor["filename"], "size": f.descriptor["size"],
+            } for f in files}
+            pdf = render_pdf(
+                markdown, title=node.title, attachments=rendered_files,
+                publication_id=str(entity_id) if files else "",
+                published_at=_timestamp(created_at) if files else "",
+                audience="msp_internal" if files else "", reason=reason if files else "",
+            )
             if not pdf.startswith(b"%PDF-") or len(pdf) > 8 * 1024 * 1024:
                 raise PublicationConflict("Publication PDF is unavailable or exceeds its limit")
             pending = PendingArtifact(
@@ -277,7 +296,7 @@ def publish_internal_git_document(
                 checksum=hashlib.sha256(pdf).hexdigest(),
             )
             manifest = {
-                "format": GIT_STATIC_FORMAT,
+                "format": FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT,
                 "publication_id": str(publication_id),
                 "publication_entity_id": str(entity_id),
                 "source_document_id": str(locked.entity_id),
@@ -295,14 +314,18 @@ def publish_internal_git_document(
                 "published_by": str(actor.id),
                 "published_at": _timestamp(created_at),
                 "git_source": source,
-                "artifacts": [_artifact_descriptor(pending)],
+                "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files]],
+                **({"managed_files": [f.descriptor for f in files]} if files else {}),
                 "entities": [],
-                "attachments": [],
+                "attachments": [
+                    {key: f.descriptor[key] for key in ("id", "filename", "media_type", "size", "checksum")}
+                    for f in files
+                ],
                 "placements": [],
                 "diagrams": [],
                 "key_resolutions": [],
             }
-            html = render_markdown(markdown)
+            html = render_markdown(markdown, attachments=rendered_files)
             digest = hashlib.sha256(
                 snapshot_payload(manifest=manifest, markdown=markdown, sanitized_html=html)
             ).digest()
@@ -354,32 +377,42 @@ def publish_internal_git_document(
                 )
                 event.full_clean()
                 event.save()  # type: ignore[no-untyped-call]
-            artifact_entity = Entity.objects.create(
-                id=pending.entity_id,
-                tenant_id=locked.tenant_id,
-                organization=workspace.organization,
-                workspace=owner,
-                entity_type="document_publication_artifact",
-                display_name="snapshot.pdf",
-                visibility="msp_private",
-            )
-            artifact = DocumentPublicationArtifact(
-                id=pending.id,
-                tenant_id=locked.tenant_id,
-                organization=workspace.organization,
-                publication=publication,
-                entity=artifact_entity,
-                kind="pdf",
-                original_filename=pending.filename,
-                media_type=pending.media_type,
-                size=len(pdf),
-                checksum=pending.checksum,
-                created_at=created_at,
-            )
-            artifact.file.save("retained", ContentFile(pdf), save=False)
-            stored.append((artifact.file.storage, artifact.file.name))
-            artifact.full_clean()
-            artifact.save()  # type: ignore[no-untyped-call]
+            for retained in (pending, *(f.artifact for f in files)):
+                artifact_entity = Entity.objects.create(
+                    id=retained.entity_id,
+                    tenant_id=locked.tenant_id,
+                    organization=workspace.organization,
+                    workspace=owner,
+                    entity_type="document_publication_artifact",
+                    display_name=retained.filename,
+                    visibility="msp_private",
+                )
+                artifact = DocumentPublicationArtifact(
+                    id=retained.id,
+                    tenant_id=locked.tenant_id,
+                    organization=workspace.organization,
+                    publication=publication,
+                    entity=artifact_entity,
+                    kind=retained.kind,
+                    original_filename=retained.filename,
+                    media_type=retained.media_type,
+                    size=len(retained.content),
+                    checksum=retained.checksum,
+                    source_attachment=retained.source_attachment,
+                    created_at=created_at,
+                )
+                # Track the opaque UUID path before writing: filesystem storage
+                # may create bytes and then raise without returning a name.
+                storage = artifact.file.storage
+                intended_name = artifact.file.field.generate_filename(artifact, "retained")
+                if storage.exists(intended_name):
+                    raise PublicationConflict("Retained artifact storage identity already exists")
+                stored.append((storage, intended_name))
+                artifact.file.save("retained", ContentFile(retained.content), save=False)
+                if artifact.file.name != intended_name:
+                    stored.append((storage, artifact.file.name))
+                artifact.full_clean()
+                artifact.save()  # type: ignore[no-untyped-call]
             AuditEvent.objects.create(
                 tenant_id=locked.tenant_id,
                 actor=actor,

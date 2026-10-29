@@ -101,3 +101,22 @@ uses the same pinned-source, review, supported-shape and custody gates as the
 publisher, with the existing preflight contract. Publication rechecks all gates.
 Retained history includes original and Git snapshots without rewriting either.
 This does not expose authority transitions or broaden migration eligibility.
+
+## Bounded file-backed migration
+
+The [file-backed extension](../../planning/migrations/file-backed-publication-migration.md)
+admits clean managed files and complete immutable primary-version chains within
+the same single-owned-fragment internal/permanent boundary. Existing v4/v5
+snapshots remain unchanged. New file-bearing snapshots use v6, binding each
+retained file artifact, owner, metadata and primary-version predecessor in the
+signed manifest. Offline verification uses retained bytes rather than current
+live storage or authority. Database migration 0197 installs the additive guard;
+reversing it prevents new v6 inserts while preserving existing signed rows.
+
+Files retain their original Document owner across promotion and rollback. New
+repository uploads for a promoted Document use that same durable link. Git body
+edits may reference only that Document's verified files, including older primary
+versions. Snapshot limits refuse oversized sets without truncation. Explicit
+rollback can preserve a subsequently enlarged set above those limits, while
+re-promotion and publication remain blocked until supported. This exception does
+not waive file-byte, source-shape, authorization or signed-history verification.

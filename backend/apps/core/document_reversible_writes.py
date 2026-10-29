@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from uuid import UUID
 
 from .content_profile import ContentProfileError, parse_content
+from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
 from .models import Block, Document, DocumentAuthority, DocumentAuthorityMode, WorkspaceRepository
 from .repository_service import RepositoryInputError, RepositoryServiceError
 
@@ -57,10 +58,13 @@ def guard_reversible_migration_write(
         **scope, entity__workspace_id=repository.workspace_id, id__in=promoted,
     )
     identities = {document_id: f"docs/{document_id}.md" for document_id in documents.values_list("id", flat=True)}
-    identities.update({
-        block_id: f"fragments/{block_id}.md"
-        for block_id in Block.objects.filter(**scope, source_document__in=documents).values_list("id", flat=True)
-    })
+    owned_blocks = {
+        block.id: block
+        for block in Block.objects.filter(**scope, source_document__in=documents).select_related(
+            "source_document__entity"
+        )
+    }
+    identities.update({block_id: f"fragments/{block_id}.md" for block_id in owned_blocks})
     if not identities:
         return
     protected_paths = set(identities.values())
@@ -84,6 +88,15 @@ def guard_reversible_migration_write(
                     continue  # Unrelated invalid source remains the indexer's concern.
                 if content_id in identities:
                     raise ReversibleShapeError("rollback_content_identity_changed")
-        reversible_markdown_projection(expected, actual)
+        markdown = reversible_markdown_projection(expected, actual)
+        for block_id, body in markdown.items():
+            owner = owned_blocks[block_id].source_document
+            if owner is None:
+                raise ReversibleShapeError("rollback_content_identity_changed")
+            portable_document_attachments(owner, body)
+    except DocumentMigrationAttachmentError as exc:
+        raise RepositoryInputError(
+            "This migrated document is kept reversible. File links must refer to its own verified files."
+        ) from exc
     except (ContentProfileError, ReversibleShapeError, RepositoryServiceError) as exc:
         raise RepositoryInputError(denial) from exc

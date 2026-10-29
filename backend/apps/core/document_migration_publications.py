@@ -92,10 +92,17 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v3",
                 "tekdocs-static-publication/v4",
                 "tekdocs-static-publication/v5",
+                "tekdocs-static-publication/v6",
             }
             or publication.audience != "msp_internal"
-            or len(artifacts) != 1
-            or artifacts[0].kind != "pdf"
+            or sum(item.kind == "pdf" for item in artifacts) != 1
+            or any(item.kind not in {"pdf", "attachment"} for item in artifacts)
+            or any(item.kind == "attachment" and (
+                item.source_attachment is None
+                or item.source_attachment.document_id != document.id
+                or item.source_attachment.owner_workspace_id != workspace.id
+                or item.source_attachment.owner_content_id != document.id
+            ) for item in artifacts)
         ):
             reasons.add("publication_shape_unsupported")
         expected = {
@@ -137,7 +144,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
         if "approved" in actions and "withdrawn" in actions and actions["withdrawn"] < actions["approved"]:
             reasons.add("publication_controls_invalid")
         try:
-            if manifest.get("format") == "tekdocs-static-publication/v5":
+            if manifest.get("format") in {"tekdocs-static-publication/v5", "tekdocs-static-publication/v6"}:
                 from .document_git_publications import verify_internal_git_publication
 
                 if not verify_internal_git_publication(publication):
@@ -208,22 +215,28 @@ def publication_migration_evidence(
         or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
         or DocumentPublication.objects.filter(document=document).exclude(retention="permanent").exists()
         or document.placements.exclude(resolution_mode=PlacementResolutionMode.LIVE).exists()
-        or DocumentAttachment.objects.filter(document=document).exists()
-        or DocumentAttachment.objects.filter(owner_workspace=workspace, owner_content_id=document.id).exists()
     ):
         return None
     try:
-        exported = build_simple_document_export(document, allow_repository_divergence=True)
+        exported = build_simple_document_export(
+            document, allow_repository_divergence=True, verify_attachments=True
+        )
         if (
             len(exported.blocks) != 1
             or exported.referenced_digests
-            or exported.attachment_digests
             or exported.key_binding_ids
             or exported.resolved_entity_links
             or repository_publication_preflight(
                 markdown=resolve_document(document).markdown,
                 audience="msp_internal",
                 topic_type=document.topic_type,
+                frozen_attachment_ids=set(
+                    DocumentAttachment.objects.filter(document=document, archived_at__isnull=True)
+                    .values_list("entity_id", flat=True)
+                ),
+                frozen_primary_file=DocumentAttachment.objects.filter(
+                    document=document, purpose="primary_file"
+                ).exists(),
             )["blockers"]
         ):
             return None

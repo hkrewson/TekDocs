@@ -146,7 +146,11 @@ def _transition_document_authority_locked(
         blockers = [
             blocker
             for blocker in blockers
-            if blocker not in {"content_copy_not_in_sync", "repository_read_projection_not_matched"}
+            # Snapshot capacity gates promotion/publication, not lossless return
+            # to retained legacy custody after files were added under Git.
+            if blocker not in {
+                "content_copy_not_in_sync", "repository_read_projection_not_matched", "managed_file_retention_limit"
+            }
         ]
     if blockers:
         raise DocumentAuthorityHandoffError(*blockers)

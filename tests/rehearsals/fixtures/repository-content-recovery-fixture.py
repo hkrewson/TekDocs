@@ -26,7 +26,7 @@ from apps.core.document_git_publications import publish_internal_git_document, v
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
 from apps.core.document_migration_publications import assess_retained_publications
 from apps.core.documents import create_document, resolve_document, update_document
-from apps.core.publications import publish_document, verify_retained_publication_custody
+from apps.core.publications import publish_document, read_publication_artifact, verify_retained_publication_custody
 from apps.core.models import (
     ContentNode,
     Document,
@@ -67,6 +67,9 @@ ORGANIZATION_MARKDOWN = "# Client enrollment\n\nUse this client's device policy.
 PUBLICATION_DOCUMENT_TITLE = "Client setup guide"
 PUBLICATION_ATTACHMENT_NAME = "recovery-guide.txt"
 PUBLICATION_ATTACHMENT_BYTES = b"Client setup instructions retained for recovery.\n"
+MIGRATED_PRIMARY_V1_BYTES = b"Migrated file-backed original version.\n"
+MIGRATED_PRIMARY_V2_BYTES = b"Migrated file-backed current version.\n"
+MIGRATED_ATTACHMENT_BYTES = b"Migrated file-backed checklist.\n"
 PUBLICATION_ATTACHMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.guide.attachment")
 PUBLICATION_MARKDOWN = f"# {PUBLICATION_DOCUMENT_TITLE}\n\n[Guide](tekdocs://attachment/{PUBLICATION_ATTACHMENT_ID})\n"
 NATIVE_ATTACHMENT_NAME = "client-enrollment.txt"
@@ -110,13 +113,23 @@ def _source_snapshot_digest(repository):
     return hashlib.sha256(snapshot.content).hexdigest()
 
 
-def _editable_bundle_digest(repository, attachment, native_attachment, primary_versions, native_primary_versions):
+def _editable_bundle_digest(
+    repository, attachment, native_attachment, primary_versions, native_primary_versions, migrated_files,
+):
     bundle = export_repository_editable_bundle(repository)
     manifest = verify_repository_editable_bundle(bundle.content)
     assert manifest["workspace_id"] == str(repository.workspace_id)
     assert manifest["accepted_commit"] == repository.accepted_commit.object_id
     descriptors = {descriptor["id"]: descriptor for descriptor in manifest["attachments"]}
-    assert set(descriptors) == {str(attachment.entity_id), str(native_attachment.entity_id)}
+    migrated_attachment = migrated_files[2]
+    assert set(descriptors) == {
+        str(attachment.entity_id), str(native_attachment.entity_id), str(migrated_attachment.entity_id),
+    }
+    assert descriptors[str(migrated_attachment.entity_id)]["sha256"] == hashlib.sha256(MIGRATED_ATTACHMENT_BYTES).hexdigest()
+    assert descriptors[str(migrated_attachment.entity_id)]["owner"] == {
+        "type": "legacy_document", "id": str(migrated_attachment.document_id),
+    }
+    assert copy_attachment_content(migrated_attachment) == MIGRATED_ATTACHMENT_BYTES
     legacy_descriptor = descriptors[str(attachment.entity_id)]
     assert legacy_descriptor["owner"] == {"type": "legacy_document", "id": str(attachment.document_id)}
     assert legacy_descriptor["sha256"] == hashlib.sha256(PUBLICATION_ATTACHMENT_BYTES).hexdigest()
@@ -126,13 +139,15 @@ def _editable_bundle_digest(repository, attachment, native_attachment, primary_v
     assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
     assert copy_attachment_content(native_attachment) == NATIVE_ATTACHMENT_BYTES
     primary_descriptors = manifest["primary_files"]
-    assert len(primary_descriptors) == len(primary_versions) + len(native_primary_versions) == 4
+    assert len(primary_descriptors) == len(primary_versions) + len(native_primary_versions) + 2 == 6
     descriptors_by_id = {item["id"]: item for item in primary_descriptors}
     for versions, owner, expected_contents in (
         (primary_versions, {"type": "legacy_document", "id": str(attachment.document_id)},
          (LEGACY_PRIMARY_V1_BYTES, LEGACY_PRIMARY_V2_BYTES)),
         (native_primary_versions, {"type": "repository_document", "id": str(NATIVE_PRIMARY_DOCUMENT_ID)},
          (NATIVE_PRIMARY_V1_BYTES, NATIVE_PRIMARY_V2_BYTES)),
+        (migrated_files[:2], {"type": "legacy_document", "id": str(migrated_attachment.document_id)},
+         (MIGRATED_PRIMARY_V1_BYTES, MIGRATED_PRIMARY_V2_BYTES)),
     ):
         for index, (record, expected_bytes) in enumerate(zip(versions, expected_contents, strict=True)):
             descriptor = descriptors_by_id.pop(str(record.entity_id))
@@ -364,6 +379,25 @@ def create_organization_fixture(owner, organization):
         tenant=repository.tenant, organization=repository.workspace.organization, actor_id=owner.id,
         title="Published Git recovery guide", markdown="Retained legacy recovery instructions.\n",
     )
+    migrated_v1 = create_document_attachment(
+        document=published_guide, actor_id=owner.id,
+        upload=SimpleUploadedFile("migrated-v1.txt", MIGRATED_PRIMARY_V1_BYTES),
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE, version_number=1,
+    )
+    migrated_v2 = replace_primary_document_file(
+        document=published_guide, actor_id=owner.id,
+        upload=SimpleUploadedFile("migrated-v2.txt", MIGRATED_PRIMARY_V2_BYTES),
+    )
+    migrated_attachment = create_document_attachment(
+        document=published_guide, actor_id=owner.id,
+        upload=SimpleUploadedFile("migrated-checklist.txt", MIGRATED_ATTACHMENT_BYTES),
+    )
+    file_link = f"\n[Checklist](tekdocs://attachment/{migrated_attachment.entity_id})\n"
+    update_document(
+        document=published_guide, actor_id=owner.id, title="Published Git recovery guide",
+        markdown="Retained legacy recovery instructions.\n" + file_link,
+        base_revision_id=published_guide.placements.get().block.current_revision_id,
+    )
     legacy_snapshot = publish_document(
         workspace=reader_workspace, document=published_guide, actor_id=owner.id,
         reason="Recovery fixture legacy snapshot", audience="msp_internal", retention="permanent",
@@ -371,7 +405,7 @@ def create_organization_fixture(owner, organization):
     )
     update_document(
         document=published_guide, actor_id=owner.id, title="Published Git recovery guide",
-        markdown="Pre-promotion recovery draft.\n",
+        markdown="Pre-promotion recovery draft.\n" + file_link,
         base_revision_id=published_guide.placements.get().block.current_revision_id,
     )
     plan = prepare_document_import(workspace=repository.workspace, document_id=published_guide.id)
@@ -387,14 +421,16 @@ def create_organization_fixture(owner, organization):
     author_content(
         repository=repository, actor_id=owner.id, request_id=None, operation="update",
         content_id=fragment.content_id, base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
-        kind=None, path=None, title=None, markdown="Recovered Git publication body.\n", metadata_patch={},
+        kind=None, path=None, title=None, markdown="Recovered Git publication body.\n" + file_link, metadata_patch={},
     )
     retained = publish_internal_git_document(
         workspace=reader_workspace, document=published_guide, actor=owner, reason="Recovery fixture Git snapshot",
         supersedes_entity_id=legacy_snapshot.entity_id,
     )
     assert verify_internal_git_publication(retained)
-    return attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2)
+    assert retained.manifest["format"] == "tekdocs-static-publication/v6"
+    return (attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2),
+            (migrated_v1, migrated_v2, migrated_attachment))
 
 
 def verify_fixture(owner):
@@ -485,11 +521,22 @@ def verify_organization_fixture(owner, organization, directory_entry):
         tenant=repository.tenant, organization=organization, entity__display_name="Published Git recovery guide",
     )
     legacy_snapshot, retained = published_guide.publications.order_by("published_at", "id")
-    assert legacy_snapshot.canonical_markdown == "Retained legacy recovery instructions.\n"
+    migrated_files = tuple(published_guide.attachments.filter(
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+    ).order_by("version_number")) + (published_guide.attachments.get(original_filename="migrated-checklist.txt"),)
+    assert len(migrated_files) == 3
+    for record, expected in zip(migrated_files, (
+        MIGRATED_PRIMARY_V1_BYTES, MIGRATED_PRIMARY_V2_BYTES, MIGRATED_ATTACHMENT_BYTES,
+    ), strict=True):
+        assert copy_attachment_content(record) == expected
+        artifact = retained.artifacts.get(source_attachment=record)
+        assert read_publication_artifact(artifact) == expected
+    file_link = f"\n[Checklist](tekdocs://attachment/{migrated_files[2].entity_id})\n"
+    assert legacy_snapshot.canonical_markdown == "Retained legacy recovery instructions.\n" + file_link
     assert retained.supersedes_id == legacy_snapshot.id
     assert legacy_snapshot.lifecycle_state == "superseded"
     assert verify_retained_publication_custody(legacy_snapshot)
-    assert retained.canonical_markdown == "Recovered Git publication body.\n"
+    assert retained.canonical_markdown == "Recovered Git publication body.\n" + file_link
     assert verify_internal_git_publication(retained)
     history = assess_retained_publications(workspace=repository.workspace, document=published_guide)
     assert history["state"] == "verified"
@@ -536,7 +583,7 @@ def verify_organization_fixture(owner, organization, directory_entry):
         purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
     ).order_by("version_number"))
     assert len(native_primary_versions) == 2
-    return attachment, native_attachment, primary_versions, native_primary_versions
+    return attachment, native_attachment, primary_versions, native_primary_versions, migrated_files
 
 
 owner = User.objects.get(email=OWNER_EMAIL)
@@ -575,13 +622,13 @@ with transaction.atomic():
         principal_mode=RLSPrincipalMode.USER,
     )
     if mode == "create":
-        attachment, native_attachment, primary_versions, native_primary_versions = create_organization_fixture(
+        attachment, native_attachment, primary_versions, native_primary_versions, migrated_files = create_organization_fixture(
             owner, organization
         )
         organization_repository = _organization_repository(owner, organization)
         organization_snapshot_digest = _source_snapshot_digest(organization_repository)
         organization_editable_digest = _editable_bundle_digest(
-            organization_repository, attachment, native_attachment, primary_versions, native_primary_versions
+            organization_repository, attachment, native_attachment, primary_versions, native_primary_versions, migrated_files
         )
         print(f"MSP_SOURCE_SHA256={msp_snapshot_digest}")
         print(f"ORGANIZATION_SOURCE_SHA256={organization_snapshot_digest}")
@@ -595,9 +642,9 @@ with transaction.atomic():
         print("MSP and client repository Markdown and managed-file recovery fixtures created")
     else:
         legacy_document = Document.objects.get(
-            tenant=tenant, organization=organization, entity__display_name=PUBLICATION_DOCUMENT_TITLE
+            tenant=tenant, organization=organization, entity__display_name="Published Git recovery guide"
         )
-        attachment = legacy_document.attachments.get(original_filename=PUBLICATION_ATTACHMENT_NAME)
+        attachment = legacy_document.attachments.get(original_filename="migrated-checklist.txt")
         historical_primary = legacy_document.attachments.get(
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             version_number=1,
@@ -609,9 +656,9 @@ with transaction.atomic():
         elif mode == "repair_managed_file":
             assert not attachment.file.storage.exists(attachment.file.name)
             assert attachment.file.storage.save(
-                attachment.file.name, ContentFile(PUBLICATION_ATTACHMENT_BYTES)
+                attachment.file.name, ContentFile(MIGRATED_ATTACHMENT_BYTES)
             ) == attachment.file.name
-            assert copy_attachment_content(attachment) == PUBLICATION_ATTACHMENT_BYTES
+            assert copy_attachment_content(attachment) == MIGRATED_ATTACHMENT_BYTES
             print("Disposable managed-file custody repaired")
         elif mode == "break_historical_primary":
             historical_primary.file.storage.delete(historical_primary.file.name)
@@ -620,18 +667,18 @@ with transaction.atomic():
         elif mode == "repair_historical_primary":
             assert not historical_primary.file.storage.exists(historical_primary.file.name)
             assert historical_primary.file.storage.save(
-                historical_primary.file.name, ContentFile(LEGACY_PRIMARY_V1_BYTES)
+                historical_primary.file.name, ContentFile(MIGRATED_PRIMARY_V1_BYTES)
             ) == historical_primary.file.name
-            assert copy_attachment_content(historical_primary) == LEGACY_PRIMARY_V1_BYTES
+            assert copy_attachment_content(historical_primary) == MIGRATED_PRIMARY_V1_BYTES
             print("Disposable historical primary-file custody repaired")
         else:
-            attachment, native_attachment, primary_versions, native_primary_versions = verify_organization_fixture(
+            attachment, native_attachment, primary_versions, native_primary_versions, migrated_files = verify_organization_fixture(
                 owner, organization, directory_entry
             )
             organization_repository = _organization_repository(owner, organization)
             organization_snapshot_digest = _source_snapshot_digest(organization_repository)
             organization_editable_digest = _editable_bundle_digest(
-                organization_repository, attachment, native_attachment, primary_versions, native_primary_versions
+                organization_repository, attachment, native_attachment, primary_versions, native_primary_versions, migrated_files
             )
             assert msp_snapshot_digest == os.environ["TEKDOCS_RECOVERY_MSP_SOURCE_SHA256"]
             assert organization_snapshot_digest == os.environ["TEKDOCS_RECOVERY_ORG_SOURCE_SHA256"]

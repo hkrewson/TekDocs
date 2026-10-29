@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 
-type State = { document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string } }
+type State = { document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -50,9 +50,19 @@ test('migrated signed history survives real publishing, correction, withdrawal a
     const response = await publishedResponse
     expect(response.status()).toBe(201)
     const published = await response.json() as DocumentPublicationDetail
-    expect(published.manifest.format).toBe('tekdocs-static-publication/v5')
+    expect(published.manifest.format).toBe('tekdocs-static-publication/v6')
     expect(published.canonical_markdown).toContain('Current migrated browser instructions.')
     expect(published.verification.valid).toBe(true)
+    await page.getByRole('button', { name: 'Downloads', exact: true }).click()
+    for (const file of state.files) {
+      const downloadPromise = page.waitForEvent('download')
+      await page.locator('.publication-artifacts').getByRole('link').filter({ hasText: file.filename }).click()
+      const download = await downloadPromise
+      try {
+        expect(await download.failure()).toBeNull()
+        expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(file.sha256)
+      } finally { await download.delete() }
+    }
 
     // Edit the owned fragment through the real Git editor, then supersede the
     // original legacy snapshot from the ordinary retained-publication interface.

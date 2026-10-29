@@ -79,7 +79,7 @@ from apps.core.models import (
     WorkspaceRepository,
 )
 from apps.core.organizations import create_organization
-from apps.core.publications import PublicationConflict, publish_document
+from apps.core.publications import publish_document, verify_retained_publication_custody
 from apps.core.repository_editable_bundle_validation import verify_repository_editable_bundle
 from apps.core.repository_editable_bundles import export_repository_editable_bundle
 from apps.core.repository_primary_publication import prepare_repository_primary_publication
@@ -444,16 +444,20 @@ def test_repository_authority_allows_git_edits_for_a_migrated_document(tmp_path,
                 "updated_at",
             )
         )
-        with pytest.raises(PublicationConflict, match="publication parity"):
-            publish_document(
-                workspace=resolve_msp_workspace(installation.owner),
-                document=document,
-                actor_id=installation.owner.id,
-                reason="Verify Git authority guard",
-                audience="msp_internal",
-                retention="permanent",
-                retention_review_on=None,
-            )
+        publication = publish_document(
+            workspace=resolve_msp_workspace(installation.owner),
+            document=document,
+            actor_id=installation.owner.id,
+            reason="Verify file-bearing Git authority",
+            audience="msp_internal",
+            retention="permanent",
+            retention_review_on=None,
+        )
+        assert publication.manifest["format"] == "tekdocs-static-publication/v6"
+        assert {item["id"] for item in publication.manifest["managed_files"]} == {
+            str(original_primary.entity_id), str(replacement_primary.entity_id), str(original_attachment.entity_id),
+        }
+        assert verify_retained_publication_custody(publication)
         repository_export = resolve_export_snapshot(
             workspace=resolve_msp_workspace(installation.owner), document=document
         )

@@ -251,23 +251,26 @@ def _create_managed_attachment(
                     ).exists()
                 ):
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
-                legacy_document_exists = Document.objects.filter(
+                legacy_document = Document.objects.select_for_update().filter(
                     id=content_id,
                     tenant=tenant,
                     organization=organization,
                     entity__workspace=workspace,
-                ).exists()
+                ).first()
                 authority = (
                     DocumentAuthority.objects.filter(workspace=workspace, content_id=content_id)
                     .values_list("authority", flat=True)
                     .first()
                 )
-                if legacy_document_exists and authority != DocumentAuthorityMode.REPOSITORY:
+                if legacy_document is not None and authority != DocumentAuthorityMode.REPOSITORY:
                     raise ValidationError({"content_id": "Legacy content remains authoritative for this document."})
                 accepted_commit = repository.accepted_commit
                 if accepted_commit is None:
                     raise ValidationError({"content_id": "An accepted, indexed document is required."})
                 upload_commit = accepted_commit.object_id
+                # A promoted document retains its durable legacy file owner so
+                # newly uploaded files remain reachable after authority rollback.
+                document = legacy_document
             elif purpose == DocumentAttachmentPurpose.PRIMARY_FILE:
                 # Publication evidence locks this same row before checking for
                 # primary versions, including when the chain is still empty.

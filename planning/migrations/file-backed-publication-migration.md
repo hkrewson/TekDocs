@@ -21,7 +21,7 @@ diagrams, client delivery and broader structural edits remain outside this slice
 New file-bearing Git snapshots use a versioned manifest rather than changing
 the meaning of signed v5 records. Existing publication formats remain verifiable.
 Runtime bytes and workflow state remain outside Git. Validation and review
-results will be recorded before delivery.
+results are recorded below.
 
 ## Implementation contract
 
@@ -165,21 +165,23 @@ or claimed by this development slice.
   The harness restored the existing frontend/migrate services to stopped base
   configurations and removed its generated test database.
 
-### Pending verification
+### Hosted validation and delivery
 
 Implementation was committed and pushed directly to main as
 `ade9dbbda56acb6eddd10153c8f5732ab90cd6de`. No branch, PR, version or tag was
 created; private ignored AGENTS files were not staged.
 
-Exact-source hosted checks are running:
+Initial checks at `ade9dbb`:
 
 - [Build 40813776462](https://github.com/hkrewson/TekDocs/actions/runs/40813776462).
 - [CodeQL 40813798595](https://github.com/hkrewson/TekDocs/actions/runs/40813798595).
 - [Extended validation 40813797244](https://github.com/hkrewson/TekDocs/actions/runs/40813797244).
 
-No hosted acceptance is inferred from source review or earlier release runs.
-Independent encrypted backup/restore, supported upgrades and production-image
-checks must confirm the pushed source. Production and public Wiki remain
+CodeQL passed. Build and Extended were explicitly canceled while incomplete
+after the coverage correction below; neither is claimed as a successful gate.
+
+Hosted acceptance is bound to the checked source and named gates, rather than
+source review or earlier release runs. Production and public Wiki remain
 unchanged. Subsequent evidence-only commits do not change this runtime source.
 
 Hosted coverage correction: inspection found that the existing supported-upgrade
@@ -189,3 +191,59 @@ fresh/0.8.46-upgrade rehearsal before publishing upgrade evidence. Its script
 creates isolated projects/volumes and is therefore hosted-only under the local
 container rule. This is validation wiring; application source remains `ade9dbb`.
 The earlier Extended run does not establish this omitted constituent.
+
+The two-line workflow correction and status note were reviewed on both axes,
+parsed as YAML, checked against the existing shell target and pushed as
+`d85f574d85341c3eb7c793222266539162c97b9b`. Application, test and migration source
+are byte-identical to `ade9dbb`. Replacement runs:
+
+- [Build 40814940764](https://github.com/hkrewson/TekDocs/actions/runs/40814940764).
+- [CodeQL 40814961602](https://github.com/hkrewson/TekDocs/actions/runs/40814961602).
+- [Extended validation 40814959514](https://github.com/hkrewson/TekDocs/actions/runs/40814959514).
+
+The hosted prepare gate passed workflow lint; actionlint is not installed
+locally. The final source-matched results are recorded below.
+
+At `d85f574`, Build and CodeQL passed completely, including all ten PostgreSQL
+shards, combined coverage, real publication browser acceptance, production-image
+rehearsal/SBOM/scans and workflow syntax. Extended attempt 1 passed the five-browser
+matrix, performance, DAST and the complete encrypted recovery/repository/billing
+job. Its supported-upgrade matrix passed, but the newly added document rehearsal
+failed in Docker BuildKit before the upgraded application started (overlay
+bind-mount `invalid argument`, job `123254149437`). The cause remains unknown;
+a runner/cache fault is only a hypothesis. The failure-follow-up reporter exited
+nonzero by design. Both are retained in `validation-failures.json`.
+
+Only the affected upgrade job and dependents were retried unchanged as Extended
+attempt 2 on a fresh hosted runner. No source, assertion, timeout or acceptance
+criterion was altered for that retry. The dedicated fresh/0.8.46 migration
+rehearsal passed, followed by diagram-source upgrade and evidence delivery.
+This successful retry does not establish the cause of the first failure.
+
+### Verified hosted closeout — October 29, 2026
+
+All three runs report `completed/success` for exact source
+`d85f574d85341c3eb7c793222266539162c97b9b`:
+
+- Build `40814940764`, attempt 1: full PostgreSQL matrix/coverage, constrained-role
+  runtime, frontend, real browser journey, diagram exports and production-image
+  rehearsal/SBOM/vulnerability checks passed. Versioned image publication was
+  skipped because 0.9.16 already exists; no release or receipt tag was created.
+- CodeQL `40814961602`, attempt 1: both language analyses and evidence passed.
+- Extended `40814959514`, successful attempt 2: all five browsers, performance,
+  DAST, independent encrypted recovery, repository foundation and billing restore,
+  supported upgrades, dedicated document-migration upgrade, diagram-source upgrade
+  and combined upgrade/restore evidence passed. The failure reporter was skipped
+  after success. Passing attempt-1 jobs were retained; only upgrade and dependents
+  were replayed.
+
+GitHub lists unexpired source-bound upgrade and combined diagram evidence from
+attempt 2, plus backup/restore, browser and DAST evidence from attempt 1. Evidence
+is not relabeled as if every job had run on attempt 2.
+
+Verified: the bounded runtime, migration, rollback, retained-file/signature/PDF
+custody and independent recovery gates above. Inferred: no broader migration or
+1.0 acceptance from those results. Blocked locally: separate-stack aggregate
+constituents under the explicit container rule; their required hosted counterparts
+are now successful. Production deployment and public Wiki publication were not
+performed. Subsequent closeout-only commits carry no new runtime claim.

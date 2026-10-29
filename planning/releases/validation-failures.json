@@ -784,6 +784,30 @@
       "fix_commit": null,
       "retest_run": "40637961760",
       "retest_attempt": 2
+    },
+    {
+      "run_id": "40814959514",
+      "run_attempt": 1,
+      "job": "Supported upgrade matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted dedicated document-migration rehearsal created its 0.8.46 baseline, then Docker BuildKit failed while loading the current backend Dockerfile with an overlay bind-mount invalid-argument error. Job 123254149437 confirms failure before the upgraded application started. The identical job passed on a fresh runner as attempt 2, job 123271123173.",
+      "cause": "Unknown. The BuildKit mount error and pre-application phase are verified; a runner/cache fault is a hypothesis, not an established cause.",
+      "next_action": "Resolved by unchanged attempt 2 at d85f574: full supported-upgrade matrix, dedicated fresh/0.8.46 migration rehearsal, diagram-source upgrade and evidence passed. Full Extended conclusion is success. Preserve the original failure and unknown cause; no source, assertions or timeouts changed for this retry.",
+      "fix_commit": null,
+      "retest_run": "40814959514",
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "40814959514",
+      "run_attempt": 1,
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Job 123264332636 ran scripts/ci_status.py while the workflow contained the failed upgrade job; the status reporter exited 1 as designed.",
+      "cause": "Expected policy outcome: ci_status.main returns nonzero for failed or incomplete validation. No independent reporter defect is inferred.",
+      "next_action": "The dependent failure reporter was skipped after successful attempt 2. Preserve the original policy report; no reporter code fix was required. Full Extended conclusion is success at d85f574.",
+      "fix_commit": null,
+      "retest_run": "40814959514",
+      "retest_attempt": 2
     }
   ]
 }

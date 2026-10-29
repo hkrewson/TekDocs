@@ -22,6 +22,11 @@ It does not change the 0.9.16 release images or production authority. Its own
 validation record distinguishes local runtime checks from hosted recovery.
 The [development release notes](file-backed-migration-notes.md) describe the user
 behavior without relabeling the published version.
+Exact-source validation at `d85f574` passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/40814940764),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/40814961602) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/40814959514).
+The slice record retains the original BuildKit failure, unchanged successful
+retry and evidence attempt boundaries.
 
 The [0.9.16 publication closeout](0.9.16-operational-closeout.md) records successful
 [Build 40637961760](https://github.com/hkrewson/TekDocs/actions/runs/40637961760)

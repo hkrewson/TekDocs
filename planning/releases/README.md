@@ -21,6 +21,12 @@ signed history/PDF custody, rollback and recovery. See its exact-source validati
 boundary before treating it as accepted. No version, image or production change
 is part of this slice. The [development release notes](shared-block-migration-notes.md)
 describe the supported behavior.
+Exact source `3495d96` passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/40985517155),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/40985578137) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/40985580577),
+including fresh/0.8.46 signed-document migration and independent encrypted recovery.
+The slice record retains the original rehearsal media-loss failure and its
+reproduced correction. Later closeout-only commits carry no new runtime claim.
 
 ## Published 0.9.16: bounded internal Git publication
 

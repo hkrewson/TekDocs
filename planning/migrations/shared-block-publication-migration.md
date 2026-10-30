@@ -170,3 +170,50 @@ cleared this harness-only correction. No signature, byte-preservation, identity,
 rollback, recovery or application assertion was loosened. The dedicated extra-
 stack rehearsal remains hosted-only under repository rules; corrected-source
 hosted results will be recorded below.
+
+## Verified hosted closeout — October 29, 2026
+
+All three workflows report `completed/success` for exact source
+`3495d96276ed6f94cb516565765435464476e34f`:
+
+- [Build 40985517155](https://github.com/hkrewson/TekDocs/actions/runs/40985517155):
+  full PostgreSQL matrix and combined coverage, constrained-role/RLS boundary,
+  frontend gates, real migrated-publication browser journey, diagram exports,
+  production-image rehearsal, SBOMs and vulnerability policy passed. Versioned
+  image publication was skipped because 0.9.16 already exists; no application or
+  receipt tag was created.
+- [CodeQL 40985578137](https://github.com/hkrewson/TekDocs/actions/runs/40985578137):
+  both language analyses and source-bound evidence delivery passed.
+- [Extended 40985580577](https://github.com/hkrewson/TekDocs/actions/runs/40985580577):
+  all five browser targets, performance, DAST, independent encrypted recovery,
+  repository foundation, invoice restore, supported upgrades, dedicated signed
+  shared-document migration, diagram-source upgrade and combined evidence passed.
+  The failure reporter was skipped after success.
+
+The corrected dedicated rehearsal explicitly reported fresh/0.8.46 acceptance.
+It compares the same original Document/Block/pinned-revision identities, signed
+publication signatures, manifest hashes and exact PDF hashes across the upgrade.
+Both upgraded and fresh installations then copy shared documents, promote their
+live group, edit the source, publish live/pinned v7 corrections and roll back
+collectively. Live text updates, the original pinned text remains selected, and
+original signed evidence is unchanged. Signature/artifact checks were retained;
+the harness fix only persisted the media volume across migration containers.
+
+GitHub lists unexpired source-bound upgrade artifact `12948344283`, backup/restore
+artifact `12948166979` and combined upgrade/restore artifact `12948603194`, all
+for `3495d96`, attempt 1. Browser and DAST evidence for the same source is also
+uploaded. Original failed run `40981792211` remains recorded rather than being
+relabeled as accepted. Original source `367ad68` separately passed Build
+`40981767146` and CodeQL `40981789373`; its failed upgrade rehearsal is superseded
+only by the corrected-source results above.
+
+Verified: the bounded same-Workspace shared-leaf migration, preserved live/pinned
+semantics, immutable signed publications/PDFs, collective rollback, SQL reverse/
+reapply, and independent recovery/upgrade gates described here. Inferred: no
+broader migration or 1.0 acceptance from those results. Blocked locally: aggregate
+constituents requiring extra stacks under repository rules; their required hosted
+counterparts are now successful. Missing pin history, repeated Block occurrences
+and other unsupported shapes remain explicit blockers. No new version, production
+inspection/deployment, live migration or public Wiki publication was performed.
+The local Wiki draft and unrelated maintainer edits remain intact. Subsequent
+closeout-only commits carry no new runtime claim.

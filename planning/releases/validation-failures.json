@@ -808,6 +808,28 @@
       "fix_commit": null,
       "retest_run": "40814959514",
       "retest_attempt": 2
+    },
+    {
+      "run_id": "40981792211",
+      "run_attempt": 1,
+      "job": "Supported upgrade matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Job 123823345508 created signed PDFs on 0.8.46, then upgraded identity verification failed reading a retained PDF. In the existing local tekdocs migrate service, a synthetic /app/media file disappeared after container recreation without a media mount and survived byte-for-byte after attaching the existing media_data volume; the owned probe was removed afterward.",
+      "cause": "The dedicated rehearsal ran its fixture in ephemeral migrate containers without mounting the existing media_data volume. Database rows persisted, but baseline PDF bytes were discarded with that container. Both baseline and current Compose configurations confirm the omission; no application migration deleted the PDFs.",
+      "next_action": "Correct the rehearsal with one override sharing existing media_data between migrate and backend for baseline, upgrade and fresh phases. Signature, artifact-byte and identity assertions remain unchanged. Full corrected-source hosted validation is pending.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "40981792211",
+      "run_attempt": 1,
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Job 123834078165 invoked scripts/ci_status.py while the dedicated upgrade job had failed; the reporter returned failure.",
+      "cause": "Expected policy result for a failed validation run; no independent reporter defect is inferred.",
+      "next_action": "Retain the original report. The reporter should be skipped after successful corrected-source Extended validation; no reporter change is required.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

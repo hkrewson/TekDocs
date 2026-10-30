@@ -144,3 +144,29 @@ with server authority round-trip and retained custody verification plus artifact
 hygiene passed. Ruff, strict mypy, migration consistency and Bandit pass again
 with no Bandit findings. Hosted Build, CodeQL and Extended validation will bind
 the committed source before hosted acceptance is recorded.
+
+## Hosted rehearsal custody correction
+
+Initial source `367ad68648f05a863cf05818cf87f9a17728c4b0` passed CodeQL run
+`40981789373`. Extended run `40981792211`, attempt 1, passed browsers, DAST,
+performance and independent encrypted recovery, but its dedicated document
+upgrade job `123823345508` failed: upgraded identity verification could not read
+a PDF created on 0.8.46. No aggregate upgrade acceptance is claimed for that run.
+The dependent failure reporter correctly returned failure as well; both are
+retained in `planning/releases/validation-failures.json`.
+
+Diagnosis: the fixture used ephemeral `migrate` containers whose baseline and
+current configurations omitted `/app/media`. Their database rows persisted while
+PDF files remained in the removed container. A real existing-project Docker probe
+reproduced file loss across recreation without a mount, then byte-exact retention
+with the existing `tekdocs_media_data` volume attached. Only the owned synthetic
+probe was written and removed; no development records were changed.
+
+The rehearsal now applies a small Compose override to share existing `media_data`
+with migration containers in baseline, upgrade and fresh phases. It adds no
+service or data volume. Both baseline/current resolved configurations match the
+backend media mapping; POSIX shell syntax and diff checks pass. Both review axes
+cleared this harness-only correction. No signature, byte-preservation, identity,
+rollback, recovery or application assertion was loosened. The dedicated extra-
+stack rehearsal remains hosted-only under repository rules; corrected-source
+hosted results will be recorded below.

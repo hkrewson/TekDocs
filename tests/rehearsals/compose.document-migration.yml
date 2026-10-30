@@ -1,0 +1,6 @@
+# The baseline and current migration fixtures create/read signed PDFs in one
+# existing project media volume. No extra service or data volume is introduced.
+services:
+  migrate:
+    volumes:
+      - media_data:/app/media

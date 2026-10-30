@@ -1,4 +1,10 @@
 #!/bin/sh
+
+#=======================# Document migration upgrade #=======================#
+# Preserve the database and signed PDF media across migration containers, then
+# compare the same bounded migration behavior on fresh and upgraded records.
+
+#=======================# VARIABLES #=======================#
 set -eu
 
 # Compare the same first-wave migration behavior on fresh and 0.8.46-upgraded data.
@@ -11,14 +17,17 @@ fresh_environment="$work_directory/fresh.env"
 upgrade_project="tekdocs_document_migration_upgrade_$$"
 fresh_project="tekdocs_document_migration_fresh_$$"
 fixture_password=$(openssl rand -base64 36 | tr -d '\n')
+fixture_override="$repository_root/tests/rehearsals/compose.document-migration.yml"
 
+#======================# FUNCTIONS #=======================#
 compose_for() {
   project=$1
   environment=$2
   directory=$3
   shift 3
   docker compose --project-name "$project" --env-file "$environment" \
-    -f "$directory/compose.yml" -f "$directory/compose.test.yml" "$@"
+    -f "$directory/compose.yml" -f "$directory/compose.test.yml" \
+    -f "$fixture_override" "$@"
 }
 
 run_fixture() {
@@ -46,6 +55,7 @@ cleanup() {
   [ -n "$work_directory" ] && [ -d "$work_directory" ] && rm -rf "$work_directory"
   exit "$status"
 }
+#=========================# MAIN #==========================#
 trap cleanup EXIT HUP INT TERM
 
 [ "$(git -C "$repository_root" show "$baseline_ref:VERSION" | tr -d '[:space:]')" = "0.8.46" ]

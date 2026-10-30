@@ -13,6 +13,15 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Shared-block development after 0.9.16
+
+The [shared-block migration record](../migrations/shared-block-publication-migration.md)
+tracks same-Workspace live/pinned references, atomic live dependency groups,
+signed history/PDF custody, rollback and recovery. See its exact-source validation
+boundary before treating it as accepted. No version, image or production change
+is part of this slice. The [development release notes](shared-block-migration-notes.md)
+describe the supported behavior.
+
 ## Published 0.9.16: bounded internal Git publication
 
 Subsequent development: the [file-backed migration slice](../migrations/file-backed-publication-migration.md)

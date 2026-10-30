@@ -1080,3 +1080,13 @@ The expanded live browser and recovery fixtures check exact retained bytes.
 Templates, key/entity dependencies, diagrams, client delivery, broader structural
 editing and final 1.0 acceptance remain open. Version stays 0.9.16; deployment
 and live document migration require separate authorization.
+
+### Shared-block publication migration — October 29, 2026
+
+The bounded #105/#106 [shared-block slice](migrations/shared-block-publication-migration.md)
+adds same-Workspace live and pinned leaf references, explicit atomic live groups,
+signed v7 publications and collective owner-preserving rollback. It extends the
+existing managed-file boundary without rewriting earlier signatures or PDFs.
+Templates, repeated Block occurrences, cross-Workspace reuse, dynamic dependencies
+and client delivery remain open. This does not close #105/#106 or declare 1.0
+acceptance, a new release or a production migration.

@@ -143,7 +143,7 @@ def _linked_historical_leaf(
 
 
 def _existing_references(
-    document: Document, placements: tuple[DocumentPlacement, ...]
+    document: Document, placements: tuple[DocumentPlacement, ...], *, allow_repository_divergence: bool = False,
 ) -> tuple[str | None, dict[uuid.UUID, ParsedContent], dict[uuid.UUID, str]]:
     """Require exact, indexed, same-workspace leaf sources; never copy them."""
 
@@ -304,6 +304,14 @@ def _existing_references(
                     raise DocumentMigrationReferenceError("pinned_source_snapshot_required")
                 parsed = historical
             pinned_commits[placement.block_id] = pinned_commit
+        from .models import DocumentAuthority
+
+        repository_live_source = (
+            allow_repository_divergence and placement.resolution_mode == PlacementResolutionMode.LIVE
+            and DocumentAuthority.objects.filter(
+                workspace=repository.workspace, content_id=source_document_id, authority="repository",
+            ).exists()
+        )
         if (
             parsed.content_id != placement.block_id
             or parsed.kind != ContentNodeKind.FRAGMENT
@@ -311,7 +319,7 @@ def _existing_references(
             or (pinned_commit == accepted_object_id or not pinned_commit)
             and parsed.content_digest != node.content_digest
             or revision is None
-            or parsed.markdown != revision.markdown
+            or (parsed.markdown != revision.markdown and not repository_live_source)
         ):
             raise DocumentMigrationReferenceError(
                 "pinned_source_snapshot_required" if pinned_commit else "cross_document_source_drift"
@@ -341,7 +349,9 @@ def build_simple_document_export(
         tree = owned_placement_tree(document, placements)
     except DocumentMigrationShapeError as exc:
         raise DocumentMigrationExportError(exc.reason) from exc
-    reference_commit, referenced, pinned_commits = _existing_references(document, tree.ordered)
+    reference_commit, referenced, pinned_commits = _existing_references(
+        document, tree.ordered, allow_repository_divergence=allow_repository_divergence,
+    )
     try:
         taxonomies = portable_document_taxonomies(document)
     except DocumentMigrationTaxonomyError as exc:

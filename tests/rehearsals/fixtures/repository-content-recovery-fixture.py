@@ -14,6 +14,7 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.core.content_authoring import author_content, read_authored_content
 from apps.core.content_read import document_detail
+from apps.core.content_profile import parse_content
 from apps.core.document_attachments import (
     append_repository_primary_document_file,
     copy_attachment_content,
@@ -22,10 +23,11 @@ from apps.core.document_attachments import (
     replace_primary_document_file,
 )
 from apps.core.document_authority_handoff import transition_document_authority
+from apps.core.document_authority_groups import prepare_authority_group, transition_authority_group
 from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
 from apps.core.document_migration_publications import assess_retained_publications
-from apps.core.documents import create_document, resolve_document, update_document
+from apps.core.documents import add_document_placement, create_document, resolve_document, update_document
 from apps.core.publications import publish_document, read_publication_artifact, verify_retained_publication_custody
 from apps.core.models import (
     ContentNode,
@@ -70,6 +72,10 @@ PUBLICATION_ATTACHMENT_BYTES = b"Client setup instructions retained for recovery
 MIGRATED_PRIMARY_V1_BYTES = b"Migrated file-backed original version.\n"
 MIGRATED_PRIMARY_V2_BYTES = b"Migrated file-backed current version.\n"
 MIGRATED_ATTACHMENT_BYTES = b"Migrated file-backed checklist.\n"
+SHARED_LIVE_ORIGINAL = "Shared live recovery instructions.\n"
+SHARED_LIVE_UPDATED = "Updated shared live recovery instructions.\n"
+SHARED_PIN_ORIGINAL = "Pinned original recovery instructions.\n"
+SHARED_PIN_UPDATED = "Updated pinned source recovery instructions.\n"
 PUBLICATION_ATTACHMENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.guide.attachment")
 PUBLICATION_MARKDOWN = f"# {PUBLICATION_DOCUMENT_TITLE}\n\n[Guide](tekdocs://attachment/{PUBLICATION_ATTACHMENT_ID})\n"
 NATIVE_ATTACHMENT_NAME = "client-enrollment.txt"
@@ -398,6 +404,27 @@ def create_organization_fixture(owner, organization):
         markdown="Retained legacy recovery instructions.\n" + file_link,
         base_revision_id=published_guide.placements.get().block.current_revision_id,
     )
+    shared_sources = []
+    for index, (title, body, mode) in enumerate((
+        ("Recovery shared live source", SHARED_LIVE_ORIGINAL, "live"),
+        ("Recovery shared pinned source", SHARED_PIN_ORIGINAL, "pinned"),
+    ), 1):
+        source = create_document(
+            tenant=repository.tenant, organization=repository.workspace.organization, actor_id=owner.id,
+            title=title, markdown=body,
+        )
+        block = source.placements.get().block
+        add_document_placement(
+            document=published_guide, source_document=source, actor_id=owner.id,
+            resolution_mode=mode, pinned_revision_id=block.current_revision_id if mode == "pinned" else None,
+            parent_id=None, position=index,
+        )
+        source_plan = prepare_document_import(workspace=repository.workspace, document_id=source.id)
+        apply_document_import(
+            workspace=repository.workspace, document_id=source.id, expected_base=source_plan.base_commit,
+            plan_sha256=source_plan.plan_sha256, actor_id=owner.id,
+        )
+        shared_sources.append(source)
     legacy_snapshot = publish_document(
         workspace=reader_workspace, document=published_guide, actor_id=owner.id,
         reason="Recovery fixture legacy snapshot", audience="msp_internal", retention="permanent",
@@ -406,29 +433,42 @@ def create_organization_fixture(owner, organization):
     update_document(
         document=published_guide, actor_id=owner.id, title="Published Git recovery guide",
         markdown="Pre-promotion recovery draft.\n" + file_link,
-        base_revision_id=published_guide.placements.get().block.current_revision_id,
+        base_revision_id=published_guide.placements.get(block__source_document=published_guide).block.current_revision_id,
     )
     plan = prepare_document_import(workspace=repository.workspace, document_id=published_guide.id)
     apply_document_import(
         workspace=repository.workspace, document_id=published_guide.id, expected_base=plan.base_commit,
         plan_sha256=plan.plan_sha256, actor_id=owner.id,
     )
-    transition_document_authority(
-        workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
-        target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
+    group = prepare_authority_group(
+        workspace=repository.workspace, document_ids=(published_guide.id, *(d.id for d in shared_sources)),
+        actor_id=owner.id, target="repository", reader_workspace=reader_workspace,
     )
-    fragment = read_authored_content(repository=repository, content_id=published_guide.placements.get().block_id)
+    transition_authority_group(
+        workspace=repository.workspace, document_ids=group.document_ids, actor_id=owner.id,
+        target="repository", reader_workspace=reader_workspace, plan_sha256=group.plan_sha256,
+    )
+    fragment = read_authored_content(
+        repository=repository, content_id=published_guide.placements.get(block__source_document=published_guide).block_id,
+    )
     author_content(
         repository=repository, actor_id=owner.id, request_id=None, operation="update",
         content_id=fragment.content_id, base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
         kind=None, path=None, title=None, markdown="Recovered Git publication body.\n" + file_link, metadata_patch={},
     )
+    for source, body in zip(shared_sources, (SHARED_LIVE_UPDATED, SHARED_PIN_UPDATED), strict=True):
+        shared = read_authored_content(repository=repository, content_id=source.placements.get().block_id)
+        author_content(
+            repository=repository, actor_id=owner.id, request_id=None, operation="update",
+            content_id=shared.content_id, base_commit=shared.accepted_commit, base_blob=shared.source_blob,
+            kind=None, path=None, title=None, markdown=body, metadata_patch={},
+        )
     retained = publish_internal_git_document(
         workspace=reader_workspace, document=published_guide, actor=owner, reason="Recovery fixture Git snapshot",
         supersedes_entity_id=legacy_snapshot.entity_id,
     )
     assert verify_internal_git_publication(retained)
-    assert retained.manifest["format"] == "tekdocs-static-publication/v6"
+    assert retained.manifest["format"] == "tekdocs-static-publication/v7"
     return (attachment, native_attachment, (primary_v1, primary_v2), (native_primary_v1, native_primary_v2),
             (migrated_v1, migrated_v2, migrated_attachment))
 
@@ -532,25 +572,53 @@ def verify_organization_fixture(owner, organization, directory_entry):
         artifact = retained.artifacts.get(source_attachment=record)
         assert read_publication_artifact(artifact) == expected
     file_link = f"\n[Checklist](tekdocs://attachment/{migrated_files[2].entity_id})\n"
-    assert legacy_snapshot.canonical_markdown == "Retained legacy recovery instructions.\n" + file_link
+    assert legacy_snapshot.canonical_markdown == (
+        "Retained legacy recovery instructions.\n" + file_link + "\n" + SHARED_LIVE_ORIGINAL + "\n" + SHARED_PIN_ORIGINAL
+    )
     assert retained.supersedes_id == legacy_snapshot.id
     assert legacy_snapshot.lifecycle_state == "superseded"
     assert verify_retained_publication_custody(legacy_snapshot)
-    assert retained.canonical_markdown == "Recovered Git publication body.\n" + file_link
+    assert retained.canonical_markdown == (
+        "Recovered Git publication body.\n" + file_link + "\n" + SHARED_LIVE_UPDATED + "\n" + SHARED_PIN_ORIGINAL
+    )
     assert verify_internal_git_publication(retained)
     history = assess_retained_publications(workspace=repository.workspace, document=published_guide)
     assert history["state"] == "verified"
     assert history["evidence_sha256"] == os.environ["TEKDOCS_RECOVERY_HISTORY_SHA256"]
     retained_digest = retained.content_digest
+    shared_sources = tuple(Document.objects.get(
+        tenant=repository.tenant, organization=organization, entity__display_name=title,
+    ) for title in ("Recovery shared live source", "Recovery shared pinned source"))
+    group_ids = (published_guide.id, *(d.id for d in shared_sources))
+    for source, expected in zip(shared_sources, (SHARED_LIVE_UPDATED, SHARED_PIN_UPDATED), strict=True):
+        assert read_authored_content(
+            repository=repository, content_id=source.placements.get().block_id,
+        ).markdown == expected
+    pinned = published_guide.placements.get(resolution_mode="pinned")
+    pin_proof = next(s for s in retained.manifest["git_source"]["sources"] if s["mode"] == "pinned")
+    _, pinned_files = read_repository_markdown_files_at_commit(
+        repository_id=repository.id, object_id=pin_proof["commit"],
+    )
+    pinned_source = parse_content(dict(pinned_files)[pin_proof["path"]])
+    assert pinned_source.content_id == pinned.block_id
+    assert pinned_source.markdown == SHARED_PIN_ORIGINAL
     state = DocumentAuthority.objects.get(workspace=repository.workspace, content_id=published_guide.id)
     if state.authority == DocumentAuthorityMode.LEGACY:
-        assert transition_document_authority(
-            workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
-            target=DocumentAuthorityMode.REPOSITORY, reader_workspace=reader_workspace,
+        group = prepare_authority_group(
+            workspace=repository.workspace, document_ids=group_ids, actor_id=owner.id,
+            target="repository", reader_workspace=reader_workspace,
+        )
+        assert transition_authority_group(
+            workspace=repository.workspace, document_ids=group.document_ids, actor_id=owner.id,
+            target="repository", reader_workspace=reader_workspace, plan_sha256=group.plan_sha256,
         ) == "transitioned"
-    assert transition_document_authority(
-        workspace=repository.workspace, document_id=published_guide.id, actor_id=owner.id,
-        target=DocumentAuthorityMode.LEGACY, reader_workspace=reader_workspace,
+    group = prepare_authority_group(
+        workspace=repository.workspace, document_ids=group_ids, actor_id=owner.id,
+        target="legacy", reader_workspace=reader_workspace,
+    )
+    assert transition_authority_group(
+        workspace=repository.workspace, document_ids=group.document_ids, actor_id=owner.id,
+        target="legacy", reader_workspace=reader_workspace, plan_sha256=group.plan_sha256,
     ) == "transitioned"
     published_guide.refresh_from_db()
     assert resolve_document(published_guide).markdown == retained.canonical_markdown

@@ -7,6 +7,7 @@ from uuid import UUID
 
 from django.core.exceptions import ImproperlyConfigured
 
+from .document_migration_shape import DocumentMigrationShapeError, owned_placement_tree
 from .models import Document, DocumentPublication, Workspace
 from .publications import _timestamp, canonical_json, verify_publication, verify_retained_publication_custody
 
@@ -52,12 +53,12 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
     )
     reasons: set[str] = set()
     if publications:
-        placements = list(document.placements.select_related("block"))
-        if (
-            document.is_template
-            or len(placements) != 1
-            or any(item.block.source_document_id != document.id or item.parent_id is not None for item in placements)
-        ):
+        placements = list(document.placements.select_related("block", "pinned_revision"))
+        try:
+            owned_placement_tree(document, placements)
+        except DocumentMigrationShapeError:
+            reasons.add("publication_document_shape_unsupported")
+        if document.is_template or not any(item.block.source_document_id == document.id for item in placements):
             reasons.add("publication_document_shape_unsupported")
     evidence = []
     artifact_count = 0
@@ -93,6 +94,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v4",
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
+                "tekdocs-static-publication/v7",
             }
             or publication.audience != "msp_internal"
             or sum(item.kind == "pdf" for item in artifacts) != 1
@@ -144,7 +146,9 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
         if "approved" in actions and "withdrawn" in actions and actions["withdrawn"] < actions["approved"]:
             reasons.add("publication_controls_invalid")
         try:
-            if manifest.get("format") in {"tekdocs-static-publication/v5", "tekdocs-static-publication/v6"}:
+            if manifest.get("format") in {
+                "tekdocs-static-publication/v5", "tekdocs-static-publication/v6", "tekdocs-static-publication/v7",
+            }:
                 from .document_git_publications import verify_internal_git_publication
 
                 if not verify_internal_git_publication(publication):
@@ -192,7 +196,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
 def publication_migration_evidence(
     *, workspace: Workspace, document: Document, assessment: dict[str, object] | None = None
 ) -> str | None:
-    """Verify the internal, permanent, single-owned-fragment migration boundary.
+    """Verify the internal, permanent, reversible-composition migration boundary.
 
     The fingerprint binds a preview to retained history; it is neither permission
     to change authority nor a substitute for rechecking custody at execution.
@@ -200,7 +204,7 @@ def publication_migration_evidence(
     from .document_migration_export import build_simple_document_export
     from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
     from .documents import resolve_document
-    from .models import DocumentAttachment, PlacementResolutionMode
+    from .models import DocumentAttachment
     from .repository_publication_preflight import repository_publication_preflight
 
     report = (
@@ -214,7 +218,6 @@ def publication_migration_evidence(
         or DocumentTemplateRevision.objects.filter(template=document).exists()
         or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
         or DocumentPublication.objects.filter(document=document).exclude(retention="permanent").exists()
-        or document.placements.exclude(resolution_mode=PlacementResolutionMode.LIVE).exists()
     ):
         return None
     try:
@@ -222,9 +225,7 @@ def publication_migration_evidence(
             document, allow_repository_divergence=True, verify_attachments=True
         )
         if (
-            len(exported.blocks) != 1
-            or exported.referenced_digests
-            or exported.key_binding_ids
+            exported.key_binding_ids
             or exported.resolved_entity_links
             or repository_publication_preflight(
                 markdown=resolve_document(document).markdown,

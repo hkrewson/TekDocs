@@ -94,6 +94,15 @@ def guard_reversible_migration_write(
             if owner is None:
                 raise ReversibleShapeError("rollback_content_identity_changed")
             portable_document_attachments(owner, body)
+            # A live consumer must also be able to project these bytes back to
+            # its original owner graph. Pins keep earlier immutable source bytes.
+            for consumer in (
+                documents.filter(placements__block_id=block_id, placements__resolution_mode="live")
+                .exclude(pk=owner.pk)
+                .select_related("entity")
+                .distinct()
+            ):
+                portable_document_attachments(consumer, body)
     except DocumentMigrationAttachmentError as exc:
         raise RepositoryInputError(
             "This migrated document is kept reversible. File links must refer to its own verified files."

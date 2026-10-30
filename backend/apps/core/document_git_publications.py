@@ -1,4 +1,4 @@
-"""Internal STATIC snapshots for the proven single-fragment promoted shape."""
+"""Internal STATIC snapshots for supported promoted documents and shared sources."""
 
 from __future__ import annotations
 
@@ -18,12 +18,14 @@ from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
+from .document_migration_shape import owned_placement_tree
 from .document_publication_files import (
     FILE_GIT_STATIC_FORMAT,
     PublicationFile,
     prepare_publication_files,
     verify_publication_file_manifest,
 )
+from .document_shared_publications import SHARED_GIT_STATIC_FORMAT, verify_shared_publication_manifest
 from .models import (
     AuditEvent,
     ContentNode,
@@ -60,7 +62,9 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         source = manifest["git_source"]
         sources = source["sources"]
         return bool(
-            manifest["format"] in {GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT}
+            manifest["format"] in {GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT, SHARED_GIT_STATIC_FORMAT}
+            and (manifest["format"] != SHARED_GIT_STATIC_FORMAT
+                 or verify_shared_publication_manifest(manifest, publication.document_id))
             and (
                 manifest["format"] != FILE_GIT_STATIC_FORMAT
                 or verify_publication_file_manifest(manifest, publication.document_id)
@@ -73,16 +77,17 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             and source["audience"] == "msp_internal"
             and source["markdown_sha256"] == hashlib.sha256(publication.canonical_markdown.encode()).hexdigest()
             and isinstance(sources, list)
-            and len(sources) == 2
+            and (manifest["format"] == SHARED_GIT_STATIC_FORMAT or len(sources) == 2)
             and sources[0]["id"] == str(publication.document_id)
-            and all(item["commit"] == source["accepted_commit"] for item in sources)
+            and (manifest["format"] == SHARED_GIT_STATIC_FORMAT
+                 or all(item["commit"] == source["accepted_commit"] for item in sources))
             and publication.document.tenant_id == publication.tenant_id
             and publication.document.organization_id == publication.organization_id
             and publication.document.entity.workspace_id == publication.entity.workspace_id
             and source["root_title"] == publication.title == manifest["title"]
             and manifest["publication_id"] == str(publication.id)
             and manifest["publication_entity_id"] == str(publication.entity_id)
-            and len({item["id"] for item in sources}) == 2
+            and len({item["id"] for item in sources}) == len(sources)
         )
     except (KeyError, TypeError, ValueError, AttributeError, OSError, ImproperlyConfigured):
         return False
@@ -112,11 +117,20 @@ def _validated_git_publication_content(
         or document.review_state in {"pending", "changes_requested"}
     ):
         raise PublicationConflict("An active promoted ordinary document is required")
-    placements = list(document.placements.select_related("block"))
-    if len(placements) != 1 or placements[0].block.source_document_id != document.id:
-        raise PublicationConflict("Publication shape is not supported")
-    if {item["id"] for item in source["sources"]} != {str(document.id), str(placements[0].block_id)}:
+    placements = list(document.placements.select_related("block", "pinned_revision"))
+    try:
+        owned_placement_tree(document, placements)
+    except ValueError as exc:
+        raise PublicationConflict("Publication shape is not supported") from exc
+    if (not any(p.block.source_document_id == document.id for p in placements)
+        or {item["id"] for item in source["sources"]} != {str(document.id), *(str(p.block_id) for p in placements)}):
         raise PublicationConflict("Publication dependencies exceed the supported shape")
+    live_ids = {p.block_id for p in placements if p.resolution_mode == "live"}
+    retired_ids = set(DocumentAuthority.objects.filter(
+        workspace=document.entity.workspace, content_id__in=live_ids, authority="repository",
+    ).values_list("content_id", flat=True))
+    if retired_ids != live_ids:
+        raise PublicationConflict("Shared live content requires a complete authority handoff")
     node = ContentNode.objects.get(repository=repository, content_id=document.id)
     variant = node.composition_variants.get("msp_internal", {})
     markdown = variant.get("markdown")
@@ -295,8 +309,10 @@ def publish_internal_git_document(
                 content=pdf,
                 checksum=hashlib.sha256(pdf).hexdigest(),
             )
+            shared_composition = len(source["sources"]) != 2 or any(s["mode"] == "pinned" for s in source["sources"])
             manifest = {
-                "format": FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT,
+                "format": (SHARED_GIT_STATIC_FORMAT if shared_composition
+                           else FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT),
                 "publication_id": str(publication_id),
                 "publication_entity_id": str(entity_id),
                 "source_document_id": str(locked.entity_id),
@@ -315,7 +331,7 @@ def publish_internal_git_document(
                 "published_at": _timestamp(created_at),
                 "git_source": source,
                 "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files]],
-                **({"managed_files": [f.descriptor for f in files]} if files else {}),
+                **({"managed_files": [f.descriptor for f in files]} if files or shared_composition else {}),
                 "entities": [],
                 "attachments": [
                     {key: f.descriptor[key] for key in ("id", "filename", "media_type", "size", "checksum")}

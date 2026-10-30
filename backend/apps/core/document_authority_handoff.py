@@ -6,6 +6,7 @@ from typing import cast
 from uuid import UUID
 
 from django.db import connection, transaction
+from django.db.models import Q
 
 from .content_profile import ContentProfileError
 from .document_migration_coexistence import document_coexistence_status
@@ -18,6 +19,7 @@ from .models import (
     Document,
     DocumentAuthority,
     DocumentAuthorityMode,
+    DocumentPlacement,
     Workspace,
     WorkspaceRepository,
 )
@@ -105,6 +107,8 @@ def _transition_document_authority_locked(
     actor_id: UUID,
     target: str,
     reader_workspace: ResolvedWorkspace,
+    _group_staged: bool = False,
+    _group_members: tuple[UUID, ...] = (),
 ) -> str:
     if target not in {DocumentAuthorityMode.LEGACY, DocumentAuthorityMode.REPOSITORY}:
         raise DocumentAuthorityHandoffError("unsupported_authority_target")
@@ -139,6 +143,28 @@ def _transition_document_authority_locked(
     status = document_coexistence_status(
         workspace=locked_workspace, document=document, reader_workspace=reader_workspace
     )
+    if target == DocumentAuthorityMode.LEGACY:
+        members = set(_group_members) if _group_members else {document.id}
+        edges = DocumentPlacement.objects.filter(
+            tenant_id=locked_workspace.tenant_id, organization=locked_workspace.organization,
+            document__entity__workspace=locked_workspace, resolution_mode="live",
+        ).filter(Q(document=document) | Q(block__source_document=document))
+        neighbors = {identity for edge in edges.values_list("document_id", "block__source_document_id")
+                     for identity in edge} - members
+        outside_repository = DocumentAuthority.objects.filter(
+            workspace=locked_workspace, content_id__in=neighbors, authority=DocumentAuthorityMode.REPOSITORY,
+        ).exists()
+        if outside_repository:
+            raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
+    if target == DocumentAuthorityMode.REPOSITORY:
+        live_owners = set(document.placements.filter(resolution_mode="live").exclude(
+            block__source_document_id=document.id,
+        ).values_list("block__source_document_id", flat=True))
+        retired_owners = set(DocumentAuthority.objects.filter(
+            workspace=locked_workspace, content_id__in=live_owners, authority=DocumentAuthorityMode.REPOSITORY,
+        ).values_list("content_id", flat=True))
+        if live_owners != retired_owners:
+            raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
     blockers = cast(list[str], status["handoff_blockers"])
     rollback_markdown: dict[UUID, str] | None = None
     if target == DocumentAuthorityMode.LEGACY and status["authority_state"] == DocumentAuthorityMode.REPOSITORY:
@@ -159,9 +185,10 @@ def _transition_document_authority_locked(
     )
     if authority is None:
         raise DocumentAuthorityHandoffError("document_authority_state_unavailable")
-    if authority.authority == target:
+    if authority.authority == target and not _group_staged:
         return "already_at_target"
-    if target == DocumentAuthorityMode.REPOSITORY and authority.authority != DocumentAuthorityMode.LEGACY:
+    if (target == DocumentAuthorityMode.REPOSITORY and authority.authority != DocumentAuthorityMode.LEGACY
+        and not _group_staged):
         raise DocumentAuthorityHandoffError("unexpected_current_authority")
 
     exported = build_simple_document_export(document, verify_attachments=True)
@@ -178,7 +205,7 @@ def _transition_document_authority_locked(
     with connection.cursor() as cursor:
         cursor.execute("SET LOCAL tekdocs.document_authority_transition = 'on'")
     if target == DocumentAuthorityMode.REPOSITORY:
-        if authority.authority != DocumentAuthorityMode.LEGACY:
+        if authority.authority != DocumentAuthorityMode.LEGACY and not _group_staged:
             raise DocumentAuthorityHandoffError("unexpected_current_authority")
         authority.authority = DocumentAuthorityMode.REPOSITORY
         authority.save(update_fields=("authority", "updated_at"))
@@ -189,6 +216,7 @@ def _transition_document_authority_locked(
             other_legacy_consumers = (
                 Document.objects.filter(
                     placements__block_id=fragment_id,
+                    placements__resolution_mode="live",
                     tenant_id=locked_workspace.tenant_id,
                     organization_id=cast(UUID, locked_workspace.organization_id),
                 )
@@ -253,6 +281,9 @@ def _transition_document_authority_locked(
         actor_id=actor_id,
         action="document.authority_transitioned",
         entity_id=document.entity_id,
-        metadata={"from": status["authority_state"], "to": target, "publication_history_sha256": history_before},
+        metadata={
+            "from": "legacy" if _group_staged else status["authority_state"],
+            "to": target, "publication_history_sha256": history_before,
+        },
     )
     return "transitioned"

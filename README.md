@@ -180,6 +180,13 @@ PDFs, file identities and private storage unchanged; rollback retains files
 uploaded under Git authority. Templates, unresolved references and client
 delivery remain outside this boundary.
 
+The [shared-block extension](planning/migrations/shared-block-publication-migration.md)
+adds same-Workspace live and pinned leaf references to this internal workflow.
+An explicit previewed group moves every live owner and consumer together. Pins
+retain their selected Git revision; signed history and PDFs remain unchanged.
+Rollback restores supported text edits to each original owner. Repeated block
+occurrences, templates, cross-Workspace reuse and client delivery remain blocked.
+
 ### Managed repository authoring
 
 The `0.9.5` checkpoint adds a separate **Repository content** editor under

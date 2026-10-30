@@ -1414,6 +1414,10 @@ def update_document_placement(
     pinned_revision_id: UUID | None = None,
     audience_profile: str | None = None,
 ) -> DocumentPlacement:
+    locked_document = Document.objects.select_for_update().select_related("entity").get(
+        pk=placement.document_id, tenant_id=placement.tenant_id, organization=placement.organization,
+    )
+    _ensure_legacy_content_authority(locked_document)
     locked = (
         DocumentPlacement.objects.select_for_update(of=("self",))
         .select_related("document", "document__entity", "block", "parent")
@@ -1443,6 +1447,11 @@ def update_document_placement(
             raise PlacementConflict("The pinned revision does not belong to the placed block.")
     elif resolution_mode != PlacementResolutionMode.LIVE or pinned_revision_id is not None:
         raise PlacementConflict("Live placements cannot specify a pinned revision.")
+    if resolution_mode == PlacementResolutionMode.LIVE:
+        block = Block.objects.select_for_update().get(
+            pk=locked.block_id, tenant_id=locked.tenant_id, organization=locked.block.organization,
+        )
+        _ensure_legacy_block_authority(block)
     locked.resolution_mode = resolution_mode
     locked.pinned_revision = pinned_revision
     locked.audience_profile = audience_profile

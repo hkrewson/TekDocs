@@ -120,3 +120,23 @@ versions. Snapshot limits refuse oversized sets without truncation. Explicit
 rollback can preserve a subsequently enlarged set above those limits, while
 re-promotion and publication remain blocked until supported. This exception does
 not waive file-byte, source-shape, authorization or signed-history verification.
+
+## Shared live dependency groups
+
+The [shared-block extension](../../planning/migrations/shared-block-publication-migration.md)
+adds explicit bounded same-Workspace authority groups. Live owner/consumer closure
+is mandatory; pinned consumers do not retain a mutable legacy writer. Previews
+bind membership, accepted commit, current revisions, files and retained history.
+Apply rechecks authorization and evidence under ordered Document/Block locks.
+Promotion stages all group roots in one transaction; rollback projects every
+owner revision before checking composed consumers. SQL guards serialize legacy
+placement writers and reject split live authority, including consumers hidden by
+RLS. Security-definer guards have fixed trusted search paths, no public execute
+grant and no data mutations.
+
+New v7 snapshots bind ordered live and pinned source evidence plus previously
+supported owned files. Older signed formats and PDFs are never rewritten. Offline
+verification uses retained signed inputs and artifacts. Migrations 0198-0200 are
+reversible; reversing guards preserves existing snapshots. Structural changes,
+repeated occurrences of one Block, shared foreign-owned file links and the other
+existing unsupported shapes remain blocked.

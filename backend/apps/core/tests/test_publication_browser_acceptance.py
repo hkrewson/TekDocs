@@ -32,9 +32,9 @@ from apps.core.document_attachments import (
     create_document_attachment,
     replace_primary_document_file,
 )
-from apps.core.document_authority_handoff import transition_document_authority
+from apps.core.document_authority_groups import prepare_authority_group, transition_authority_group
 from apps.core.document_migration_publications import assess_retained_publications
-from apps.core.documents import create_document, resolve_document, update_document
+from apps.core.documents import add_document_placement, create_document, resolve_document, update_document
 from apps.core.models import DocumentAuthority, DocumentPublication, InstallationState, Workspace, WorkspaceKind
 from apps.core.publications import (
     publish_document,
@@ -126,6 +126,40 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             markdown="Original signed browser instructions.\n" + file_link,
             base_revision_id=document.placements.get().block.current_revision_id,
         )
+        shared_sources = []
+        for index, (title, body, mode) in enumerate(
+            (
+                ("Browser shared live source", "Shared live browser original.\n", "live"),
+                ("Browser shared pinned source", "Shared pinned browser original.\n", "pinned"),
+            ),
+            1,
+        ):
+            source = create_document(
+                tenant=installation.tenant,
+                organization=None,
+                actor_id=installation.owner.id,
+                title=title,
+                markdown=body,
+            )
+            block = source.placements.get().block
+            add_document_placement(
+                document=document,
+                source_document=source,
+                actor_id=installation.owner.id,
+                resolution_mode=mode,
+                pinned_revision_id=block.current_revision_id if mode == "pinned" else None,
+                parent_id=None,
+                position=index,
+            )
+            source_plan = document_migration_import.prepare_document_import(workspace=workspace, document_id=source.id)
+            document_migration_import.apply_document_import(
+                workspace=workspace,
+                document_id=source.id,
+                expected_base=source_plan.base_commit,
+                plan_sha256=source_plan.plan_sha256,
+                actor_id=installation.owner.id,
+            )
+            shared_sources.append(source)
         original = publish_document(
             workspace=reader,
             document=document,
@@ -142,7 +176,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             actor_id=installation.owner.id,
             title=document.entity.display_name,
             markdown="Current migrated browser instructions.\n" + file_link,
-            base_revision_id=document.placements.get().block.current_revision_id,
+            base_revision_id=document.placements.get(block__source_document=document).block.current_revision_id,
         )
         plan = document_migration_import.prepare_document_import(workspace=workspace, document_id=document.id)
         assert (
@@ -155,13 +189,22 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             ).status
             == "imported"
         )
+        group_ids = (document.id, *(source.id for source in shared_sources))
+        group = prepare_authority_group(
+            workspace=workspace,
+            document_ids=group_ids,
+            actor_id=installation.owner.id,
+            target="repository",
+            reader_workspace=reader,
+        )
         assert (
-            transition_document_authority(
+            transition_authority_group(
                 workspace=workspace,
-                document_id=document.id,
+                document_ids=group.document_ids,
                 actor_id=installation.owner.id,
                 target="repository",
                 reader_workspace=reader,
+                plan_sha256=group.plan_sha256,
             )
             == "transitioned"
         )
@@ -176,7 +219,9 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         prepared_state = {
             "document_id": str(document.entity_id),
             "content_id": str(document.id),
-            "fragment_id": str(document.placements.get().block_id),
+            "fragment_id": str(document.placements.get(block__source_document=document).block_id),
+            "shared_live_fragment_id": str(shared_sources[0].placements.get().block_id),
+            "shared_pin_fragment_id": str(shared_sources[1].placements.get().block_id),
             "original_id": str(original.entity_id),
             "original_pdf_sha256": hashlib.sha256(original_pdf).hexdigest(),
             "session_name": settings.SESSION_COOKIE_NAME,
@@ -222,22 +267,36 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         assert [item.lifecycle_state for item in snapshots] == ["superseded", "superseded", "published", "withdrawn"]
         assert all(verify_publication(item)["valid"] for item in snapshots)
         assert all(verify_retained_publication_custody(item) for item in snapshots)
+        assert "Shared live browser original." in snapshots[1].canonical_markdown
+        assert "Shared live browser updated." in snapshots[2].canonical_markdown
+        assert all("Shared pinned browser original." in item.canonical_markdown for item in snapshots)
         assessment = assess_retained_publications(workspace=workspace, document=document)
         assert assessment["state"] == "verified"
         for target in ("legacy", "repository"):
+            group = prepare_authority_group(
+                workspace=workspace,
+                document_ids=group_ids,
+                actor_id=installation.owner.id,
+                target=target,
+                reader_workspace=reader,
+            )
             assert (
-                transition_document_authority(
+                transition_authority_group(
                     workspace=workspace,
-                    document_id=document.id,
+                    document_ids=group.document_ids,
                     actor_id=installation.owner.id,
                     target=target,
                     reader_workspace=reader,
+                    plan_sha256=group.plan_sha256,
                 )
                 == "transitioned"
             )
             assert assess_retained_publications(workspace=workspace, document=document) == assessment
             if target == "legacy":
                 assert "Browser-corrected Git instructions." in resolve_document(document).markdown
+                assert "Shared live browser updated." in resolve_document(document).markdown
+                assert "Shared pinned browser original." in resolve_document(document).markdown
+                assert resolve_document(shared_sources[1]).markdown == "Shared pinned source browser updated.\n"
         assert DocumentAuthority.objects.get(workspace=workspace, content_id=document.id).authority == "repository"
         for file, content in ((first_file, first_bytes), (second_file, second_bytes), (checklist, checklist_bytes)):
             file.refresh_from_db()

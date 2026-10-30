@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 
-type State = { document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -33,6 +33,8 @@ test('migrated signed history survives real publishing, correction, withdrawal a
     const expected = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
     expect((await diagnostics.json() as { application_version: string }).application_version).toBe(expected.version)
     await expect(page.getByText('Current migrated browser instructions.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Shared live browser original.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Shared pinned browser original.', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Publication history', exact: true }).click()
     await page.getByRole('region', { name: 'Publication history' }).getByRole('button').filter({ hasText: 'Migrated publication acceptance guide' }).click()
     await expect(page.getByText('Original signed browser instructions.', { exact: true })).toBeVisible()
@@ -50,7 +52,7 @@ test('migrated signed history survives real publishing, correction, withdrawal a
     const response = await publishedResponse
     expect(response.status()).toBe(201)
     const published = await response.json() as DocumentPublicationDetail
-    expect(published.manifest.format).toBe('tekdocs-static-publication/v6')
+    expect(published.manifest.format).toBe('tekdocs-static-publication/v7')
     expect(published.canonical_markdown).toContain('Current migrated browser instructions.')
     expect(published.verification.valid).toBe(true)
     await page.getByRole('button', { name: 'Downloads', exact: true }).click()
@@ -63,6 +65,24 @@ test('migrated signed history survives real publishing, correction, withdrawal a
         expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(file.sha256)
       } finally { await download.delete() }
     }
+
+    for (const [fragment, body] of [
+      [state.shared_live_fragment_id, 'Shared live browser updated.\n'],
+      [state.shared_pin_fragment_id, 'Shared pinned source browser updated.\n'],
+    ] as const) {
+      await page.goto(`/documentation?repository=${fragment}`)
+      await page.getByLabel('Markdown body').fill(body)
+      await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+      await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+    }
+    await page.goto(path)
+    await expect(page.getByText('Shared live browser updated.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Shared pinned browser original.', { exact: true })).toBeVisible()
+    await expect(page.getByText('Shared pinned source browser updated.', { exact: true })).toHaveCount(0)
+    const frozen = await (await page.request.get(`${endpoint}/${published.id}`)).json() as DocumentPublicationDetail
+    expect(frozen.canonical_markdown).toContain('Shared live browser original.')
+    expect(frozen.signature).toBe(published.signature)
+    expect(frozen.manifest).toEqual(published.manifest)
 
     // Edit the owned fragment through the real Git editor, then supersede the
     // original legacy snapshot from the ordinary retained-publication interface.

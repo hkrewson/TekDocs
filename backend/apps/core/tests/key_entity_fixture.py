@@ -76,14 +76,19 @@ class AddressedFixture:
         }
 
 
+def ensure_fixture_mfa(owner) -> None:
+    """Let sequential acceptance fixtures share the owner's existing factor."""
+    if not Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).exists():
+        TOTP.activate(owner, generate_totp_secret())
+
+
 def seed_addressed_fixture(owner) -> AddressedFixture:
     """Use only APIs present at the supported 0.8.46 source boundary."""
     from apps.accounts.policy import require_installation_member
 
     member = require_installation_member(owner)
     assert not Document.objects.filter(tenant=member.tenant, entity__display_name=TITLE).exists()
-    if not Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).exists():
-        TOTP.activate(owner, generate_totp_secret())
+    ensure_fixture_mfa(owner)
     organization = create_organization(
         tenant=member.tenant,
         actor_id=owner.id,

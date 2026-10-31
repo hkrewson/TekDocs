@@ -129,3 +129,63 @@ zero remaining findings on both axes.
 Version remains 0.9.16. The Wiki draft is local and unpublished; unrelated Wiki
 edits and ignored AGENTS instructions are preserved. No branch/PR, release tag,
 image publication, SSH, deployment or live-data migration is part of this slice.
+
+## Hosted source attempt `3ae5ed8`
+
+Runtime source: `3ae5ed8abae015ccbf83df4d9f771048148a7f44`, pushed directly to
+main after the complete local validation and both source-review axes passed.
+[Build 41181865875](https://github.com/hkrewson/TekDocs/actions/runs/41181865875),
+[CodeQL 41181874058](https://github.com/hkrewson/TekDocs/actions/runs/41181874058)
+and [Extended 41181875866](https://github.com/hkrewson/TekDocs/actions/runs/41181875866)
+all name that exact source.
+
+Verified so far: all fourteen PostgreSQL partitions, **70 key/entity cases**,
+**89% merged backend coverage**, frontend tests, runtime/RLS, code/dependency/
+secret policy, diagram exports and the hosted real browser/server journeys passed.
+CodeQL and its downloaded commit-bound receipt passed. The encrypted-recovery
+rehearsal step passed; broader recovery, supported upgrades and final image gates
+are still in progress. This is not yet a passing aggregate receipt.
+
+Extended attempt 1 failed one existing WebKit document-settings draft-protection
+case at 1024px (missing unsaved-changes dialog). Its other **410 cases passed**,
+including all six new Keys cases; four opt-in cases were skipped. Cause remains
+**unknown**. The unchanged case passed 40 development-server repetitions and 30
+repetitions against a fresh production bundle using the CI browser configuration.
+A complete unchanged production-build WebKit run is also in progress locally.
+No behavior, selector, assertion, timeout or retry setting changed. GitHub rejects
+a job rerun while the parent workflow is running; retry the failed job once the
+remaining workflow jobs finish. The original run and observation remain in
+`planning/releases/validation-failures.json`; passing a retry must not be called
+a demonstrated fix or a known cause.
+
+
+## Corrective validation-fixture preparation
+
+Source `3ae5ed8` completed Build and CodeQL successfully, including all fourteen
+PostgreSQL partitions, **70 key/entity cases**, **89% coverage**, real browser/
+server verification and production image/SBOM/vulnerability policy. Extended
+verified exact addressed-document encrypted recovery and its remaining recovery
+checks, all eight historical upgrade paths, performance, DAST and four browser
+groups. It is **not** an aggregate pass: WebKit failed as recorded above, and the
+subsequent fresh/0.8.46 document-migration step hit duplicate owner MFA enrollment.
+
+The actual original `create` fixture, addressed seed, and original `exercise`
+entrypoint reproduced the same `unique_authenticator_type` error in the existing
+Docker test database. Both stages now call one test-only `ensure_fixture_mfa`
+operation, creating TOTP only when absent. Existing factor identity and data are
+preserved by two database regressions. The complete original exercise followed
+by addressed promotion passed in **36.47 seconds**. The successful local probe
+explicitly loaded bound source via `PYTHONPATH=/app`; an earlier probe had loaded
+the installed image's older helper. No application MFA policy or validation
+threshold changed. The candidate-only exercise import leaves baseline seeding
+compatible with 0.8.46. Both source-review axes found no code issue in this delta.
+
+The full unchanged local production WebKit run passed **410 cases**, including
+the originally failing case. Its only failure was the real backend-health probe:
+HTTP502 from the preview proxy, with the backend service verified stopped. It is
+an explicitly limited reproduction, not a complete passing browser receipt.
+All **70** unchanged targeted repetitions also passed. The original hosted
+unsaved-dialog cause remains **unknown**; no UI behavior, selector, assertion,
+timeout or retry setting changed. The new exact-source hosted replay must cover
+both the corrected fixture and the unchanged WebKit journey. Earlier receipts
+remain supporting evidence and cannot validate the corrective source by themselves.

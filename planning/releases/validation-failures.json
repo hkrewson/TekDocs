@@ -1041,6 +1041,42 @@
       "next_action": "Final runtime source 4bb6bdd passed complete Build, CodeQL and Extended validation. Retain this failed attempt and its reproduction; unknown original browser timing causes remain unknown rather than being inferred from a successful retest.",
       "fix_commit": "4bb6bddc78abdb706656d76f1de2cda810729f84",
       "retest_run": "41169545095"
+    },
+    {
+      "run_id": "41181875866",
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs frontend: unchanged WebKit document-wide draft protection at 1024px passed ten development-server repetitions with three workers, thirty with two workers, and thirty against a fresh production build using playwright.compose.config.ts (70 total). The prior complete three-engine publication/template regression passed 69 cases. No failure reproduced locally. A complete unchanged local production WebKit run passed the original case and 410 tests; its sole failure was backend readiness (HTTP502 from preview with backend service stopped), so it is not a complete passing suite.",
+      "cause": "unknown; hosted WebKit did not find the unsaved-changes dialog after editing document settings and clicking Files at 1024px. The other 410 browser cases passed, including all six new Keys cases. No local reproduction or demonstrated cause yet.",
+      "next_action": "Replay the full hosted matrix at the corrective MFA-fixture source. Frontend code and assertions remain unchanged. Preserve the original failure; no local reproduction or demonstrated UI cause exists.",
+      "fix_commit": null,
+      "retest_run": null,
+      "run_attempt": 1,
+      "job_id": "124480778341"
+    },
+    {
+      "run_id": "41181875866",
+      "run_attempt": 1,
+      "job": "Supported upgrade matrix",
+      "job_id": "124480778291",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate service, test_td_key_entity_migration: actual original fixture create + addressed seed + original exercise reproduced unique_authenticator_type in test_combined_original_and_addressed_upgrade_fixture. After sharing MFA preparation, the complete original exercise + addressed promote passed in 36.47s. A first local green attempt loaded the older installed helper; the successful replay explicitly used PYTHONPATH=/app and verified the bound source path.",
+      "cause": "The addressed seed enrolled the owner TOTP first; the original document migration exercise then unconditionally enrolled it again. This is a composed-fixture defect, not a missing schema migration or application MFA-policy change.",
+      "next_action": "Validate the corrective shared ensure_fixture_mfa helper and both real factor-preservation cases, then replay complete exact-source hosted validation. Existing factors must retain identity and data.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41181875866",
+      "run_attempt": 1,
+      "job": "Assign validation failure follow-up",
+      "job_id": "124488488548",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The completed diagnostic job exited1 while ci_status.py reported the failed WebKit/upgrade workflow. scripts/ci_status.py intentionally returns nonzero for a failed or incomplete run; its unit tests pass.",
+      "cause": "Diagnostic cascade from the failed workflow; no separate application defect identified.",
+      "next_action": "Retain the upstream failures and replay the corrected source. Do not suppress the non-success report.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

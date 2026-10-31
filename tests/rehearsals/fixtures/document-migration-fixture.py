@@ -239,8 +239,6 @@ elif mode == "identity":
     assert resolve_document(target).markdown == "Target introduction\n\nReusable setup instructions\n"
     print(json.dumps(identities(source, target, template), sort_keys=True))
 elif mode == "exercise":
-    from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
-
     from apps.core.content_authoring import author_content, read_authored_content
     from apps.core.content_index import index_repository_content
     from apps.core.document_authority_groups import prepare_authority_group, transition_authority_group
@@ -255,10 +253,11 @@ elif mode == "exercise":
     from apps.core.document_migration_inventory import inventory_legacy_documents
     from apps.core.models import AuditEvent, ContentNode
     from apps.core.repository_service import read_repository_markdown_files_at_commit
+    from apps.core.tests.key_entity_fixture import ensure_fixture_mfa
     from apps.core.workspaces import resolve_msp_workspace
 
     owner, workspace, source, target, template = records()
-    TOTP.activate(owner, generate_totp_secret())
+    ensure_fixture_mfa(owner)
     index_repository_content(repository_id=workspace.repository.id)
     inventory = inventory_legacy_documents(workspace)
     rows = {row["document_id"]: row for row in inventory["documents"]}

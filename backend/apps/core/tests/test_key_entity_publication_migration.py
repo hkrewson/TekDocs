@@ -1005,3 +1005,33 @@ def test_migration_rejects_missing_or_foreign_record_mentions_without_partial_im
     assert repository.accepted_commit_id == head
     assert context.document.publications.count() == count
     assert verify_retained_publication_custody(context.original)
+
+
+@pytest.mark.parametrize("existing_factor", [False, True])
+def test_fixture_mfa_preparation_can_be_shared_without_replacing_an_existing_factor(published_context, existing_factor):
+    import hashlib
+    import json
+
+    from allauth.mfa.models import Authenticator
+
+    from apps.core.tests.key_entity_fixture import ensure_fixture_mfa
+
+    owner = published_context[0].owner
+    assert not Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).exists()
+    if existing_factor:
+        TOTP.activate(owner, generate_totp_secret())
+        factor = Authenticator.objects.get(user=owner, type=Authenticator.Type.TOTP)
+        expected = (factor.pk, hashlib.sha256(json.dumps(factor.data, sort_keys=True).encode()).hexdigest())
+    else:
+        expected = None
+    ensure_fixture_mfa(owner)
+    factor = Authenticator.objects.get(user=owner, type=Authenticator.Type.TOTP)
+    identity = factor.pk
+    before = hashlib.sha256(json.dumps(factor.data, sort_keys=True).encode()).hexdigest()
+    if expected is not None:
+        assert (identity, before) == expected
+    ensure_fixture_mfa(owner)
+    assert Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).count() == 1
+    factor.refresh_from_db()
+    assert factor.pk == identity
+    assert hashlib.sha256(json.dumps(factor.data, sort_keys=True).encode()).hexdigest() == before

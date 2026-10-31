@@ -64,7 +64,7 @@ class DocumentImportResult:
 def fingerprint_document_import(
     *, base_commit: str, export: SimpleDocumentExport, publication_evidence_sha256: str | None = None
 ) -> str:
-    payload = {
+    payload: dict[str, object] = {
         "base_commit": base_commit,
         "document_id": str(export.document_id),
         "blocks": [(str(block_id), str(revision_id)) for block_id, revision_id in export.blocks],
@@ -80,6 +80,15 @@ def fingerprint_document_import(
     }
     if publication_evidence_sha256 is not None:
         payload["publication_evidence_sha256"] = publication_evidence_sha256
+    if export.template_enrollment_sha256 is not None:
+        payload["template_enrollment_sha256"] = export.template_enrollment_sha256
+    if export.library_references:
+        payload["library_references"] = [
+            (str(identity), str(workspace), str(revision), commit, digest)
+            for identity, workspace, revision, commit, digest in export.library_references
+        ]
+    if export.template_source_sha256 is not None:
+        payload["template_source_sha256"] = export.template_source_sha256
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -151,7 +160,7 @@ def _verify_projection(prepared: PreparedDocumentImport, commit: str) -> bool:
         return False
     if repository.indexed_commit_id != repository.accepted_commit_id:
         return False
-    identities = (prepared.export.document_id, *(block_id for block_id, _revision_id in prepared.export.blocks))
+    identities = prepared.export.indexed_content_ids
     nodes = {
         node.content_id: node
         for node in ContentNode.objects.filter(repository=repository, content_id__in=identities).prefetch_related(
@@ -204,11 +213,18 @@ def apply_document_import(
     """Copy only; legacy remains authoritative until a later explicit cutover."""
 
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
-    if prepared.publication_evidence_sha256 is not None and not publication_migration_actor_allowed(
+    protected = (
+        prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
+        or prepared.export.template_source_sha256 is not None
+    )
+    if protected and not publication_migration_actor_allowed(
         workspace=workspace, actor_id=actor_id
     ):
-        raise DocumentMigrationBlocked("publication_migration_not_authorized")
-    if prepared.publication_evidence_sha256 is not None and (
+        raise DocumentMigrationBlocked(
+            "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
+            else "template_migration_not_authorized"
+        )
+    if protected and (
         expected_base != prepared.base_commit or plan_sha256 != prepared.plan_sha256
     ):
         raise DocumentMigrationBlocked("preview_changed")
@@ -257,10 +273,15 @@ def rollback_document_import(
     """Remove only unchanged copied files, never a referenced source fragment."""
 
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
-    if prepared.publication_evidence_sha256 is not None and not publication_migration_actor_allowed(
-        workspace=workspace, actor_id=actor_id
-    ):
-        raise DocumentMigrationBlocked("publication_migration_not_authorized")
+    protected = (
+        prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
+        or prepared.export.template_source_sha256 is not None
+    )
+    if protected and not publication_migration_actor_allowed(workspace=workspace, actor_id=actor_id):
+        raise DocumentMigrationBlocked(
+            "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
+            else "template_migration_not_authorized"
+        )
     if not prepared.already_present:
         raise DocumentMigrationBlocked("import_not_present")
     if prepared.base_commit != expected_commit:

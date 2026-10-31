@@ -199,6 +199,18 @@ export type PreflightFinding = { code: string; severity: 'blocker' | 'warning' |
 export type DocumentPreflight = { version: string; scope: 'document'; scope_id: string; composition_digest: string; audience: PublicationAudience; valid: boolean; counts: Record<'blocker' | 'warning' | 'info', number>; findings: PreflightFinding[] }
 export type TopicConversionPreview = { topic_type: DocumentTopicType; topic_schema_version: number; base_revision_id: string; original_markdown: string; converted_markdown: string; findings: { code: string; severity: string; section_id?: string; line?: number }[] }
 export type DocumentFacet = { value: string; count: number }
+export type TemplateLibrarySource = Pick<DocumentRecord, 'id' | 'title' | 'category' | 'content_authority' | 'placement_count'> & {
+  source_state?: 'ready' | 'unavailable'
+  definition_sha256?: string | null
+  placements: Pick<DocumentPlacement, 'id' | 'block_id' | 'block_name' | 'is_primary' | 'resolved_html'>[]
+}
+export type TemplateLibraryResult = {
+  results: TemplateLibrarySource[]
+  count: number
+  page?: number
+  page_size?: number
+  has_more?: boolean
+}
 export type DocumentResult = {
   results: DocumentRecord[]
   count: number
@@ -328,6 +340,8 @@ export type TemplateRolloutItem = {
   mode?: TemplatePlacementMode
   reason?: string
 }
+export type GitTemplateReview = { expected_base: string; expected_composition: string }
+export type GitTemplateDetachReview = GitTemplateReview & { expected_applied_revision_id: string }
 export type TemplateRollout = {
   enrollment_id: string
   applied_revision_id: string
@@ -338,6 +352,9 @@ export type TemplateRollout = {
   changed: TemplateRolloutItem[]
   removed: TemplateRolloutItem[]
   conflicts: TemplateRolloutItem[]
+  base_commit?: string
+  composition_digest?: string
+  reused_sections?: Array<{ placement_id: string; title: string; mode: 'live' | 'pinned' }>
 }
 export type DocumentRemoteSource = { id: string; url: string; source_kind: 'auto' | 'markdown' | 'html'; enabled: boolean; check_interval_minutes: number; next_check_at: string; last_checked_at: string | null; last_applied_observation_id: string | null }
 export type DocumentRemoteObservation = { id: string; state: 'changed' | 'unchanged' | 'failed'; status_code: number | null; content_type: string; content_digest: string; error_code: string; fetched_at: string; canonical_markdown: string; diff: string }
@@ -375,13 +392,13 @@ export interface DocumentsClient {
   removePlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
   getReuseImpact(scope: DocumentScope, id: string, placementId: string): Promise<ReuseImpact>
   updateSharedBlock(scope: DocumentScope, id: string, placementId: string, markdown: string, baseRevisionId: string): Promise<DocumentRecord>
-  detachPlacement(scope: DocumentScope, id: string, placementId: string): Promise<DocumentRecord>
+  detachPlacement(scope: DocumentScope, id: string, placementId: string, review?: GitTemplateDetachReview): Promise<DocumentRecord>
   searchMentionEntities(scope: DocumentScope, query: string, signal?: AbortSignal): Promise<EntityMentionResult>
   searchBlockLibrary(scope: DocumentScope, query: string, signal?: AbortSignal, page?: number, excludeDocument?: string): Promise<BlockLibraryResult>
-  listTemplateLibrary(scope: DocumentScope, signal?: AbortSignal, query?: string, page?: number): Promise<DocumentResult>
-  instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory, placementRules?: Record<string, TemplatePlacementMode>): Promise<DocumentRecord>
+  listTemplateLibrary(scope: DocumentScope, signal?: AbortSignal, query?: string, page?: number): Promise<TemplateLibraryResult>
+  instantiateTemplate(scope: DocumentScope, sourceDocumentId: string, title: string, category: DocumentCategory, placementRules?: Record<string, TemplatePlacementMode>, expectedSourceSha256?: string): Promise<DocumentRecord>
   previewTemplateRollout(scope: DocumentScope, enrollmentId: string): Promise<TemplateRollout>
-  applyTemplateRollout(scope: DocumentScope, enrollmentId: string, expectedRevisionId: string, placementRules?: Record<string, TemplatePlacementMode>): Promise<TemplateRollout>
+  applyTemplateRollout(scope: DocumentScope, enrollmentId: string, expectedRevisionId: string, placementRules?: Record<string, TemplatePlacementMode>, expectedAvailableRevision?: number, review?: GitTemplateReview): Promise<TemplateRollout>
   getRemoteSource(scope: DocumentScope, id: string): Promise<DocumentRemoteSource | undefined>
   saveRemoteSource(scope: DocumentScope, id: string, input: Pick<DocumentRemoteSource, 'url' | 'source_kind' | 'enabled' | 'check_interval_minutes'>): Promise<DocumentRemoteSource>
   listRemoteObservations(scope: DocumentScope, id: string): Promise<{ results: DocumentRemoteObservation[]; count: number }>
@@ -611,7 +628,7 @@ export const browserDocumentsClient: DocumentsClient = {
     return parse<ReuseImpact>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/reuse`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   updateSharedBlock: (scope, id, placementId, markdown, baseRevisionId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/reuse`, 'PUT', { markdown, base_revision_id: baseRevisionId }),
-  detachPlacement: (scope, id, placementId) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/detach`, 'POST'),
+  detachPlacement: (scope, id, placementId, review) => mutate<DocumentRecord>(`${collectionPath(scope)}/${encodeURIComponent(id)}/placements/${encodeURIComponent(placementId)}/detach`, 'POST', review),
   async listKeyBindings(scope, id, signal) {
     return parse<DocumentKeyBindingResult>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/key-bindings`, { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },
@@ -640,13 +657,13 @@ export const browserDocumentsClient: DocumentsClient = {
   },
   async listTemplateLibrary(scope, signal, query = '', page = 1) {
     if (!scope.organizationId) return { results: [], count: 0 }
-    return parse<DocumentResult>(await fetch(`${collectionPath(scope)}/template-library?${new URLSearchParams({ q: query, page: String(page), page_size: '25' })}`, {
+    return parse<TemplateLibraryResult>(await fetch(`${collectionPath(scope)}/template-library?${new URLSearchParams({ q: query, page: String(page), page_size: '25' })}`, {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
     }))
   },
-  instantiateTemplate: (scope, sourceDocumentId, title, category, placementRules = {}) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category, placement_rules: placementRules }),
+  instantiateTemplate: (scope, sourceDocumentId, title, category, placementRules = {}, expectedSourceSha256) => mutate<DocumentRecord>(`${collectionPath(scope)}/from-template`, 'POST', { source_document_id: sourceDocumentId, title, category, placement_rules: placementRules, ...(expectedSourceSha256 ? { expected_source_sha256: expectedSourceSha256 } : {}) }),
   previewTemplateRollout: (scope, enrollmentId) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/preview`, 'POST', { enrollment_id: enrollmentId }),
-  applyTemplateRollout: (scope, enrollmentId, expectedRevisionId, placementRules = {}) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/apply`, 'POST', { enrollment_id: enrollmentId, expected_applied_revision_id: expectedRevisionId, placement_rules: placementRules }),
+  applyTemplateRollout: (scope, enrollmentId, expectedRevisionId, placementRules = {}, expectedAvailableRevision, review) => mutate<TemplateRollout>(`${collectionPath(scope)}/template-rollouts/apply`, 'POST', { enrollment_id: enrollmentId, expected_applied_revision_id: expectedRevisionId, placement_rules: placementRules, expected_available_revision: expectedAvailableRevision, ...review }),
   async getRemoteSource(scope, id) {
     return parse<DocumentRemoteSource | undefined>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },

@@ -11,7 +11,7 @@ function successStatus(page: Page) {
 
 async function openPrimaryDocumentBlock(page: Page, title: string) {
   if (new URL(page.url()).searchParams.has('document')) {
-    await expect(page.locator('.document-reader-title strong')).toHaveText(title)
+    await expect(page.locator('.document-reader-title').getByRole('heading', { level: 1 })).toHaveText(title)
   } else {
     await page.getByRole('button', { name: title }).click()
   }
@@ -819,7 +819,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.locator('.document-content-item')).toHaveCount(2)
   await expect(page.getByText('Document blocks')).toHaveCount(0)
   await page.reload()
-  await expect(page.locator('.document-reader-title strong')).toHaveText('Live Acme onboarding')
+  await expect(page.locator('.document-reader-title').getByRole('heading', { level: 1 })).toHaveText('Live Acme onboarding')
   await expect(page.getByRole('heading', { name: 'Acme onboarding' })).toBeVisible()
   await expect(page.getByText('Revision two is retained.', { exact: true })).toBeVisible()
 

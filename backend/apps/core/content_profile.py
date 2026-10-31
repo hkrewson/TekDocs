@@ -102,6 +102,8 @@ class ParsedInclude:
     audience: str
     pinned_object_id: str
     ordinal: int
+    library_workspace_id: uuid.UUID | None = None
+    library_revision_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,6 +292,12 @@ def _parse_includes(value: Any) -> tuple[ParsedInclude, ...]:
             raise ContentProfileError("include.shape", "Each include must be a mapping")
         mode = item.get("mode")
         expected_fields = {"id", "mode", "audience", "commit"} if mode == "pinned" else {"id", "mode", "audience"}
+        if "library_workspace" in item:
+            if "library_revision" not in item:
+                raise ContentProfileError(
+                    "include.library_revision", "Library references require a template revision UUID"
+                )
+            expected_fields.update({"library_workspace", "library_revision"})
         if set(item) != expected_fields or mode not in INCLUDE_MODES:
             raise ContentProfileError("include.shape", "Include fields or resolution mode are invalid")
         audience = item.get("audience")
@@ -310,6 +318,20 @@ def _parse_includes(value: Any) -> tuple[ParsedInclude, ...]:
                     else ""
                 ),
                 ordinal=ordinal,
+                library_workspace_id=(
+                    _uuid(
+                        item["library_workspace"], code="include.library_workspace",
+                        message="Library Workspace must be a UUID",
+                    )
+                    if "library_workspace" in item else None
+                ),
+                library_revision_id=(
+                    _uuid(
+                        item["library_revision"], code="include.library_revision",
+                        message="Template revision must be a UUID",
+                    )
+                    if "library_workspace" in item else None
+                ),
             )
         )
     return tuple(includes)

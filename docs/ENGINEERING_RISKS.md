@@ -377,6 +377,26 @@ IDs under the same retained-byte, Workspace, and delivery checks.
 
 The controlled Networks cleanup adds only lossless supported-model projections. Legacy compatibility rows and relationships remain retained under ADR 0104; deleting them requires a separate deprecation, operator-approved migration, and rollback plan. `TD-RISK-069` through `TD-RISK-071` remain open with their named `0.9.1`–`0.9.8` owners because `0.9.0` does not yet make Git canonical.
 
+## Template source/enrollment development after 0.9.16
+
+For the bounded #105/#106 template cohort, `TD-RISK-001`, `TD-RISK-002` and
+`TD-RISK-008` retain recurring ownership: central edit/MFA and exact-client policy,
+scoped approved-library reads, deferred graph guards and immutable publication /
+fork evidence remain required. This grants no general cross-Workspace reuse or
+client-portal write access.
+
+`TD-RISK-003`, `TD-RISK-006`, `TD-RISK-007` and `TD-RISK-069` remain **mitigated
+with remaining owners**, conditional on the [slice validation record](../planning/migrations/template-enrollment-migration.md).
+Real browser coverage exercises enrolled copy/live/pinned workflows and retained
+files/PDFs. Git refs and copied-file cleanup follow the final SQL outcome;
+source-and-client LIVE authority changes are atomic. Missing foreign Git custody
+fails closed. Full recovery still requires PostgreSQL, all accepted repositories,
+media and keys together; a client editable ZIP is not that recovery set.
+Fresh/0.8.46 upgrades, encrypted independent recovery, production-image checks
+and exact-source hosted CI must confirm the candidate. None is inferred from a
+local pass or workflow presence. No production recovery or aggregate 1.0 risk is
+closed by this development slice, and no dependency exception is extended.
+
 ## Release rule
 
 Release evidence must name every risk assigned to that milestone and record it as `resolved`, `mitigated with remaining owner`, or `blocked`. Moving a risk requires updating both this register and the destination milestone; it may not disappear from a release note merely because feature work passed.

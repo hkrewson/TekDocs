@@ -2286,6 +2286,17 @@ paths:
         required: true
       tags:
       - documents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -22134,6 +22145,17 @@ paths:
         required: true
       tags:
       - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DocumentTemplateDetachRequest'
       security:
       - TekDocsBearerToken: []
       - cookieAuth: []
@@ -41345,6 +41367,18 @@ components:
       - page_size
       - results
       - tags
+    DocumentTemplateDetachRequest:
+      type: object
+      properties:
+        expected_base:
+          type: string
+          pattern: ^(?:[0-9a-f]{40}|[0-9a-f]{64})$
+        expected_composition:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        expected_applied_revision_id:
+          type: string
+          format: uuid
     DocumentTemplateInstantiate:
       type: object
       properties:
@@ -41370,6 +41404,9 @@ components:
             * `guide` - Guide
             * `reference` - Reference
           x-spec-enum-id: 5c27c16eb333c7c1
+        expected_source_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
         placement_rules:
           type: object
           additionalProperties:
@@ -41387,6 +41424,27 @@ components:
       - category
       - source_document_id
       - title
+    DocumentTemplateReusedSection:
+      type: object
+      properties:
+        placement_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        mode:
+          enum:
+          - live
+          - pinned
+          type: string
+          description: |-
+            * `live` - live
+            * `pinned` - pinned
+          x-spec-enum-id: 82c1e4db01ac712d
+      required:
+      - mode
+      - placement_id
+      - title
     DocumentTemplateRolloutApply:
       type: object
       properties:
@@ -41396,6 +41454,15 @@ components:
         expected_applied_revision_id:
           type: string
           format: uuid
+        expected_available_revision:
+          type: integer
+          minimum: 1
+        expected_base:
+          type: string
+          pattern: ^(?:[0-9a-f]{40}|[0-9a-f]{64})$
+        expected_composition:
+          type: string
+          pattern: ^[0-9a-f]{64}$
         placement_rules:
           type: object
           additionalProperties:
@@ -41455,6 +41522,14 @@ components:
           items:
             type: object
             additionalProperties: {}
+        base_commit:
+          type: string
+        composition_digest:
+          type: string
+        reused_sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentTemplateReusedSection'
       required:
       - added
       - applied_revision_id
@@ -53274,7 +53349,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/Document'
+            $ref: '#/components/schemas/TemplateLibrarySource'
         count:
           type: integer
         page:
@@ -53289,6 +53364,86 @@ components:
       - page
       - page_size
       - results
+    TemplateLibrarySection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        block_id:
+          type: string
+          format: uuid
+        block_name:
+          type: string
+        is_primary:
+          type: boolean
+        resolved_html:
+          type: string
+      required:
+      - block_id
+      - block_name
+      - id
+      - is_primary
+      - resolved_html
+    TemplateLibrarySource:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        category:
+          enum:
+          - general
+          - policy
+          - procedure
+          - guide
+          - reference
+          type: string
+          description: |-
+            * `general` - General
+            * `policy` - Policy
+            * `procedure` - Procedure
+            * `guide` - Guide
+            * `reference` - Reference
+          x-spec-enum-id: 5c27c16eb333c7c1
+        content_authority:
+          enum:
+          - legacy
+          - repository
+          type: string
+          description: |-
+            * `legacy` - Legacy document
+            * `repository` - Git repository
+          x-spec-enum-id: d3592de727c2a73d
+        source_state:
+          enum:
+          - ready
+          - unavailable
+          type: string
+          description: |-
+            * `ready` - ready
+            * `unavailable` - unavailable
+          x-spec-enum-id: 333c5fdb272addbb
+        definition_sha256:
+          type: string
+          nullable: true
+        placements:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateLibrarySection'
+        placement_count:
+          type: integer
+      required:
+      - category
+      - content_authority
+      - definition_sha256
+      - id
+      - placement_count
+      - placements
+      - source_state
+      - title
     TopicSchema:
       type: object
       properties:

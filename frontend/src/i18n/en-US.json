@@ -3565,6 +3565,7 @@
   "networkLayout.handoffClear_device": "Clear handoff device",
   "networkLayout.handoffClear_interface": "Clear handoff interface",
   "documentation.templateCreateFailed": "The document could not be created. Your choices are preserved. Review the error or try again when ready.",
+  "documentation.templateSourceUnavailable": "Template content is unavailable. Retry when the source is current.",
   "documentation.templateLoadFailed": "Templates could not be loaded. Retry to load the library.",
   "documentation.blockLoadFailed": "Reusable content could not be loaded. Retry to load the library.",
   "documentation.noTemplates": "No available templates match this search.",
@@ -3640,5 +3641,10 @@
   "integrations.netboxProposalCreate": "Create",
   "integrations.netboxProposalUpdate": "Update",
   "integrations.netboxProposalRecheck": "This proposal is rechecked against UniFi and NetBox before it runs.",
-  "integrations.publishToNetBox": "Publish to NetBox"
+  "integrations.publishToNetBox": "Publish to NetBox",
+  "documentation.templateReviewMissing": "Reload the template review before applying changes.",
+  "documentation.templateSectionDetached": "The selected section is now a local copy. Later source changes will not change its text.",
+  "documentation.templateReusedSections": "Reused template sections",
+  "documentation.templateDetachHelp": "Make a local copy to keep the selected text and edit it independently. Other documents keep their existing source.",
+  "documentation.templateMakeLocal": "Make {name} a local copy"
 }

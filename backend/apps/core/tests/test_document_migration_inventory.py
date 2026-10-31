@@ -1437,12 +1437,11 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
         before = inventory_legacy_documents(msp)
         assert before == inventory_legacy_documents(msp)
         assert before["document_count"] == 2
-        assert before["counts"]["simple_candidate"] == 1
-        assert before["counts"]["deferred"] == 1
+        assert before["counts"] == {"simple_candidate": 2}
         assert before["documents"] == sorted(before["documents"], key=lambda row: row["document_id"])
         by_id = {row["document_id"]: row for row in before["documents"]}
         assert by_id[str(simple.id)]["reasons"] == []
-        assert "template" in by_id[str(template.id)]["reasons"]
+        assert by_id[str(template.id)]["reasons"] == []
         assert "Legacy body" not in json.dumps(before)
 
         output = io.StringIO()
@@ -1479,8 +1478,9 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
             "msp-document-migration-status", kwargs={"document_entity_id": template.entity_id}
         )
         template_status = browser.get(template_status_url).json()
-        assert template_status["content_copy_state"] == "unsupported_legacy_shape"
-        assert "template_parity_not_verified" in template_status["handoff_blockers"]
+        assert template_status["content_copy_state"] == "legacy_only"
+        assert "template_history_git_custody_unavailable" in template_status["handoff_blockers"]
+        assert not template_status["cutover_ready"]
         assert browser.get(org_status_url).status_code == 404
         own_org_status_url = reverse(
             "organization-document-migration-status",
@@ -1527,7 +1527,7 @@ def test_inventory_is_repeatable_read_only_and_exact_workspace(tmp_path, monkeyp
             document=str(template.id),
             stdout=blocked_output,
         )
-        assert "template" in json.loads(blocked_output.getvalue())["blockers"]
+        assert json.loads(blocked_output.getvalue())["eligible"] is True
 
         import_args = {
             "workspace": str(msp.id),

@@ -6,8 +6,10 @@ from collections.abc import Callable, Mapping
 from uuid import UUID
 
 from .content_profile import ContentProfileError, parse_content
+from .document_keys import key_targets_in_markdown
 from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
 from .models import Block, Document, DocumentAuthority, DocumentAuthorityMode, WorkspaceRepository
+from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_service import RepositoryInputError, RepositoryServiceError
 
 
@@ -47,6 +49,10 @@ def guard_reversible_migration_write(
     another Git lock. Native Git identities have no legacy owner and are excluded.
     This cannot repair a snapshot that had already diverged before this guard.
     """
+    from .template_git_operation import permits_template_repository_write
+
+    if permits_template_repository_write(repository, changes):
+        return
     scope = {
         "tenant_id": repository.tenant_id,
         "organization_id": repository.workspace.organization_id,
@@ -93,6 +99,15 @@ def guard_reversible_migration_write(
             owner = owned_blocks[block_id].source_document
             if owner is None:
                 raise ReversibleShapeError("rollback_content_identity_changed")
+            if (
+                owner.is_template and owner.library_visible and owned_blocks[block_id].library_visible
+                and not owner.placements.filter(block_id=block_id, parent__isnull=True, position=0).exists()
+                and (attachment_ids_in_markdown(body) or key_targets_in_markdown(body) or entity_ids_in_markdown(body))
+            ):
+                # Borrowable template sections must remain portable even when
+                # enrolled LIVE clients are hidden from this source Workspace.
+                # The always-copied introduction keeps its owned file support.
+                raise ReversibleShapeError("template_library_section_requires_text")
             portable_document_attachments(owner, body)
             # A live consumer must also be able to project these bytes back to
             # its original owner graph. Pins keep earlier immutable source bytes.
@@ -107,5 +122,12 @@ def guard_reversible_migration_write(
         raise RepositoryInputError(
             "This migrated document is kept reversible. File links must refer to its own verified files."
         ) from exc
-    except (ContentProfileError, ReversibleShapeError, RepositoryServiceError) as exc:
+    except ReversibleShapeError as exc:
+        if str(exc) == "template_library_section_requires_text":
+            raise RepositoryInputError(
+                "This migrated template section supports live reuse. "
+                "File, key and entity links require copied sections."
+            ) from exc
+        raise RepositoryInputError(denial) from exc
+    except (ContentProfileError, RepositoryServiceError) as exc:
         raise RepositoryInputError(denial) from exc

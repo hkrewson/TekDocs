@@ -21,6 +21,8 @@ from rest_framework.views import APIView
 from apps.accounts.models import TenantMembership
 from apps.accounts.policy import PermissionKey, context_has_permission, require_installation_member, require_permission
 
+from .content_composition import ContentCompositionError
+from .content_index import ContentIndexError
 from .content_read import RepositoryContentNotIndexed
 from .diagram_exports import DiagramExportArtifact
 from .document_attachments import (
@@ -80,6 +82,8 @@ from .document_review_serializers import (
 )
 from .document_template_models import DocumentTemplateEnrollment
 from .document_template_serializers import (
+    DocumentTemplateDetachRequestSerializer,
+    DocumentTemplateDetachSerializer,
     DocumentTemplateInstantiateSerializer,
     DocumentTemplateRolloutApplySerializer,
     DocumentTemplateRolloutPreviewSerializer,
@@ -139,6 +143,7 @@ from .publications import (
 )
 from .relationships import search_entities
 from .rendering import split_markdown_sections
+from .repository_service import RepositoryServiceError
 from .scoping import DataScope
 from .serializers import (
     BlockRevisionDetailSerializer,
@@ -840,21 +845,66 @@ def _instantiate_template(workspace: ResolvedWorkspace, request: Request) -> Res
                 archived_at__isnull=True,
             )
     try:
-        document = instantiate_document_template(
-            source=source,
-            tenant=workspace.member.tenant,
-            organization=workspace.organization,
-            actor_id=request.user.pk,
-            title=serializer.validated_data["title"],
-            category=serializer.validated_data["category"],
-            placement_rules=serializer.validated_data["placement_rules"],
-        )
+        if DocumentAuthority.objects.filter(
+            tenant_id=source.tenant_id, workspace_id=source.entity.workspace_id,
+            content_id=source.id, authority=DocumentAuthorityMode.REPOSITORY,
+        ).exists():
+            from .template_git_workflows import instantiate_git_template
+
+            if "expected_source_sha256" not in serializer.validated_data:
+                raise serializers.ValidationError({"expected_source_sha256": "Review the current template first."})
+            document = instantiate_git_template(
+                source=source, workspace=workspace_for_owner(
+                    tenant=workspace.member.tenant, organization=workspace.organization,
+                ), actor_id=request.user.pk, title=serializer.validated_data["title"],
+                category=serializer.validated_data["category"],
+                placement_rules=serializer.validated_data["placement_rules"],
+                expected_source_sha256=serializer.validated_data["expected_source_sha256"],
+            )
+        else:
+            document = instantiate_document_template(
+                source=source, tenant=workspace.member.tenant, organization=workspace.organization,
+                actor_id=request.user.pk, title=serializer.validated_data["title"],
+                category=serializer.validated_data["category"],
+                placement_rules=serializer.validated_data["placement_rules"],
+            )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
+    except (RepositoryServiceError, ContentIndexError, ContentCompositionError):
+        return _placement_conflict(PlacementConflict(
+            "Template Git content is unavailable or changed. Review the current source and retry."
+        ))
     return Response(
         DocumentSerializer(_document(workspace, document.entity_id), context={"workspace": workspace}).data,
         status=201,
     )
+
+
+def _template_library_record(source: Document) -> dict[str, object]:
+    from .document_reuse_serializers import DocumentPlacementSerializer
+    from .repository_service import RepositoryServiceError
+    from .template_git_workflows import template_definition_sha256
+
+    repository_owned = DocumentAuthority.objects.filter(
+        tenant_id=source.tenant_id, workspace_id=source.entity.workspace_id,
+        content_id=source.id, authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists()
+    record: dict[str, object] = {
+        "id": source.entity_id, "title": source.entity.display_name, "category": source.category,
+        "content_authority": "repository" if repository_owned else "legacy",
+        "source_state": "unavailable", "definition_sha256": None, "placements": [], "placement_count": 0,
+    }
+    try:
+        definition = template_definition_sha256(source) if repository_owned else None
+        resolved = resolve_document(source)
+    except (PlacementConflict, RepositoryServiceError, RepositoryContentNotIndexed):
+        return record
+    record.update({
+        "source_state": "ready", "definition_sha256": definition,
+        "placements": DocumentPlacementSerializer(resolved.placements, many=True).data,
+        "placement_count": len(resolved.placements),
+    })
+    return record
 
 
 def _template_library(workspace: ResolvedWorkspace, request: Request) -> Response:
@@ -862,7 +912,7 @@ def _template_library(workspace: ResolvedWorkspace, request: Request) -> Respons
     query.is_valid(raise_exception=True)
     values = query.validated_data
     queryset = documents_for_scope(DataScope.tenant(workspace.member.tenant)).filter(
-        is_template=True, library_visible=True
+        is_template=True, library_visible=True, organization__isnull=True
     )
     if values["q"]:
         queryset = queryset.filter(entity__display_name__icontains=values["q"])
@@ -874,7 +924,7 @@ def _template_library(workspace: ResolvedWorkspace, request: Request) -> Respons
     return Response(
         TemplateLibraryResultSerializer(
             {
-                "results": records,
+                "results": [_template_library_record(item) for item in records],
                 "count": count,
                 "page": page,
                 "page_size": page_size,
@@ -888,9 +938,7 @@ def _template_enrollment(workspace: ResolvedWorkspace, enrollment_id: UUID) -> D
     if workspace.organization is None:
         raise Http404
     return get_object_or_404(
-        DocumentTemplateEnrollment.objects.select_related(
-            "source_template__entity", "destination_document__entity", "applied_revision"
-        ),
+        DocumentTemplateEnrollment.objects.select_related("destination_document__entity", "applied_revision"),
         id=enrollment_id,
         tenant=workspace.member.tenant,
         organization=workspace.organization,
@@ -911,7 +959,19 @@ def _preview_template_rollout(workspace: ResolvedWorkspace, request: Request) ->
     serializer = DocumentTemplateRolloutPreviewSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     enrollment = _template_enrollment(workspace, serializer.validated_data["enrollment_id"])
-    _, preview = template_rollout_preview(enrollment=enrollment, actor_id=request.user.pk)
+    try:
+        if _legacy_content_unavailable(enrollment.destination_document):
+            from .template_git_workflows import preview_git_template_rollout
+
+            preview = preview_git_template_rollout(document=enrollment.destination_document, actor_id=request.user.pk)
+        else:
+            _, preview = template_rollout_preview(enrollment=enrollment, actor_id=request.user.pk)
+    except PlacementConflict as conflict:
+        return _placement_conflict(conflict)
+    except (RepositoryServiceError, ContentIndexError, ContentCompositionError):
+        return _placement_conflict(PlacementConflict(
+            "Template Git content is unavailable or changed. Review the current source and retry."
+        ))
     return _template_rollout_response(enrollment, preview)
 
 
@@ -920,14 +980,36 @@ def _apply_template_rollout(workspace: ResolvedWorkspace, request: Request) -> R
     serializer.is_valid(raise_exception=True)
     enrollment = _template_enrollment(workspace, serializer.validated_data["enrollment_id"])
     try:
-        preview = apply_template_rollout(
-            enrollment=enrollment,
-            actor_id=request.user.pk,
-            expected_applied_revision_id=serializer.validated_data["expected_applied_revision_id"],
-            placement_rules=serializer.validated_data["placement_rules"],
-        )
+        if _legacy_content_unavailable(enrollment.destination_document):
+            from .template_git_workflows import apply_git_template_rollout
+
+            missing = {key: "Review the current template and client content before applying."
+                       for key in ("expected_base", "expected_composition", "expected_available_revision")
+                       if key not in serializer.validated_data}
+            if missing:
+                raise serializers.ValidationError(missing)
+            preview = apply_git_template_rollout(
+                document=enrollment.destination_document, actor_id=request.user.pk,
+                expected_base=serializer.validated_data["expected_base"],
+                expected_composition=serializer.validated_data["expected_composition"],
+                expected_applied_revision_id=serializer.validated_data["expected_applied_revision_id"],
+                expected_available_revision=serializer.validated_data["expected_available_revision"],
+                placement_rules=serializer.validated_data["placement_rules"],
+            )
+        else:
+            preview = apply_template_rollout(
+                enrollment=enrollment,
+                actor_id=request.user.pk,
+                expected_applied_revision_id=serializer.validated_data["expected_applied_revision_id"],
+                expected_available_revision=serializer.validated_data.get("expected_available_revision"),
+                placement_rules=serializer.validated_data["placement_rules"],
+            )
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
+    except (RepositoryServiceError, ContentIndexError, ContentCompositionError):
+        return _placement_conflict(PlacementConflict(
+            "Template Git content is unavailable or changed. Review the current source and retry."
+        ))
     enrollment.refresh_from_db()
     return _template_rollout_response(enrollment, preview)
 
@@ -1511,9 +1593,22 @@ def _detach_placement(
     document, placement = _document_placement(workspace, document_entity_id, placement_id)
     _mutate_workspace(request, workspace, document)
     try:
-        detach_document_placement(placement=placement, actor_id=request.user.pk)
+        if _legacy_content_unavailable(document):
+            from .template_git_workflows import detach_git_template_section
+
+            review = DocumentTemplateDetachSerializer(data=request.data)
+            review.is_valid(raise_exception=True)
+            detach_git_template_section(
+                document=document, placement_id=placement.id, actor_id=request.user.pk, **review.validated_data,
+            )
+        else:
+            detach_document_placement(placement=placement, actor_id=request.user.pk)
     except PlacementConflict as conflict:
         return _placement_conflict(conflict)
+    except (RepositoryServiceError, ContentIndexError, ContentCompositionError):
+        return _placement_conflict(PlacementConflict(
+            "Template Git content is unavailable or changed. Review the current source and retry."
+        ))
     return _retrieve(workspace, document_entity_id)
 
 
@@ -2041,7 +2136,7 @@ class MSPDocumentPlacementReuseView(APIView):
 class MSPDocumentPlacementDetachView(APIView):
     @extend_schema(
         operation_id="document_placement_msp_detach",
-        request=None,
+        request=DocumentTemplateDetachRequestSerializer,
         responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
     )
     def post(self, request, document_entity_id, placement_id):  # type: ignore[no-untyped-def]
@@ -2603,7 +2698,7 @@ class OrganizationDocumentPlacementReuseView(APIView):
 class OrganizationDocumentPlacementDetachView(APIView):
     @extend_schema(
         operation_id="document_placement_organization_detach",
-        request=None,
+        request=DocumentTemplateDetachRequestSerializer,
         responses={200: DocumentSerializer, 409: OpenApiResponse(description="Placement conflict")},
     )
     def post(self, request, organization_entity_id, document_entity_id, placement_id):  # type: ignore[no-untyped-def]

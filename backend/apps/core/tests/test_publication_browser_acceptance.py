@@ -216,7 +216,11 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             browser.force_login(user)
             sessions[name] = browser.cookies[settings.SESSION_COOKIE_NAME].value
 
+        from apps.core.tests.template_browser_fixture import prepare_template_browser_fixture
+
+        template_fixture = prepare_template_browser_fixture(installation.owner)
         prepared_state = {
+            "template": template_fixture.browser,
             "document_id": str(document.entity_id),
             "content_id": str(document.id),
             "fragment_id": str(document.placements.get(block__source_document=document).block_id),
@@ -302,3 +306,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             file.refresh_from_db()
             assert file.document_id == document.id
             assert copy_attachment_content(file) == content
+
+        from apps.core.tests.template_browser_fixture import verify_template_browser_fixture
+
+        verify_template_browser_fixture(template_fixture, installation.owner)

@@ -111,6 +111,7 @@ def _prepare_group(
                     "content_copy_not_in_sync",
                     "repository_read_projection_not_matched",
                     "managed_file_retention_limit",
+                    "template_history_git_custody_unavailable",
                 }
             ]
         if blockers:
@@ -128,6 +129,13 @@ def _prepare_group(
                 "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in exported.files],
                 "attachments": [(str(identity), digest) for identity, digest in exported.attachment_digests],
                 "history": cast(dict[str, object], status["publication_history"])["evidence_sha256"],
+                **(
+                    {"template_enrollment": exported.template_enrollment_sha256}
+                    if exported.template_enrollment_sha256 is not None
+                    else {}
+                ),
+                **({"template_source": exported.template_source_sha256}
+                   if exported.template_source_sha256 is not None else {}),
                 "review": [document.review_state, document.review_content_sha256, str(document.last_reviewed_at)],
             }
         )

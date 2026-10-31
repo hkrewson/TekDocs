@@ -9,15 +9,18 @@ import shutil
 import signal
 import stat
 import subprocess  # nosec B404
+import sys
 import tempfile
+import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 from .models import (
@@ -210,8 +213,30 @@ def _cleanup_staging_directories(root: Path, repository_id: uuid.UUID) -> None:
             raise RepositoryServiceError("Repository staging cleanup failed") from exc
 
 
+@dataclass(slots=True)
+class _RepositoryLockLease:
+    thread_id: int
+    root: str
+    repository_id: uuid.UUID
+    exclusive: bool
+    active: bool = True
+
+
+_held_repository_locks: ContextVar[tuple[_RepositoryLockLease, ...]] = ContextVar(
+    "tekdocs_held_repository_locks", default=(),
+)
+
+
 @contextmanager
 def _repository_lock(root: Path, repository_id: uuid.UUID, *, exclusive: bool) -> Iterator[None]:
+    identity = (threading.get_ident(), str(root), repository_id)
+    held = _held_repository_locks.get()
+    for lease in held:
+        if lease.active and (lease.thread_id, lease.root, lease.repository_id) == identity:
+            if exclusive and not lease.exclusive:
+                raise RepositoryConflictError("Repository is busy")
+            yield
+            return
     lock_directory = root / ".locks"
     _ensure_private_directory(lock_directory)
     lock_path = lock_directory / f"{repository_id}.lock"
@@ -240,9 +265,13 @@ def _repository_lock(root: Path, repository_id: uuid.UUID, *, exclusive: bool) -
                 if time.monotonic() >= deadline:
                     raise RepositoryConflictError("Repository is busy") from exc
                 time.sleep(LOCK_POLL_SECONDS)
+        lease = _RepositoryLockLease(*identity, exclusive)
+        token = _held_repository_locks.set((*held, lease))
         try:
             yield
         finally:
+            lease.active = False
+            _held_repository_locks.reset(token)
             fcntl.flock(descriptor, fcntl.LOCK_UN)
     finally:
         os.close(descriptor)
@@ -736,6 +765,9 @@ def commit_repository_files(
     message: str,
     attribution: RepositoryAuditAttribution | None = None,
 ) -> RepositoryCommitResult:
+    active = _active_repository_transaction()
+    if active is not None:
+        active.enlist(repository_id)
     validated_changes = _validate_changes(changes)
     validated_message = _validate_message(message)
     validated_attribution = _validate_attribution(attribution)
@@ -776,6 +808,8 @@ def commit_repository_files(
                 advanced = False
                 commit_id = accepted
                 try:
+                    if active is not None:
+                        active.written.add(repository.id)
                     commit_id, created = git.write_commit(
                         base=accepted,
                         changes=validated_changes,
@@ -827,6 +861,9 @@ def read_accepted_repository_file(
     *, repository_id: uuid.UUID, path: str, expected_commit: str | None = None
 ) -> bytes:
     validated_path = _validate_path(path)
+    active = _active_repository_transaction()
+    if active is not None:
+        active.enlist(repository_id, write=False)
     repository, root, repository_path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
         repository.refresh_from_db(fields=("accepted_commit",))
@@ -854,6 +891,9 @@ def read_accepted_repository_markdown_files(
 ) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
     """Read a bounded, stable Markdown snapshot from exactly one accepted commit."""
 
+    active = _active_repository_transaction()
+    if active is not None and record_reconciliation:
+        active.enlist(repository_id, write=False)
     repository, root, repository_path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
         repository.refresh_from_db(fields=("accepted_commit",))
@@ -890,6 +930,9 @@ def list_accepted_repository_history(
 
     if limit < 1 or limit > 32:
         raise RepositoryInputError("History limit is outside the migration safety bound")
+    active = _active_repository_transaction()
+    if active is not None and record_reconciliation:
+        active.enlist(repository_id, write=False)
     repository, root, repository_path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
         repository.refresh_from_db(fields=("accepted_commit",))
@@ -910,6 +953,9 @@ def read_repository_markdown_files_at_commit(
 ) -> tuple[RepositoryCommit, tuple[tuple[str, bytes], ...]]:
     """Read one retained commit from the selected repository without widening its scope."""
 
+    active = _active_repository_transaction()
+    if active is not None and record_reconciliation:
+        active.enlist(repository_id, write=False)
     repository, root, repository_path, object_format = _load_repository(repository_id)
     validated_object_id = _validate_object_id(object_id, object_format)
     with _repository_lock(root, repository.id, exclusive=False):
@@ -948,6 +994,9 @@ def pin_accepted_repository_for_publication(repository_id: uuid.UUID) -> Iterato
     writer cannot advance the accepted ref between proof and retention.
     """
 
+    active = _active_repository_transaction()
+    if active is not None:
+        active.enlist(repository_id, write=False)
     repository, root, path, object_format = _load_repository(repository_id)
     with _repository_lock(root, repository.id, exclusive=False):
         with transaction.atomic():
@@ -975,6 +1024,9 @@ def reconcile_workspace_repository(
     *, repository_id: uuid.UUID, repair_to_accepted: bool = False
 ) -> RepositoryReconciliationResult:
     try:
+        active = _active_repository_transaction()
+        if active is not None:
+            active.enlist(repository_id, write=False)
         repository, root, path, object_format = _load_repository(repository_id)
     except RepositoryServiceError:
         WorkspaceRepository.objects.filter(pk=repository_id).update(
@@ -1064,3 +1116,274 @@ def repository_health_diagnostics() -> dict[str, object]:
         "last_checked_at": WorkspaceRepository.objects.aggregate(value=Max("last_reconciled_at"))["value"],
         "repair": "reconcile_to_accepted" if status != "ready" else None,
     }
+
+
+@dataclass(frozen=True, slots=True)
+class TemplateLibraryFragmentRead:
+    object_id: str
+    source: bytes
+    expected_body_sha256: str
+    source_path: str
+    template_revision_id: uuid.UUID
+
+
+def read_template_library_fragment(
+    *, destination_document_id: uuid.UUID, library_workspace_id: uuid.UUID,
+    source_block_id: uuid.UUID, mode: str, pinned_object_id: str = "",
+    template_revision_id: uuid.UUID | None = None, audience: str = "shared",
+) -> TemplateLibraryFragmentRead:
+    """Read one approved enrolled source without granting access to its repository."""
+    from .repository_storage import configured_repository_root, repository_path
+
+    if mode not in {"live", "pinned"} or (mode == "live" and pinned_object_id):
+        raise RepositoryInputError("Template library selection is invalid")
+    if not connection.in_atomic_block:
+        raise RepositoryInputError("Template library reads require a bound transaction")
+
+    from django.core.exceptions import ObjectDoesNotExist
+
+    from .document_template_migration import TemplateMigrationError, template_enrollment_evidence
+    from .document_template_models import DocumentTemplateEnrollment
+    from .models import DocumentPlacement
+
+    def descriptor() -> tuple[uuid.UUID, str, str, str, str, str, uuid.UUID, str]:
+        enrollment = DocumentTemplateEnrollment.objects.filter(
+            destination_document_id=destination_document_id, archived_at__isnull=True,
+        ).first()
+        if enrollment is None:
+            raise RepositoryInputError("Enrolled template library source is unavailable")
+        try:
+            destination, template = enrollment.destination_document, enrollment.source_template
+            if template_revision_id is not None and template_revision_id != enrollment.applied_revision_id:
+                raise TemplateMigrationError("template_library_revision_changed")
+            evidence = template_enrollment_evidence(destination)
+            source_workspace = template.entity.workspace_id
+            if evidence is None or source_workspace != library_workspace_id or not template.library_visible:
+                raise TemplateMigrationError("template_library_scope_invalid")
+            placement = DocumentPlacement.objects.select_related("block", "pinned_revision").get(
+                document=destination, block_id=source_block_id, resolution_mode=mode, audience_profile=audience,
+                block__source_document=template, block__library_visible=True,
+            )
+            matches = [item for item in enrollment.placement_map if (
+                item["mode"] == mode and item["destination_placement_id"] == str(placement.id)
+                and item["source_block_id"] == str(placement.block.entity_id)
+            )]
+            if len(matches) != 1 or destination.archived_at is not None or template.archived_at is not None:
+                raise TemplateMigrationError("template_library_scope_invalid")
+            revision = placement.pinned_revision if mode == "pinned" else placement.block.current_revision
+            if revision is None:
+                raise TemplateMigrationError("template_library_revision_unavailable")
+            repository = WorkspaceRepository.objects.select_related("accepted_commit").get(
+                tenant_id=enrollment.tenant_id, workspace_id=library_workspace_id,
+                lifecycle_state=RepositoryLifecycleState.ACTIVE,
+            )
+            if repository.accepted_commit is None:
+                raise TemplateMigrationError("template_library_repository_unavailable")
+        except (ObjectDoesNotExist, TemplateMigrationError) as exc:
+            raise RepositoryInputError("Enrolled template library source is unavailable") from exc
+        return (
+            repository.id, repository.storage_relative_path, repository.accepted_commit.object_id,
+            repository.accepted_commit.object_format, revision.checksum, evidence.fingerprint,
+            enrollment.applied_revision_id, enrollment.applied_revision.checksum,
+        )
+
+    selected = descriptor()
+    identity, relative_path, accepted, object_format, checksum, _fingerprint, revision_id, manifest_sha256 = selected
+    root = configured_repository_root()
+    if root is None:
+        raise RepositoryStorageError("Managed repository storage is not configured")
+    path = repository_path(root=root, repository_id=identity, storage_relative_path=relative_path)
+    with _repository_lock(root, identity, exclusive=False):
+        if descriptor() != selected:
+            raise RepositoryConflictError("Template library source changed before read")
+        if _repository_object_format(path) != object_format:
+            raise RepositoryServiceError("Template library repository format differs")
+        _validate_object_id(accepted, object_format)
+        git = _GitRepository(identity, path, object_format)
+        state, usable = _classify_reconciliation(git, accepted)
+        if not usable or state != RepositoryReconciliationState.MATCHED:
+            raise RepositoryReconciliationError("Template library repository requires reconciliation")
+        object_id = pinned_object_id if mode == "pinned" else accepted
+        _validate_object_id(object_id, object_format)
+        if mode == "pinned" and not git.is_ancestor(object_id, accepted):
+            raise RepositoryInputError("Template library pin is not retained in accepted history")
+        source_path = f"fragments/{source_block_id}.md"
+        if mode == "pinned":
+            retained_path = f"template-snapshots/{revision_id}/fragments/{source_block_id}.content"
+            try:
+                source = git.read_file(object_id, retained_path)
+            except RepositoryFileNotFoundError:
+                source = git.read_file(object_id, source_path)
+            else:
+                import hashlib
+
+                retained_manifest = git.read_file(object_id, f"template-snapshots/{revision_id}/manifest.json")
+                if hashlib.sha256(retained_manifest).hexdigest() != manifest_sha256:
+                    raise RepositoryInputError("Retained template version differs from its immutable manifest")
+                source_path = retained_path
+        else:
+            source = git.read_file(object_id, source_path)
+        if descriptor() != selected:
+            raise RepositoryConflictError("Template library enrollment changed during read")
+    return TemplateLibraryFragmentRead(object_id, source, checksum, source_path, revision_id)
+
+
+class _CoordinatedRepositoryTransaction:
+    def __init__(self, *, writes_allowed: bool) -> None:
+        self.thread_id = threading.get_ident()
+        self.writes_allowed = writes_allowed
+        self.database_committed = False
+        self.closed = False
+        self.locks = ExitStack()
+        self.repositories: dict[uuid.UUID, tuple[_GitRepository, str | None]] = {}
+        self.tenants: dict[uuid.UUID, uuid.UUID] = {}
+        self.written: set[uuid.UUID] = set()
+        self.created_artifacts: list[tuple[Callable[[], bool], Callable[[], None]]] = []
+        self.retained_artifacts: set[int] = set()
+
+    def register_created_artifact(self, retained: Callable[[], bool], discard: Callable[[], None]) -> None:
+        if not self.writes_allowed or self.closed or self.database_committed:
+            raise RepositoryInputError("Artifact creation requires the outer coordinated transaction")
+        self.created_artifacts.append((retained, discard))
+
+    def prepare_artifacts(self) -> None:
+        # Evaluate against final SQL state before commit: callbacks discarded by a
+        # savepoint or skipped after an earlier failing on_commit callback cannot
+        # provide a reliable record of which new files became durable.
+        self.retained_artifacts = {
+            index for index, (retained, _discard) in enumerate(self.created_artifacts) if retained()
+        }
+
+    def discard_rolled_back_artifacts(self, *, preserve_error: bool) -> None:
+        failures = 0
+        for index, (_retained, discard) in enumerate(self.created_artifacts):
+            if not self.database_committed or index not in self.retained_artifacts:
+                try:
+                    discard()
+                except Exception:
+                    failures += 1
+        if failures:
+            logger.critical("repository_transaction_artifact_cleanup_failed count=%s", failures)
+            if not preserve_error:
+                raise RepositoryReconciliationError("Coordinated artifact cleanup requires recovery")
+
+    def mark_committed(self) -> None:
+        self.database_committed = True
+
+    def enlist(self, repository_id: uuid.UUID, *, write: bool = True) -> None:
+        if (write and not self.writes_allowed) or self.database_committed or not connection.in_atomic_block:
+            raise RepositoryInputError("Coordinated repository writes require the outer database transaction")
+        if repository_id in self.repositories:
+            return
+        repository, root, path, object_format = _load_repository(repository_id)
+        self.locks.enter_context(_repository_lock(root, repository.id, exclusive=True))
+        git = _GitRepository(repository.id, path, object_format)
+        self.repositories[repository.id] = (git, git.raw_current_ref())
+        self.tenants[repository.id] = repository.tenant_id
+
+    def align_written_refs(self) -> None:
+        """Honor SQL savepoints, including those owned by legacy callers.
+
+        Only a validated write attempt authorizes compensation. Merely reading
+        or rejecting a write must never repair preexisting repository drift.
+        """
+        for identity in self.written:
+            git, original = self.repositories[identity]
+            repository = WorkspaceRepository.objects.filter(
+                tenant_id=self.tenants[identity], pk=identity,
+            ).first()
+            desired = _accepted_object(repository, git.object_format) if repository is not None else original
+            current = git.raw_current_ref()
+            if current != desired:
+                if current is None:
+                    git.recover_ref(desired, current)
+                else:
+                    git.rollback_ref(current=current, previous=desired)
+
+    def checkpoint(self) -> dict[uuid.UUID, str | None]:
+        return {identity: git.raw_current_ref() for identity, (git, _original) in self.repositories.items()}
+
+    def restore(self, checkpoint: Mapping[uuid.UUID, str | None] | None = None) -> None:
+        failed = False
+        for identity, (git, original) in reversed(tuple(self.repositories.items())):
+            previous = checkpoint.get(identity, original) if checkpoint is not None else original
+            try:
+                current = git.raw_current_ref()
+                if current != previous:
+                    if current is None:
+                        git.recover_ref(previous, current)
+                    else:
+                        git.rollback_ref(current=current, previous=previous)
+            except RepositoryServiceError:
+                failed = True
+                logger.critical("repository_transaction_ref_rollback_failed repository=%s", identity)
+        if failed:
+            raise RepositoryReconciliationError("Coordinated repository rollback requires reconciliation")
+
+    def changed(self) -> bool:
+        return any(git.raw_current_ref() != original for git, original in self.repositories.values())
+
+
+_repository_transaction: ContextVar[_CoordinatedRepositoryTransaction | None] = ContextVar(
+    "tekdocs_repository_transaction", default=None,
+)
+
+
+def _active_repository_transaction() -> _CoordinatedRepositoryTransaction | None:
+    active = _repository_transaction.get()
+    return active if (
+        active is not None and active.thread_id == threading.get_ident()
+        and not active.closed and not active.database_committed
+    ) else None
+
+
+def coordinated_repository_write_pending() -> bool:
+    active = _active_repository_transaction()
+    return active is not None and active.changed()
+
+
+@contextmanager
+def coordinated_repository_transaction() -> Iterator[None]:
+    """Hold Git locks through SQL outcome and compensate refs when SQL rolls back.
+
+    The request middleware or operator controller owns the outermost scope.
+    Nested scopes restore their own savepoint's refs even if a caller catches
+    their error and commits earlier successful work in the same transaction.
+    """
+    active = _active_repository_transaction()
+    if active is not None:
+        checkpoint = active.checkpoint()
+        try:
+            with transaction.atomic():
+                yield
+                rolled_back = transaction.get_rollback()
+                if not rolled_back:
+                    active.align_written_refs()
+        except BaseException:
+            active.restore(checkpoint)
+            raise
+        if rolled_back:
+            active.restore(checkpoint)
+        return
+    active = _CoordinatedRepositoryTransaction(writes_allowed=not connection.in_atomic_block)
+    token = _repository_transaction.set(active)
+    try:
+        try:
+            with transaction.atomic():
+                # Registered first: a later post-commit callback failure cannot
+                # cause compensation of a database transaction already committed.
+                transaction.on_commit(active.mark_committed)
+                yield
+                if not transaction.get_rollback():
+                    active.align_written_refs()
+                    active.prepare_artifacts()
+        finally:
+            if not active.database_committed:
+                active.restore()
+    finally:
+        try:
+            active.discard_rolled_back_artifacts(preserve_error=sys.exc_info()[0] is not None)
+        finally:
+            active.closed = True
+            _repository_transaction.reset(token)
+            active.locks.close()

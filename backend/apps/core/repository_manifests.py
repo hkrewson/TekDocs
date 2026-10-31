@@ -16,6 +16,7 @@ from .repository_service import (
     RepositoryConflictError,
     RepositoryFileNotFoundError,
     commit_repository_files,
+    coordinated_repository_transaction,
     read_accepted_repository_file,
 )
 from .repository_storage import configured_repository_root
@@ -381,6 +382,7 @@ def _organization_directory_entries(tenant_id: uuid.UUID) -> tuple[OrganizationD
     return tuple(entries)
 
 
+@coordinated_repository_transaction()
 def synchronize_workspace_manifests(repository_id: uuid.UUID) -> RepositoryCommitResult:
     conflict: RepositoryConflictError | None = None
     for _ in range(MAX_SYNC_ATTEMPTS):

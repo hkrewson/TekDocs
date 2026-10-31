@@ -33,6 +33,16 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
         placements
     ):
         raise DocumentMigrationShapeError("unsupported_placement_graph")
+    library_placements: set[uuid.UUID] = set()
+    if any(item.block.organization_id != document.organization_id for item in placements):
+        from .document_template_migration import TemplateMigrationError, template_enrollment_evidence
+
+        try:
+            evidence = template_enrollment_evidence(document)
+        except TemplateMigrationError as exc:
+            raise DocumentMigrationShapeError("cross_workspace_reference") from exc
+        if evidence is not None:
+            library_placements.update(evidence.library_placement_ids)
     children: dict[uuid.UUID | None, list[DocumentPlacement]] = {}
     for placement in placements:
         if (
@@ -57,7 +67,7 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
             raise DocumentMigrationShapeError("non_primary_or_pinned_placement")
         if (
             placement.block.tenant_id != document.tenant_id
-            or placement.block.organization_id != document.organization_id
+            or (placement.block.organization_id != document.organization_id and placement.id not in library_placements)
         ):
             raise DocumentMigrationShapeError("cross_workspace_reference")
         if placement.parent_id is not None and placement.parent_id not in placement_ids:

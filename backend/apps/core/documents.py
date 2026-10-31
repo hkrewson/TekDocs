@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
+from contextlib import AbstractContextManager, ExitStack
 from dataclasses import dataclass
 from difflib import unified_diff
 from typing import cast
@@ -61,6 +63,10 @@ class PlacementConflict(Exception):
 def _ensure_legacy_content_authority(document: Document) -> None:
     """Prevent legacy content services from mutating a repository-owned document."""
 
+    from .template_git_operation import permits_template_document
+
+    if permits_template_document(document):
+        return
     if DocumentAuthority.objects.filter(
         tenant_id=document.tenant_id,
         organization_id=cast(UUID, document.organization_id),
@@ -239,6 +245,10 @@ def blocks_for_library(scope: DataScope) -> QuerySet[Block]:
 
 
 def resolve_document(document: Document, *, audience: str | None = None) -> ResolvedDocument:
+    if document.is_template:
+        from .template_library_projection import verify_template_source_projection
+
+        verify_template_source_projection(document)
     if audience is not None and audience not in PublicationAudience.values:
         raise PlacementConflict("The selected publication audience is not supported.")
     placements = list(getattr(document, "active_placements", ()))
@@ -810,12 +820,17 @@ def instantiate_document_template(
     title: str,
     category: str,
     placement_rules: dict[str, str] | None = None,
+    _git_enrollment: Callable[
+        [Document, DocumentTemplateRevision, list[dict[str, object]]], AbstractContextManager[None]
+    ] | None = None,
+    _source_attachments: tuple[DocumentAttachment, ...] | None = None,
+    _copied_attachment: Callable[[DocumentAttachment], None] | None = None,
 ) -> Document:
     from .document_attachments import copy_document_attachment
 
     copied_attachments: list[DocumentAttachment] = []
     try:
-        with transaction.atomic():
+        with transaction.atomic(), ExitStack() as operations:
             if not source.is_template:
                 raise PlacementConflict("The selected document is not a template.")
             resolved = resolve_document(source)
@@ -826,15 +841,22 @@ def instantiate_document_template(
                 ensure_template_revision(source=source, actor_id=actor_id) if source.organization_id is None else None
             )
             attachment_ids = attachment_ids_in_markdown(resolved.markdown)
-            source_attachments = list(
-                DocumentAttachment.objects.filter(
-                    tenant=source.tenant,
-                    document=source,
-                    entity_id__in=attachment_ids,
-                    archived_at__isnull=True,
-                ).select_related("entity")
-            )
-            if {item.entity_id for item in source_attachments} != attachment_ids:
+            if _source_attachments is None:
+                source_attachments = list(
+                    DocumentAttachment.objects.filter(
+                        tenant=source.tenant, document=source, archived_at__isnull=True,
+                    ).filter(
+                        Q(entity_id__in=attachment_ids)
+                        | Q(purpose="primary_file")
+                    ).select_related("entity")
+                )
+            else:
+                source_attachments = list(_source_attachments)
+                if any(
+                    item.document_id != source.id or item.tenant_id != source.tenant_id for item in source_attachments
+                ):
+                    raise PlacementConflict("Template files do not belong to the reviewed source.")
+            if not attachment_ids.issubset({item.entity_id for item in source_attachments}):
                 raise PlacementConflict("The template contains an unavailable managed attachment reference.")
 
             replacements = {item.entity_id: uuid4() for item in source_attachments}
@@ -872,6 +894,10 @@ def instantiate_document_template(
                     "applied_revision_id": str(primary.revision.id),
                 }
             ]
+            if _git_enrollment is not None:
+                if template_revision is None or organization is None:
+                    raise PlacementConflict("A reviewed client enrollment is required.")
+                operations.enter_context(_git_enrollment(destination, template_revision, placement_map))
             for item in resolved.placements[1:]:
                 source_block = item.placement.block
                 mode = _template_rule(rules, source_block.entity_id, primary=False)
@@ -913,15 +939,21 @@ def instantiate_document_template(
                         "applied_revision_id": str(item.revision.id),
                     }
                 )
-            for attachment in source_attachments:
+            previous_primary = None
+            for attachment in sorted(source_attachments, key=lambda item: (item.version_number or 0, str(item.id))):
                 copied_attachments.append(
                     copy_document_attachment(
                         attachment=attachment,
                         destination=destination,
                         actor_id=actor_id,
                         entity_id=replacements[attachment.entity_id],
+                        replaces=previous_primary if attachment.purpose == "primary_file" else None,
                     )
                 )
+                if _copied_attachment is not None:
+                    _copied_attachment(copied_attachments[-1])
+                if attachment.purpose == "primary_file":
+                    previous_primary = copied_attachments[-1]
             AuditEvent.objects.create(
                 tenant=tenant,
                 actor_id=actor_id,
@@ -932,7 +964,7 @@ def instantiate_document_template(
                     "template_revision": template_revision.revision_number if template_revision is not None else None,
                 },
             )
-            if organization is not None and template_revision is not None:
+            if organization is not None and template_revision is not None and _git_enrollment is None:
                 DocumentTemplateEnrollment.objects.create(
                     tenant=tenant,
                     organization=organization,
@@ -944,8 +976,9 @@ def instantiate_document_template(
                     last_applied_by_id=actor_id,
                 )
     except Exception:
-        for copied in copied_attachments:
-            copied.file.storage.delete(copied.file.name)
+        if _copied_attachment is None:
+            for copied in copied_attachments:
+                copied.file.storage.delete(copied.file.name)
         raise
     return destination
 
@@ -1002,8 +1035,15 @@ def apply_template_rollout(
     enrollment: DocumentTemplateEnrollment,
     actor_id: UUID,
     expected_applied_revision_id: UUID,
+    expected_available_revision: int | None = None,
     placement_rules: dict[str, str] | None = None,
 ) -> dict[str, object]:
+    # Handoff locks the destination before examining enrollment controls.
+    Document.objects.select_for_update().get(
+        pk=enrollment.destination_document_id,
+        tenant_id=enrollment.tenant_id,
+        organization_id=enrollment.organization_id,
+    )
     locked = (
         DocumentTemplateEnrollment.objects.select_for_update(of=("self",))
         .select_related("source_template", "destination_document", "destination_document__entity", "applied_revision")
@@ -1013,6 +1053,8 @@ def apply_template_rollout(
     if locked.applied_revision_id != expected_applied_revision_id:
         raise PlacementConflict("The client template enrollment changed after this preview loaded.")
     latest, preview = template_rollout_preview(enrollment=locked, actor_id=actor_id)
+    if expected_available_revision is not None and latest.revision_number != expected_available_revision:
+        raise PlacementConflict("The template source changed after this preview loaded. Review the new version.")
     if preview["conflicts"]:
         raise PlacementConflict("Resolve copied-block or removal conflicts before applying this rollout.")
     rules = placement_rules or {}
@@ -1159,6 +1201,7 @@ def detach_document_placement(*, placement: DocumentPlacement, actor_id: UUID) -
         organization=locked.document.organization,
         entity=entity,
         source_document=locked.document,
+        kind=locked.block.kind,
     )
     detached_revision = BlockRevision.objects.create(
         tenant=locked.tenant,
@@ -1350,7 +1393,10 @@ def add_block_placement(
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
     block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
-    _ensure_legacy_block_authority(block)
+    from .template_git_operation import permits_template_reference
+
+    if not permits_template_reference(locked_document, block.source_document_id):
+        _ensure_legacy_block_authority(block)
     if block.tenant_id != locked_document.tenant_id or block.archived_at is not None:
         raise PlacementConflict("The selected block is unavailable in this installation.")
     if block.source_document_id == locked_document.id:

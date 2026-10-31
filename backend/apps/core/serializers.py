@@ -764,7 +764,10 @@ class DocumentSerializer(serializers.Serializer):
         enrollment = self._template_enrollment(obj)
         if enrollment is None or enrollment.archived_at is not None:
             return None
-        return enrollment.source_template.entity_id
+        try:
+            return enrollment.source_template.entity_id
+        except ObjectDoesNotExist:
+            return None
 
     @extend_schema_field(DocumentAttachmentSerializer(many=True))
     def get_attachments(self, obj: Document) -> list[dict[str, object]]:
@@ -992,7 +995,28 @@ class DocumentResultSerializer(serializers.Serializer):
     count = serializers.IntegerField()
 
 
-class TemplateLibraryResultSerializer(DocumentResultSerializer):
+class TemplateLibrarySectionSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    block_id = serializers.UUIDField()
+    block_name = serializers.CharField()
+    is_primary = serializers.BooleanField()
+    resolved_html = serializers.CharField(allow_blank=True)
+
+
+class TemplateLibrarySourceSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    title = serializers.CharField()
+    category = serializers.ChoiceField(choices=DocumentCategory.choices)
+    content_authority = serializers.ChoiceField(choices=DocumentAuthorityMode.choices)
+    source_state = serializers.ChoiceField(choices=("ready", "unavailable"))
+    definition_sha256 = serializers.CharField(allow_null=True)
+    placements = TemplateLibrarySectionSerializer(many=True)
+    placement_count = serializers.IntegerField()
+
+
+class TemplateLibraryResultSerializer(serializers.Serializer):
+    results = TemplateLibrarySourceSerializer(many=True)
+    count = serializers.IntegerField()
     page = serializers.IntegerField()
     page_size = serializers.IntegerField()
     has_more = serializers.BooleanField()

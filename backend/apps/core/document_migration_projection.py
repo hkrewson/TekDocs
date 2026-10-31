@@ -83,6 +83,29 @@ def portable_node_projection_matches(
         ):
             return False
     for included, expected_include in zip(includes, parsed.includes, strict=True):
+        if expected_include.library_workspace_id is not None:
+            from .content_composition import ContentCompositionError
+            from .template_library_content import template_library_loader
+
+            if (
+                included.library_workspace_id != expected_include.library_workspace_id
+                or included.library_revision_id != expected_include.library_revision_id
+                or included.target_id is not None or included.ordinal != expected_include.ordinal
+                or included.target_content_id != expected_include.target_content_id
+                or included.resolution_mode != expected_include.mode
+                or included.audience_profile != expected_include.audience
+                or included.pinned_object_id != expected_include.pinned_object_id
+            ):
+                return False
+            try:
+                selected, source = template_library_loader(node.repository)(node.content_id, expected_include)
+            except ContentCompositionError:
+                return False
+            if included.resolved_object_id != selected or included.resolved_content_digest != source.content_digest:
+                return False
+            continue
+        if included.library_workspace_id is not None or included.library_revision_id is not None:
+            return False
         target = targets.get(expected_include.target_content_id)
         resolved_object_id = (
             indexed_object_id if expected_include.mode == "live" else expected_include.pinned_object_id

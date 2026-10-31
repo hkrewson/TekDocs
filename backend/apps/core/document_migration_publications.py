@@ -58,7 +58,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
             owned_placement_tree(document, placements)
         except DocumentMigrationShapeError:
             reasons.add("publication_document_shape_unsupported")
-        if document.is_template or not any(item.block.source_document_id == document.id for item in placements):
+        if not any(item.block.source_document_id == document.id for item in placements):
             reasons.add("publication_document_shape_unsupported")
     evidence = []
     artifact_count = 0
@@ -94,7 +94,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v4",
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
-                "tekdocs-static-publication/v7",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
             }
             or publication.audience != "msp_internal"
             or sum(item.kind == "pdf" for item in artifacts) != 1
@@ -147,7 +147,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
             reasons.add("publication_controls_invalid")
         try:
             if manifest.get("format") in {
-                "tekdocs-static-publication/v5", "tekdocs-static-publication/v6", "tekdocs-static-publication/v7",
+                "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
             }:
                 from .document_git_publications import verify_internal_git_publication
 
@@ -202,7 +203,7 @@ def publication_migration_evidence(
     to change authority nor a substitute for rechecking custody at execution.
     """
     from .document_migration_export import build_simple_document_export
-    from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
+    from .document_template_migration import TemplateMigrationError, template_enrollment_fingerprint
     from .documents import resolve_document
     from .models import DocumentAttachment
     from .repository_publication_preflight import repository_publication_preflight
@@ -213,14 +214,12 @@ def publication_migration_evidence(
     if report["state"] != "verified" or not isinstance(report["evidence_sha256"], str):
         return None
     if (
-        document.is_template
-        or document.archived_at is not None
-        or DocumentTemplateRevision.objects.filter(template=document).exists()
-        or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
+        document.archived_at is not None
         or DocumentPublication.objects.filter(document=document).exclude(retention="permanent").exists()
     ):
         return None
     try:
+        template_enrollment_fingerprint(document)
         exported = build_simple_document_export(
             document, allow_repository_divergence=True, verify_attachments=True
         )
@@ -241,6 +240,6 @@ def publication_migration_evidence(
             )["blockers"]
         ):
             return None
-    except (OSError, ValueError, ImproperlyConfigured):
+    except (OSError, ValueError, ImproperlyConfigured, TemplateMigrationError):
         return None
     return report["evidence_sha256"]

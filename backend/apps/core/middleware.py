@@ -105,7 +105,9 @@ class RLSRequestScopeMiddleware:
         if connection.vendor != "postgresql" or not (has_session or has_api_token):
             return self.get_response(request)
 
-        with transaction.atomic():
+        from .repository_service import coordinated_repository_transaction, coordinated_repository_write_pending
+
+        with coordinated_repository_transaction():
             if request.user.is_authenticated:
                 state = (
                     InstallationState.objects.select_related("tenant")
@@ -141,7 +143,10 @@ class RLSRequestScopeMiddleware:
                             actor_user_id=request.user.pk,
                             principal_mode=RLSPrincipalMode.USER,
                         )
-            return self.get_response(request)
+            response = self.get_response(request)
+            if response.status_code >= 400 and coordinated_repository_write_pending():
+                transaction.set_rollback(True)
+            return response
 
     def process_view(
         self,

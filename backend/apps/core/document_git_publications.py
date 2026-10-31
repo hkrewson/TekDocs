@@ -25,7 +25,12 @@ from .document_publication_files import (
     prepare_publication_files,
     verify_publication_file_manifest,
 )
-from .document_shared_publications import SHARED_GIT_STATIC_FORMAT, verify_shared_publication_manifest
+from .document_shared_publications import (
+    SHARED_GIT_STATIC_FORMAT,
+    TEMPLATE_GIT_STATIC_FORMAT,
+    verify_shared_publication_manifest,
+    verify_template_publication_manifest,
+)
 from .models import (
     AuditEvent,
     ContentNode,
@@ -61,8 +66,13 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         manifest = publication.manifest
         source = manifest["git_source"]
         sources = source["sources"]
+        shared = manifest["format"] in {SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT}
         return bool(
-            manifest["format"] in {GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT, SHARED_GIT_STATIC_FORMAT}
+            manifest["format"] in {
+                GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT, SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT,
+            }
+            and (manifest["format"] != TEMPLATE_GIT_STATIC_FORMAT
+                 or verify_template_publication_manifest(manifest, publication.document_id))
             and (manifest["format"] != SHARED_GIT_STATIC_FORMAT
                  or verify_shared_publication_manifest(manifest, publication.document_id))
             and (
@@ -71,15 +81,17 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             )
             and publication.audience == manifest["audience"] == "msp_internal"
             and manifest["source_document_id"] == str(publication.document.entity_id)
-            and source["format"] == "tekdocs.git-dependencies/v1"
+            and source["format"] == ("tekdocs.git-dependencies/v2"
+                                      if manifest["format"] == TEMPLATE_GIT_STATIC_FORMAT
+                                      else "tekdocs.git-dependencies/v1")
             and source["content_id"] == str(publication.document_id)
             and source["workspace_id"] == str(publication.entity.workspace_id)
             and source["audience"] == "msp_internal"
             and source["markdown_sha256"] == hashlib.sha256(publication.canonical_markdown.encode()).hexdigest()
             and isinstance(sources, list)
-            and (manifest["format"] == SHARED_GIT_STATIC_FORMAT or len(sources) == 2)
+            and (shared or len(sources) == 2)
             and sources[0]["id"] == str(publication.document_id)
-            and (manifest["format"] == SHARED_GIT_STATIC_FORMAT
+            and (shared
                  or all(item["commit"] == source["accepted_commit"] for item in sources))
             and publication.document.tenant_id == publication.tenant_id
             and publication.document.organization_id == publication.organization_id
@@ -87,7 +99,8 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             and source["root_title"] == publication.title == manifest["title"]
             and manifest["publication_id"] == str(publication.id)
             and manifest["publication_entity_id"] == str(publication.entity_id)
-            and len({item["id"] for item in sources}) == len(sources)
+            and len({(item.get("library_workspace", source["workspace_id"]), item["id"])
+                     for item in sources}) == len(sources)
         )
     except (KeyError, TypeError, ValueError, AttributeError, OSError, ImproperlyConfigured):
         return False
@@ -113,10 +126,16 @@ def _validated_git_publication_content(
             authority="repository",
         ).exists()
         or document.archived_at
-        or document.is_template
         or document.review_state in {"pending", "changes_requested"}
     ):
         raise PublicationConflict("An active promoted ordinary document is required")
+    if document.is_template:
+        from .document_template_migration import TemplateMigrationError, template_source_fingerprint
+
+        try:
+            template_source_fingerprint(document)
+        except TemplateMigrationError as exc:
+            raise PublicationConflict("Template source history is unavailable or unsupported") from exc
     placements = list(document.placements.select_related("block", "pinned_revision"))
     try:
         owned_placement_tree(document, placements)
@@ -125,7 +144,18 @@ def _validated_git_publication_content(
     if (not any(p.block.source_document_id == document.id for p in placements)
         or {item["id"] for item in source["sources"]} != {str(document.id), *(str(p.block_id) for p in placements)}):
         raise PublicationConflict("Publication dependencies exceed the supported shape")
-    live_ids = {p.block_id for p in placements if p.resolution_mode == "live"}
+    from .document_template_migration import template_enrollment_evidence
+
+    enrollment = template_enrollment_evidence(document)
+    if enrollment is not None and enrollment.library_placement_ids:
+        library_source = Document.objects.get(tenant_id=document.tenant_id, pk=enrollment.source_document_id)
+        if not DocumentAuthority.objects.filter(
+            tenant_id=document.tenant_id, workspace_id=library_source.entity.workspace_id,
+            content_id=library_source.id, authority="repository",
+        ).exists():
+            raise PublicationConflict("Template library source requires the complete authority handoff")
+    live_ids = {p.block_id for p in placements if p.resolution_mode == "live"
+                and p.block.organization_id == document.organization_id}
     retired_ids = set(DocumentAuthority.objects.filter(
         workspace=document.entity.workspace, content_id__in=live_ids, authority="repository",
     ).values_list("content_id", flat=True))
@@ -309,9 +339,21 @@ def publish_internal_git_document(
                 content=pdf,
                 checksum=hashlib.sha256(pdf).hexdigest(),
             )
-            shared_composition = len(source["sources"]) != 2 or any(s["mode"] == "pinned" for s in source["sources"])
+            template_source = None
+            if locked.is_template:
+                from .documents import ensure_template_revision
+
+                version = ensure_template_revision(source=locked, actor_id=actor.id)
+                template_source = {
+                    "content_id": str(locked.id), "revision": str(version.id), "checksum": version.checksum,
+                }
+                source = {**source, "format": "tekdocs.git-dependencies/v2"}
+            shared_composition = (source["format"] == "tekdocs.git-dependencies/v2"
+                                  or len(source["sources"]) != 2
+                                  or any(s["mode"] == "pinned" for s in source["sources"]))
             manifest = {
-                "format": (SHARED_GIT_STATIC_FORMAT if shared_composition
+                "format": (TEMPLATE_GIT_STATIC_FORMAT if source["format"] == "tekdocs.git-dependencies/v2"
+                           else SHARED_GIT_STATIC_FORMAT if shared_composition
                            else FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT),
                 "publication_id": str(publication_id),
                 "publication_entity_id": str(entity_id),
@@ -330,6 +372,7 @@ def publish_internal_git_document(
                 "published_by": str(actor.id),
                 "published_at": _timestamp(created_at),
                 "git_source": source,
+                **({"template_source": template_source} if template_source is not None else {}),
                 "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files]],
                 **({"managed_files": [f.descriptor for f in files]} if files or shared_composition else {}),
                 "entities": [],

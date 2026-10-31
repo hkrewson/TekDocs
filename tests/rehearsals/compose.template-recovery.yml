@@ -1,0 +1,6 @@
+# The owner-role fixture uses the same private media as the runtime service.
+# No additional database, named volume or service is created by this override.
+services:
+  migrate:
+    volumes:
+      - media_data:/app/media

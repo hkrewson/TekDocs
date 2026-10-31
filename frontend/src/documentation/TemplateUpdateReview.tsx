@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { translate } from '../i18n/localization'
 import type { TemplatePlacementMode, TemplateRollout } from './api'
 
-export function TemplateUpdateReview({ rollout, rules, busy, onRule, onApply, onClose }: { rollout: TemplateRollout; rules: Record<string, TemplatePlacementMode>; busy: boolean; onRule: (id: string, mode: TemplatePlacementMode) => void; onApply: () => void; onClose: () => void }) {
+export function TemplateUpdateReview({ rollout, rules, busy, onRule, onApply, onDetach, onClose }: { rollout: TemplateRollout; rules: Record<string, TemplatePlacementMode>; busy: boolean; onRule: (id: string, mode: TemplatePlacementMode) => void; onApply: () => void; onDetach?: (placementId: string) => void; onClose: () => void }) {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus(); heading.current?.scrollIntoView?.({ block: 'nearest' }) }, [])
   return <section className="document-context-panel template-rollout" aria-labelledby="template-update-heading">
@@ -13,5 +13,6 @@ export function TemplateUpdateReview({ rollout, rules, busy, onRule, onApply, on
       <p>{translate('documentation.templateBehaviorHelp')}</p>
       <button className="primary-button" type="button" disabled={busy || rollout.conflicts.length > 0} onClick={onApply}>{translate('documentation.applySafeChanges')}</button>
     </>}
+    {onDetach && rollout.reused_sections && rollout.reused_sections.length > 0 && <section aria-label={translate('documentation.templateReusedSections')}><h3>{translate('documentation.templateReusedSections')}</h3><p>{translate('documentation.templateDetachHelp')}</p><ul className="template-section-choices">{rollout.reused_sections.map((section) => <li key={section.placement_id}><strong>{section.title}</strong><p>{translate(section.mode === 'live' ? 'documentation.templateKeepUpdated' : 'documentation.templateKeepVersion')}</p><button className="secondary-button" type="button" disabled={busy} onClick={() => onDetach(section.placement_id)}>{translate('documentation.templateMakeLocal', { name: section.title })}</button></li>)}</ul></section>}
   </section>
 }

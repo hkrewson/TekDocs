@@ -55,7 +55,8 @@
   gap: 2px;
 }
 
-.document-reader-title strong {
+.document-reader-title h1 {
+  margin: 0;
   overflow: hidden;
   font-size: 14px;
   text-overflow: ellipsis;

@@ -204,6 +204,8 @@ class ContentInclude(models.Model):
     source = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="includes")
     target = models.ForeignKey(ContentNode, on_delete=models.CASCADE, related_name="included_by", null=True, blank=True)
     target_content_id = models.UUIDField()
+    library_workspace_id = models.UUIDField(null=True, blank=True)
+    library_revision_id = models.UUIDField(null=True, blank=True)
     ordinal = models.PositiveIntegerField()
     resolution_mode = models.CharField(max_length=12, choices=ContentIncludeMode.choices)
     audience_profile = models.CharField(max_length=24, choices=ContentAudienceProfile.choices)
@@ -217,6 +219,11 @@ class ContentInclude(models.Model):
     class Meta:
         ordering = ("source_id", "ordinal", "id")
         constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(library_workspace_id__isnull=True, library_revision_id__isnull=True)
+                           | models.Q(library_workspace_id__isnull=False, library_revision_id__isnull=False)),
+                name="content_include_library_identity_pair",
+            ),
             models.UniqueConstraint(fields=("source", "ordinal"), name="content_include_ordinal_unique"),
             models.CheckConstraint(
                 condition=models.Q(resolution_mode__in=ContentIncludeMode.values),

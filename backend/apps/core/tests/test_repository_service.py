@@ -516,3 +516,231 @@ def test_unavailable_repository_records_bounded_health(managed_repository, monke
     assert sensitive_marker not in caplog.text
     repository.refresh_from_db()
     assert repository.last_reconciliation_state == RepositoryReconciliationState.UNAVAILABLE
+
+
+def test_request_database_rollback_also_restores_git_head(managed_repository):
+    from types import SimpleNamespace
+
+    from django.http import HttpResponse
+
+    from apps.core.middleware import RLSRequestScopeMiddleware
+
+    repository, _root, _path = managed_repository
+    initial = repository_service.reconcile_workspace_repository(repository_id=repository.id).state
+
+    def response(_request):
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/rollback.md": b"Uncommitted request content"}, message="Exercise request rollback",
+        )
+        transaction.set_rollback(True)
+        return HttpResponse(status=500)
+
+    request = SimpleNamespace(COOKIES={}, api_token=object(), user=SimpleNamespace(is_authenticated=False))
+    result = RLSRequestScopeMiddleware(response)(request)
+    assert result.status_code == 500
+    repository.refresh_from_db()
+    assert repository.accepted_commit_id is None
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == initial
+
+
+def test_coordinated_write_restores_refs_after_late_failure(managed_repository):
+    repository, _root, _path = managed_repository
+    initial = repository_service.reconcile_workspace_repository(repository_id=repository.id).state
+    with pytest.raises(ValueError, match="late validation"), repository_service.coordinated_repository_transaction():
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/rollback.md": b"Rollback coordinated content"}, message="Exercise late failure",
+        )
+        assert repository_service.read_accepted_repository_file(
+            repository_id=repository.id, path="docs/rollback.md",
+        ) == b"Rollback coordinated content"
+        raise ValueError("late validation")
+    repository.refresh_from_db()
+    assert repository.accepted_commit_id is None
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == initial
+
+
+def test_nested_coordinated_failure_preserves_earlier_success(managed_repository):
+    repository, _root, _path = managed_repository
+    with repository_service.coordinated_repository_transaction():
+        first = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/guide.md": b"Earlier successful operation"}, message="Accept earlier operation",
+        )
+        with pytest.raises(ValueError), repository_service.coordinated_repository_transaction():
+            repository_service.commit_repository_files(
+                repository_id=repository.id, expected_base=first.object_id,
+                changes={"docs/guide.md": b"Failed nested operation"}, message="Attempt nested operation",
+            )
+            raise ValueError("nested validation")
+        assert repository_service.read_accepted_repository_file(
+            repository_id=repository.id, path="docs/guide.md",
+        ) == b"Earlier successful operation"
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == first.object_id
+    assert RepositoryCommit.objects.filter(repository=repository).count() == 1
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == "matched"
+
+
+def test_post_commit_callback_failure_does_not_revert_committed_git(managed_repository):
+    repository, _root, _path = managed_repository
+
+    def fail_after_commit():
+        raise ValueError("post-commit callback")
+
+    with (
+        pytest.raises(ValueError, match="post-commit callback"),
+        repository_service.coordinated_repository_transaction(),
+    ):
+        committed = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/guide.md": b"Committed content"}, message="Accept durable operation",
+        )
+        transaction.on_commit(fail_after_commit)
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == committed.object_id
+    assert repository_service.read_accepted_repository_file(
+        repository_id=repository.id, path="docs/guide.md",
+    ) == b"Committed content"
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == "matched"
+
+
+def test_nested_explicit_rollback_restores_its_git_checkpoint(managed_repository):
+    repository, _root, _path = managed_repository
+    with repository_service.coordinated_repository_transaction():
+        first = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/guide.md": b"Earlier successful operation"}, message="Accept earlier operation",
+        )
+        with repository_service.coordinated_repository_transaction():
+            repository_service.commit_repository_files(
+                repository_id=repository.id, expected_base=first.object_id,
+                changes={"docs/guide.md": b"Explicitly rolled back operation"}, message="Attempt nested operation",
+            )
+            transaction.set_rollback(True)
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == first.object_id
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == "matched"
+
+
+def test_post_commit_manifest_synchronization_remains_supported(managed_repository):
+    from apps.core.repository_manifests import (
+        WORKSPACE_MANIFEST_PATH,
+        schedule_tenant_manifest_synchronization,
+    )
+
+    repository, _root, _path = managed_repository
+    tenant = repository.tenant
+    with repository_service.coordinated_repository_transaction():
+        tenant.name = "Renamed coordinated fixture"
+        tenant.save(update_fields=("name", "updated_at"))
+        schedule_tenant_manifest_synchronization(tenant.id)
+    import yaml
+
+    manifest = yaml.safe_load(repository_service.read_accepted_repository_file(
+        repository_id=repository.id, path=WORKSPACE_MANIFEST_PATH,
+    ))
+    assert manifest["workspace"]["display_name"] == "Renamed coordinated fixture"
+
+
+def test_copied_context_cannot_reuse_an_expired_filesystem_lock(managed_repository, monkeypatch):
+    from contextvars import copy_context
+    from threading import Event
+
+    repository, root, _path = managed_repository
+    with repository_service.coordinated_repository_transaction():
+        repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/guide.md": b"Committed context fixture"}, message="Accept context fixture",
+        )
+        copied = copy_context()
+    held, release = Event(), Event()
+
+    def hold_writer():
+        with repository_service._repository_lock(root, repository.id, exclusive=True):
+            held.set()
+            assert release.wait(10)
+
+    monkeypatch.setattr(repository_service, "LOCK_TIMEOUT_SECONDS", 0.05)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(hold_writer)
+        assert held.wait(5)
+        try:
+            with pytest.raises(repository_service.RepositoryConflictError, match="busy"):
+                copied.run(
+                    repository_service.read_accepted_repository_file,
+                    repository_id=repository.id, path="docs/guide.md",
+                )
+        finally:
+            release.set()
+        writer.result(timeout=5)
+
+
+def test_caught_plain_savepoint_failure_cannot_leave_git_ahead_of_sql(managed_repository):
+    repository, _root, _path = managed_repository
+    with repository_service.coordinated_repository_transaction():
+        first = repository_service.commit_repository_files(
+            repository_id=repository.id, expected_base=None,
+            changes={"docs/guide.md": b"Committed earlier operation"}, message="Accept earlier operation",
+        )
+        try:
+            with transaction.atomic():
+                repository_service.commit_repository_files(
+                    repository_id=repository.id, expected_base=first.object_id,
+                    changes={"docs/guide.md": b"Rolled-back plain savepoint"}, message="Exercise plain savepoint",
+                )
+                raise ValueError("caught savepoint failure")
+        except ValueError:
+            pass
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == first.object_id
+    assert repository_service.reconcile_workspace_repository(repository_id=repository.id).state == "matched"
+
+
+@pytest.mark.parametrize("operation", ["read", "rejected_write"])
+def test_coordinated_scope_does_not_repair_preexisting_git_drift(managed_repository, tmp_path, operation):
+    repository, _root, path = managed_repository
+    accepted = repository_service.commit_repository_files(
+        repository_id=repository.id, expected_base=None,
+        changes={"docs/guide.md": b"Accepted bytes"}, message="Accept drift fixture",
+    )
+    git = repository_service._GitRepository(repository.id, path, accepted.object_format)
+    stage = tmp_path / "unaccepted-stage"
+    stage.mkdir(mode=0o700)
+    advanced, _created = git.write_commit(
+        base=accepted.object_id, changes={"docs/guide.md": b"Unaccepted bytes"},
+        message="Exercise preexisting drift", stage_directory=stage,
+    )
+    with repository_service.coordinated_repository_transaction():
+        if operation == "read":
+            assert repository_service.read_accepted_repository_file(
+                repository_id=repository.id, path="docs/guide.md",
+            ) == b"Accepted bytes"
+        else:
+            with pytest.raises(repository_service.RepositoryReconciliationError):
+                repository_service.commit_repository_files(
+                    repository_id=repository.id, expected_base=accepted.object_id,
+                    changes={"docs/guide.md": b"Rejected bytes"}, message="Reject drifted write",
+                )
+    assert git.raw_current_ref() == advanced
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == accepted.object_id
+
+
+def test_coordinated_artifact_cleanup_attempts_every_file_and_preserves_primary_error():
+    from apps.core.repository_service import _active_repository_transaction, coordinated_repository_transaction
+
+    discarded = []
+
+    def unavailable_storage():
+        discarded.append("unavailable")
+        raise OSError("synthetic storage failure")
+
+    with pytest.raises(RuntimeError, match="original request failed"):
+        with coordinated_repository_transaction():
+            active = _active_repository_transaction()
+            active.register_created_artifact(lambda: False, unavailable_storage)
+            active.register_created_artifact(lambda: False, lambda: discarded.append("second"))
+            raise RuntimeError("original request failed")
+    assert discarded == ["unavailable", "second"]

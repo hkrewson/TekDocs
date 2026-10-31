@@ -14,6 +14,120 @@ SOURCE_TITLE = "Migration rehearsal source"
 TARGET_TITLE = "Migration rehearsal target"
 TEMPLATE_TITLE = "Migration rehearsal deferred template"
 PINNED_TITLE = "Migration rehearsal pinned consumer"
+LIBRARY_TITLE = "Migration rehearsal enrolled template"
+ENROLLED_TITLES = {mode: f"Migration enrolled {mode}" for mode in ("copy", "live", "pinned")}
+
+
+def enrolled_records(tenant):
+    source = Document.objects.get(tenant=tenant, entity__display_name=LIBRARY_TITLE)
+    documents = tuple(Document.objects.get(tenant=tenant, entity__display_name=title)
+                      for title in ENROLLED_TITLES.values())
+    return source, documents
+
+
+def create_enrolled_records(owner, tenant):
+    from apps.core.documents import create_document_block, instantiate_document_template, update_document
+    from apps.core.organizations import create_organization
+    from apps.core.publications import publish_document
+    from apps.core.workspaces import resolve_msp_workspace, resolve_organization_workspace
+
+    organization = create_organization(
+        tenant=tenant, actor_id=owner.id, name="Migration enrolled client",
+        legal_name="", website="", classifications=["client"],
+    )
+    source = create_document(
+        tenant=tenant, organization=None, actor_id=owner.id, title=LIBRARY_TITLE,
+        markdown="Retained template introduction\n", is_template=True, library_visible=True,
+    )
+    placement = create_document_block(
+        document=source, actor_id=owner.id, markdown="Retained template procedure\n", kind="rich_text",
+        name="Retained procedure", parent_id=None, position=1, library_visible=True,
+    )
+    reader = resolve_organization_workspace(owner, entity_id=organization.entity_id)
+    documents = []
+    for mode, title in ENROLLED_TITLES.items():
+        document = instantiate_document_template(
+            source=source, tenant=tenant, organization=organization, actor_id=owner.id,
+            title=title, category="guide", placement_rules={str(placement.block.entity_id): mode},
+        )
+        update_document(
+            document=document, actor_id=owner.id, title=title, category="guide",
+            markdown=f"Retained client {mode} local introduction\n",
+            base_revision_id=document.placements.get(position=0).block.current_revision_id,
+        )
+        documents.append(document)
+    for document in (source, *documents):
+        publish_document(
+            workspace=resolve_msp_workspace(owner) if document == source else reader,
+            document=document, actor_id=owner.id, reason="Retain pre-upgrade enrolled template",
+            audience="msp_internal", retention="permanent", retention_review_on=None,
+        )
+
+
+def enrolled_identities(tenant):
+    source, documents = enrolled_records(tenant)
+    return {
+        "source": str(source.id), "documents": [str(document.id) for document in documents],
+        "enrollments": [[str(document.template_enrollment.id), str(document.template_enrollment.applied_revision_id),
+                         document.template_enrollment.placement_map] for document in documents],
+        "publications": [original_evidence(document) for document in (source, *documents)],
+    }
+
+
+def exercise_enrolled_records(owner, tenant):
+    from apps.core.content_index import index_repository_content
+    from apps.core.document_git_publications import publish_internal_git_document, verify_internal_git_publication
+    from apps.core.document_migration_import import apply_document_import, prepare_document_import
+    from apps.core.document_template_migration import prepare_template_library_handoff, transition_template_library_authority
+    from apps.core.repository_storage import ensure_workspace_repository
+    from apps.core.template_library_history import prepare_template_library_history, retain_template_library_history
+    from apps.core.workspaces import resolve_msp_workspace, resolve_organization_workspace
+
+    source, documents = enrolled_records(tenant)
+    before = enrolled_identities(tenant)
+    for document in (source, *documents):
+        workspace = document.entity.workspace
+        ensure_workspace_repository(workspace)
+        index_repository_content(repository_id=workspace.repository.id)
+        plan = prepare_document_import(workspace=workspace, document_id=document.id)
+        assert apply_document_import(
+            workspace=workspace, document_id=document.id, actor_id=owner.id,
+            expected_base=plan.base_commit, plan_sha256=plan.plan_sha256,
+        ).indexed
+        if document == source:
+            history = prepare_template_library_history(source=source, actor_id=owner.id)
+            assert retain_template_library_history(
+                source=source, actor_id=owner.id, plan_sha256=history.plan_sha256,
+            ).indexed
+    arguments = dict(
+        source_workspace=source.entity.workspace, source_document_id=source.id,
+        destination_document_ids=tuple(document.id for document in documents), actor_id=owner.id,
+    )
+    plan = prepare_template_library_handoff(**arguments, target="repository")
+    assert transition_template_library_authority(
+        **arguments, target="repository", plan_sha256=plan.plan_sha256,
+    ) == "transitioned"
+    snapshots = []
+    for document in (source, *documents):
+        reader = resolve_msp_workspace(owner) if document == source else resolve_organization_workspace(
+            owner, entity_id=document.organization.entity_id,
+        )
+        snapshot = publish_internal_git_document(
+            workspace=reader, document=document, actor=owner, reason="Retain upgraded template source proof",
+        )
+        assert verify_internal_git_publication(snapshot)
+        snapshots.append(snapshot)
+    rollback = prepare_template_library_handoff(**arguments, target="legacy")
+    assert transition_template_library_authority(
+        **arguments, target="legacy", plan_sha256=rollback.plan_sha256,
+    ) == "transitioned"
+    assert enrolled_identities(tenant) == before
+    assert all(verify_internal_git_publication(snapshot) for snapshot in snapshots)
+    for mode, document in zip(ENROLLED_TITLES, documents):
+        assert resolve_document(document).markdown == (
+            f"Retained client {mode} local introduction\n\nRetained template procedure\n"
+        )
+
 
 
 def original_evidence(document):
@@ -46,6 +160,7 @@ def records():
 def identities(source, target, template):
     pinned = Document.objects.get(tenant=source.tenant, organization=source.organization, entity__display_name=PINNED_TITLE)
     return {
+        "template_enrollments": enrolled_identities(source.tenant),
         "source": str(source.id),
         "source_block": str(source.placements.get().block_id),
         "source_revision": str(source.placements.get().block.current_revision_id),
@@ -115,6 +230,7 @@ if mode == "create":
         markdown="Template content\n",
         is_template=True,
     )
+    create_enrolled_records(installation.owner, installation.tenant)
     print(json.dumps(identities(source, target, template), sort_keys=True))
 elif mode == "identity":
     _owner, _workspace, source, target, template = records()
@@ -151,7 +267,8 @@ elif mode == "exercise":
     assert rows[str(target.id)]["reasons"] == [
         "cross_document_source_unavailable", "publication_parity_required"
     ], rows[str(target.id)]["reasons"]
-    assert "template" in rows[str(template.id)]["reasons"]
+    assert rows[str(template.id)]["disposition"] == "simple_candidate"
+    assert rows[str(template.id)]["reasons"] == []
 
     source_preview = prepare_document_import(workspace=workspace, document_id=source.id)
     assert source_preview.plan_sha256 == prepare_document_import(
@@ -294,11 +411,13 @@ elif mode == "exercise":
     assert resolve_document(pinned).markdown == "Pinned introduction\n\nReusable setup instructions\n"
     assert [original_evidence(document) for document in (source, target, pinned)] == before
     assert all(verify_internal_git_publication(snapshot) for snapshot in snapshots)
+    exercise_enrolled_records(owner, source.tenant)
     print(
         json.dumps(
             {
                 "documents": inventory["document_count"],
-                "deferred_template": True,
+                "standalone_template_copy_eligible": True,
+                "enrolled_template_authority_round_trip": True,
                 "source_markdown_sha256": hashlib.sha256(resolve_document(source).markdown.encode()).hexdigest(),
                 "target_markdown_sha256": hashlib.sha256(resolve_document(target).markdown.encode()).hexdigest(),
                 "imported": 2,

@@ -38,7 +38,17 @@ class RepositoryContentNotIndexed(APIException):
 
 def repository_for_reader(workspace: ResolvedWorkspace) -> WorkspaceRepository:
     owner = workspace_for_owner(tenant=workspace.member.tenant, organization=workspace.organization)
-    return WorkspaceRepository.objects.select_related("accepted_commit", "indexed_commit").get(workspace=owner)
+    from .content_composition import ContentCompositionError
+    from .content_index import ContentIndexError
+    from .repository_service import RepositoryServiceError
+    from .template_library_content import refresh_template_library_projection
+
+    repository = WorkspaceRepository.objects.select_related("accepted_commit", "indexed_commit").get(workspace=owner)
+    try:
+        refresh_template_library_projection(repository)
+    except (ContentCompositionError, ContentIndexError, RepositoryServiceError) as exc:
+        raise RepositoryContentNotIndexed() from exc
+    return repository
 
 
 def _visible_entity_context(workspace: ResolvedWorkspace, ids: set[uuid.UUID]) -> dict[uuid.UUID, dict[str, Any]]:

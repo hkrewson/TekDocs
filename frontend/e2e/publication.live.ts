@@ -4,7 +4,8 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 
-type State = { document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
+type State = { template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -17,6 +18,59 @@ async function downloadPdf(page: Page) {
     expect(bytes.subarray(0, 5).toString()).toBe('%PDF-')
     return createHash('sha256').update(bytes).digest('hex')
   } finally { await download.delete() }
+}
+
+async function templateJourney(page: Page, state: State) {
+  const fixture = state.template
+  const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
+  await page.goto(`/documentation?repository=${fixture.source_fragment_id}`)
+  await page.getByLabel('Markdown body').fill('Browser template procedure updated.\n')
+  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  for (const mode of ['copy', 'live', 'pinned'] as const) {
+    await page.goto(`${path}?document=${fixture.documents[mode]}`)
+    await expect(page.getByText(`Browser client ${mode} local introduction.`, { exact: true })).toBeVisible()
+    await expect(page.getByText(mode === 'live' ? 'Browser template procedure updated.' : 'Browser template procedure original.', { exact: true })).toBeVisible()
+  }
+  await page.getByRole('button', { name: 'Check template updates' }).click()
+  await page.getByRole('button', { name: 'Apply update', exact: true }).click()
+  await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Publish document', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Retain reviewed enrolled template')
+  const publicationResponse = page.waitForResponse(r => r.url().endsWith('/publications') && r.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Publish', exact: true }).click()
+  const response = await publicationResponse
+  expect(response.status()).toBe(201)
+  const publication = await response.json() as DocumentPublicationDetail
+  expect(publication.manifest.format).toBe('tekdocs-static-publication/v8')
+  expect(publication.verification.valid).toBe(true)
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click()
+  await downloadPdf(page)
+  for (const file of fixture.files) {
+    const promise = page.waitForEvent('download')
+    await page.locator('.publication-artifacts').getByRole('link').filter({ hasText: file.filename }).click()
+    const download = await promise
+    try {
+      expect(await download.failure()).toBeNull()
+      expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(file.sha256)
+    } finally { await download.delete() }
+  }
+  await page.goto(`${path}?document=${fixture.documents.pinned}&publication=${fixture.pin_original_publication}`)
+  await expect(page.getByText('Browser template procedure original.', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click()
+  expect(await downloadPdf(page)).toBe(fixture.pin_original_pdf_sha256)
+  await page.goto(`${path}?document=${fixture.documents.live}`)
+  await page.getByRole('button', { name: 'Check template updates' }).click()
+  await page.getByRole('button', { name: 'Make Template procedure a local copy' }).click()
+  await expect(page.getByRole('button', { name: 'Make Template procedure a local copy' })).toHaveCount(0)
+  await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
+  await page.goto(path)
+  await page.getByRole('button', { name: 'Templates from your MSP' }).click()
+  await page.getByRole('button', { name: 'Use template' }).click()
+  await page.getByLabel('Document title', { exact: true }).fill('Browser newly enrolled')
+  await page.getByRole('button', { name: 'Create document', exact: true }).click()
+  await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
 }
 
 test('migrated signed history survives real publishing, correction, withdrawal and PDF downloads', async ({ page, browser }) => {
@@ -158,6 +212,7 @@ test('migrated signed history survives real publishing, correction, withdrawal a
     expect(retained.manifest).toEqual(original.manifest)
     expect(retained.canonical_markdown).toBe(original.canonical_markdown)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+    await templateJourney(page, state)
     await writeFile(`${stateDirectory}/browser-finished.json`, JSON.stringify({ status: 'passed' }), { mode: 0o640 })
   } catch (error) {
     await writeFile(`${stateDirectory}/browser-finished.json`, JSON.stringify({ status: 'failed' }), { mode: 0o640 })

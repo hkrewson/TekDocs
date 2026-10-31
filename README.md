@@ -187,6 +187,14 @@ retain their selected Git revision; signed history and PDFs remain unchanged.
 Rollback restores supported text edits to each original owner. Repeated block
 occurrences, templates, cross-Workspace reuse and client delivery remain blocked.
 
+The [template enrollment extension](planning/migrations/template-enrollment-migration.md)
+supports approved MSP sources and their enrolled client documents as one cohort.
+Copy/live/pinned behavior, local edits, managed-file versions and signed
+publications/PDFs survive reviewed updates, rollback and recovery in the recorded
+Docker tests and real browser journey.
+It adds no general cross-Workspace reuse or client delivery. The slice record
+separates verified evidence from outstanding work.
+
 ### Managed repository authoring
 
 The `0.9.5` checkpoint adds a separate **Repository content** editor under

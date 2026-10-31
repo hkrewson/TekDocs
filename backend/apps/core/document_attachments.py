@@ -463,7 +463,8 @@ def open_document_attachment(attachment: DocumentAttachment) -> ContentFile[byte
 
 
 def copy_document_attachment(
-    *, attachment: DocumentAttachment, destination: Document, actor_id: UUID, entity_id: UUID
+    *, attachment: DocumentAttachment, destination: Document, actor_id: UUID, entity_id: UUID,
+    replaces: DocumentAttachment | None = None,
 ) -> DocumentAttachment:
     content = copy_attachment_content(attachment)
     uploaded = UploadedFile(
@@ -477,6 +478,11 @@ def copy_document_attachment(
         actor_id=actor_id,
         upload=uploaded,
         entity_id=entity_id,
+        purpose=attachment.purpose,
+        version_number=(
+            (replaces.version_number or 0) + 1 if replaces else 1
+        ) if attachment.purpose == DocumentAttachmentPurpose.PRIMARY_FILE else None,
+        replaces=replaces,
     )
 
 

@@ -163,6 +163,18 @@ def _transition_document_authority_locked(
         retired_owners = set(DocumentAuthority.objects.filter(
             workspace=locked_workspace, content_id__in=live_owners, authority=DocumentAuthorityMode.REPOSITORY,
         ).values_list("content_id", flat=True))
+        # A foreign owner is allowed only through the exact validated template
+        # enrollment. Its public root authority is SELECT-only under client RLS.
+        from .document_template_migration import template_enrollment_evidence
+
+        evidence = template_enrollment_evidence(document)
+        if evidence is not None and evidence.source_document_id in live_owners:
+            source = Document.objects.get(tenant_id=document.tenant_id, pk=evidence.source_document_id)
+            if DocumentAuthority.objects.filter(
+                tenant_id=document.tenant_id, workspace_id=source.entity.workspace_id,
+                content_id=source.id, authority=DocumentAuthorityMode.REPOSITORY,
+            ).exists():
+                retired_owners.add(source.id)
         if live_owners != retired_owners:
             raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
     blockers = cast(list[str], status["handoff_blockers"])
@@ -175,7 +187,8 @@ def _transition_document_authority_locked(
             # Snapshot capacity gates promotion/publication, not lossless return
             # to retained legacy custody after files were added under Git.
             if blocker not in {
-                "content_copy_not_in_sync", "repository_read_projection_not_matched", "managed_file_retention_limit"
+                "content_copy_not_in_sync", "repository_read_projection_not_matched", "managed_file_retention_limit",
+                "template_history_git_custody_unavailable"
             }
         ]
     if blockers:

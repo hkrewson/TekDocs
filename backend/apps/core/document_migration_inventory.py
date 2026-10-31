@@ -18,6 +18,12 @@ from .document_migration_relationships import (
 )
 from .document_migration_shape import DocumentMigrationShapeError, owned_placement_tree
 from .document_migration_taxonomy import DocumentMigrationTaxonomyError, portable_document_taxonomies
+from .document_template_migration import (
+    TemplateMigrationError,
+    template_enrollment_evidence,
+    template_enrollment_fingerprint,
+    template_source_fingerprint,
+)
 from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
 from .models import (
     Block,
@@ -52,11 +58,21 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
     totals: Counter[str] = Counter()
     for document in documents.iterator(chunk_size=200):
         document_placements = document.migration_placements
-        block_ids = {placement.block_id for placement in document_placements}
         owned_block_ids = {
             placement.block_id for placement in document_placements if placement.block.source_document_id == document.id
         }
-        referenced_block_ids = block_ids - owned_block_ids
+        referenced_block_ids = {
+            item.block_id for item in document_placements if item.block.source_document_id != document.id
+        }
+        if any(item.block.organization_id != document.organization_id for item in document_placements):
+            try:
+                enrollment = template_enrollment_evidence(document)
+            except TemplateMigrationError:
+                enrollment = None
+            if enrollment is not None:
+                referenced_block_ids.difference_update(
+                    item.block_id for item in document_placements if item.id in enrollment.library_placement_ids
+                )
         reasons: list[str] = []
         if not publication_file_limits_satisfied(document):
             reasons.append("managed_file_retention_limit")
@@ -77,9 +93,15 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
         ):
             reasons.append("legacy_tags_not_portable")
         if document.is_template or DocumentTemplateRevision.objects.filter(template=document).exists():
-            reasons.append("template")
+            try:
+                template_source_fingerprint(document)
+            except TemplateMigrationError:
+                reasons.append("template")
         if DocumentTemplateEnrollment.objects.filter(destination_document=document).exists():
-            reasons.append("template_enrollment")
+            try:
+                template_enrollment_fingerprint(document)
+            except TemplateMigrationError:
+                reasons.append("template_enrollment")
         try:
             owned_placement_tree(document, document_placements)
         except DocumentMigrationShapeError as exc:

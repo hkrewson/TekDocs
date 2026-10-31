@@ -32,7 +32,13 @@ from .document_migration_relationships import (
     portable_document_entity_references,
 )
 from .document_operations import DocumentOperationsError, _reviewed_markdown
-from .document_template_models import DocumentTemplateEnrollment, DocumentTemplateRevision
+from .document_template_migration import (
+    TemplateMigrationError,
+    template_enrollment_fingerprint,
+    template_history_custody_matches,
+    template_source_fingerprint,
+)
+from .document_template_models import DocumentTemplateRevision
 from .documents import PlacementConflict, resolve_document
 from .entity_mentions import resolve_entity_mentions
 from .models import (
@@ -136,9 +142,19 @@ def document_coexistence_status(
     if (
         document.is_template
         or DocumentTemplateRevision.objects.filter(template=document).exists()
-        or DocumentTemplateEnrollment.objects.filter(destination_document=document).exists()
     ):
-        blockers.append("template_parity_not_verified")
+        try:
+            template_source_fingerprint(document)
+        except TemplateMigrationError:
+            blockers.append("template_parity_not_verified")
+        else:
+            if not template_history_custody_matches(document, workspace.repository.id):
+                blockers.append("template_history_git_custody_unavailable")
+    else:
+        try:
+            template_enrollment_fingerprint(document)
+        except TemplateMigrationError:
+            blockers.append("template_parity_not_verified")
     primary_versions = list(
         DocumentAttachment.objects.filter(document=document, purpose=DocumentAttachmentPurpose.PRIMARY_FILE).order_by(
             "version_number", "id"
@@ -236,7 +252,7 @@ def _document_copy_status(*, workspace: Workspace, document: Document) -> dict[s
         return response
     response["legacy_revision_id"] = str(export.revision_id)
     response["legacy_revision_ids"] = [str(revision_id) for _block_id, revision_id in export.blocks]
-    identities = (export.document_id, *(block_id for block_id, _revision_id in export.blocks))
+    identities = export.indexed_content_ids
     nodes = {
         node.content_id: node
         for node in ContentNode.objects.filter(repository=repository, content_id__in=identities).prefetch_related(

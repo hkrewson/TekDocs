@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from typing import Any
 
 from .content_index import (
@@ -155,6 +155,11 @@ def freeze_git_document_dependencies(
         for include in variant["manifest"]:
             include_commit = str(include["commit"])
             include_id = uuid.UUID(str(include["id"]))
+            if "workspace" in include:
+                evidence.append(_library_source_record(
+                    repository=repository, document_id=content_id, include=include,
+                ))
+                continue
             if include_commit == accepted.object_id:
                 sources = accepted_sources
             else:
@@ -193,7 +198,8 @@ def freeze_git_document_dependencies(
     except RepositoryServiceError as exc:
         raise ContentPublicationSourceError("Repository source objects are unavailable") from exc
     return {
-        "format": "tekdocs.git-dependencies/v1",
+        "format": ("tekdocs.git-dependencies/v2" if any(s.get("library_workspace") for s in evidence)
+                   else "tekdocs.git-dependencies/v1"),
         "repository_id": str(repository.id),
         "workspace_id": str(repository.workspace_id),
         "content_id": str(content_id),
@@ -219,7 +225,14 @@ def pinned_git_document_dependencies(
     """
 
     try:
-        with pin_accepted_repository_for_publication(repository_id) as locked:
+        # Foreign source heads and the client head remain fixed until signing.
+        # Discover only the actual approved enrollment, never arbitrary includes.
+        with ExitStack() as pins:
+            locked_repositories = {
+                identity: pins.enter_context(pin_accepted_repository_for_publication(identity))
+                for identity in _publication_repository_ids(repository_id=repository_id, content_id=content_id)
+            }
+            locked = locked_repositories[repository_id]
             proof = freeze_git_document_dependencies(
                 repository_id=repository_id, content_id=content_id, audience=audience
             )
@@ -228,3 +241,83 @@ def pinned_git_document_dependencies(
             yield proof
     except RepositoryServiceError as exc:
         raise ContentPublicationSourceError("Repository source cannot be pinned for publication") from exc
+
+
+
+def _publication_repository_ids(*, repository_id: uuid.UUID, content_id: uuid.UUID) -> tuple[uuid.UUID, ...]:
+    from .document_template_migration import TemplateMigrationError, template_enrollment_evidence
+    from .models import Document
+
+    repository = WorkspaceRepository.objects.get(pk=repository_id)
+    document = Document.objects.filter(
+        tenant_id=repository.tenant_id, entity__workspace_id=repository.workspace_id,
+        organization=repository.workspace.organization, pk=content_id,
+    ).first()
+    identities = {repository_id}
+    if document is not None:
+        try:
+            enrollment = template_enrollment_evidence(document)
+        except TemplateMigrationError as exc:
+            raise ContentPublicationSourceError("Template enrollment source proof is unavailable") from exc
+        if enrollment is not None and enrollment.library_placement_ids:
+            source = Document.objects.get(tenant_id=document.tenant_id, pk=enrollment.source_document_id)
+            identities.add(WorkspaceRepository.objects.get(
+                tenant_id=repository.tenant_id, workspace_id=source.entity.workspace_id,
+            ).id)
+    return tuple(sorted(identities))
+
+
+def _library_source_record(*, repository: WorkspaceRepository, document_id: uuid.UUID,
+                           include: dict[str, Any]) -> dict[str, Any]:
+    from django.db import transaction
+
+    from .content_profile import ParsedInclude
+    from .document_template_models import DocumentTemplateRevision
+    from .models import DocumentPlacement
+    from .repository_service import read_template_library_fragment
+    from .template_library_content import template_library_loader
+
+    workspace_id, revision_id = uuid.UUID(include["workspace"]), uuid.UUID(include["template_revision"])
+    source_repository = WorkspaceRepository.objects.select_related("accepted_commit").get(
+        tenant_id=repository.tenant_id, workspace_id=workspace_id,
+    )
+    selected_include = ParsedInclude(
+        target_content_id=uuid.UUID(include["id"]), mode=include["mode"], audience=include["audience"],
+        pinned_object_id=include["commit"] if include["mode"] == "pinned" else "",
+        ordinal=include["ordinal_path"][-1], library_workspace_id=workspace_id, library_revision_id=revision_id,
+    )
+    with transaction.atomic():
+        selected = read_template_library_fragment(
+            destination_document_id=document_id, library_workspace_id=workspace_id,
+            source_block_id=selected_include.target_content_id, mode=selected_include.mode,
+            pinned_object_id=selected_include.pinned_object_id, template_revision_id=revision_id,
+            audience=selected_include.audience,
+        )
+        placement = DocumentPlacement.objects.select_related("parent").get(
+            tenant_id=repository.tenant_id, document_id=document_id,
+            block_id=selected_include.target_content_id, resolution_mode=selected_include.mode,
+            audience_profile=selected_include.audience,
+        )
+        parent_content_id = placement.parent.block_id if placement.parent is not None else document_id
+        object_id, parsed = template_library_loader(repository)(parent_content_id, selected_include)
+    if object_id != include["commit"] or parsed.content_digest != include["digest"]:
+        raise ContentPublicationSourceError("Template library source changed during publication")
+    if source_repository.accepted_commit is None:
+        raise ContentPublicationSourceError("Template library repository is unavailable")
+    record = _source_record(
+        content_id=parsed.content_id, commit=selected.object_id,
+        source=(selected.source_path, selected.source, parsed),
+        object_format=source_repository.accepted_commit.object_format, audience=include["audience"],
+        mode=include["mode"], ordinal_path=include["ordinal_path"],
+    )
+    record.update({
+        "library_workspace": str(workspace_id), "repository_id": str(source_repository.id),
+        "object_format": source_repository.accepted_commit.object_format,
+        "accepted_commit": source_repository.accepted_commit.object_id,
+        "template_revision": str(revision_id),
+        "template_checksum": DocumentTemplateRevision.objects.get(
+            tenant_id=repository.tenant_id, pk=revision_id,
+        ).checksum,
+        "body_only": True,
+    })
+    return record

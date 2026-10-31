@@ -11608,6 +11608,12 @@ export interface components {
             readonly tags: readonly components["schemas"]["DocumentFacet"][];
             readonly health: readonly components["schemas"]["DocumentFacet"][];
         };
+        readonly DocumentTemplateDetachRequest: {
+            readonly expected_base?: string;
+            readonly expected_composition?: string;
+            /** Format: uuid */
+            readonly expected_applied_revision_id?: string;
+        };
         readonly DocumentTemplateInstantiate: {
             /** Format: uuid */
             readonly source_document_id: string;
@@ -11621,15 +11627,30 @@ export interface components {
              * @enum {string}
              */
             readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
+            readonly expected_source_sha256?: string;
             readonly placement_rules?: {
                 readonly [key: string]: "copy" | "live" | "pinned";
             };
+        };
+        readonly DocumentTemplateReusedSection: {
+            /** Format: uuid */
+            readonly placement_id: string;
+            readonly title: string;
+            /**
+             * @description * `live` - live
+             *     * `pinned` - pinned
+             * @enum {string}
+             */
+            readonly mode: "live" | "pinned";
         };
         readonly DocumentTemplateRolloutApply: {
             /** Format: uuid */
             readonly enrollment_id: string;
             /** Format: uuid */
             readonly expected_applied_revision_id: string;
+            readonly expected_available_revision?: number;
+            readonly expected_base?: string;
+            readonly expected_composition?: string;
             readonly placement_rules?: {
                 readonly [key: string]: "copy" | "live" | "pinned";
             };
@@ -11658,6 +11679,9 @@ export interface components {
             readonly conflicts: readonly {
                 readonly [key: string]: unknown;
             }[];
+            readonly base_commit?: string;
+            readonly composition_digest?: string;
+            readonly reused_sections?: readonly components["schemas"]["DocumentTemplateReusedSection"][];
         };
         readonly DocumentTopicConversion: {
             /**
@@ -16840,11 +16864,49 @@ export interface components {
             readonly created_at: string;
         };
         readonly TemplateLibraryResult: {
-            readonly results: readonly components["schemas"]["Document"][];
+            readonly results: readonly components["schemas"]["TemplateLibrarySource"][];
             readonly count: number;
             readonly page: number;
             readonly page_size: number;
             readonly has_more: boolean;
+        };
+        readonly TemplateLibrarySection: {
+            /** Format: uuid */
+            readonly id: string;
+            /** Format: uuid */
+            readonly block_id: string;
+            readonly block_name: string;
+            readonly is_primary: boolean;
+            readonly resolved_html: string;
+        };
+        readonly TemplateLibrarySource: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            /**
+             * @description * `general` - General
+             *     * `policy` - Policy
+             *     * `procedure` - Procedure
+             *     * `guide` - Guide
+             *     * `reference` - Reference
+             * @enum {string}
+             */
+            readonly category: "general" | "policy" | "procedure" | "guide" | "reference";
+            /**
+             * @description * `legacy` - Legacy document
+             *     * `repository` - Git repository
+             * @enum {string}
+             */
+            readonly content_authority: "legacy" | "repository";
+            /**
+             * @description * `ready` - ready
+             *     * `unavailable` - unavailable
+             * @enum {string}
+             */
+            readonly source_state: "ready" | "unavailable";
+            readonly definition_sha256: string | null;
+            readonly placements: readonly components["schemas"]["TemplateLibrarySection"][];
+            readonly placement_count: number;
         };
         readonly TopicSchema: {
             /**
@@ -19052,7 +19114,13 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: never;
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTemplateDetachRequest"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTemplateDetachRequest"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTemplateDetachRequest"];
+            };
+        };
         readonly responses: {
             readonly 200: {
                 headers: {
@@ -33386,7 +33454,13 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: never;
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DocumentTemplateDetachRequest"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DocumentTemplateDetachRequest"];
+                readonly "multipart/form-data": components["schemas"]["DocumentTemplateDetachRequest"];
+            };
+        };
         readonly responses: {
             readonly 200: {
                 headers: {

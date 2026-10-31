@@ -10,7 +10,7 @@ import yaml
 
 from .content_composition import ContentCompositionResolver
 from .content_index_models import ContentNodeKind
-from .content_profile import CONTENT_SCHEMA, ContentProfileError, ParsedContent, parse_content
+from .content_profile import CONTENT_SCHEMA, ContentProfileError, ParsedContent, ParsedInclude, parse_content
 from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
 from .document_migration_keys import DocumentMigrationKeyError, portable_document_keys
 from .document_migration_relationships import (
@@ -19,6 +19,11 @@ from .document_migration_relationships import (
 )
 from .document_migration_shape import DocumentMigrationShapeError, owned_placement_tree
 from .document_migration_taxonomy import DocumentMigrationTaxonomyError, portable_document_taxonomies
+from .document_template_migration import (
+    TemplateMigrationError,
+    template_enrollment_fingerprint,
+    template_source_fingerprint,
+)
 from .documents import resolve_document
 from .models import (
     ContentNode,
@@ -80,6 +85,14 @@ class SimpleDocumentExport:
     files: tuple[tuple[str, bytes], ...]
     resolved_markdown_sha256: str
     resolved_entity_links: tuple[tuple[str, str, str], ...]
+    template_enrollment_sha256: str | None = None
+    template_source_sha256: str | None = None
+    library_references: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str, str], ...] = ()
+
+    @property
+    def indexed_content_ids(self) -> tuple[uuid.UUID, ...]:
+        foreign = {item[0] for item in self.library_references}
+        return (self.document_id, *(block_id for block_id, _revision in self.blocks if block_id not in foreign))
 
     @property
     def block_id(self) -> uuid.UUID:
@@ -110,6 +123,14 @@ def _include_source(placement: DocumentPlacement, pinned_commits: dict[uuid.UUID
     source = {"id": str(placement.block_id), "mode": "live", "audience": "shared"}
     if placement.resolution_mode == PlacementResolutionMode.PINNED:
         source.update({"mode": "pinned", "commit": pinned_commits[placement.block_id]})
+    if placement.block.organization_id != placement.organization_id:
+        source_document = placement.block.source_document
+        if source_document is None:
+            raise DocumentMigrationReferenceError("cross_document_source_unavailable")
+        source.update({
+            "library_workspace": str(source_document.entity.workspace_id),
+            "library_revision": str(placement.document.template_enrollment.applied_revision_id),
+        })
     return source
 
 
@@ -148,7 +169,9 @@ def _existing_references(
     """Require exact, indexed, same-workspace leaf sources; never copy them."""
 
     references = tuple(placement for placement in placements if placement.block.source_document_id != document.id)
-    if not references:
+    library_references = tuple(item for item in references if item.block.organization_id != document.organization_id)
+    references = tuple(item for item in references if item.block.organization_id == document.organization_id)
+    if not references and not library_references:
         return None, {}, {}
     repository = (
         WorkspaceRepository.objects.select_related("accepted_commit", "indexed_commit")
@@ -223,6 +246,56 @@ def _existing_references(
         raise DocumentMigrationReferenceError("cross_document_source_unavailable")
     parsed_references: dict[uuid.UUID, ParsedContent] = {}
     pinned_commits: dict[uuid.UUID, str] = {}
+    if library_references:
+        from django.db import transaction
+
+        from .content_composition import ContentCompositionError
+        from .template_library_content import template_library_loader
+
+        loader = template_library_loader(repository)
+        for placement in library_references:
+            owner = placement.block.source_document
+            if owner is None:
+                raise DocumentMigrationReferenceError("cross_document_source_unavailable")
+            source_repository = WorkspaceRepository.objects.select_related("accepted_commit").get(
+                tenant_id=document.tenant_id, workspace_id=owner.entity.workspace_id,
+            )
+            if source_repository.accepted_commit is None:
+                raise DocumentMigrationReferenceError("cross_document_source_unavailable")
+            prior_library_root = prior_files.get(
+                placement.parent.block_id if placement.parent is not None else document.id
+            )
+            selected_commit = source_repository.accepted_commit.object_id
+            if prior_library_root is not None:
+                previous_include = next(
+                    (item for item in prior_library_root.includes if item.target_content_id == placement.block_id),
+                    None,
+                )
+                if previous_include is None:
+                    raise DocumentMigrationReferenceError("cross_document_source_drift")
+                if placement.resolution_mode == "pinned":
+                    from .template_git_operation import permits_template_document
+
+                    if (not permits_template_document(document)
+                        or previous_include.library_revision_id == document.template_enrollment.applied_revision_id):
+                        selected_commit = previous_include.pinned_object_id
+            include = ParsedInclude(
+                target_content_id=placement.block_id, mode=placement.resolution_mode,
+                audience=placement.audience_profile,
+                pinned_object_id=selected_commit if placement.resolution_mode == "pinned" else "",
+                ordinal=placement.position, library_workspace_id=owner.entity.workspace_id,
+                library_revision_id=document.template_enrollment.applied_revision_id,
+            )
+            try:
+                with transaction.atomic():
+                    object_id, parsed_library = loader(
+                        placement.parent.block_id if placement.parent is not None else document.id, include,
+                    )
+            except ContentCompositionError as exc:
+                raise DocumentMigrationReferenceError("template_library_source_unavailable") from exc
+            parsed_references[placement.block_id] = parsed_library
+            if placement.resolution_mode == "pinned":
+                pinned_commits[placement.block_id] = object_id
     for placement in references:
         source_document_id = placement.block.source_document_id
         if source_document_id is None:
@@ -340,11 +413,14 @@ def build_simple_document_export(
     )
     if (
         document.archived_at is not None
-        or document.is_template
         or document.topic_type not in SCHEMAS
         or document.topic_schema_version != SCHEMA_VERSION
     ):
         raise DocumentMigrationExportError("Document is not a supported first-wave candidate")
+    try:
+        source_evidence = template_source_fingerprint(document)
+    except TemplateMigrationError as exc:
+        raise DocumentMigrationExportError("Template source history is not supported") from exc
     try:
         tree = owned_placement_tree(document, placements)
     except DocumentMigrationShapeError as exc:
@@ -419,9 +495,15 @@ def build_simple_document_export(
     for _path, source in files:
         content = parse_content(source)
         parsed[content.content_id] = content
+    from .template_library_content import template_library_loader
+
+    repository = WorkspaceRepository.objects.select_related("workspace__organization").filter(
+        workspace_id=document.entity.workspace_id, tenant_id=document.tenant_id,
+    ).first()
     resolved = ContentCompositionResolver(
         accepted_object_id="migration:preview",
         accepted=parsed,
+        library_loader=template_library_loader(repository) if repository is not None else None,
         loader=lambda object_id: (
             {
                 content_id: content
@@ -452,5 +534,12 @@ def build_simple_document_export(
         resolved_markdown_sha256=hashlib.sha256(legacy.encode("utf-8")).hexdigest(),
         resolved_entity_links=tuple(
             (str(link["id"]), str(link["relationship"]), str(link["origin"])) for link in resolved.entity_links
+        ),
+        template_enrollment_sha256=template_enrollment_fingerprint(document),
+        template_source_sha256=source_evidence,
+        library_references=tuple(
+            (uuid.UUID(str(item["id"])), uuid.UUID(str(item["workspace"])),
+             uuid.UUID(str(item["template_revision"])), str(item["commit"]), str(item["digest"]))
+            for item in resolved.manifest if "workspace" in item
         ),
     )

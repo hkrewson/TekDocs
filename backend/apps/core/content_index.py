@@ -40,6 +40,7 @@ from .repository_service import (
     read_accepted_repository_markdown_files,
     read_repository_markdown_files_at_commit,
 )
+from .template_library_content import template_library_loader
 from .topic_schemas import inspect_markdown
 
 logger = logging.getLogger(__name__)
@@ -290,6 +291,7 @@ def _resolve_compositions(
         accepted_object_id=accepted_object_id,
         accepted=accepted,
         loader=snapshots.load,
+        library_loader=template_library_loader(repository),
     )
     compositions: dict[uuid.UUID, dict[str, dict[str, Any]]] = {}
     direct: dict[tuple[uuid.UUID, int], ResolvedDirectInclude] = {}
@@ -304,6 +306,7 @@ def _resolve_compositions(
                 object_id, target = resolver.direct_target(
                     context_object_id=accepted_object_id,
                     include=include,
+                    root_content_id=content_id,
                 )
                 direct[(content_id, include.ordinal)] = ResolvedDirectInclude(object_id, target)
 
@@ -408,6 +411,8 @@ def _projection_payload(
                     "id": str(include.target_content_id),
                     "mode": include.mode,
                     "ordinal": include.ordinal,
+                    **({"library_workspace": str(include.library_workspace_id),
+                        "library_revision": str(include.library_revision_id)} if include.library_workspace_id else {}),
                 }
                 for include in parsed.includes
             ],
@@ -641,8 +646,10 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                     ContentInclude(
                         **scope,
                         source=source,
-                        target=nodes.get(include.target_content_id),
+                        target=nodes.get(include.target_content_id) if include.library_workspace_id is None else None,
                         target_content_id=include.target_content_id,
+                        library_workspace_id=include.library_workspace_id,
+                        library_revision_id=include.library_revision_id,
                         ordinal=include.ordinal,
                         resolution_mode=include.mode,
                         audience_profile=include.audience,
@@ -707,6 +714,9 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                 "projection_digest": projection_digest,
             },
         )
+        from .template_library_projection import project_template_source_content
+
+        project_template_source_content(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
         locked.indexed_commit = commit
         locked.save(update_fields=("indexed_commit", "updated_at"))
 

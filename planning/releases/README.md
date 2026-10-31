@@ -13,6 +13,17 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Template enrollment development after 0.9.16
+
+The [template enrollment slice](../migrations/template-enrollment-migration.md)
+extends migration to MSP sources and enrolled client documents together. Its
+[development notes](template-enrollment-migration-notes.md) describe creation,
+reviewed updates, local copies and retained history. Implementation, both source
+review axes and local Docker/browser validation are recorded in the slice.
+The containing commit's Build, CodeQL and Extended validation checks are the
+required hosted receipt; earlier release runs cannot stand in for them. No new
+release or deployment is claimed. ADR 0116 records the bounded library-custody decision.
+
 ## Shared-block development after 0.9.16
 
 The [shared-block migration record](../migrations/shared-block-publication-migration.md)

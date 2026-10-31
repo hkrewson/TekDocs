@@ -23,7 +23,8 @@ compose_for() {
   TEKDOCS_SECRET_DIRECTORY="$secret_directory" docker compose --env-file "$environment" \
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" \
     -f "$repository_root/compose.production.yml" -f "$repository_root/compose.secret-files.yml" \
-    -f "$repository_root/compose.bootstrap-secret.yml" "$@"
+    -f "$repository_root/compose.bootstrap-secret.yml" \
+    -f "$repository_root/tests/rehearsals/compose.template-recovery.yml" "$@"
 }
 cleanup() {
   status=$?
@@ -93,6 +94,13 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py shell < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
 compose_for "$source_environment" "$source_secrets" exec -T \
   backend python manage.py initialize_workspace_repositories
+template_cohort_log="$work_directory/template-cohort.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_TEMPLATE_RECOVERY_MODE=create migrate manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/template-cohort-recovery-fixture.py" > "$template_cohort_log"
+template_cohort_sha=$(sed -n 's/^TEMPLATE_COHORT_SHA256=//p' "$template_cohort_log")
+printf '%s\n' "$template_cohort_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Enrolled template encrypted-recovery fixture created/p' "$template_cohort_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -335,6 +343,10 @@ echo "Restoring without external network access into independent database, media
 "$repository_root/scripts/tekdocs-restore.sh" --env-file "$restore_environment" \
   --backup "$backup_directory" --key-file "$recovery_key" \
   --secret-output "$restored_secrets" --confirm-destroy "$restore_project" --network-isolated
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_TEMPLATE_RECOVERY_MODE=verify -e TEKDOCS_TEMPLATE_RECOVERY_SHA256="$template_cohort_sha" \
+  migrate manage.py shell --no-imports \
+  < "$repository_root/tests/rehearsals/fixtures/template-cohort-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

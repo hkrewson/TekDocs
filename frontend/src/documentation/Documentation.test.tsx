@@ -220,7 +220,7 @@ it('paginates the library and gives an opened document a focused workspace', asy
   expect(screen.queryByRole('heading', { name: 'Documentation' })).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Documents' })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Documents' })).toBeVisible()
-  expect(screen.getByText('Firewall standard', { selector: '.document-reader-title strong' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Firewall standard', level: 1 })).toBeVisible()
 
   await user.click(screen.getByRole('button', { name: 'Documents' }))
   expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
@@ -794,7 +794,7 @@ it('previews and applies a conflict-free client template rollout', async () => {
   expect(await screen.findByText('Your version: 1 · Latest template: 2')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Apply update' }))
   await waitFor(() => expect(applyTemplateRollout).toHaveBeenCalledWith(
-    { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', { 'block-new': 'copy' },
+    { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', { 'block-new': 'copy' }, 2,
   ))
   expect(screen.getByRole('status')).toHaveTextContent('Template revision 2 applied.')
 })
@@ -1131,7 +1131,7 @@ it('preserves selected rollout behavior after failure without retrying the mutat
   await user.click(screen.getByRole('button', { name: 'Apply update' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Enrollment changed')
   expect(screen.getByLabelText('New guidance')).toHaveValue('pinned')
-  expect(applyRollout).toHaveBeenCalledExactlyOnceWith({}, 'enrollment-1', 'r1', { b1: 'pinned' })
+  expect(applyRollout).toHaveBeenCalledExactlyOnceWith({}, 'enrollment-1', 'r1', { b1: 'pinned' }, 2)
 })
 
 it('keeps failed block searches distinct from empty results and excludes the destination', async () => {
@@ -1522,4 +1522,40 @@ it('keeps departure blocked until a document save has a known result', async () 
   expect(continueButton).toBeEnabled()
   await user.click(continueButton)
   expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+})
+
+it('reviews a promoted template update with the Git content fences', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, getDocument } = clients()
+  const enrolled = { ...document, content_id: 'content-1', content_authority: 'repository' as const, template_enrollment_id: 'enrollment-1', template_applied_revision_id: 'template-revision-1', template_source_id: 'doc-source' }
+  const preview = { enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 2, up_to_date: false, added: [], changed: [{ source_block_id: 'source-section', source_revision_id: 'source-revision-2', checksum: 'checksum-2', kind: 'rich_text' as const, name: 'Shared checklist', depth: 0, mode: 'pinned' as const }], removed: [], conflicts: [], base_commit: 'a'.repeat(40), composition_digest: 'b'.repeat(64), reused_sections: [] }
+  documents.list = vi.fn().mockResolvedValue({ results: [enrolled], count: 1 })
+  documents.previewTemplateRollout = vi.fn().mockResolvedValue(preview)
+  const apply = vi.fn().mockResolvedValue({ ...preview, current_revision: 2, up_to_date: true })
+  documents.applyTemplateRollout = apply
+  getDocument.mockResolvedValue({ ...enrolled })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Synthetic client', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: 'Check template updates' }))
+  await user.click(await screen.findByRole('button', { name: 'Apply update' }))
+  await waitFor(() => expect(apply).toHaveBeenCalledWith(
+    { organizationId: 'org-1' }, 'enrollment-1', 'template-revision-1', {}, 2,
+    { expected_base: 'a'.repeat(40), expected_composition: 'b'.repeat(64) },
+  ))
+  expect(apply).toHaveBeenCalledTimes(1)
+})
+
+it('binds a Git template enrollment to the reviewed source definition', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, instantiateTemplate } = clients()
+  documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [{
+    ...sourceDocument, content_authority: 'repository', source_state: 'ready', definition_sha256: 'a'.repeat(64),
+  }], count: 1 })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+  await user.click(await screen.findByRole('button', { name: 'Use template' }))
+  await user.click(screen.getByRole('button', { name: 'Create document' }))
+  await waitFor(() => expect(instantiateTemplate).toHaveBeenCalledWith(
+    { organizationId: 'org-1' }, 'doc-source', 'Acme — Shared checklist', 'policy', {}, 'a'.repeat(64),
+  ))
 })

@@ -3,7 +3,7 @@ import { CollectionPagination } from '../CollectionPagination'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
-import type { DocumentRecord, DocumentResult, DocumentScope, DocumentsClient, TemplatePlacementMode } from './api'
+import type { DocumentRecord, TemplateLibraryResult, TemplateLibrarySource, DocumentScope, DocumentsClient, TemplatePlacementMode } from './api'
 
 export function TemplateLibrary({ scope, workspaceName, client, onCreated, urlManaged = false }: { urlManaged?: boolean; scope: DocumentScope; workspaceName: string; client: DocumentsClient; onCreated: (document: DocumentRecord) => void }) {
   const [query, setQuery] = useState(() => urlManaged ? new URLSearchParams(window.location.search).get('template_q') ?? '' : '')
@@ -19,9 +19,9 @@ export function TemplateLibrary({ scope, workspaceName, client, onCreated, urlMa
     window.history.replaceState(window.history.state, '', `${window.location.pathname}?${parameters}${window.location.hash}`)
   }, [query, page, urlManaged])
   const [retry, setRetry] = useState(0)
-  const [result, setResult] = useState<DocumentResult | null>(null)
+  const [result, setResult] = useState<TemplateLibraryResult | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [draft, setDraft] = useState<{ source: DocumentRecord; title: string; rules: Record<string, TemplatePlacementMode> } | null>(null)
+  const [draft, setDraft] = useState<{ source: TemplateLibrarySource; title: string; rules: Record<string, TemplatePlacementMode> } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
@@ -43,7 +43,9 @@ export function TemplateLibrary({ scope, workspaceName, client, onCreated, urlMa
     if (!draft || busy || !draft.title.trim()) return
     setBusy(true); setError(null)
     try {
-      const document = await client.instantiateTemplate(scope, draft.source.id, draft.title.trim(), draft.source.category, draft.rules)
+      const document = draft.source.content_authority === 'repository'
+        ? await client.instantiateTemplate(scope, draft.source.id, draft.title.trim(), draft.source.category, draft.rules, draft.source.definition_sha256 ?? undefined)
+        : await client.instantiateTemplate(scope, draft.source.id, draft.title.trim(), draft.source.category, draft.rules)
       setDraft(null); onCreated(document)
     } catch { setError(translate('documentation.templateCreateFailed')) }
     finally { setBusy(false) }
@@ -69,7 +71,7 @@ export function TemplateLibrary({ scope, workspaceName, client, onCreated, urlMa
       {phase === 'error' && <div role="alert"><p>{translate('documentation.templateLoadFailed')}</p><button type="button" className="secondary-button" onClick={() => { setPhase('loading'); setRetry((value) => value + 1) }}>{translate('common.retry')}</button></div>}
       {phase === 'ready' && result && <>
         {result.results.length === 0 && <p>{translate('documentation.noTemplates')}</p>}
-        <ul>{result.results.map((template) => <li key={template.id}><span><strong>{template.title}</strong><small>{translate('documentation.sectionCount', { count: template.placement_count })}</small></span><button className="secondary-button" type="button" onClick={() => setDraft({ source: template, title: `${workspaceName} — ${template.title}`, rules: Object.fromEntries(template.placements.filter((placement) => !placement.is_primary).map((placement) => [placement.block_id, 'copy'])) })}>{translate('documentation.useTemplate')}</button></li>)}</ul>
+        <ul>{result.results.map((template) => <li key={template.id}><span><strong>{template.title}</strong><small>{translate('documentation.sectionCount', { count: template.placement_count })}</small>{template.source_state === 'unavailable' && <small>{translate('documentation.templateSourceUnavailable')}</small>}</span><button className="secondary-button" type="button" disabled={template.source_state === 'unavailable' || (template.content_authority === 'repository' && !template.definition_sha256)} onClick={() => setDraft({ source: template, title: `${workspaceName} — ${template.title}`, rules: Object.fromEntries(template.placements.filter((placement) => !placement.is_primary).map((placement) => [placement.block_id, 'copy'])) })}>{translate('documentation.useTemplate')}</button></li>)}</ul>
         <CollectionPagination label={translate('documentation.templatesLabel')} page={result.page ?? page} pageSize={result.page_size ?? 25} count={result.count} hasMore={result.has_more ?? false} onPageChange={(value) => { setPage(value); setPhase('loading') }} />
       </>}
     </>}

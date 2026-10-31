@@ -112,7 +112,8 @@ def test_readiness_reports_only_coarse_diagram_renderer_health(client, tmp_path)
 
 @pytest.mark.django_db
 @override_settings(TEKDOCS_BOOTSTRAP_TOKEN="", TEKDOCS_DIAGRAM_JOB_DIRECTORY="")
-def test_readiness_fails_closed_without_bootstrap_token_before_owner_claim(client):
+def test_readiness_fails_closed_without_bootstrap_token_before_owner_claim(client, settings, tmp_path):
+    settings.TEKDOCS_REPOSITORY_ROOT = str(tmp_path / "repositories")
     assert not InstallationState.objects.get(pk=InstallationState.SINGLETON_ID).is_bootstrapped
 
     response = client.get(reverse("health-ready"))

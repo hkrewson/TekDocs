@@ -832,6 +832,149 @@
       "fix_commit": null,
       "retest_run": "40985580577",
       "retest_attempt": 1
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (route-session)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (accounts)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (route-access)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (route-methods)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (core-a)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate container and separate test database: the access-control catalog test with inherited production settings and a temporary repository root reproduced RepositoryInputError; adding --ds=tekdocs.settings.test passed. Fresh accounts plus route-access: 729 passed. Route-method/CSRF/MFA subset: 1084 passed, one existing skip. All 12 shard argument plans reproduced the missing override before correction. Two explicitly Git-enabled storage tests independently reproduced the outer-transaction error with test settings. They now use real commits instead of a rollback wrapper and synthetic callbacks; storage/health/rendering fresh retest: 56 passed.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged. Those two Git storage tests also required actual transaction boundaries; one readiness test now explicitly configures its temporary repository root while keeping its exact response assertion.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "Diagram authoring, failures, and exports",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The Make dry-run test reproduced a diagram unit invocation without explicit test settings. The equivalent existing-container diagram/document unit retest passed 108 tests with two existing renderer-runtime skips.",
+      "cause": "Compose migrate exports production Django settings, which override the pytest.ini test default. Ordinary rollback-based fixtures therefore attempted repository manifest writes inside an uncoordinated outer test transaction. Explicit pytest --ds=tekdocs.settings.test restores the intended opt-in Git test isolation; the production transaction guard is unchanged. This separate Make unit invocation also needed the explicit settings override. Production startup and the isolated renderer runtime check remain unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "Chromium regression",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The unchanged mobile document-reading test reproduced the same two-element strict-mode error against the actual local app. Corrected title/body assertions passed Chromium, Firefox and WebKit.",
+      "cause": "The accessibility correction supplies a reader-title h1 while authored Markdown retains its own h1. A global heading locator matched both valid elements. Scoped exact heading assertions identify the intended title and body independently; content, keyboard, touch target, overflow and Axe assertions are retained.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160427117",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The hosted journey reached the split/reload assertion: Acme onboarding matched both the Live Acme onboarding reader title and the authored Acme onboarding heading. The locally reproduced heading ambiguity has the same cause; the authored-body assertion is now scoped and exact while the reader-title assertion remains separate. Full real-stack replay stays hosted.",
+      "cause": "The accessibility correction supplies a reader-title h1 while authored Markdown retains its own h1. A global heading locator matched both valid elements. Scoped exact heading assertions identify the intended title and body independently; content, keyboard, touch target, overflow and Axe assertions are retained.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160446819",
+      "run_attempt": 1,
+      "job": "Browser (firefox)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The unchanged mobile document-reading test reproduced the same two-element strict-mode error against the actual local app. Corrected title/body assertions passed Chromium, Firefox and WebKit.",
+      "cause": "The accessibility correction supplies a reader-title h1 while authored Markdown retains its own h1. A global heading locator matched both valid elements. Scoped exact heading assertions identify the intended title and body independently; content, keyboard, touch target, overflow and Axe assertions are retained.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160446819",
+      "run_attempt": 1,
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The unchanged mobile document-reading test reproduced the same two-element strict-mode error against the actual local app. Corrected title/body assertions passed Chromium, Firefox and WebKit.",
+      "cause": "The accessibility correction supplies a reader-title h1 while authored Markdown retains its own h1. A global heading locator matched both valid elements. Scoped exact heading assertions identify the intended title and body independently; content, keyboard, touch target, overflow and Axe assertions are retained.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160446819",
+      "run_attempt": 1,
+      "job": "Browser (chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The unchanged mobile document-reading test reproduced the same two-element strict-mode error against the actual local app. Corrected title/body assertions passed Chromium, Firefox and WebKit.",
+      "cause": "The accessibility correction supplies a reader-title h1 while authored Markdown retains its own h1. A global heading locator matched both valid elements. Scoped exact heading assertions identify the intended title and body independently; content, keyboard, touch target, overflow and Axe assertions are retained.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41160446819",
+      "run_attempt": 1,
+      "job": "Supported backup and restore",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The authenticated restore and general publication/file verifiers completed, then the new owner-role cohort verifier could not start. Executing the actual Compose helper in configuration-only mode reproduced internal=false for the restored profile before correction; the repaired contract checks restored internal=true, source internal=false and the existing media mount. Full independent replay is hosted-only under the repository single-project rule.",
+      "cause": "The post-restore one-off verifier omitted the isolated network overlay used by tekdocs-restore.sh. This verified configuration mismatch caused Compose to request the source network profile after isolated restoration; the primary failure was the Docker daemon network error, not the earlier deliberately induced reconciliation error in cleanup logs. The cohort fingerprint and all preservation checks are unchanged.",
+      "next_action": "The correction is in the commit introducing this entry. Complete exact-source Build, CodeQL and Extended validation, then record its fix commit and hosted receipt. The original failed run remains historical evidence.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

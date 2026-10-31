@@ -509,7 +509,8 @@ test('document reading and inline insertion remain accessible on mobile', async 
   await page.goto('/documentation')
   await page.getByRole('button', { name: 'UniFi Network Setup Guide' }).click()
 
-  await expect(page.getByRole('heading', { name: 'UniFi Network Setup Guide', exact: true })).toBeVisible()
+  await expect(page.locator('.document-reader-title').getByRole('heading', { name: 'UniFi Network Setup Guide', level: 1, exact: true })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Document content', exact: true }).getByRole('heading', { name: 'UniFi Network Setup Guide', level: 1, exact: true })).toBeVisible()
   await expect(page.getByText('Document blocks')).not.toBeVisible()
   await expect(page.locator('.document-page')).toBeVisible()
   expect(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.document.documentElement.clientWidth + 1)).toBe(true)

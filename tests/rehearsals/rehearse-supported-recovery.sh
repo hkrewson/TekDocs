@@ -20,6 +20,11 @@ compose_for() {
   environment=$1
   secret_directory=$2
   shift 2
+  # Post-restore one-off verifiers must use the same isolated network definition
+  # as tekdocs-restore.sh, rather than reconciling it back to the source profile.
+  if [ "$environment" = "$restore_environment" ]; then
+    set -- -f "$repository_root/compose.recovery-isolated.yml" "$@"
+  fi
   TEKDOCS_SECRET_DIRECTORY="$secret_directory" docker compose --env-file "$environment" \
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" \
     -f "$repository_root/compose.production.yml" -f "$repository_root/compose.secret-files.yml" \

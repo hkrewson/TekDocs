@@ -23,6 +23,10 @@ review axes and local Docker/browser validation are recorded in the slice.
 The containing commit's Build, CodeQL and Extended validation checks are the
 required hosted receipt; earlier release runs cannot stand in for them. No new
 release or deployment is claimed. ADR 0116 records the bounded library-custody decision.
+The first `d80983c` hosted attempt exposed settings, transaction-fixture, heading
+locator and restored-network harness defects. Their reproduced corrections and
+original failed runs are retained in the slice record and failure ledger; the
+corrective source requires its own complete hosted receipt.
 
 ## Shared-block development after 0.9.16
 

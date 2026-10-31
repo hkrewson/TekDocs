@@ -107,6 +107,11 @@ case "$shard" in
     ;;
 esac
 
+# Compose intentionally keeps migration/bootstrap startup on production settings.
+# pytest's ini default loses to that inherited environment; the CLI override
+# selects test isolation, including opt-in repository custody, for every shard.
+set -- "$@" --ds=tekdocs.settings.test
+
 if [ "${TEKDOCS_POSTGRES_SHARD_LIST_ONLY:-false}" = "true" ]; then
   printf '%s\n' "$@"
   exit 0

@@ -384,3 +384,54 @@ authorization. No version change, application tag,
 image publication, production deployment or live-data migration is included.
 The required `Template-library.md` Wiki change is prepared locally; its separate
 checkout's pre-existing edits are preserved and publication remains separate.
+
+## First hosted attempt and validation-harness correction
+
+Application implementation `d80983c` was pushed directly to main. Its
+[Build attempt](https://github.com/hkrewson/TekDocs/actions/runs/41160427117) and
+[Extended attempt](https://github.com/hkrewson/TekDocs/actions/runs/41160446819)
+exposed the following validation defects; neither is a passing receipt.
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41160444588) passed.
+The individual failed jobs, reproduction, ownership and next actions are retained
+in [validation failures](../releases/validation-failures.json).
+
+- Compose's production `DJANGO_SETTINGS_MODULE` overrode pytest's ini default.
+  A focused existing-container accounts test reproduced the uncoordinated Git
+  write rejection; the same test passed with `--ds=tekdocs.settings.test`.
+  Shard arguments and the diagram unit Make invocation now select test settings
+  explicitly, while production migration/bootstrap startup remains unchanged.
+  The black-box plan regressions failed for all 12 shard plans and the diagram
+  invocation before correction. Fresh Docker retests passed **729** accounts /
+  route-access tests, **1084** route-method/CSRF/MFA tests (one existing skip),
+  and **108** diagram/document unit tests (two existing renderer-runtime skips).
+- Two storage tests that explicitly enable Git also reproduced the rejection
+  under test settings. They now use real commits instead of an outer test
+  rollback and simulated on-commit callbacks. A readiness test explicitly opts
+  into temporary repository custody while preserving its exact response check.
+  Fresh storage/readiness/rendering retest: **56 passed**. An intermediate reused
+  database lacked the migration-created singleton after earlier transactional
+  tests; recreating only the test database through normal Django migrations
+  restored that seed. No application bootstrap fallback was added.
+- The mobile reader assertion reproduced a two-heading ambiguity against the
+  actual app: the accessible reader title and authored Markdown both have an h1.
+  Assertions now identify the title and body separately, with exact text and
+  heading level. Keyboard, touch size, overflow and Axe checks remain unchanged;
+  **three browser engines passed**. The real workspace journey's analogous
+  partial-name assertion now identifies the exact authored heading after split
+  and reload; its full replay remains part of hosted Build.
+- The authenticated encrypted restore and general retained-publication/file
+  verifiers completed, then the new owner-role cohort verifier failed to start
+  with a Docker network error. Configuration-only execution of the actual helper
+  reproduced the mismatch: the restored profile requested `internal: false`
+  after restoration used `internal: true`. Restore-side commands now keep the
+  same isolated overlay; source networking and existing media custody remain.
+  The regression validates both profiles without provisioning a stack. This is
+  a configuration reproduction; the repaired independent restore must still
+  pass in hosted CI before recovery acceptance.
+
+The correction's **124 script tests passed** (three existing skips), plus Compose
+contracts, shell syntax, frontend lint, changed-backend Ruff and diff hygiene.
+Standards and Spec re-review found no remaining concrete defect. No runtime guard,
+preservation assertion, dependency or application version was relaxed. Complete
+Build, CodeQL and Extended validation against the corrective commit; earlier
+source receipts cannot substitute for that final hosted result.

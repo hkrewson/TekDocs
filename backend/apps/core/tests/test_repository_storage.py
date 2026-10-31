@@ -127,7 +127,7 @@ def test_failed_git_initialization_leaves_no_partial_repository(tmp_path, monkey
     assert list(root.iterdir()) == []
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_repository_initializer_backfills_all_workspaces_and_is_retry_safe(tmp_path):
     root = tmp_path / "repositories"
     first_tenant = Tenant.objects.create(name="First MSP", slug="first-custody-msp")
@@ -149,11 +149,8 @@ def test_repository_initializer_backfills_all_workspaces_and_is_retry_safe(tmp_p
     assert (root / f"{second.id}.git").is_dir()
 
 
-@pytest.mark.django_db
-def test_supported_workspace_creation_paths_initialize_storage(
-    tmp_path,
-    django_capture_on_commit_callbacks,
-):
+@pytest.mark.django_db(transaction=True)
+def test_supported_workspace_creation_paths_initialize_storage(tmp_path):
     root = tmp_path / "repositories"
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
 
@@ -167,23 +164,22 @@ def test_supported_workspace_creation_paths_initialize_storage(
         msp_workspace = Workspace.objects.get(tenant=installation.tenant, kind=WorkspaceKind.MSP)
         assert WorkspaceRepository.objects.filter(workspace=msp_workspace).exists()
 
-        with django_capture_on_commit_callbacks(execute=True):
-            organization = create_organization(
-                tenant=installation.tenant,
-                actor_id=installation.owner.id,
-                name="Lifecycle Client",
-                legal_name="",
-                website="",
-                classifications=(),
-            )
-            sibling = create_organization(
-                tenant=installation.tenant,
-                actor_id=installation.owner.id,
-                name="Lifecycle Sibling",
-                legal_name="",
-                website="",
-                classifications=(),
-            )
+        organization = create_organization(
+            tenant=installation.tenant,
+            actor_id=installation.owner.id,
+            name="Lifecycle Client",
+            legal_name="",
+            website="",
+            classifications=(),
+        )
+        sibling = create_organization(
+            tenant=installation.tenant,
+            actor_id=installation.owner.id,
+            name="Lifecycle Sibling",
+            legal_name="",
+            website="",
+            classifications=(),
+        )
 
     client_repository = WorkspaceRepository.objects.get(workspace=organization.ownership_workspace)
     sibling_repository = WorkspaceRepository.objects.get(workspace=sibling.ownership_workspace)

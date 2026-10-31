@@ -820,7 +820,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Document blocks')).toHaveCount(0)
   await page.reload()
   await expect(page.locator('.document-reader-title').getByRole('heading', { level: 1 })).toHaveText('Live Acme onboarding')
-  await expect(page.getByRole('heading', { name: 'Acme onboarding' })).toBeVisible()
+  await expect(page.getByRole('list', { name: 'Document content', exact: true }).getByRole('heading', { name: 'Acme onboarding', level: 1, exact: true })).toBeVisible()
   await expect(page.getByText('Revision two is retained.', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Documents', exact: true }).click()

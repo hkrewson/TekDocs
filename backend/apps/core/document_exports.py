@@ -61,6 +61,7 @@ from .workspaces import ResolvedWorkspace
 
 EXPORT_FORMATS = frozenset({"md", "html", "pdf", "docx", "bundle"})
 BUNDLE_FORMAT = "tekdocs-portable-document/v3"
+CONTENT_KEY_BUNDLE_FORMAT = "tekdocs-portable-document/v4"
 MAX_BUNDLE_ATTACHMENTS = 50
 MAX_BUNDLE_ATTACHMENT_BYTES = 50 * 1024 * 1024
 _MARKDOWN = MarkdownIt("commonmark", {"html": False}).enable(("table", "strikethrough"))
@@ -286,6 +287,7 @@ def resolve_export_snapshot(
             # time, it changes with resolved state and keeps an unchanged portable
             # snapshot byte-deterministic.
             resolved_at=None,
+            content_repository=repository if repository_owned else None,
         )
     except KeyFreezeConflict as exc:
         raise ExportConflict(str(exc)) from exc
@@ -414,7 +416,9 @@ def resolve_export_snapshot(
     ]
     organization = locked_document.organization
     manifest: dict[str, object] = {
-        "format": BUNDLE_FORMAT,
+        "format": CONTENT_KEY_BUNDLE_FORMAT if any(
+            record.get("git_source") is not None for record in frozen_keys.manifest_records
+        ) else BUNDLE_FORMAT,
         "export_class": "editable_revision_snapshot",
         "immutable_publication": False,
         "source_document_id": str(locked_document.entity_id),

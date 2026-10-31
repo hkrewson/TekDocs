@@ -11,8 +11,8 @@ BASELINE = "35e93cabdfa3e1ae2b32f447ca7a09f21f6d16a8"
 
 class AddressedUpgradeFixtureTests(unittest.TestCase):
     def test_seed_top_level_imports_exist_on_supported_baseline(self):
-        fixture = ROOT / "backend/apps/core/tests/key_entity_fixture.py"
-        tree = ast.parse(fixture.read_text())
+        fixtures = [ROOT / "backend/apps/core/tests" / name for name in ("key_entity_fixture.py", "content_key_fixture.py")]
+        tree = ast.Module(body=[node for fixture in fixtures for node in ast.parse(fixture.read_text()).body], type_ignores=[])
         for node in tree.body:
             if not isinstance(node, ast.ImportFrom) or not (node.module or "").startswith("apps.core."):
                 continue

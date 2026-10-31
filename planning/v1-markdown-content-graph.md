@@ -1114,3 +1114,16 @@ passed at `6ce9519`. Existing signatures/PDFs and file versions survived rollbac
 and encrypted recovery. Content keys, foreign record
 references, diagrams, client delivery and final 1.0 acceptance remain separate.
 Version remains 0.9.16; no release or production migration is authorized here.
+
+### Content-key publication migration — October 31, 2026
+
+The maintainer's scope reply explicitly includes content-key block substitution
+in the next [#105/#106 continuation](migrations/content-key-publication-migration.md).
+Prepare exact-Workspace nested dependency migration, collective handoff/rollback,
+current Git reads and frozen STATIC v10 substitution proof, retaining signed
+publications, PDFs and managed-file versions. Both source-review axes passed,
+as did 496 combined Docker cases, 65 focused content cases and three real-browser
+journeys with server-side custody/rollback verification. Exact-source hosted
+fresh/upgraded migration and encrypted recovery remain pending. General
+cross-Workspace reuse, diagrams, client delivery and final 1.0 acceptance remain
+separate. No release or production change is claimed.

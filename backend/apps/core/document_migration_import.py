@@ -73,6 +73,10 @@ def fingerprint_document_import(
         "key_binding_ids": [
             (name, str(binding_id), str(target_id)) for name, binding_id, target_id in export.key_binding_ids
         ],
+        "key_content_sources": [
+            (str(entity), str(block), str(revision), digest)
+            for entity, block, revision, digest in export.key_content_sources
+        ],
         "pinned_commits": [(str(content_id), commit) for content_id, commit in export.pinned_commits],
         "reference_commit": export.reference_commit,
         "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in export.files],

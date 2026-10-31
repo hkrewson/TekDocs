@@ -6,7 +6,7 @@ import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/d
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; files: { filename: string; sha256: string }[] }
-type State = { addressed: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -226,17 +226,15 @@ test('migrated signed history survives real publishing, correction, withdrawal a
   await templateJourney(page, state)
 })
 
-test('field keys and entity references retain signed values, files and PDF history', async ({ page }) => {
+async function runKeyPublicationJourney(page: Page, state: State, fixture: AddressedState, expected: { initial: string; retained: string; current: string; format: string; keys: string[] }) {
   page.on('dialog', dialog => void dialog.accept())
-  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
-  const fixture = state.addressed
   const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
   await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`${path}?document=${fixture.document_id}`)
-  await expect(page.locator('article')).toContainText('Visit Current addressed site.')
+  await expect(page.locator('article')).toContainText(expected.initial)
   await page.goto(`${path}?document=${fixture.document_id}&publication=${fixture.original_id}`)
-  await expect(page.getByText('Visit Original addressed site.', { exact: true })).toBeVisible()
+  await expect(page.getByText(expected.retained, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Downloads', exact: true }).click()
   expect(await downloadPdf(page)).toBe(fixture.original_pdf_sha256)
 
@@ -247,25 +245,26 @@ test('field keys and entity references retain signed values, files and PDF histo
   expect((await saved).status()).toBe(200)
   await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
   await page.goto(`${path}?document=${fixture.document_id}`)
-  await expect(page.locator('article')).toContainText('Visit Current addressed site with code OPS.')
+  await expect(page.locator('article')).toContainText(expected.current)
   await page.getByRole('button', { name: /^Keys/ }).click()
   const report = page.getByRole('group', { name: 'Keys used in this document' })
-  await expect(report.getByText('subject.code', { exact: true })).toBeVisible()
-  await expect(report.getByText('subject.name', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Retire subject' })).toHaveCount(0)
+  for (const key of expected.keys) {
+    await expect(report.getByText(key, { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: `Retire ${key.split('.')[0]}` })).toHaveCount(0)
+  }
   await expect(page.getByRole('textbox', { name: 'Declare', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Close keys' }).click()
 
   await page.getByRole('button', { name: 'Publish document', exact: true }).click()
-  await page.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Retain current addressed values')
+  await page.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Retain current resolved instructions')
   const published = page.waitForResponse(response => response.url().endsWith('/publications') && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Publish', exact: true }).click()
   const response = await published
   expect(response.status()).toBe(201)
   const publication = await response.json() as DocumentPublicationDetail
-  expect(publication.manifest.format).toBe('tekdocs-static-publication/v9')
+  expect(publication.manifest.format).toBe(expected.format)
   expect(publication.verification.valid).toBe(true)
-  await expect(page.getByText('Visit Current addressed site with code OPS.', { exact: true })).toBeVisible()
+  await expect(page.getByText(expected.current, { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Downloads', exact: true }).click()
   await downloadPdf(page)
   for (const file of fixture.files) {
@@ -278,4 +277,43 @@ test('field keys and entity references retain signed values, files and PDF histo
     } finally { await download.delete() }
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+  return publication
+}
+
+
+test('field keys and entity references retain signed values, files and PDF history', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  await runKeyPublicationJourney(page, state, state.addressed, {
+    initial: 'Visit Current addressed site.', retained: 'Visit Original addressed site.',
+    current: 'Visit Current addressed site with code OPS.', format: 'tekdocs-static-publication/v9',
+    keys: ['subject.code', 'subject.name'],
+  })
+})
+
+test('nested content keys retain signed substitutions, file versions and PDF history', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const publication = await runKeyPublicationJourney(page, state, state.content_keys, {
+    initial: 'Original reusable recovery instructions.', retained: 'Original reusable recovery instructions.',
+    current: 'Current accepted reusable recovery instructions.', format: 'tekdocs-static-publication/v10',
+    keys: ['procedure.content'],
+  })
+  await page.getByRole('button', { name: 'Publish correction', exact: true }).click()
+  const form = page.locator('.publication-form')
+  await form.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Correct retained content substitutions')
+  const corrected = page.waitForResponse(response => response.url().endsWith('/publications') && response.request().method() === 'POST')
+  await form.getByRole('button', { name: 'Publish correction', exact: true }).click()
+  const response = await corrected
+  expect(response.status()).toBe(201)
+  const correction = await response.json() as DocumentPublicationDetail
+  expect(correction.supersedes_id).toBe(publication.id)
+  expect(correction.manifest.format).toBe('tekdocs-static-publication/v10')
+  expect(correction.verification.valid).toBe(true)
+  await page.getByRole('button', { name: 'Withdraw publication' }).click()
+  await page.getByRole('textbox', { name: 'Decision reason' }).fill('Retain withdrawn content-key history')
+  await page.getByRole('button', { name: 'Withdraw', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('Published version withdrawn')
+  await page.getByRole('button', { name: 'History', exact: true }).click()
+  await expect(page.getByText('Retain withdrawn content-key history', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click()
+  await downloadPdf(page)
 })

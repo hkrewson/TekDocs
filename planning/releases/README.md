@@ -13,6 +13,16 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Content-key development after 0.9.16
+
+The maintainer explicitly included content-key block substitution in the
+[next #105/#106 continuation](../migrations/content-key-publication-migration.md).
+Implementation, both source-review axes, 65 focused Docker cases and all three
+real browser journeys with server-side custody/rollback verification have passed.
+The final combined Docker regression passed all 496 cases; exact-source hosted
+upgrade/recovery gates remain pending. [Development notes](content-key-migration-notes.md) describe the
+bounded behavior. No completion, release or production migration is claimed.
+
 ## Field-key/entity development after 0.9.16
 
 The [addressed-document slice](../migrations/key-entity-publication-migration.md)

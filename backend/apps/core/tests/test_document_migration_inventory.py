@@ -843,7 +843,7 @@ def test_field_key_bindings_are_portable_preview_bound_and_reader_scoped(tmp_pat
         assert DocumentKeyBinding.objects.get(pk=binding.id).target_entity_id == second.entity_id
 
 
-def test_content_keys_remain_deferred_from_document_copy(tmp_path):
+def test_circular_content_keys_remain_blocked_from_document_copy(tmp_path):
     with override_settings(TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories")):
         InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
         installation = bootstrap_owner(
@@ -876,7 +876,7 @@ def test_content_keys_remain_deferred_from_document_copy(tmp_path):
         call_command(
             "preview_document_migration", workspace=str(workspace.id), document=str(document.id), stdout=output
         )
-        assert json.loads(output.getvalue())["blockers"] == ["content_key_parity_required"]
+        assert json.loads(output.getvalue())["blockers"] == ["content_key_cycle"]
 
 
 def test_attachment_links_survive_copy_render_and_rollback(tmp_path, monkeypatch):

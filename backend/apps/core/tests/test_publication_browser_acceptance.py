@@ -223,8 +223,19 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         addressed_fixture = seed_addressed_fixture(installation.owner)
         promote_addressed_fixture(addressed_fixture, installation.owner)
+        from apps.core.tests.content_key_fixture import (
+            content_key_browser_state,
+            content_key_legacy_state,
+            promote_content_key_fixture,
+            seed_content_key_fixture,
+        )
+
+        seed_content_key_fixture(installation.owner)
+        content_key_legacy = content_key_legacy_state(installation.owner)
+        promote_content_key_fixture(installation.owner)
         prepared_state = {
             "addressed": addressed_fixture.browser,
+            "content_keys": content_key_browser_state(installation.owner),
             "template": template_fixture.browser,
             "document_id": str(document.entity_id),
             "content_id": str(document.id),
@@ -318,3 +329,6 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.key_entity_fixture import verify_addressed_browser_fixture
 
         verify_addressed_browser_fixture(addressed_fixture, installation.owner)
+        from apps.core.tests.content_key_fixture import verify_content_key_browser_fixture
+
+        verify_content_key_browser_fixture(installation.owner, content_key_legacy)

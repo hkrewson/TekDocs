@@ -12,7 +12,7 @@ from .content_composition import ContentCompositionResolver
 from .content_index_models import ContentNodeKind
 from .content_profile import CONTENT_SCHEMA, ContentProfileError, ParsedContent, ParsedInclude, parse_content
 from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
-from .document_migration_keys import DocumentMigrationKeyError, portable_document_keys
+from .document_migration_keys import DocumentMigrationKeyError, portable_content_key_sources, portable_document_keys
 from .document_migration_relationships import (
     DocumentMigrationRelationshipError,
     portable_document_entity_references,
@@ -88,6 +88,7 @@ class SimpleDocumentExport:
     template_enrollment_sha256: str | None = None
     template_source_sha256: str | None = None
     library_references: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str, str], ...] = ()
+    key_content_sources: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str], ...] = ()
 
     @property
     def indexed_content_ids(self) -> tuple[uuid.UUID, ...]:
@@ -439,6 +440,7 @@ def build_simple_document_export(
     legacy = resolve_document(document).markdown
     try:
         key_bindings, key_binding_ids = portable_document_keys(document, legacy)
+        key_content_sources = portable_content_key_sources(document, legacy)
     except DocumentMigrationKeyError as exc:
         raise DocumentMigrationBindingError(exc.code) from exc
     title = document.entity.display_name
@@ -528,6 +530,7 @@ def build_simple_document_export(
         ),
         attachment_digests=attachment_digests,
         key_binding_ids=key_binding_ids,
+        key_content_sources=key_content_sources,
         pinned_commits=tuple(sorted(pinned_commits.items())),
         reference_commit=reference_commit,
         files=tuple(files),

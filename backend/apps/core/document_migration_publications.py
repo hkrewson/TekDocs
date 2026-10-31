@@ -94,7 +94,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v4",
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
-                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
             }
             or publication.audience != "msp_internal"
             or sum(item.kind == "pdf" for item in artifacts) != 1
@@ -148,7 +149,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
         try:
             if manifest.get("format") in {
                 "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
-                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
             }:
                 from .document_git_publications import verify_internal_git_publication
 

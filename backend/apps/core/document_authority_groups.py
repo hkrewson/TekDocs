@@ -17,6 +17,7 @@ from .document_authority_handoff import (
 )
 from .document_migration_coexistence import document_coexistence_status
 from .document_migration_export import build_simple_document_export
+from .document_migration_keys import content_key_authority_edges
 from .document_migration_publications import publication_migration_actor_allowed
 from .documents import _append_block_revision
 from .models import Block, Document, DocumentAuthority, DocumentPlacement, Workspace
@@ -84,6 +85,7 @@ def _prepare_group(
         .filter(Q(document_id__in=ids) | Q(block__source_document_id__in=ids))
         .values_list("document_id", "block__source_document_id")
     )
+    edges.extend(content_key_authority_edges(workspace, ids))
     if any(owner not in ids or consumer not in ids for consumer, owner in edges):
         raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
     modes = dict(
@@ -129,6 +131,10 @@ def _prepare_group(
                 "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in exported.files],
                 "attachments": [(str(identity), digest) for identity, digest in exported.attachment_digests],
                 "history": cast(dict[str, object], status["publication_history"])["evidence_sha256"],
+                "key_bindings": [(name, str(binding), str(target))
+                                 for name, binding, target in exported.key_binding_ids],
+                "key_sources": [(str(entity), str(block), str(revision), digest)
+                                for entity, block, revision, digest in exported.key_content_sources],
                 **(
                     {"template_enrollment": exported.template_enrollment_sha256}
                     if exported.template_enrollment_sha256 is not None

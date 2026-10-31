@@ -199,6 +199,11 @@ separates verified evidence from outstanding work.
 
 ### Managed repository authoring
 
+The [content-key continuation](planning/migrations/content-key-publication-migration.md)
+adds same-Workspace block substitution, nested dependency migration and signed
+Git substitution proof. The slice record distinguishes local checks and source
+review from complete hosted validation, release and production acceptance.
+
 The `0.9.5` checkpoint adds a separate **Repository content** editor under
 Documentation for staff with document-edit permission. It creates Markdown
 documents and reusable fragments, updates body and portable metadata, and

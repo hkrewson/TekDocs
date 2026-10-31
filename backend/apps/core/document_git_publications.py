@@ -20,6 +20,7 @@ from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
 from .document_addressed_publications import ADDRESSED_GIT_STATIC_FORMAT, verify_addressed_publication_manifest
+from .document_content_key_publications import CONTENT_KEY_GIT_STATIC_FORMAT
 from .document_keys import key_targets_in_markdown
 from .document_migration_shape import owned_placement_tree
 from .document_publication_files import (
@@ -89,12 +90,12 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         manifest = publication.manifest
         source = manifest["git_source"]
         sources = source["sources"]
-        addressed = manifest["format"] == ADDRESSED_GIT_STATIC_FORMAT
+        addressed = manifest["format"] in {ADDRESSED_GIT_STATIC_FORMAT, CONTENT_KEY_GIT_STATIC_FORMAT}
         shared = addressed or manifest["format"] in {SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT}
         return bool(
             manifest["format"] in {
                 GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT, SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT,
-                ADDRESSED_GIT_STATIC_FORMAT,
+                ADDRESSED_GIT_STATIC_FORMAT, CONTENT_KEY_GIT_STATIC_FORMAT,
             }
             and (not addressed or verify_addressed_publication_manifest(
                 manifest, publication.document_id, publication.canonical_markdown,
@@ -203,10 +204,6 @@ def _validated_git_publication_content(
         raise PublicationConflict("Indexed composition does not match the pinned Git source")
     if document.review_state == "approved" and document.review_content_sha256 != source["markdown_sha256"]:
         raise PublicationConflict("Approved review does not match the pinned Git content")
-    try:
-        files = prepare_publication_files(document=document, markdown=markdown)
-    except (ValueError, OSError) as exc:
-        raise PublicationConflict("Managed file custody is unavailable") from exc
     key_snapshot = None
     entities: list[RenderedEntityMention] = []
     if key_targets_in_markdown(markdown) or entity_ids_in_markdown(markdown):
@@ -219,12 +216,18 @@ def _validated_git_publication_content(
                 audience="msp_internal", actor=actor, signed_at=signed_at,
             )
             entities = freeze_repository_entity_cards(
-                repository=repository, markdown=markdown, audience="msp_internal", actor=actor, member=member,
+                repository=repository, markdown=key_snapshot["markdown"] if key_snapshot is not None else markdown,
+                audience="msp_internal", actor=actor, member=member,
             )
         except RepositoryPublicationDependencyError as exc:
             raise PublicationConflict("Record dependencies are unavailable or outside the reviewed scope") from exc
+    frozen_markdown = key_snapshot["markdown"] if key_snapshot is not None else markdown
+    try:
+        files = prepare_publication_files(document=document, markdown=frozen_markdown)
+    except (ValueError, OSError) as exc:
+        raise PublicationConflict("Managed file custody is unavailable") from exc
     preflight = repository_publication_preflight(
-        markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
+        markdown=frozen_markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
         frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},
         frozen_primary_file=any(item.descriptor["purpose"] == "primary_file" for item in files),
         frozen_entity_ids={uuid.UUID(item["id"]) for item in entities},
@@ -413,7 +416,9 @@ def publish_internal_git_document(
                                   or len(source["sources"]) != 2
                                   or any(s["mode"] == "pinned" for s in source["sources"]))
             manifest = {
-                "format": (ADDRESSED_GIT_STATIC_FORMAT if prepared.addressed
+                "format": (CONTENT_KEY_GIT_STATIC_FORMAT if prepared.key_snapshot is not None
+                           and any(item["kind"] == "content" for item in prepared.key_snapshot["records"])
+                           else ADDRESSED_GIT_STATIC_FORMAT if prepared.addressed
                            else TEMPLATE_GIT_STATIC_FORMAT if source["format"] == "tekdocs.git-dependencies/v2"
                            else SHARED_GIT_STATIC_FORMAT if shared_composition
                            else FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT),

@@ -113,6 +113,13 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 addressed_recovery_sha=$(sed -n 's/^ADDRESSED_RECOVERY_SHA256=//p' "$addressed_recovery_log")
 printf '%s\n' "$addressed_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Addressed Git, bindings, file versions, signatures and PDFs verified/p' "$addressed_recovery_log"
+content_key_recovery_log="$work_directory/content-key-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CONTENT_KEY_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/content_key_fixture.py" > "$content_key_recovery_log"
+content_key_recovery_sha=$(sed -n 's/^CONTENT_KEY_RECOVERY_SHA256=//p' "$content_key_recovery_log")
+printf '%s\n' "$content_key_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Content-key graph, signed publications, file versions, PDFs and rollback verified/p' "$content_key_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -363,6 +370,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_KEY_ENTITY_FIXTURE_MODE=recovery_verify \
   -e TEKDOCS_ADDRESSED_RECOVERY_SHA256="$addressed_recovery_sha" migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/key_entity_fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CONTENT_KEY_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_CONTENT_KEY_RECOVERY_SHA256="$content_key_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/content_key_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

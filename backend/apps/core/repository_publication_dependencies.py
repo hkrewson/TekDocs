@@ -9,6 +9,7 @@ from apps.accounts.models import User
 from apps.accounts.policy import DataAudience, InstallationMemberContext, entity_visible_to_audience
 
 from .content_index_models import ContentNode
+from .document_content_key_publications import verify_frozen_content_keys
 from .document_key_freeze import KeyFreezeConflict, freeze_document_keys, verify_frozen_field_keys
 from .document_key_models import DocumentKeyBinding
 from .document_keys import key_targets_in_markdown
@@ -92,7 +93,7 @@ def freeze_repository_key_snapshot(
     actor: User,
     signed_at: str,
 ) -> dict[str, Any] | None:
-    """Freeze only portable field keys whose authored bindings match the live owner."""
+    """Freeze portable keys whose authored bindings match the live owner."""
     if not key_targets_in_markdown(markdown):
         return None
     if document is None:
@@ -122,6 +123,7 @@ def freeze_repository_key_snapshot(
             ),
             resolved_at=signed_at,
             lock=True,
+            content_repository=repository,
         )
     except (DocumentMigrationKeyError, KeyFreezeConflict) as exc:
         raise RepositoryPublicationDependencyError(
@@ -134,7 +136,7 @@ def freeze_repository_key_snapshot(
         "sha256": hashlib.sha256(frozen.markdown.encode("utf-8")).hexdigest(),
         "records": list(frozen.manifest_records),
     }
-    if not verify_frozen_field_keys(markdown, snapshot):
+    if not (verify_frozen_field_keys(markdown, snapshot) or verify_frozen_content_keys(markdown, snapshot)):
         raise RepositoryPublicationDependencyError(
             "Repository publication preflight blocked: repository.key.unavailable"
         )

@@ -19,9 +19,11 @@ from .content_index_models import (
     DocumentAuthorityMode,
 )
 from .document_attachments import resolve_rendered_attachments, resolve_repository_rendered_attachments
+from .document_key_freeze import expand_rendered_content_keys
 from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
 from .document_keys import key_targets_in_markdown
+from .entity_mentions import resolve_entity_mentions
 from .models import ClientAsset, Document, Entity, WorkspaceRepository, workspace_for_owner
 from .relationships import entity_for_workspace, entity_projection, visible_entities_for_workspace
 from .rendering import RenderedEntityMention, render_markdown
@@ -112,12 +114,19 @@ def document_detail(
         }
         if node.frontmatter.get("key_bindings", {}) == active_key_bindings:
             key_document = legacy_document
-    attachments = resolve_rendered_attachments(workspace=workspace, document=legacy_document, markdown=markdown)
+    rendered_markdown = expand_rendered_content_keys(
+        workspace=workspace, document=key_document, markdown=markdown, content_repository=repository,
+    )
+    if rendered_markdown != markdown:
+        mentions.update(resolve_entity_mentions(workspace=workspace, markdown=rendered_markdown))
+    attachments = resolve_rendered_attachments(
+        workspace=workspace, document=legacy_document, markdown=rendered_markdown,
+    )
     if node.kind == "document":
         attachments.update(resolve_repository_rendered_attachments(
-            workspace=workspace, repository=repository, content_id=node.content_id, markdown=markdown
+            workspace=workspace, repository=repository, content_id=node.content_id, markdown=rendered_markdown
         ))
-    key_resolutions = resolve_rendered_keys(workspace=workspace, document=key_document, markdown=markdown)
+    key_resolutions = resolve_rendered_keys(workspace=workspace, document=key_document, markdown=rendered_markdown)
     result: dict[str, Any] = {
         "id": node.content_id,
         "kind": node.kind,
@@ -126,7 +135,7 @@ def document_detail(
         "indexed_commit": node.indexed_commit.object_id,
         "markdown": markdown,
         "sanitized_html": render_markdown(
-            markdown,
+            rendered_markdown,
             entity_mentions=mentions,
             attachments=attachments,
             key_resolutions=key_resolutions,

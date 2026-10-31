@@ -4899,7 +4899,8 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
         }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
@@ -4937,7 +4938,8 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
         }:
             expected_lifecycle = {
                 "reason": self.reason,
@@ -4953,7 +4955,8 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
         }:
             key_resolutions = self.manifest.get("key_resolutions")
             if not isinstance(key_resolutions, list):
@@ -4973,7 +4976,10 @@ class DocumentPublication(models.Model):
                 "dependency_chain",
             }
             for resolution in key_resolutions:
-                if not isinstance(resolution, dict) or set(resolution) != required:
+                content_git = (self.manifest.get("format") == "tekdocs-static-publication/v10"
+                               and isinstance(resolution, dict) and resolution.get("kind") == "content")
+                expected_fields = required | {"git_source"} if content_git else required
+                if not isinstance(resolution, dict) or set(resolution) != expected_fields:
                     raise ValidationError("Publication key resolutions are invalid")
                 string_fields = required - {"source_revision_id", "source_revision_number", "dependency_chain"}
                 if not all(isinstance(resolution[key], str) for key in string_fields):
@@ -4998,7 +5004,9 @@ class DocumentPublication(models.Model):
                     revision_id is not None or revision_number is not None or dependency_chain
                 ):
                     raise ValidationError("Field-key revision metadata is invalid")
-                if resolution["kind"] == "content" and (
+                if content_git and (revision_id is not None or revision_number is not None or not dependency_chain):
+                    raise ValidationError("Git content-key revision metadata is invalid")
+                if resolution["kind"] == "content" and not content_git and (
                     not isinstance(revision_id, str)
                     or not isinstance(revision_number, int)
                     or revision_number < 1
@@ -5008,7 +5016,7 @@ class DocumentPublication(models.Model):
                 expressions.append(resolution["expression"])
             if expressions != sorted(set(expressions)):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
-        if self.manifest.get("format") == "tekdocs-static-publication/v9":
+        if self.manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
             from .document_addressed_publications import verify_addressed_publication_manifest
 
             if not verify_addressed_publication_manifest(self.manifest, self.document_id, self.canonical_markdown):

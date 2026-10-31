@@ -11,6 +11,7 @@ from django.db.models import Q
 from .content_profile import ContentProfileError
 from .document_migration_coexistence import document_coexistence_status
 from .document_migration_export import build_simple_document_export
+from .document_migration_keys import content_key_authority_edges
 from .document_reversible_writes import ReversibleShapeError, reversible_markdown_projection
 from .documents import _append_block_revision
 from .models import (
@@ -129,6 +130,14 @@ def _transition_document_authority_locked(
     )
     if document is None:
         raise DocumentAuthorityHandoffError("document_unavailable")
+    key_edges = content_key_authority_edges(locked_workspace, (document.id,))
+    members = set(_group_members) if _group_members else {document.id}
+    neighbors = {identity for edge in key_edges for identity in edge} - members
+    same_target = set(DocumentAuthority.objects.filter(
+        workspace=locked_workspace, content_id__in=neighbors, authority=target,
+    ).values_list("content_id", flat=True))
+    if neighbors != same_target:
+        raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
     from .document_migration_publications import publication_migration_actor_allowed
     from .models import DocumentPublication
 

@@ -1,4 +1,4 @@
-"""Freeze authorized field-key values into evidence and export Markdown (ADR 0089)."""
+"""Freeze authorized field and content keys into evidence and export Markdown (ADR 0089)."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from apps.accounts.policy import DataAudience
 
 from .document_key_resolution import KeyResolutionKind, ResolutionState, ResolvedKey, resolve_markdown_keys
 from .document_keys import MAXIMUM_KEYS_PER_DOCUMENT, key_targets_in_markdown, keys_in_markdown
-from .models import Document
+from .models import Document, WorkspaceRepository
 from .workspaces import ResolvedWorkspace
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
@@ -192,6 +192,7 @@ def _manifest_record(
         "source_revision_number": result.source_revision_number,
         "dependency_chain": list(dependency_chain),
         "_source_state_at": result.source_state_at.isoformat() if result.source_state_at is not None else None,
+        **({"git_source": result.source_git} if result.source_git is not None else {}),
     }
 
 
@@ -206,6 +207,7 @@ def _expand_content_keys(
     lock: bool,
     ancestry: tuple[str, ...] = (),
     depth: int = 0,
+    content_repository: WorkspaceRepository | None = None,
 ) -> tuple[str, list[dict[str, object]]]:
     if depth >= MAXIMUM_CONTENT_KEY_DEPTH:
         raise KeyFreezeConflict(
@@ -226,6 +228,7 @@ def _expand_content_keys(
         audience=audience,
         organization=workspace.organization,
         lock=lock,
+        content_repository=content_repository,
     )
     expanded = markdown
     records: list[dict[str, object]] = []
@@ -246,6 +249,7 @@ def _expand_content_keys(
             depth=depth + 1,
             expressions=expressions,
             lock=lock,
+            content_repository=content_repository,
         )
         pattern = re.compile(rf"(?m)^ {{0,3}}<{re.escape(key.target)}>[ \t]*(?:\n|$)")
         expanded, count = pattern.subn(
@@ -265,7 +269,8 @@ def _expand_content_keys(
 
 
 def expand_rendered_content_keys(
-    *, workspace: ResolvedWorkspace, document: Document | None, markdown: str
+    *, workspace: ResolvedWorkspace, document: Document | None, markdown: str,
+    content_repository: WorkspaceRepository | None = None,
 ) -> str:
     """Expand valid content keys for a live read; leave failures for explicit markers."""
     if document is None:
@@ -283,6 +288,7 @@ def expand_rendered_content_keys(
             resolved_at="",
             expressions=set(),
             lock=False,
+            content_repository=content_repository,
         )
     except KeyFreezeConflict:
         return markdown
@@ -297,6 +303,7 @@ def freeze_document_keys(
     audience: DataAudience,
     resolved_at: str | None,
     lock: bool = True,
+    content_repository: WorkspaceRepository | None = None,
 ) -> FrozenKeyDocument:
     """Resolve all parsed keys under row locks and return one canonical frozen projection."""
     expressions: set[str] = set()
@@ -308,6 +315,7 @@ def freeze_document_keys(
         resolved_at=resolved_at,
         expressions=expressions,
         lock=lock,
+        content_repository=content_repository,
     )
     keys, unparsable = keys_in_markdown(expanded_markdown)
     if not keys and not unparsable:

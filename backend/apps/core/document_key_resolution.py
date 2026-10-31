@@ -64,7 +64,7 @@ from .document_key_fields import (
 )
 from .document_key_models import DocumentKeyBinding
 from .document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT, DocumentKey, keys_in_markdown
-from .models import Block, BlockRevision, Document, Entity, NetBoxReference, Organization
+from .models import Block, BlockRevision, Document, Entity, NetBoxReference, Organization, WorkspaceRepository
 from .rendering import RenderedKey
 from .workspaces import ResolvedWorkspace
 
@@ -119,6 +119,7 @@ class ResolvedKey:
     source_revision_id: UUID | None = None
     source_revision_number: int | None = None
     reason: UnresolvableReason | None = None
+    source_git: dict[str, str] | None = None
 
 
 def _withheld(key: DocumentKey, label: str) -> ResolvedKey:
@@ -285,6 +286,7 @@ def resolve_keys(
     audience: DataAudience,
     organization: Organization | None,
     lock: bool = False,
+    content_repository: WorkspaceRepository | None = None,
 ) -> dict[str, ResolvedKey]:
     """Resolve ``keys`` for one reader, keyed by the ``tekdocs://key/`` target.
 
@@ -308,7 +310,10 @@ def resolve_keys(
         for entity in entities
         if entity_visible_to_audience(context, entity, audience=audience, organization=organization)
     }
-    records = _records_by_entity([entity for entity in entities if entity.id in visible], lock=lock)
+    records = _records_by_entity([
+        entity for entity in entities if entity.id in visible
+        and not (content_repository is not None and entity.entity_type == "document_block")
+    ], lock=lock)
     observed = _observed_fingerprints(visible, lock=lock)
 
     for key in requested:
@@ -321,6 +326,7 @@ def resolve_keys(
             observed=observed,
             audience=audience,
             organization=organization,
+            content_repository=content_repository,
         )
     return resolutions
 
@@ -335,6 +341,7 @@ def _resolve_one(
     observed: Mapping[UUID, tuple[str, datetime]],
     audience: DataAudience,
     organization: Organization | None,
+    content_repository: WorkspaceRepository | None = None,
 ) -> ResolvedKey:
     if binding is None:
         return _unresolvable(key, key.expression, UnresolvableReason.NO_BINDING)
@@ -347,6 +354,12 @@ def _resolve_one(
         return _withheld(key, key.expression)
 
     if entity.entity_type == "document_block" and key.path == ("content",):
+        if content_repository is not None:
+            from .repository_content_keys import resolve_repository_content_key
+
+            return resolve_repository_content_key(
+                repository=content_repository, entity=entity, expression=key.expression,
+            )
         block = records.get(entity.id)
         if not isinstance(block, Block) or block.archived_at is not None or block.current_revision is None:
             return _unresolvable(key, "Content", UnresolvableReason.ARCHIVED)
@@ -422,6 +435,7 @@ def resolve_markdown_keys(
     audience: DataAudience,
     organization: Organization | None,
     lock: bool = False,
+    content_repository: WorkspaceRepository | None = None,
 ) -> dict[str, ResolvedKey]:
     """Resolve every key in ``markdown``, including ones that are not valid keys.
 
@@ -436,6 +450,7 @@ def resolve_markdown_keys(
         audience=audience,
         organization=organization,
         lock=lock,
+        content_repository=content_repository,
     )
     for target in unresolvable:
         # The scheme is stripped from the label: the marker names the expression the

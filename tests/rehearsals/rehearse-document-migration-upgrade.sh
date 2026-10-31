@@ -68,6 +68,19 @@ run_addressed_fixture() {
     < "$repository_root/backend/apps/core/tests/key_entity_fixture.py"
 }
 
+run_content_key_fixture() {
+  content_project=$1
+  content_environment=$2
+  content_directory=$3
+  content_mode=$4
+  content_legacy_sha=${5:-}
+  compose_for "$content_project" "$content_environment" "$content_directory" run --rm -T \
+    -e TEKDOCS_CONTENT_KEY_FIXTURE_MODE="$content_mode" \
+    -e TEKDOCS_CONTENT_KEY_LEGACY_SHA256="$content_legacy_sha" \
+    migrate python manage.py shell --no-imports \
+    < "$repository_root/backend/apps/core/tests/content_key_fixture.py"
+}
+
 #=========================# MAIN #==========================#
 trap cleanup EXIT HUP INT TERM
 
@@ -96,6 +109,9 @@ run_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" crea
 run_addressed_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/addressed-legacy.log"
 addressed_upgrade_sha=$(sed -n 's/^ADDRESSED_LEGACY_SHA256=//p' "$work_directory/addressed-legacy.log")
 printf '%s\n' "$addressed_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
+run_content_key_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/content-legacy.log"
+content_upgrade_sha=$(sed -n 's/^CONTENT_KEY_LEGACY_SHA256=//p' "$work_directory/content-legacy.log")
+printf '%s\n' "$content_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" down --remove-orphans
 
 echo "Upgrading the preserved database and proving stable legacy identities"
@@ -107,6 +123,7 @@ compose_for "$upgrade_project" "$upgrade_environment" "$repository_root" run --r
   python manage.py initialize_workspace_repositories >/dev/null
 run_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" exercise > "$work_directory/upgraded-result.json"
 run_addressed_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$addressed_upgrade_sha"
+run_content_key_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$content_upgrade_sha"
 
 echo "Running the identical migration workflow on a fresh installation"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" up -d --build --wait backend
@@ -114,12 +131,16 @@ run_fixture "$fresh_project" "$fresh_environment" "$repository_root" create > "$
 run_addressed_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/addressed-fresh.log"
 addressed_fresh_sha=$(sed -n 's/^ADDRESSED_LEGACY_SHA256=//p' "$work_directory/addressed-fresh.log")
 printf '%s\n' "$addressed_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
+run_content_key_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/content-fresh.log"
+content_fresh_sha=$(sed -n 's/^CONTENT_KEY_LEGACY_SHA256=//p' "$work_directory/content-fresh.log")
+printf '%s\n' "$content_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 run_fixture "$fresh_project" "$fresh_environment" "$repository_root" identity > "$work_directory/fresh-verified-ids.json"
 cmp "$work_directory/fresh-ids.json" "$work_directory/fresh-verified-ids.json"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" run --rm -T migrate \
   python manage.py initialize_workspace_repositories >/dev/null
 run_fixture "$fresh_project" "$fresh_environment" "$repository_root" exercise > "$work_directory/fresh-result.json"
 run_addressed_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$addressed_fresh_sha"
+run_content_key_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$content_fresh_sha"
 cmp "$work_directory/upgraded-result.json" "$work_directory/fresh-result.json"
 
 echo "Document migration fresh/0.8.46 upgrade acceptance passed"

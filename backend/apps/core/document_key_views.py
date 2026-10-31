@@ -206,13 +206,15 @@ def _archive_binding(workspace: ResolvedWorkspace, document_entity_id: UUID, bin
 
 def _key_report(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
     document = _document(workspace, document_entity_id)
+    content_repository = None
     if _legacy_content_unavailable(document):
-        from .content_read import document_detail
+        from .content_read import document_detail, repository_for_reader
 
         markdown = document_detail(
             workspace=workspace, content_id=document.id,
             audience="client_visible" if audience_for(workspace.member) == DataAudience.CLIENT_PORTAL else "all",
         )["markdown"]
+        content_repository = repository_for_reader(workspace)
     else:
         markdown = resolve_document(document).markdown
     resolutions = resolve_markdown_keys(
@@ -221,6 +223,7 @@ def _key_report(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Respo
         document=document,
         audience=audience_for(workspace.member),
         organization=workspace.organization,
+        content_repository=content_repository,
     )
     rows: list[dict[str, str | None]] = sorted(
         (

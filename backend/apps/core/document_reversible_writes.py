@@ -5,10 +5,17 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from uuid import UUID
 
+from django.db.models import Q
+
 from .content_profile import ContentProfileError, parse_content
 from .document_keys import key_targets_in_markdown
 from .document_migration_attachments import DocumentMigrationAttachmentError, portable_document_attachments
-from .models import Block, Document, DocumentAuthority, DocumentAuthorityMode, WorkspaceRepository
+from .document_migration_keys import (
+    DocumentMigrationKeyError,
+    portable_content_key_sources,
+    portable_document_keys,
+)
+from .models import Block, Document, DocumentAuthority, DocumentAuthorityMode, DocumentKeyBinding, WorkspaceRepository
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
 from .repository_service import RepositoryInputError, RepositoryServiceError
 
@@ -74,11 +81,28 @@ def guard_reversible_migration_write(
     if not identities:
         return
     protected_paths = set(identities.values())
+    content_key_documents = {
+        identity for consumer, owner in DocumentKeyBinding.objects.filter(
+            **scope, workspace_id=repository.workspace_id, archived_at__isnull=True,
+            target_entity__entity_type="document_block",
+        ).values_list("document_id", "target_entity__block_record__source_document_id")
+        for identity in (consumer, owner) if identity is not None
+    }
     denial = (
         "This migrated document is kept reversible. Edit only its owned fragment text; "
         "restore legacy authority before changing its metadata, paths or structure."
     )
     try:
+        def key_source_markdown(block_id: UUID) -> str:
+            path = f"fragments/{block_id}.md"
+            source = changes[path] if path in changes else read_source(path)
+            if source is None:
+                raise ReversibleShapeError("rollback_key_source_missing")
+            parsed = parse_content(source)
+            if parsed.kind != "fragment" or parsed.content_id != block_id:
+                raise ReversibleShapeError("rollback_key_source_identity_changed")
+            return parsed.markdown
+
         expected: dict[str, bytes] = {}
         actual: dict[str, bytes] = {}
         for path, source in changes.items():
@@ -109,15 +133,29 @@ def guard_reversible_migration_write(
                 # The always-copied introduction keeps its owned file support.
                 raise ReversibleShapeError("template_library_section_requires_text")
             portable_document_attachments(owner, body)
+            if owner.id in content_key_documents:
+                portable_document_keys(owner, body)
+                portable_content_key_sources(owner, body, source_markdown=key_source_markdown)
             # A live consumer must also be able to project these bytes back to
             # its original owner graph. Pins keep earlier immutable source bytes.
             for consumer in (
-                documents.filter(placements__block_id=block_id, placements__resolution_mode="live")
+                documents.filter(
+                    Q(placements__block_id=block_id, placements__resolution_mode="live")
+                    | Q(key_bindings__target_entity_id=owned_blocks[block_id].entity_id,
+                        key_bindings__archived_at__isnull=True)
+                )
                 .exclude(pk=owner.pk)
                 .select_related("entity")
                 .distinct()
             ):
                 portable_document_attachments(consumer, body)
+                if consumer.id in content_key_documents:
+                    portable_document_keys(consumer, body)
+                    portable_content_key_sources(consumer, body, source_markdown=key_source_markdown)
+    except DocumentMigrationKeyError as exc:
+        raise RepositoryInputError(
+            "This migrated document is kept reversible. Keys must retain valid bindings for every live consumer."
+        ) from exc
     except DocumentMigrationAttachmentError as exc:
         raise RepositoryInputError(
             "This migrated document is kept reversible. File links must refer to its own verified files."

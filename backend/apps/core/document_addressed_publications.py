@@ -1,4 +1,4 @@
-"""Verify retained field-key and entity-card proof without live record reads."""
+"""Verify retained key and entity-card proof without live record reads."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from .content_profile import MAX_KEY_BINDINGS
+from .document_content_key_publications import CONTENT_KEY_GIT_STATIC_FORMAT, verify_frozen_content_keys
 from .document_key_freeze import verify_frozen_field_keys
 from .document_keys import key_targets_in_markdown
 from .document_shared_publications import verify_shared_publication_manifest, verify_template_publication_manifest
@@ -23,6 +24,7 @@ def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id:
         bindings = manifest["key_bindings"]
         snapshot = manifest["key_snapshot"]
         cards = manifest["entities"]
+        content_keys = manifest["format"] == CONTENT_KEY_GIT_STATIC_FORMAT
         if (
             not isinstance(authored, str)
             or len(authored.encode()) > 2 * 1024 * 1024
@@ -43,7 +45,8 @@ def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id:
             if key_targets_in_markdown(authored) or markdown != authored or manifest["key_resolutions"] != []:
                 return False
         elif (
-            not verify_frozen_field_keys(authored, snapshot)
+            not (verify_frozen_content_keys(authored, snapshot) if content_keys
+                 else verify_frozen_field_keys(authored, snapshot))
             or markdown != snapshot["markdown"]
             or manifest["key_resolutions"] != snapshot["records"]
             or any(
@@ -51,6 +54,14 @@ def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id:
                 or record["resolved_at"] != manifest["published_at"]
                 for record in snapshot["records"]
             )
+        ):
+            return False
+        if content_keys and any(
+            record["git_source"]["workspace_id"] != manifest["git_source"]["workspace_id"]
+            or record["git_source"]["repository_id"] != manifest["git_source"]["repository_id"]
+            or record["git_source"]["commit"] != manifest["git_source"]["accepted_commit"]
+            or record["git_source"]["object_format"] != manifest["git_source"]["object_format"]
+            for record in snapshot["records"] if record["kind"] == "content"
         ):
             return False
         identities = []

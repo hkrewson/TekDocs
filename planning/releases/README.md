@@ -27,6 +27,10 @@ The first `d80983c` hosted attempt exposed settings, transaction-fixture, headin
 locator and restored-network harness defects. Their reproduced corrections and
 original failed runs are retained in the slice record and failure ledger; the
 corrective source requires its own complete hosted receipt.
+The second attempt verified exact encrypted template recovery, then exposed a
+separate foundation-fixture transaction failure, a core-shard capacity limit and
+a template-apply browser synchronization defect. Reproductions and corrections
+are recorded in the slice; the original hosted apply timeout cause remains unknown.
 
 ## Shared-block development after 0.9.16
 

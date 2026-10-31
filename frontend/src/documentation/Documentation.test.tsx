@@ -1531,11 +1531,21 @@ it('reviews a promoted template update with the Git content fences', async () =>
   const preview = { enrollment_id: 'enrollment-1', applied_revision_id: 'template-revision-1', current_revision: 1, available_revision: 2, up_to_date: false, added: [], changed: [{ source_block_id: 'source-section', source_revision_id: 'source-revision-2', checksum: 'checksum-2', kind: 'rich_text' as const, name: 'Shared checklist', depth: 0, mode: 'pinned' as const }], removed: [], conflicts: [], base_commit: 'a'.repeat(40), composition_digest: 'b'.repeat(64), reused_sections: [] }
   documents.list = vi.fn().mockResolvedValue({ results: [enrolled], count: 1 })
   documents.previewTemplateRollout = vi.fn().mockResolvedValue(preview)
-  const apply = vi.fn().mockResolvedValue({ ...preview, current_revision: 2, up_to_date: true })
+  let applied = false
+  documents.getRepositoryContent = vi.fn().mockImplementation(() => Promise.resolve({
+    id: 'content-1', title: enrolled.title, kind: 'document', indexed_commit: 'a'.repeat(40),
+    sanitized_html: `<p>${applied ? 'Updated pinned template instructions.' : 'Original pinned template instructions.'}</p>`,
+    entity_context: [],
+  }))
+  const apply = vi.fn().mockImplementation(() => {
+    applied = true
+    return Promise.resolve({ ...preview, current_revision: 2, up_to_date: true })
+  })
   documents.applyTemplateRollout = apply
   getDocument.mockResolvedValue({ ...enrolled })
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Synthetic client', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
   await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await screen.findByText('Original pinned template instructions.')
   await user.click(await screen.findByRole('button', { name: 'Check template updates' }))
   await user.click(await screen.findByRole('button', { name: 'Apply update' }))
   await waitFor(() => expect(apply).toHaveBeenCalledWith(
@@ -1543,6 +1553,7 @@ it('reviews a promoted template update with the Git content fences', async () =>
     { expected_base: 'a'.repeat(40), expected_composition: 'b'.repeat(64) },
   ))
   expect(apply).toHaveBeenCalledTimes(1)
+  await screen.findByText('Updated pinned template instructions.')
 })
 
 it('binds a Git template enrollment to the reviewed source definition', async () => {

@@ -8,7 +8,7 @@ const placement = crypto.randomUUID(), block = crypto.randomUUID()
 const endpoint = `/api/v1/workspaces/organizations/${organization}/documents`
 const location = `/workspaces/organizations/${organization}/documentation`
 
-async function setup(page: Page, baseURL: string) {
+async function setup(page: Page, baseURL: string, applyDelayMs = 0) {
   let created = false, applied = false, detached = false, sourceChanged = false, writes = 0, detaches = 0
   const record = () => ({
     id: document, content_id: content, title: 'Client enrollment guide', category: 'guide',
@@ -40,7 +40,7 @@ async function setup(page: Page, baseURL: string) {
   await page.route('**/api/v1/documents/topic-schemas', r => r.fulfill({ json: { topics: [] } }))
   await page.route(`**/api/v1/workspaces/organizations/${organization}/content-graph/documents/${content}`, r => r.fulfill({ json: {
     id: content, kind: 'document', title: 'Client enrollment guide', indexed_commit: 'b'.repeat(40),
-    sanitized_html: '<p>Local client introduction.</p><p>Selected template procedure.</p>', entity_context: [],
+    sanitized_html: `<p>Local client introduction.</p><p>${applied ? 'Updated template procedure.' : 'Selected template procedure.'}</p>`, entity_context: [],
   } }))
   await page.route(`**${endpoint}**`, async r => {
     const url = new URL(r.request().url())
@@ -65,6 +65,7 @@ async function setup(page: Page, baseURL: string) {
         sourceChanged = true
         return r.fulfill({ status: 409, json: { code: 'placement_conflict', detail: 'Template changed after review. Review again.' } })
       }
+      if (applyDelayMs) await new Promise(resolve => setTimeout(resolve, applyDelayMs))
       applied = true
       return r.fulfill({ json: review() })
     }
@@ -83,10 +84,10 @@ async function setup(page: Page, baseURL: string) {
   return { writes: () => writes, detaches: () => detaches }
 }
 
-for (const width of [320, 1440]) {
-  test(`reviewed Git template creation, updates and detach at ${width}px`, async ({ page, baseURL }) => {
+for (const [width, applyDelayMs] of [[320, 0], [1440, 0], [1440, 6000]] as const) {
+  test(`reviewed Git template creation, updates and detach at ${width}px${applyDelayMs ? ' with slow acknowledgement' : ''}`, async ({ page, baseURL }) => {
     await page.setViewportSize({ width, height: 900 })
-    const state = await setup(page, baseURL!)
+    const state = await setup(page, baseURL!, applyDelayMs)
     await page.goto(location)
     await page.getByRole('button', { name: 'Templates from your MSP' }).click()
     await page.getByRole('button', { name: 'Use template' }).click()
@@ -105,7 +106,10 @@ for (const width of [320, 1440]) {
     await page.getByRole('button', { name: 'Discard changes', exact: true }).click()
     await expect(page.getByText('Your version: 1 · Latest template: 3', { exact: true })).toBeVisible()
     await page.getByRole('combobox', { name: 'Additional checklist', exact: true }).selectOption('live')
+    const applied = page.waitForResponse(response => response.url().endsWith('/template-rollouts/apply') && response.request().method() === 'POST')
     await page.getByRole('button', { name: 'Apply update', exact: true }).click()
+    expect((await applied).status()).toBe(200)
+    await expect(page.getByText('Updated template procedure.', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Check template updates' }).click()
     await page.getByRole('button', { name: 'Make Shared procedure a local copy' }).click()
     await expect(page.getByRole('alert')).toContainText('Your account is not authorized to change documentation')

@@ -435,3 +435,37 @@ Standards and Spec re-review found no remaining concrete defect. No runtime guar
 preservation assertion, dependency or application version was relaxed. Complete
 Build, CodeQL and Extended validation against the corrective commit; earlier
 source receipts cannot substitute for that final hosted result.
+
+## Second hosted attempt and final validation corrections
+
+Corrective source `ee8fd38` passed CodeQL, the route/accounts/runtime and migration
+shards, desktop/mobile browser regressions, dynamic security checks and performance.
+Its independent encrypted restore verified the exact template cohort, including
+Git content, enrollment metadata, every file version, signatures and retained PDFs.
+Its overall Build and Extended attempts still failed; see the failure ledger.
+
+- Core-b collected 700 cases and exhausted its unchanged 30-minute budget. The
+  109-case template migration file now has a dedicated mandatory coverage shard.
+  Every other file keeps its original partition, all core files are covered once,
+  and missing template coverage fails collection. No timeout or threshold changed.
+- The real template journey twice missed its five-second updated-body assertion.
+  **The original hosted cause remains unknown**: unchanged local replay passed.
+  Separately, a deterministic six-second successful apply acknowledgement reproduced
+  the same assertion failure in all three engines. The journey now waits for the
+  apply response, requires HTTP 200, then retains the same five-second body check.
+  Delayed and normal browser scenarios: **21 passed**. A value-free acknowledgement
+  duration is retained for diagnosis. Full real Docker browser replay passed, with
+  server verification of retained bytes and rollback/re-promotion; acknowledgement
+  took 3916 ms in that replay. No retry or application change was introduced.
+- After successful template recovery, the separate repository-foundation exercise
+  rejected its plain outer database transaction. The actual fixture reproduced
+  this in the existing Docker service with a separate test database. Using the
+  shared repository coordinator passed commit, injected-interruption, recovery and
+  manifest-parity assertions. Full independent replay remains hosted-only.
+
+Verified locally: **125 script tests passed** (three existing skips), **776 frontend
+tests / 127 files passed**, the strengthened 69-test Documentation suite passed
+after final lint corrections, frontend lint/typecheck passed, shell syntax and diff
+hygiene passed. Standards and Spec re-review reported zero remaining findings.
+Hosted acceptance remains pending complete Build, CodeQL and Extended checks on
+the final corrective source; earlier successful jobs are supporting evidence.

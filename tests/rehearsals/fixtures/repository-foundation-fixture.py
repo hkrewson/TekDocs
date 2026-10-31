@@ -3,7 +3,6 @@ import json
 import os
 
 import yaml
-from django.db import transaction
 
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import User
@@ -28,6 +27,7 @@ from apps.core.repository_service import (
     RepositoryAuditAttribution,
     RepositoryFileNotFoundError,
     commit_repository_files,
+    coordinated_repository_transaction,
     read_accepted_repository_file,
 )
 from apps.core.repository_storage import resolve_managed_repository_path
@@ -183,7 +183,7 @@ def create_fixture():
 def exercise_fixture():
     owner = User.objects.get(email=OWNER_EMAIL)
     tenant = owner.tenant_memberships.get(organization__isnull=True).tenant
-    with transaction.atomic():
+    with coordinated_repository_transaction():
         bind_local_rls_scope(
             DataScope.tenant(tenant),
             organization_mode=OrganizationRLSMode.ALL_AUTHORIZED,

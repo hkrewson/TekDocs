@@ -33,7 +33,11 @@ async function templateJourney(page: Page, state: State) {
     await expect(page.getByText(mode === 'live' ? 'Browser template procedure updated.' : 'Browser template procedure original.', { exact: true })).toBeVisible()
   }
   await page.getByRole('button', { name: 'Check template updates' }).click()
+  const applyStarted = performance.now()
+  const applied = page.waitForResponse(response => response.url().endsWith('/template-rollouts/apply') && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Apply update', exact: true }).click()
+  expect((await applied).status()).toBe(200)
+  console.info(`Template acceptance apply acknowledgement: ${Math.round(performance.now() - applyStarted)} ms`)
   await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Publish document', exact: true }).click()
   await page.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Retain reviewed enrolled template')

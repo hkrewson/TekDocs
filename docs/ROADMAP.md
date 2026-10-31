@@ -20,7 +20,12 @@ preserves settings, observations, local edits, signed history/PDFs and all file
 versions. The implementation adds reviewed Git updates and the promoted-reader
 source controls. Both source-review axes and five live browser/server journeys
 passed. Local validation passed 656 combined Docker cases, 34 final source/transport
-cases and 793 frontend cases; exact-source hosted upgrade/recovery remains pending. Version remains 0.9.16.
+cases and 793 frontend cases. Runtime `6c3824c6` passed Build and CodeQL, all seventeen
+database groups, 33 monitored cases, 89% backend coverage and five live publication
+journeys. Hosted fresh/0.8.46 migration and encrypted recovery passed. Extended
+attempt 2 passed after an unchanged mobile Chromium retry following an infrastructure
+failure. The bounded slice is complete.
+The slice record owns the exact-source receipts and original failure. Version remains 0.9.16.
 
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 

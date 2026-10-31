@@ -21,8 +21,16 @@ every file version. The bounded implementation adds reviewed current-Git apply,
 local-edit protection and promoted-reader controls. [Development notes](monitored-source-migration-notes.md)
 describe the behavior. Both source-review axes and five live browser/server
 journeys passed. Local validation passed 656 combined Docker cases, 34 final
-source/transport cases and 793 frontend cases. Exact-source hosted upgrade/recovery
-evidence remains pending. Version remains
+source/transport cases and 793 frontend cases. Exact runtime `6c3824c6` passed
+[Build](https://github.com/hkrewson/TekDocs/actions/runs/41243680921) and
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41243682650), including
+all seventeen database groups, 33 monitored cases, 89% backend coverage and five
+live publication journeys. Hosted fresh/0.8.46 migration and exact encrypted
+recovery passed in [Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/41243684051);
+attempt 2 passed after an unchanged mobile Chromium retry. The slice record retains
+the original Alpine package-index TLS failure before browser assertions and the
+original attempt-1 upgrade/recovery packet identities. The bounded slice is
+complete; later evidence-only commits make no new runtime claim. Version remains
 0.9.16; no release, deployment or production migration is claimed.
 
 ## Diagram development after 0.9.16

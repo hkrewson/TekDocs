@@ -69,8 +69,9 @@ full ISO timestamp precision. The regression passes.
 At re-review, all 32 focused Docker cases and 789 frontend tests passed, together
 with API generation, lint, types, build/bundle, audit and license checks. The
 initial 505-case migration/adjacent regression had 504 passes and the invalid-UUID
-fixture failure above. Final full migration, real browser/server and exact-source
-hosted upgrade/recovery receipts remain pending in the slice record. Source
+fixture failure above. At that checkpoint, final full migration, real browser/server
+and exact-source hosted upgrade/recovery receipts were still pending; the final
+results are recorded below and in the slice record. Source
 review alone does not declare those runtime gates complete.
 
 Summary: Standards zero remaining findings; Spec zero remaining findings. The
@@ -89,6 +90,11 @@ A large-history probe then reproduced excess cursor buffering (39,205,291 traced
 peak bytes); smaller cursor batches pass the unchanged 24 MiB bound. All 34 final
 source/transport cases passed after that resource correction. The final frontend
 gate passed 793 cases, and all five final live browser journeys and server-side
-custody/rollback checks passed with the impact notice. The source slice remains
-pending its exact-source hosted Build, CodeQL, fresh/upgrade and encrypted-recovery
-receipts. No existing risk exception is accepted or renewed.
+custody/rollback checks passed with the impact notice. Exact source `6c3824c6`
+subsequently passed hosted Build and CodeQL, all seventeen
+database groups (33 monitored cases), 89% backend coverage, 793 frontend cases and
+five live browser/server journeys. Hosted fresh/0.8.46 migration and independent
+encrypted recovery passed. Extended attempt 2 passed after the unchanged mobile
+Chromium retry. The original package-index TLS failure before browser assertions
+and unchanged retry remain separate from source review. The slice record owns the
+exact-source receipt boundary. No existing risk exception is accepted or renewed.

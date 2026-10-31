@@ -75,19 +75,49 @@ server-side retained-byte and authority round-trip checks.
   Compose checks; all five real browser journeys and server custody/rollback.
   The local Wiki draft validates with 53 pages and is not published. No model
   changes were detected using the actual retained test database.
-- **Pending:** exact-source hosted Build, CodeQL and Extended validation. The authoring/migration Make commands use per-run
-  containers, so their union is adapted to `exec` in the existing `tekdocs`
-  service with a separate test database. Backend pytest runs remain sequential.
-- **Blocked locally by repository policy:** the independent fresh/0.8.46 upgrade,
-  encrypted restore and production-image environments require separate projects
-  and services. Hosted `document-migration-upgrade-rehearsal`,
-  `supported-recovery-rehearsal` and production-image jobs must confirm them.
-  The standalone source cohort preserves source settings/observations, actual
-  file/PDF bytes, all local revisions, signatures, controls and accepted Git
-  sources, without contacting an upstream server.
+- **Verified hosted at exact runtime source `6c3824c66ce3afdf485ce27c4ea6194b1af8120a`:**
+  [Build 41243680921](https://github.com/hkrewson/TekDocs/actions/runs/41243680921)
+  and [CodeQL 41243682650](https://github.com/hkrewson/TekDocs/actions/runs/41243682650)
+  passed. Build passed all seventeen database groups, including 33 monitored-source
+  cases, 89% combined backend coverage, 793 frontend cases, production-image scans
+  and all five live publication journeys with server-side preservation and authority
+  round-trip verification. The downloaded publication summary has five passed tests
+  and `server_verification: passed`.
+- **Verified hosted upgrade/recovery:**
+  [Extended 41243684051](https://github.com/hkrewson/TekDocs/actions/runs/41243684051)
+  attempt 1 passed fresh/0.8.46 document migration and the supported upgrade matrix,
+  plus independent encrypted recovery. Original upgrade job `124662618366` logged
+  both monitored rollback cohorts and fresh/0.8.46 acceptance. Original recovery
+  job `124662618164` logged monitored settings, observations, local edits, signed
+  publications, files and PDFs recovered exactly at `2026-10-31T21:46:37Z`.
+  Downloaded security packets for authorization/RLS, dependency/license/secrets,
+  image scans, CodeQL, DAST, upgrade and backup/restore, and the diagram
+  upgrade/restore packet, identify the exact source and report `passed`.
+- **Verified final Extended conclusion:** attempt 2 passed with unchanged source.
+  Retried mobile Chromium job `124677581401` passed all four responsive cases;
+  the downloaded browser packet identifies `41243684051:2:chromium+firefox+webkit+mobile`, the
+  exact source and status `passed`. The other nine Extended jobs succeeded in
+  attempt 1; their retained packet identities remain `41243684051:1:*`, not
+  re-execution claims for attempt 2. Original attempt 1 failed that browser image
+  build: `apk upgrade --no-cache`
+  could not fetch Alpine v3.23 main APKINDEX (`TLS: unspecified error`), then exited
+  99 with stale/unavailable repositories before any browser assertion. The underlying
+  network cause remains **unknown**. No code, package policy, timeout or assertion
+  changed for the retry. The original failure and diagnostic cascade remain in the
+  [failure ledger](../releases/validation-failures.json).
+- **Blocked locally by repository policy, resolved by hosted evidence:** independent
+  fresh/0.8.46 upgrade, encrypted restore and production-image environments require
+  separate projects and services. They ran in hosted CI rather than provisioning
+  parallel local stacks. Locally, authoring/migration Make commands were adapted to
+  `exec` against existing `tekdocs` services with a separate test database and
+  sequential backend tests. The standalone source cohort compares source workflow,
+  all local revisions, signatures/control events, actual file/PDF bytes and accepted
+  Git sources without contacting an upstream server.
 
-Both final source reviews have zero remaining findings. The final live rerun
-passed all five browser/server journeys with the reuse-impact disclosure included.
+The bounded slice is complete at runtime source `6c3824c6`; later evidence-only
+commits make no new runtime claim. Both final source reviews have zero remaining
+findings. The final live rerun passed all five browser/server journeys with the
+reuse-impact disclosure included.
 
 Version remains 0.9.16. Existing CSP/COEP/KaTeX and development/build-tool findings
 retain their ownership and expiry; this slice accepts or renews no exception.

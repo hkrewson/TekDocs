@@ -1089,6 +1089,32 @@
       "next_action": "Content-key runtime 781f1ad passed all three hosted real publication journeys and server-side retained-byte/authority verification in Build 41213064315. Preserve the original timeout as unknown; no demonstrated UI fix, timeout, selector, assertion or retry change is attributed to this successful retest. Investigate recurrence before 1.0.",
       "fix_commit": null,
       "retest_run": "41213064315"
+    },
+    {
+      "run_id": "41243684051",
+      "job": "Browser (mobile-chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Exact source 6c3824c66ce3afdf485ce27c4ea6194b1af8120a: hosted frontend image build failed at apk upgrade --no-cache before any browser assertion. The isolated local rehearsal provisions a parallel project and is prohibited locally; an unchanged hosted job retry was dispatched instead.",
+      "cause": "Underlying network cause unknown. Logs show TLS: unspecified error fetching the Alpine v3.23 main APKINDEX, followed by stale/unavailable repositories and exit 99. No source or package-policy change is justified by this infrastructure failure.",
+      "next_action": "Exact source 6c3824c66ce3afdf485ce27c4ea6194b1af8120a passed unchanged mobile Chromium job 124677581401 (four cases) and complete Extended attempt 2. Retain this original attempt-1 failure and diagnostic cascade; the underlying network cause remains unknown and no code fix is attributed to the retry. Other successful original jobs and upgrade/recovery packets retain attempt-1 provenance.",
+      "fix_commit": null,
+      "retest_run": "41243684051",
+      "job_id": "124662618513",
+      "run_attempt": 1,
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "41243684051",
+      "run_attempt": 1,
+      "job": "Assign validation failure follow-up",
+      "job_id": "124672420119",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Completed diagnostic step reports the original failed mobile Chromium workflow. The named browser job failed during Alpine package-index retrieval before any browser assertion.",
+      "cause": "Diagnostic cascade from the original mobile Chromium image-build failure; no separate application defect identified.",
+      "next_action": "Exact source 6c3824c66ce3afdf485ce27c4ea6194b1af8120a passed unchanged mobile Chromium job 124677581401 (four cases) and complete Extended attempt 2. Retain this original attempt-1 failure and diagnostic cascade; the underlying network cause remains unknown and no code fix is attributed to the retry. Other successful original jobs and upgrade/recovery packets retain attempt-1 provenance.",
+      "fix_commit": null,
+      "retest_run": "41243684051",
+      "retest_attempt": 2
     }
   ]
 }

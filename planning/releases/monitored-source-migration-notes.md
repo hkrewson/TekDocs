@@ -5,7 +5,12 @@ Unreleased #105/#106 continuation, version 0.9.16. The
 acceptance and validation status. Source review is clear and all five live
 browser/server journeys passed. Local validation passed 656 combined Docker
 cases, 34 final source/transport cases and 793 frontend cases. Exact-source hosted
-receipts remain pending.
+Build and CodeQL passed at `6c3824c6`, with seventeen database groups, 33 monitored
+cases, 89% combined backend coverage and five hosted live publication journeys.
+Fresh/0.8.46 migration and exact encrypted recovery also passed. Extended validation
+attempt 2 passed after an unchanged mobile Chromium retry following a package-index
+TLS failure before browser assertions. The bounded slice is complete.
+The slice record retains the original failure and evidence attempt boundaries.
 
 Supported monitored documents retain source settings, schedules and immutable
 observation history when authored content moves to Git. Local revisions, signed

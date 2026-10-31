@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-31
 
-**Status**: accepted for the bounded development slice; source review and local validation complete; exact-source hosted receipts pending
+**Status**: accepted and validated for the bounded development slice at `6c3824c6`; source review, local Docker/browser checks and exact-source hosted Build/CodeQL/Extended receipts complete
 
 **Deciders**: TekDocs maintainer
 

@@ -1152,5 +1152,10 @@ PDFs and every file version. The bounded implementation preserves SQL workflow
 custody and adds reviewed Git apply and local-edit refusal in the promoted reader.
 Both source-review axes and five live browser/server journeys passed. Local
 validation passed 656 combined Docker cases, 34 final source/transport cases and
-793 frontend cases; exact-source hosted upgrade/recovery receipts remain pending. This does not close #105/#106 or aggregate 1.0 acceptance.
+793 frontend cases. Runtime `6c3824c6` passed Build and CodeQL, all seventeen database
+groups, 33 monitored cases, 89% backend coverage and five live publication journeys.
+Hosted fresh/0.8.46 migration and exact encrypted recovery passed. Extended attempt
+2 passed after an unchanged mobile Chromium retry following an infrastructure failure.
+The bounded slice is complete. The slice record preserves the original failure and receipt attempt boundaries. This does
+not close #105/#106 or aggregate 1.0 acceptance.
 Version remains 0.9.16; no release or production migration is claimed.

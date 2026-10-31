@@ -191,6 +191,14 @@ describe('documentation placement API client', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/documents/topic-schemas')
   })
 
+  it('sends the reviewed source fingerprint within the selected client boundary', async () => {
+    Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('{}', { status: 200 })))
+    await browserDocumentsClient.applyRemoteObservation({ organizationId: 'client/id' }, 'doc/id', 'observation/id', 'a'.repeat(64))
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/workspaces/organizations/client%2Fid/documents/doc%2Fid/remote-source/observations/observation%2Fid/apply')
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ review_fingerprint: 'a'.repeat(64) }))
+  })
+
   it('repeats the field message a rejected request came back with', async () => {
     Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=document-csrf' })
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({

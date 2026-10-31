@@ -6,6 +6,7 @@ export type DocumentRemoteSourceDraft = Pick<DocumentRemoteSource, 'url' | 'sour
 
 type DocumentRemoteSourcePanelProps = {
   busy: boolean
+  settingsDirty: boolean
   draft: DocumentRemoteSourceDraft
   observations: DocumentRemoteObservation[]
   source: DocumentRemoteSource | null
@@ -18,6 +19,7 @@ type DocumentRemoteSourcePanelProps = {
 
 export function DocumentRemoteSourcePanel({
   busy,
+  settingsDirty,
   draft,
   observations,
   source,
@@ -27,6 +29,8 @@ export function DocumentRemoteSourcePanel({
   onDraftChange,
   onSave,
 }: DocumentRemoteSourcePanelProps) {
+  const needsReview = (observation: DocumentRemoteObservation) => observation.id !== source?.last_applied_observation_id
+    && (observation.state === 'changed' || (observation.state === 'unchanged' && Boolean(observation.diff)))
   return <section className="document-context-panel remote-source" aria-labelledby="remote-source-heading">
     <div className="section-heading">
       <div>
@@ -59,15 +63,17 @@ export function DocumentRemoteSourcePanel({
     </label>
     <div className="document-actions">
       <button className="primary-button" type="button" disabled={busy || !draft.url} onClick={onSave}>{translate('documentation.saveSource')}</button>
-      {source && <button className="secondary-button" type="button" onClick={onCheck}><RefreshCw size={15} />{translate('documentation.checkNow')}</button>}
+      {source && <button className="secondary-button" type="button" disabled={busy || settingsDirty} onClick={onCheck}><RefreshCw size={15} />{translate('documentation.checkNow')}</button>}
     </div>
+    {observations.some(needsReview) && <p>{translate('documentation.sourceReuseImpact')}</p>}
     {observations.length > 0 && <ol className="remote-observations">{observations.map((observation) => <li key={observation.id}>
       <header>
-        <strong>{observation.state === 'changed' ? translate('documentation.changeDetected') : observation.state === 'failed' ? translate('documentation.checkFailed') : translate('documentation.noChange')}</strong>
+        <strong>{observation.state === 'changed' ? translate('documentation.changeDetected') : observation.state === 'failed' ? translate('documentation.checkFailed') : translate(needsReview(observation) ? 'documentation.pendingSourceChange' : 'documentation.noChange')}</strong>
         <span>{new Date(observation.fetched_at).toLocaleString()}</span>
       </header>
-      {observation.diff && <pre>{observation.diff}</pre>}
-      {observation.state === 'changed' && observation.id !== source?.last_applied_observation_id && <button className="secondary-button" type="button" onClick={() => onApplyObservation(observation)}>{translate('documentation.applyReviewedChange')}</button>}
+      {(observation.apply_review?.diff ?? observation.diff) && <pre>{observation.apply_review?.diff ?? observation.diff}</pre>}
+      {needsReview(observation) && observation.apply_review?.blocker && <p role="status">{translate(observation.apply_review.blocker === 'local_edits_require_integration' ? 'documentation.sourceLocalEdits' : 'documentation.sourceReviewUnavailable')}</p>}
+      {needsReview(observation) && <button className="secondary-button" type="button" disabled={busy || settingsDirty || Boolean(observation.apply_review?.blocker)} onClick={() => onApplyObservation(observation)}>{translate('documentation.applyReviewedChange')}</button>}
     </li>)}</ol>}
   </section>
 }

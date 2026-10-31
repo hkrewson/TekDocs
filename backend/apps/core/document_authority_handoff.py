@@ -130,6 +130,9 @@ def _transition_document_authority_locked(
     )
     if document is None:
         raise DocumentAuthorityHandoffError("document_unavailable")
+    from .document_source_models import DocumentRemoteSource
+
+    monitored = DocumentRemoteSource.objects.select_for_update().filter(document=document).first()
     key_edges = content_key_authority_edges(locked_workspace, (document.id,))
     members = set(_group_members) if _group_members else {document.id}
     neighbors = {identity for edge in key_edges for identity in edge} - members
@@ -141,7 +144,7 @@ def _transition_document_authority_locked(
     from .document_migration_publications import publication_migration_actor_allowed
     from .models import DocumentPublication
 
-    if DocumentPublication.objects.filter(document=document).exists() and (
+    if (monitored is not None or DocumentPublication.objects.filter(document=document).exists()) and (
         not publication_migration_actor_allowed(workspace=locked_workspace, actor_id=actor_id)
         or reader_workspace.member.user.id != actor_id
         or reader_workspace.member.tenant.id != locked_workspace.tenant_id

@@ -5,8 +5,8 @@ import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
-type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; files: { filename: string; sha256: string }[] }
-type State = { diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
+type State = { monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -238,6 +238,18 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   await page.getByRole('button', { name: 'Downloads', exact: true }).click()
   expect(await downloadPdf(page)).toBe(fixture.original_pdf_sha256)
 
+  if (fixture.observation_id) {
+    await page.goto(`${path}?document=${fixture.document_id}`)
+    await page.getByRole('button', { name: 'Web source', exact: true }).click()
+    const change = page.locator('.remote-observations li').first()
+    await expect(change).toContainText(expected.current)
+    await expect(change.getByRole('button', { name: 'Apply reviewed change' })).toBeDisabled()
+    await expect(change.getByRole('status')).toContainText('Local edits are preserved.')
+    await expect(page.getByText('Applying this source also updates documents that follow this section. Pinned versions and signed publications stay unchanged.')).toBeVisible()
+    await expect(page.locator('article')).toContainText('Local recovery note must survive.')
+    await page.getByRole('button', { name: 'Close web source' }).click()
+  }
+
   await page.goto(`${path}?repository=${fixture.fragment_id}`)
   await page.getByLabel('Markdown body').fill(fixture.edited_markdown)
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
@@ -246,6 +258,35 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
   await page.goto(`${path}?document=${fixture.document_id}`)
   await expect(page.locator('article')).toContainText(expected.current)
+  if (fixture.observation_id) {
+    await page.getByRole('button', { name: 'Web source', exact: true }).click()
+    const change = page.locator('.remote-observations li').first()
+    const sourceInterval = page.getByLabel('Check every (minutes)')
+    await sourceInterval.fill('240')
+    const settingsSaved = page.waitForResponse(response => response.url().endsWith('/remote-source') && response.request().method() === 'PUT')
+    await page.getByRole('button', { name: 'Save source', exact: true }).click()
+    expect((await settingsSaved).status()).toBe(201)
+    await expect(page.getByRole('button', { name: 'Save source', exact: true })).toBeEnabled()
+    await expect(page.getByRole('status')).toHaveText('Web source saved.')
+    const refused = page.waitForResponse(response => response.url().endsWith(`/observations/${fixture.observation_id}/apply`))
+    await change.getByRole('button', { name: 'Apply reviewed change' }).click()
+    expect((await refused).status()).toBe(409)
+    await expect(sourceInterval).toHaveValue('240')
+    await expect(page.getByRole('alert')).toContainText('changed after review')
+    await sourceInterval.fill('180')
+    const settingsRestored = page.waitForResponse(response => response.url().endsWith('/remote-source') && response.request().method() === 'PUT')
+    await page.getByRole('button', { name: 'Save source', exact: true }).click()
+    expect((await settingsRestored).status()).toBe(201)
+    await expect(page.getByRole('button', { name: 'Save source', exact: true })).toBeEnabled()
+    await expect(page.getByRole('status')).toHaveText('Web source saved.')
+    await page.getByRole('button', { name: 'Close web source' }).click()
+    await page.getByRole('button', { name: 'Web source', exact: true }).click()
+    const applied = page.waitForResponse(response => response.url().endsWith(`/observations/${fixture.observation_id}/apply`))
+    await change.getByRole('button', { name: 'Apply reviewed change' }).click()
+    expect((await applied).status()).toBe(200)
+    await expect(page.getByRole('status')).toHaveText('Reviewed source change applied.')
+    await expect(page.locator('article')).toContainText('Local recovery note must survive.')
+  }
   if (expected.keys.length) {
     await page.getByRole('button', { name: /^Keys/ }).click()
     const report = page.getByRole('group', { name: 'Keys used in this document' })
@@ -351,4 +392,15 @@ test('diagram revisions retain graphics, signed PDFs and file versions after mig
     } finally { await download.delete() }
   }
   await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v11')
+})
+
+
+test('monitored sources preserve local edits, require a fresh review and retain signed files and PDFs', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const publication = await runKeyPublicationJourney(page, state, state.monitored, {
+    initial: 'Original monitored recovery instructions.', retained: 'Original monitored recovery instructions.',
+    current: 'Current monitored recovery instructions.', format: 'tekdocs-static-publication/v6', keys: [],
+  })
+  expect(publication.canonical_markdown).toContain('Local recovery note must survive.')
+  await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v6')
 })

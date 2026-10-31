@@ -68,7 +68,8 @@ case "$shard" in
       ! -name 'test_permission_idor_matrix.py' \
       ! -name 'test_key_entity_publication_migration.py' \
       ! -name 'test_content_key_publication_migration.py' \
-      ! -name 'test_diagram_publication_migration.py' -print | sort | \
+      ! -name 'test_diagram_publication_migration.py' \
+      ! -name 'test_monitored_source_migration.py' -print | sort | \
       awk -v partition="$partition" \
         'NR % 3 == partition && $0 !~ /\/test_template_enrollment_migration\.py$/' | \
       sed "s|$repository_root/backend/||")
@@ -103,6 +104,9 @@ PARTITION
     ;;
   key-entity-migration)
     set -- apps/core/tests/test_key_entity_publication_migration.py
+    ;;
+  monitored-migration)
+    set -- apps/core/tests/test_monitored_source_migration.py
     ;;
   diagram-migration)
     set -- apps/core/tests/test_diagram_publication_migration.py
@@ -146,7 +150,7 @@ PARTITION
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|monitored-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac

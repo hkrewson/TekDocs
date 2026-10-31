@@ -1143,3 +1143,14 @@ groups, 33 diagram cases, 89% coverage, fresh/0.8.46 migration and independent
 encrypted recovery. The bounded slice is complete; its record links the receipts. General
 cross-Workspace reuse, client delivery and final 1.0 acceptance remain separate.
 Version remains 0.9.16; no release or production migration is claimed.
+
+### Monitored-source migration — October 31, 2026
+
+The maintainer authorized the [monitored-source #105/#106 continuation](migrations/monitored-source-publication-migration.md)
+to retain source settings, observation history, local edits, signed publications,
+PDFs and every file version. The bounded implementation preserves SQL workflow
+custody and adds reviewed Git apply and local-edit refusal in the promoted reader.
+Both source-review axes and five live browser/server journeys passed. Local
+validation passed 656 combined Docker cases, 34 final source/transport cases and
+793 frontend cases; exact-source hosted upgrade/recovery receipts remain pending. This does not close #105/#106 or aggregate 1.0 acceptance.
+Version remains 0.9.16; no release or production migration is claimed.

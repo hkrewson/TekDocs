@@ -74,6 +74,12 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
                     item.block_id for item in document_placements if item.id in enrollment.library_placement_ids
                 )
         reasons: list[str] = []
+        from .document_source_state import MonitoredSourceStateError, monitored_source_fingerprint
+
+        try:
+            monitored_source_fingerprint(document)
+        except MonitoredSourceStateError:
+            reasons.append("monitored_source_history_unavailable")
         if not publication_file_limits_satisfied(document):
             reasons.append("managed_file_retention_limit")
         if document.id in nodes or owned_block_ids.intersection(nodes):

@@ -15,6 +15,13 @@ reviewed controls, rollback and independent recovery. Its record links Build,
 CodeQL and Extended evidence and preserves failed attempts and reproduced fixes.
 This does not close aggregate 1.0 acceptance or authorize production migration.
 
+Current authorized continuation: [monitored-source migration](../planning/migrations/monitored-source-publication-migration.md)
+preserves settings, observations, local edits, signed history/PDFs and all file
+versions. The implementation adds reviewed Git updates and the promoted-reader
+source controls. Both source-review axes and five live browser/server journeys
+passed. Local validation passed 656 combined Docker cases, 34 final source/transport
+cases and 793 frontend cases; exact-source hosted upgrade/recovery remains pending. Version remains 0.9.16.
+
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 
 Most patch slices should fit one to three focused engineering sessions. A slice that grows beyond its stated exit condition must be split rather than silently expanded. Dates follow demonstrated velocity; security, migration, isolation, backup, and upgrade gates never compress to preserve a date.

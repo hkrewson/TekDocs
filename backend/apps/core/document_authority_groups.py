@@ -73,6 +73,9 @@ def _prepare_group(
     )
     if len(documents) != len(ids):
         raise DocumentAuthorityHandoffError("document_unavailable")
+    from .document_source_models import DocumentRemoteSource
+
+    list(DocumentRemoteSource.objects.select_for_update().filter(document_id__in=ids).order_by("id"))
     # Placement writers lock their source block before insertion. Lock every
     # owned block before discovering inbound edges, including as-yet-unused ones.
     list(Block.objects.select_for_update().filter(**scope, source_document_id__in=ids).order_by("id"))
@@ -130,6 +133,7 @@ def _prepare_group(
                 "revisions": [(str(block), str(revision)) for block, revision in exported.blocks],
                 "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in exported.files],
                 "attachments": [(str(identity), digest) for identity, digest in exported.attachment_digests],
+                "monitored_source": exported.monitored_source_sha256,
                 "history": cast(dict[str, object], status["publication_history"])["evidence_sha256"],
                 "key_bindings": [(name, str(binding), str(target))
                                  for name, binding, target in exported.key_binding_ids],

@@ -817,7 +817,81 @@ it('reviews a monitored public source before applying its Markdown', async () =>
   await user.click(screen.getByRole('button', { name: 'Apply reviewed change' }))
   await waitFor(() => expect(checkRemoteSource).toHaveBeenCalledWith({}, 'doc-1'))
   expect(applyRemoteObservation).toHaveBeenCalledWith({}, 'doc-1', 'observation-1')
-  expect(screen.getByRole('status')).toHaveTextContent('Reviewed source change applied as a new revision.')
+  expect(screen.getByRole('status')).toHaveTextContent('Reviewed source change applied.')
+})
+
+it.each(['applied', 'refused', 'refresh_failed'])('reviews a promoted source and preserves mutation outcome (%s)', async (outcome) => {
+  const refused = outcome === 'refused'
+  const user = userEvent.setup()
+  const { documents, workspaces, applyRemoteObservation } = clients()
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1 })
+  vi.spyOn(documents, 'getRemoteSource').mockResolvedValue({ id: 'source-1', url: 'https://example.invalid/guide', source_kind: 'markdown', enabled: false, check_interval_minutes: 180, next_check_at: '2026-10-31T00:00:00Z', last_checked_at: null, last_applied_observation_id: null })
+  vi.spyOn(documents, 'listRemoteObservations').mockResolvedValue({ results: [{ id: 'observation-1', state: 'changed', status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-10-31T00:00:00Z', canonical_markdown: 'Updated instructions.', diff: 'Old baseline diff', apply_review: { fingerprint: 'b'.repeat(64), blocker: '', diff: 'Current document review' } }], count: 1 })
+  if (refused) applyRemoteObservation.mockRejectedValue(new Error('The document changed after review.'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Web source' }))
+  expect(await screen.findByText('Current document review')).toBeVisible()
+  if (outcome === 'refresh_failed') vi.spyOn(documents, 'getRepositoryContent').mockRejectedValue(new Error('Synthetic reader outage'))
+  await user.click(screen.getByRole('button', { name: 'Apply reviewed change' }))
+  await waitFor(() => expect(applyRemoteObservation).toHaveBeenCalledWith({}, 'doc-1', 'observation-1', 'b'.repeat(64)))
+  if (refused) {
+    expect(await screen.findByRole('alert')).toHaveTextContent('changed after review')
+    expect(screen.getByLabelText('Public document URL')).toHaveValue('https://example.invalid/guide')
+    expect(screen.getByRole('button', { name: 'Apply reviewed change' })).toBeEnabled()
+  } else {
+    expect(await screen.findByRole('status')).toHaveTextContent('Reviewed source change applied.')
+    expect(screen.queryByRole('button', { name: 'Close web source' })).not.toBeInTheDocument()
+    expect(Reflect.get(documents, 'getRepositoryContent')).toHaveBeenLastCalledWith({}, 'content-1')
+    if (outcome === 'refresh_failed') expect(await screen.findByRole('alert')).toHaveTextContent('Git-backed content is unavailable')
+  }
+})
+
+it('loads a fresh Git review after a source check has completed', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, checkRemoteSource, applyRemoteObservation } = clients()
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1 })
+  vi.spyOn(documents, 'getRemoteSource').mockResolvedValue({ id: 'source-1', url: 'https://example.invalid/guide', source_kind: 'markdown', enabled: false, check_interval_minutes: 180, next_check_at: '2026-10-31T00:00:00Z', last_checked_at: null, last_applied_observation_id: null })
+  const observed = { id: 'observation-1', state: 'changed' as const, status_code: 200, content_type: 'text/markdown', content_digest: 'a'.repeat(64), error_code: '', fetched_at: '2026-10-31T00:00:00Z', canonical_markdown: 'Observed instructions.', diff: 'Retained source diff', apply_review: { fingerprint: '', blocker: 'source_review_required', diff: '' } }
+  checkRemoteSource.mockResolvedValue(observed)
+  const listing = vi.spyOn(documents, 'listRemoteObservations').mockResolvedValueOnce({ results: [], count: 0 }).mockResolvedValue({ results: [{ ...observed, apply_review: { fingerprint: 'c'.repeat(64), blocker: '', diff: 'Fresh Git review' } }], count: 1 })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Web source' }))
+  await user.click(await screen.findByRole('button', { name: 'Check now' }))
+  expect(await screen.findByText('Fresh Git review')).toBeVisible()
+  expect(listing).toHaveBeenCalledTimes(2)
+  await user.click(screen.getByRole('button', { name: 'Apply reviewed change' }))
+  expect(applyRemoteObservation).toHaveBeenCalledWith({}, 'doc-1', 'observation-1', 'c'.repeat(64))
+})
+
+it('guards a second source save even while the previous success message is visible', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, saveRemoteSource } = clients()
+  const source = { id: 'source-1', url: 'https://example.invalid/guide', source_kind: 'markdown' as const, enabled: false, check_interval_minutes: 180, next_check_at: '2026-10-31T00:00:00Z', last_checked_at: null, last_applied_observation_id: null }
+  vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1 })
+  vi.spyOn(documents, 'getRemoteSource').mockResolvedValue(source)
+  saveRemoteSource.mockResolvedValueOnce({ ...source, check_interval_minutes: 240 })
+  let acknowledge!: () => void
+  const pendingSave = new Promise<typeof source>(resolve => { acknowledge = () => resolve(source) })
+  saveRemoteSource.mockImplementationOnce(() => pendingSave)
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Web source' }))
+  const interval = await screen.findByLabelText('Check every (minutes)')
+  await user.clear(interval); await user.type(interval, '240')
+  await user.click(screen.getByRole('button', { name: 'Save source' }))
+  expect(await screen.findByRole('status')).toHaveTextContent('Web source saved.')
+  await user.clear(interval); await user.type(interval, '180')
+  await user.click(screen.getByRole('button', { name: 'Save source' }))
+  expect(screen.getByRole('status')).toHaveTextContent('Web source saved.')
+  expect(screen.getByRole('button', { name: 'Save source' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Close web source' }))
+  expect(await screen.findByRole('dialog')).toBeVisible()
+  await act(async () => { acknowledge(); await pendingSave })
+  await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Keep editing' }))
+  expect(screen.getByLabelText('Check every (minutes)')).toHaveValue(180)
+  expect(screen.getByRole('button', { name: 'Save source' })).toBeEnabled()
 })
 
 it('reviews shared audiences and detaches a reused block', async () => {

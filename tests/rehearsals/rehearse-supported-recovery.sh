@@ -127,6 +127,13 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 diagram_recovery_sha=$(sed -n 's/^DIAGRAM_RECOVERY_SHA256=//p' "$diagram_recovery_log")
 printf '%s\n' "$diagram_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Diagram revisions, signed graphics, file versions, PDFs and rollback verified/p' "$diagram_recovery_log"
+monitored_source_recovery_log="$work_directory/monitored_source-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_MONITORED_SOURCE_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/monitored_source_fixture.py" > "$monitored_source_recovery_log"
+monitored_source_recovery_sha=$(sed -n 's/^MONITORED_SOURCE_RECOVERY_SHA256=//p' "$monitored_source_recovery_log")
+printf '%s\n' "$monitored_source_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Monitored settings, observations, local edits, signed publications, files, PDFs and rollback verified/p' "$monitored_source_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -385,6 +392,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_DIAGRAM_FIXTURE_MODE=recovery_verify \
   -e TEKDOCS_DIAGRAM_RECOVERY_SHA256="$diagram_recovery_sha" migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/diagram_fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_MONITORED_SOURCE_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_MONITORED_SOURCE_RECOVERY_SHA256="$monitored_source_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/monitored_source_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

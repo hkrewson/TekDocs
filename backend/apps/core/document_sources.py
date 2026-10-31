@@ -103,6 +103,7 @@ def _digest_header(value: str | None) -> str:
 
 @transaction.atomic
 def fetch_remote_document(source: DocumentRemoteSource) -> DocumentRemoteObservation:
+    source = DocumentRemoteSource.objects.select_for_update().get(pk=source.pk, archived_at__isnull=True)
     error_code = ""
     status_code: int | None = None
     content_type = ""
@@ -172,9 +173,27 @@ def fetch_remote_document(source: DocumentRemoteSource) -> DocumentRemoteObserva
     return observation
 
 
-@transaction.atomic
-def apply_remote_observation(*, observation: DocumentRemoteObservation, actor_id: UUID) -> None:
-    source = DocumentRemoteSource.objects.select_for_update().select_related("document").get(pk=observation.source_id)
+def apply_remote_observation(
+    *, observation: DocumentRemoteObservation, actor_id: UUID, review_fingerprint: str | None = None,
+) -> None:
+    from .document_source_git import apply_git_observation, locked_remote_source, source_uses_git
+
+    with locked_remote_source(observation.source_id) as (source, document, repository):
+        if source_uses_git(source):
+            apply_git_observation(
+                source=source, document=document, repository=repository, observation=observation,
+                actor_id=actor_id, review_fingerprint=review_fingerprint,
+            )
+        else:
+            if review_fingerprint is not None:
+                raise PlacementConflict("Document authority changed after review. Close and reopen Web source.")
+            _apply_legacy_observation(source=source, observation=observation, actor_id=actor_id)
+
+
+def _apply_legacy_observation(
+    *, source: DocumentRemoteSource, observation: DocumentRemoteObservation, actor_id: UUID,
+) -> None:
+    observation = source.observations.get(pk=observation.id)
     if observation.source_id != source.id or observation.state == "failed" or not observation.canonical_markdown:
         raise PlacementConflict("Only a successful retained source observation can be applied.")
     placement = primary_placement(source.document)

@@ -13,6 +13,18 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Monitored-source development after 0.9.16
+
+The maintainer authorized the [monitored-source #105/#106 slice](../migrations/monitored-source-publication-migration.md)
+to preserve settings, observations, local edits, signed publications, PDFs and
+every file version. The bounded implementation adds reviewed current-Git apply,
+local-edit protection and promoted-reader controls. [Development notes](monitored-source-migration-notes.md)
+describe the behavior. Both source-review axes and five live browser/server
+journeys passed. Local validation passed 656 combined Docker cases, 34 final
+source/transport cases and 793 frontend cases. Exact-source hosted upgrade/recovery
+evidence remains pending. Version remains
+0.9.16; no release, deployment or production migration is claimed.
+
 ## Diagram development after 0.9.16
 
 The maintainer authorized the [diagram-bearing #105/#106 slice](../migrations/diagram-publication-migration.md),

@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
@@ -11,6 +12,7 @@ from apps.accounts.policy import PermissionKey
 
 from .document_source_models import DocumentRemoteSource
 from .document_source_serializers import (
+    RemoteObservationApplySerializer,
     RemoteObservationListSerializer,
     RemoteObservationSerializer,
     RemoteSourceResultSerializer,
@@ -31,6 +33,7 @@ def _source(workspace: ResolvedWorkspace, document_entity_id: UUID) -> DocumentR
     )
 
 
+@transaction.atomic
 def _source_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
     document = _document(workspace, document_entity_id)
     if request.method == "GET":
@@ -41,6 +44,11 @@ def _source_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
         return Response(RemoteSourceResultSerializer(source).data)
     serializer = RemoteSourceWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
+    from .models import Document
+
+    Document.objects.select_for_update().get(pk=document.pk)
+    # Serialize settings with polling, apply, and the authority handoff.
+    list(DocumentRemoteSource.objects.select_for_update().filter(document=document))
     source, created = DocumentRemoteSource.objects.get_or_create(
         document=document,
         defaults={
@@ -62,18 +70,39 @@ def _observations(workspace: ResolvedWorkspace, document_entity_id: UUID, reques
     source = _source(workspace, document_entity_id)
     if request.method == "POST":
         observation = fetch_remote_document(source)
-        return Response(RemoteObservationSerializer(observation).data, status=201)
-    records = source.observations.all()[:50]
+        from .document_source_git import source_uses_git
+
+        # Polling holds the source row until the request commits. Do not take a
+        # Git lock in this response: a writer may already hold Git while waiting
+        # for this row. The reader obtains its review in a subsequent GET.
+        review = (
+            {"fingerprint": "", "blocker": "source_review_required", "diff": ""} if source_uses_git(source) else None
+        )
+        return Response(RemoteObservationSerializer(
+            observation, context={"apply_reviews": {observation.id: review}},
+        ).data, status=201)
+    from .document_source_git import preview_remote_observations
+
+    records = list(source.observations.all()[:50])
+    reviews = preview_remote_observations(source=source, observations=records)
     return Response(
-        {"results": RemoteObservationSerializer(records, many=True).data, "count": source.observations.count()}
+        {
+            "results": RemoteObservationSerializer(records, many=True, context={"apply_reviews": reviews}).data,
+            "count": source.observations.count(),
+        }
     )
 
 
 def _apply(workspace: ResolvedWorkspace, document_entity_id: UUID, observation_id: UUID, request: Request) -> Response:
     source = _source(workspace, document_entity_id)
     observation = get_object_or_404(source.observations.all(), id=observation_id)
+    serializer = RemoteObservationApplySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
     try:
-        apply_remote_observation(observation=observation, actor_id=request.user.pk)
+        apply_remote_observation(
+            observation=observation, actor_id=request.user.pk,
+            review_fingerprint=serializer.validated_data.get("review_fingerprint"),
+        )
     except PlacementConflict as exc:
         return Response({"code": "placement_conflict", "detail": str(exc)}, status=409)
     return Response(RemoteObservationSerializer(observation).data)
@@ -136,7 +165,7 @@ class OrganizationDocumentRemoteObservationView(APIView):
 
 
 class MSPDocumentRemoteObservationApplyView(APIView):
-    @extend_schema(request=None, responses={200: RemoteObservationSerializer})
+    @extend_schema(request=RemoteObservationApplySerializer, responses={200: RemoteObservationSerializer})
     def post(self, request: Request, document_entity_id: UUID, observation_id: UUID) -> Response:
         return _apply(
             _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, observation_id, request
@@ -144,7 +173,7 @@ class MSPDocumentRemoteObservationApplyView(APIView):
 
 
 class OrganizationDocumentRemoteObservationApplyView(APIView):
-    @extend_schema(request=None, responses={200: RemoteObservationSerializer})
+    @extend_schema(request=RemoteObservationApplySerializer, responses={200: RemoteObservationSerializer})
     def post(
         self, request: Request, organization_entity_id: UUID, document_entity_id: UUID, observation_id: UUID
     ) -> Response:

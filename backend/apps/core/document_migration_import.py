@@ -93,6 +93,8 @@ def fingerprint_document_import(
         ]
     if export.template_source_sha256 is not None:
         payload["template_source_sha256"] = export.template_source_sha256
+    if export.monitored_source_sha256 is not None:
+        payload["monitored_source_sha256"] = export.monitored_source_sha256
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -219,13 +221,14 @@ def apply_document_import(
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
     protected = (
         prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
-        or prepared.export.template_source_sha256 is not None
+        or prepared.export.template_source_sha256 is not None or prepared.export.monitored_source_sha256 is not None
     )
     if protected and not publication_migration_actor_allowed(
         workspace=workspace, actor_id=actor_id
     ):
         raise DocumentMigrationBlocked(
             "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
+            else "monitored_source_migration_not_authorized" if prepared.export.monitored_source_sha256 is not None
             else "template_migration_not_authorized"
         )
     if protected and (
@@ -279,11 +282,12 @@ def rollback_document_import(
     prepared = prepare_document_import(workspace=workspace, document_id=document_id)
     protected = (
         prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
-        or prepared.export.template_source_sha256 is not None
+        or prepared.export.template_source_sha256 is not None or prepared.export.monitored_source_sha256 is not None
     )
     if protected and not publication_migration_actor_allowed(workspace=workspace, actor_id=actor_id):
         raise DocumentMigrationBlocked(
             "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
+            else "monitored_source_migration_not_authorized" if prepared.export.monitored_source_sha256 is not None
             else "template_migration_not_authorized"
         )
     if not prepared.already_present:

@@ -11098,6 +11098,14 @@ export interface components {
              */
             readonly primary_file_state: "absent" | "retained_bytes_verified" | "unavailable";
             /**
+             * @description * `absent` - absent
+             *     * `retained_bytes_verified` - retained_bytes_verified
+             *     * `unavailable` - unavailable
+             * @enum {string}
+             */
+            readonly monitored_source_state: "absent" | "retained_bytes_verified" | "unavailable";
+            readonly monitored_source_sha256: string | null;
+            /**
              * @description * `legacy_only` - legacy_only
              *     * `repository_missing` - repository_missing
              *     * `index_pending` - index_pending
@@ -15907,6 +15915,14 @@ export interface components {
             readonly fetched_at: string;
             readonly canonical_markdown: string;
             readonly diff: string;
+            readonly apply_review: {
+                readonly fingerprint: string;
+                readonly blocker: string;
+                readonly diff: string;
+            } | null;
+        };
+        readonly RemoteObservationApply: {
+            readonly review_fingerprint?: string;
         };
         readonly RemoteObservationList: {
             readonly results: readonly components["schemas"]["RemoteObservation"][];
@@ -19748,7 +19764,13 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: never;
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RemoteObservationApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RemoteObservationApply"];
+                readonly "multipart/form-data": components["schemas"]["RemoteObservationApply"];
+            };
+        };
         readonly responses: {
             readonly 200: {
                 headers: {
@@ -34031,7 +34053,13 @@ export interface operations {
             };
             readonly cookie?: never;
         };
-        readonly requestBody?: never;
+        readonly requestBody?: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["RemoteObservationApply"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["RemoteObservationApply"];
+                readonly "multipart/form-data": components["schemas"]["RemoteObservationApply"];
+            };
+        };
         readonly responses: {
             readonly 200: {
                 headers: {

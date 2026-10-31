@@ -38,6 +38,8 @@ class DocumentMigrationStatusSerializer(serializers.Serializer):
     handoff_blockers = serializers.ListField(child=serializers.CharField())
     read_projection_state = serializers.ChoiceField(choices=("not_checked", "matched", "different", "unavailable"))
     primary_file_state = serializers.ChoiceField(choices=("absent", "retained_bytes_verified", "unavailable"))
+    monitored_source_state = serializers.ChoiceField(choices=("absent", "retained_bytes_verified", "unavailable"))
+    monitored_source_sha256 = serializers.CharField(allow_null=True)
     content_copy_state = serializers.ChoiceField(
         choices=(
             "legacy_only",

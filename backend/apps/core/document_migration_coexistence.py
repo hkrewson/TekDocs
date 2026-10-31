@@ -133,6 +133,17 @@ def document_coexistence_status(
                 else "different"
             )
     blockers = []
+    from .document_source_state import MonitoredSourceStateError, monitored_source_fingerprint
+
+    try:
+        source_state = monitored_source_fingerprint(document)
+    except MonitoredSourceStateError:
+        response["monitored_source_state"] = "unavailable"
+        response["monitored_source_sha256"] = None
+        blockers.append("monitored_source_history_unavailable")
+    else:
+        response["monitored_source_state"] = "retained_bytes_verified" if source_state else "absent"
+        response["monitored_source_sha256"] = source_state
     if authority_state is None:
         blockers.append("document_authority_state_unavailable")
     if response["content_copy_state"] != "in_sync":

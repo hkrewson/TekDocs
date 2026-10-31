@@ -87,6 +87,7 @@ class SimpleDocumentExport:
     resolved_entity_links: tuple[tuple[str, str, str], ...]
     template_enrollment_sha256: str | None = None
     template_source_sha256: str | None = None
+    monitored_source_sha256: str | None = None
     library_references: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str, str], ...] = ()
     key_content_sources: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str], ...] = ()
 
@@ -522,6 +523,12 @@ def build_simple_document_export(
         raise DocumentMigrationFileError(exc.code) from exc
     if any(finding["severity"] == "blocker" for finding in inspect_markdown(document.topic_type, resolved.markdown)):
         raise DocumentMigrationTopicError("structured_topic_sections_required")
+    from .document_source_state import MonitoredSourceStateError, monitored_source_fingerprint
+
+    try:
+        source_state = monitored_source_fingerprint(document)
+    except MonitoredSourceStateError as exc:
+        raise DocumentMigrationExportError(str(exc)) from exc
     return SimpleDocumentExport(
         document_id=document.id,
         blocks=tuple(blocks),
@@ -540,6 +547,7 @@ def build_simple_document_export(
         ),
         template_enrollment_sha256=template_enrollment_fingerprint(document),
         template_source_sha256=source_evidence,
+        monitored_source_sha256=source_state,
         library_references=tuple(
             (uuid.UUID(str(item["id"])), uuid.UUID(str(item["workspace"])),
              uuid.UUID(str(item["template_revision"])), str(item["commit"]), str(item["digest"]))

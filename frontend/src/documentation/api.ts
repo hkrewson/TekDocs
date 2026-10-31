@@ -357,7 +357,7 @@ export type TemplateRollout = {
   reused_sections?: Array<{ placement_id: string; title: string; mode: 'live' | 'pinned' }>
 }
 export type DocumentRemoteSource = { id: string; url: string; source_kind: 'auto' | 'markdown' | 'html'; enabled: boolean; check_interval_minutes: number; next_check_at: string; last_checked_at: string | null; last_applied_observation_id: string | null }
-export type DocumentRemoteObservation = { id: string; state: 'changed' | 'unchanged' | 'failed'; status_code: number | null; content_type: string; content_digest: string; error_code: string; fetched_at: string; canonical_markdown: string; diff: string }
+export type DocumentRemoteObservation = { id: string; state: 'changed' | 'unchanged' | 'failed'; status_code: number | null; content_type: string; content_digest: string; error_code: string; fetched_at: string; canonical_markdown: string; diff: string; apply_review?: { fingerprint: string; blocker: string; diff: string } | null }
 
 export class RevisionConflictError extends AuthRequestError {
   constructor(readonly payload: RevisionConflictPayload) {
@@ -403,7 +403,7 @@ export interface DocumentsClient {
   saveRemoteSource(scope: DocumentScope, id: string, input: Pick<DocumentRemoteSource, 'url' | 'source_kind' | 'enabled' | 'check_interval_minutes'>): Promise<DocumentRemoteSource>
   listRemoteObservations(scope: DocumentScope, id: string): Promise<{ results: DocumentRemoteObservation[]; count: number }>
   checkRemoteSource(scope: DocumentScope, id: string): Promise<DocumentRemoteObservation>
-  applyRemoteObservation(scope: DocumentScope, id: string, observationId: string): Promise<DocumentRemoteObservation>
+  applyRemoteObservation(scope: DocumentScope, id: string, observationId: string, reviewFingerprint?: string): Promise<DocumentRemoteObservation>
   importMarkdown(scope: DocumentScope, file: File, title: string, category: DocumentCategory, isTemplate: boolean): Promise<DocumentRecord>
   uploadAttachment(scope: DocumentScope, id: string, file: File): Promise<DocumentAttachment>
   replacePrimaryFile(scope: DocumentScope, id: string, file: File): Promise<DocumentPrimaryFile>
@@ -672,7 +672,7 @@ export const browserDocumentsClient: DocumentsClient = {
     return parse<{ results: DocumentRemoteObservation[]; count: number }>(await fetch(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations`, { credentials: 'same-origin', headers: { Accept: 'application/json' } }))
   },
   checkRemoteSource: (scope, id) => mutate<DocumentRemoteObservation>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations`, 'POST'),
-  applyRemoteObservation: (scope, id, observationId) => mutate<DocumentRemoteObservation>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations/${encodeURIComponent(observationId)}/apply`, 'POST'),
+  applyRemoteObservation: (scope, id, observationId, reviewFingerprint) => mutate<DocumentRemoteObservation>(`${collectionPath(scope)}/${encodeURIComponent(id)}/remote-source/observations/${encodeURIComponent(observationId)}/apply`, 'POST', reviewFingerprint ? { review_fingerprint: reviewFingerprint } : undefined),
   async importMarkdown(scope, file, title, category, isTemplate) {
     const form = new FormData()
     form.set('file', file)

@@ -244,10 +244,22 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         diagram_legacy = diagram_retained_state(installation.owner)
         promote_diagram_fixture(installation.owner)
 
+        from apps.core.tests.monitored_source_fixture import (
+            monitored_source_browser_state,
+            monitored_source_retained_state,
+            promote_monitored_source_fixture,
+            seed_monitored_source_fixture,
+        )
+
+        seed_monitored_source_fixture(installation.owner)
+        monitored_source_legacy = monitored_source_retained_state(installation.owner)
+        promote_monitored_source_fixture(installation.owner)
+
         prepared_state = {
             "addressed": addressed_fixture.browser,
             "content_keys": content_key_browser_state(installation.owner),
             "diagrams": diagram_browser_state(installation.owner),
+            "monitored": monitored_source_browser_state(installation.owner),
             "template": template_fixture.browser,
             "document_id": str(document.entity_id),
             "content_id": str(document.id),
@@ -347,3 +359,6 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.diagram_fixture import verify_diagram_browser_fixture
 
         verify_diagram_browser_fixture(installation.owner, diagram_legacy)
+        from apps.core.tests.monitored_source_fixture import verify_monitored_source_browser_fixture
+
+        verify_monitored_source_browser_fixture(installation.owner, monitored_source_legacy)

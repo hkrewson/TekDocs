@@ -1,7 +1,9 @@
 """API serializers for monitored document sources and observations."""
 
 from difflib import unified_diff
+from typing import Any, cast
 
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .document_source_models import DocumentRemoteObservation, DocumentSourceKind
@@ -39,6 +41,18 @@ class RemoteObservationSerializer(serializers.Serializer):
     fetched_at = serializers.DateTimeField()
     canonical_markdown = serializers.CharField()
     diff = serializers.SerializerMethodField()
+    apply_review = serializers.SerializerMethodField()
+
+    @extend_schema_field({"type": "object", "nullable": True, "properties": {
+        "fingerprint": {"type": "string"}, "blocker": {"type": "string"}, "diff": {"type": "string"},
+    }, "required": ["fingerprint", "blocker", "diff"]})
+    def get_apply_review(self, observation: DocumentRemoteObservation) -> dict[str, Any] | None:
+        from .document_source_git import preview_remote_observation
+
+        reviews = self.context.get("apply_reviews")
+        if reviews is not None:
+            return cast(dict[str, Any] | None, reviews.get(observation.id))
+        return preview_remote_observation(observation=observation)
 
     def get_diff(self, observation: DocumentRemoteObservation) -> str:
         source = observation.source
@@ -57,3 +71,7 @@ class RemoteObservationSerializer(serializers.Serializer):
 class RemoteObservationListSerializer(serializers.Serializer):
     results = RemoteObservationSerializer(many=True)
     count = serializers.IntegerField()
+
+
+class RemoteObservationApplySerializer(serializers.Serializer):
+    review_fingerprint = serializers.RegexField(r"^[0-9a-f]{64}$", required=False)

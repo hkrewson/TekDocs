@@ -8,9 +8,11 @@ environment_file="$work_directory/postgres-shard.env"
 project_name="tekdocs_postgres_${shard:-unknown}_$$"
 coverage_directory="$repository_root/artifacts/postgres-coverage/$shard"
 matrix_file="apps/core/tests/test_permission_idor_matrix.py"
+needs_diagram_renderer=false
+case "$shard" in core|diagram-migration) needs_diagram_renderer=true ;; esac
 
 shard_compose() {
-  if [ "$shard" = "diagram-migration" ]; then
+  if [ "$needs_diagram_renderer" = "true" ]; then
     set -- -f "$repository_root/tests/rehearsals/compose.diagram-migration.yml" "$@"
   fi
   docker compose --project-name "$project_name" --env-file "$environment_file" \
@@ -168,7 +170,7 @@ fi
 echo "Starting isolated PostgreSQL test shard: $shard"
 shard_compose build --quiet migrate
 shard_compose up -d db valkey mailpit --wait
-if [ "$shard" = "diagram-migration" ]; then
+if [ "$needs_diagram_renderer" = "true" ]; then
   shard_compose up -d --build --wait diagram-renderer
 fi
 shard_compose run --rm migrate

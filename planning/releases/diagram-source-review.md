@@ -83,3 +83,17 @@ opt-in skips), three additional cases, all 33 diagram cases, 781 frontend tests
 and four real-browser journeys with server-side retained-byte and rollback
 verification. Exact-source hosted validation remains pending; review alone does
 not establish independent encrypted restore or production acceptance.
+
+
+## Combined-core runner compatibility correction
+
+After the first source push, read-only review confirmed the supported monolithic
+`core` runner also selects the new real-render tests. Only the dedicated group
+had received the renderer setup. Read-only Compose rendering reproduced its
+missing job mount, matching the earlier actual unmounted-render timeout.
+One shared `needs_diagram_renderer` flag now supplies the same existing project
+mount and renderer startup to both `core` and `diagram-migration`. Test selection,
+assertions and pre-existing matrix behavior are unchanged. Both reviewers cleared the actual corrective delta with zero findings;
+exact-source CI must validate its new commit. Initial-source runs 41228633907,
+41228636478 and 41228638894 were intentionally cancelled as superseded, rather
+than being reported as failed tests or complete validation.

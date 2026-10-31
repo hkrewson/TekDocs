@@ -1077,6 +1077,18 @@
       "next_action": "Corrective source 6ce9519 passed complete Extended validation 41185528840; no follow-up diagnostic failure remained. Retain the original upstream failures and diagnostic cascade.",
       "fix_commit": null,
       "retest_run": "41185528840"
+    },
+    {
+      "run_id": "41189551693",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "job_id": "124504339007",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted documentation-only d8f75b4 run exceeded the existing 120-second publication journey budget while awaiting POST /from-template after clicking Create document. The field-key journey passed. The subsequent content-key source passed the complete three-journey local Docker acceptance and server custody checks; the original timeout has not reproduced locally.",
+      "cause": "unknown; the log identifies a document-creation response wait inside the existing template journey, not a demonstrated application or content-key cause. No selector, assertion, timeout or retry was weakened.",
+      "next_action": "Content-key runtime 781f1ad passed all three hosted real publication journeys and server-side retained-byte/authority verification in Build 41213064315. Preserve the original timeout as unknown; no demonstrated UI fix, timeout, selector, assertion or retry change is attributed to this successful retest. Investigate recurrence before 1.0.",
+      "fix_commit": null,
+      "retest_run": "41213064315"
     }
   ]
 }

@@ -7,7 +7,8 @@ authorized direct-main commit. No PR, version bump or production change is inclu
 The code-review skill's independent, read-only Standards and Spec reviews were
 repeated after runtime reproductions and corrections. Review does not substitute
 for runtime validation. Complete local/backend/browser validation subsequently
-passed; exact-source hosted gates remain pending.
+passed. Exact-source hosted gates subsequently passed at `781f1ad`; the
+slice record links the complete receipts.
 
 ## Standards
 
@@ -28,7 +29,8 @@ control-event fingerprints strengthen lifecycle verification.
 
 No additional documented-standard breach or actionable heuristic smell found.
 The subsequent 496-case backend regression and three browser journeys passed.
-Hosted upgrade and recovery remain pending and are not inferred from this review.
+Hosted upgrade and recovery subsequently passed at `781f1ad`; those results
+come from their independent receipts, not from this review.
 
 ## Spec
 
@@ -39,7 +41,8 @@ resolve current Git content with appropriate proof and timestamps. Legacy
 formats and repository-evidence refusal remain intact. Correction, withdrawal
 and control-event preservation are covered by the fixture.
 
-Subsequent complete local runtime validation passed; hosted validation remains pending.
+Subsequent complete local and exact-source hosted runtime validation passed;
+the slice record links the receipts.
 
 ## Reproductions and disposition
 

@@ -1123,7 +1123,9 @@ Prepare exact-Workspace nested dependency migration, collective handoff/rollback
 current Git reads and frozen STATIC v10 substitution proof, retaining signed
 publications, PDFs and managed-file versions. Both source-review axes passed,
 as did 496 combined Docker cases, 65 focused content cases and three real-browser
-journeys with server-side custody/rollback verification. Exact-source hosted
-fresh/upgraded migration and encrypted recovery remain pending. General
+journeys with server-side custody/rollback verification. Exact runtime `781f1ad`
+passed Build, CodeQL and Extended validation, including fifteen database groups,
+89% coverage, fresh/0.8.46 migration and independent encrypted recovery. The
+bounded slice is complete; its record links the receipts. General
 cross-Workspace reuse, diagrams, client delivery and final 1.0 acceptance remain
 separate. No release or production change is claimed.

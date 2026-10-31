@@ -24,8 +24,10 @@ to refuse content snapshots before creating evidence or retained files.
 
 All three local real-browser journeys and server-side custody/rollback checks
 passed, alongside 65 focused content cases and both source-review axes. The hosted
-fresh/0.8.46 and encrypted-recovery adapters exercise the same graph; their required
-complete exact-source results remain pending. The final combined local migration,
+fresh/0.8.46 migration and independent encrypted-recovery checks passed against
+runtime `781f1ad`, confirming the same graph, retained signed publications, PDFs
+and file versions. Build, CodeQL and Extended validation all passed; the slice
+record links their exact-source receipts. The final combined local migration,
 key, read and evidence regression passed all 496 cases.
 Local focused tests alone do not establish independent restore or production
 acceptance. General cross-Workspace reuse, diagrams and client delivery remain

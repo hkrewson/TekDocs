@@ -19,9 +19,15 @@ The maintainer explicitly included content-key block substitution in the
 [next #105/#106 continuation](../migrations/content-key-publication-migration.md).
 Implementation, both source-review axes, 65 focused Docker cases and all three
 real browser journeys with server-side custody/rollback verification have passed.
-The final combined Docker regression passed all 496 cases; exact-source hosted
-upgrade/recovery gates remain pending. [Development notes](content-key-migration-notes.md) describe the
-bounded behavior. No completion, release or production migration is claimed.
+The final combined Docker regression passed all 496 cases. Exact runtime source
+`781f1ad` passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/41213064315),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41213066706) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/41213068455),
+including all fifteen database groups, 89% backend coverage, three live publication
+journeys, fresh/0.8.46 migration and independent encrypted recovery. [Development notes](content-key-migration-notes.md) describe the
+bounded behavior and exact-source custody evidence. The bounded development
+slice is complete; version remains 0.9.16. No release or production migration
+is claimed. Evidence-only closeout commits make no new runtime claim.
 
 ## Field-key/entity development after 0.9.16
 

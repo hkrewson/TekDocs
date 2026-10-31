@@ -65,14 +65,21 @@ async function templateJourney(page: Page, state: State) {
   expect(await downloadPdf(page)).toBe(fixture.pin_original_pdf_sha256)
   await page.goto(`${path}?document=${fixture.documents.live}`)
   await page.getByRole('button', { name: 'Check template updates' }).click()
+  const detached = page.waitForResponse(response => /\/placements\/[^/]+\/detach$/.test(response.url()) && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Make Template procedure a local copy' }).click()
+  expect((await detached).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Make Template procedure a local copy' })).toHaveCount(0)
   await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
   await page.goto(path)
   await page.getByRole('button', { name: 'Templates from your MSP' }).click()
   await page.getByRole('button', { name: 'Use template' }).click()
   await page.getByLabel('Document title', { exact: true }).fill('Browser newly enrolled')
+  const created = page.waitForResponse(response => response.url().endsWith('/from-template') && response.request().method() === 'POST')
   await page.getByRole('button', { name: 'Create document', exact: true }).click()
+  const createdResponse = await created
+  expect(createdResponse.status()).toBe(201)
+  const createdDocument = await createdResponse.json() as { id: string }
+  await expect(page).toHaveURL(new RegExp(`[?&]document=${createdDocument.id}(?:&|$)`))
   await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
 }

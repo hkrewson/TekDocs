@@ -17,9 +17,9 @@ for shard in route-access route-methods route-session accounts migration-foundat
 done
 
 if [ ! -s "$coverage_directory/coverage.core" ]; then
-  for shard in core-a core-b core-c template-migration; do
+  for shard in core-a core-b core-c template-migration-a template-migration-b template-migration-c; do
     test -s "$coverage_directory/coverage.$shard" || {
-      echo "Missing coverage data for PostgreSQL shard: core or core-a/core-b/core-c/template-migration" >&2
+      echo "Missing coverage data for PostgreSQL shard: core or core-a/core-b/core-c/template-migration-a/template-migration-b/template-migration-c" >&2
       exit 1
     }
   done

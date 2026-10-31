@@ -469,3 +469,46 @@ after final lint corrections, frontend lint/typecheck passed, shell syntax and d
 hygiene passed. Standards and Spec re-review reported zero remaining findings.
 Hosted acceptance remains pending complete Build, CodeQL and Extended checks on
 the final corrective source; earlier successful jobs are supporting evidence.
+
+## Final browser acknowledgement follow-up
+
+Source `d450f11` passed the hosted template update after an HTTP 200 acknowledgement
+in **10513 ms**, then the local-copy button-removal check expired at five seconds.
+The original hosted detach cause remains unknown. Separate six-second successful
+detach and creation responses reproduced **six failures** across Chromium, Firefox
+and WebKit. These two steps now require HTTP 200 and HTTP 201 respectively before
+their existing five-second display assertions. Slow update, detach and creation
+are independent scenarios; permission denials, stale-review checks and content,
+responsive and accessibility assertions remain. No application behavior, retries
+or timeout settings changed. Standards and Spec re-review found no issues.
+
+The new slow-creation scenario then exposed a **reproduced interface defect** in
+Firefox: the created document body appeared while its navigation was blocked by
+the completed form's old busy guard. A URL assertion reproduced the resulting
+“Ready to leave” prompt. Template creation now synchronously releases only its
+successfully completed draft and busy state before handing the record to the
+parent. It does not bypass other navigation guards or discard failed drafts.
+All **15 browser scenarios passed** across three engines after this correction,
+including six-second delays for each write and the stronger created-document URL
+assertion. Documentation/navigation tests: **73 passed**.
+
+The dedicated hosted template shard also exhausted 30 minutes after 72/109 cases
+passed. It is now three required function partitions, keeping every parameter
+case. Actual Docker pytest collection proves **40 + 39 + 30 = 109 cases**, selected
+exactly once. Other core-file assignments, deadlines and the 80% aggregate
+coverage threshold are unchanged; all three coverage artifacts are mandatory.
+Black-box plan/coverage regressions failed before correction, then passed; all
+**126 script tests passed** (three existing skips). Standards and Spec re-review
+approved both the interface handoff and partition changes without findings.
+
+The final frontend rerun passed **776 tests / 127 files** with all global coverage
+thresholds, lint, type checks, production build and compressed bundle limits. A
+prior targeted invocation accidentally requested global coverage for only two
+files: its 73 assertions passed but aggregate coverage correctly failed; the
+complete run passed without changing thresholds. No probe logging is retained.
+
+Final rebuilt real-browser replay: **1 passed**, server custody verification
+passed, retained bytes and authority rollback/re-promotion passed; template apply
+acknowledgement was 3882 ms. The harness removed its generated sessions and test
+database. The superseded hosted run's encrypted recovery and foundation exercise
+passed individually; complete acceptance requires the next exact-source run.

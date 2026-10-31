@@ -983,9 +983,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted job 124424213142 collected 700 cases and was cancelled at the unchanged 30-minute deadline. Collection places the 109-case template file at cases 574\u2013682. Black-box shard-plan and missing-coverage tests reproduced the absent dedicated shard before correction.",
       "cause": "The core-b file partition exceeded its runtime budget; no assertion failure was reported before cancellation. Move template migration into its own mandatory coverage shard, retaining every other file assignment and the deadline.",
-      "next_action": "The correction is in the commit introducing this entry. Require exact-source Build, CodeQL and Extended validation, then record the fix commit and hosted retest.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "The correction was pushed as d450f11; retain exact-source hosted retest evidence. Build progressed past apply after HTTP 200 (10513 ms), then exposed the separate local-copy synchronization failure recorded below. Aggregate acceptance still requires a complete final-source receipt.",
+      "fix_commit": "d450f11d26ef5f94d91cb1c0cec0e10fe54d473c",
+      "retest_run": "41166989957"
     },
     {
       "run_id": "41162898296",
@@ -994,9 +994,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted apply-body assertion failed at five seconds; unchanged full local journey passed. A separate deterministic six-second successful apply acknowledgement reproduced the same assertion failure in all three browser engines. Awaiting HTTP 200 before the unchanged render assertion passed 21 browser cases and the full real journey, including server custody verification.",
       "cause": "unknown for the original hosted failure; an independently reproduced harness defect asserted updated content before the successful apply response. Synchronize on that response without retries or longer render timeout, and retain a value-free acknowledgement duration.",
-      "next_action": "The correction is in the commit introducing this entry. Require exact-source Build, CodeQL and Extended validation, then record the fix commit and hosted retest.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "The correction was pushed as d450f11; retain exact-source hosted retest evidence. Build progressed past apply after HTTP 200 (10513 ms), then exposed the separate local-copy synchronization failure recorded below. Aggregate acceptance still requires a complete final-source receipt.",
+      "fix_commit": "d450f11d26ef5f94d91cb1c0cec0e10fe54d473c",
+      "retest_run": "41166989957"
     },
     {
       "run_id": "41162898296",
@@ -1005,9 +1005,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Unchanged hosted rerun job 124431111216 failed at the same five-second template apply-body assertion. See attempt 1 for local unchanged pass and independently reproduced delayed-acknowledgement defect.",
       "cause": "unknown for the original hosted failure; response synchronization is supported by a separate deterministic reproduction, not an inferred diagnosis of runner timing.",
-      "next_action": "The correction is in the commit introducing this entry. Require exact-source Build, CodeQL and Extended validation, then record the fix commit and hosted retest.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "The correction was pushed as d450f11; retain exact-source hosted retest evidence. Build progressed past apply after HTTP 200 (10513 ms), then exposed the separate local-copy synchronization failure recorded below. Aggregate acceptance still requires a complete final-source receipt.",
+      "fix_commit": "d450f11d26ef5f94d91cb1c0cec0e10fe54d473c",
+      "retest_run": "41166989957"
     },
     {
       "run_id": "41162915805",
@@ -1016,7 +1016,29 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Encrypted restore and exact template cohort verification passed. The later existing foundation exercise rejected manifest sync inside plain transaction.atomic. Executing the actual fixture against the existing Docker service and separate test database reproduced the rejection; its coordinated transaction repair passed commits, injected interruption, recovery and manifest parity.",
       "cause": "The foundation fixture used an uncoordinated outer transaction around coordinated Git manifest work. Use the shared coordinator for the outer transaction; preserve interruption, recovery and parity assertions.",
-      "next_action": "The correction is in the commit introducing this entry. Require exact-source Build, CodeQL and Extended validation, then record the fix commit and hosted retest.",
+      "next_action": "The correction was pushed as d450f11; retain exact-source hosted retest evidence. Build progressed past apply after HTTP 200 (10513 ms), then exposed the separate local-copy synchronization failure recorded below. Aggregate acceptance still requires a complete final-source receipt.",
+      "fix_commit": "d450f11d26ef5f94d91cb1c0cec0e10fe54d473c",
+      "retest_run": "41166994240"
+    },
+    {
+      "run_id": "41166989957",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted job 124437991664 passed update after a 10513 ms HTTP 200 acknowledgement, then failed the five-second local-copy button-removal assertion. Independent successful six-second detach and creation delays reproduced six failures across Chromium, Firefox and WebKit before response synchronization.",
+      "cause": "unknown for the original hosted detach failure; independently reproduced synchronization defects asserted detach and creation results before their successful responses. Require HTTP 200 detach and HTTP 201 creation before unchanged five-second display checks.",
+      "next_action": "Require successful delayed-response regressions, full local browser/server verification, review, then final-source hosted Build, CodeQL and Extended validation.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41166989957",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (template-migration)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted job 124436667844 reached 72/109 successful cases (66%) after about 25 minutes of test execution and was cancelled at the unchanged 30-minute job limit. Actual Docker pytest collection confirms 109 cases. Black-box plan tests reproduced unsupported three-way partition names before correction.",
+      "cause": "The dedicated template migration file alone exceeds the existing coverage-instrumented job budget. Split whole test functions into three required partitions retaining every parametrized case; collection proves 40/39/30 cases and exact-once coverage. No assertion failure was reported before cancellation.",
+      "next_action": "Require all three final-source shards and aggregate coverage to pass; preserve the unchanged 30-minute deadline and 80% coverage threshold.",
       "fix_commit": null,
       "retest_run": null
     }

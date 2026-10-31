@@ -71,6 +71,28 @@ case "$shard" in
         "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
     fi
     ;;
+  template-migration-a|template-migration-b|template-migration-c)
+    case "$shard" in
+      template-migration-a) partition=0 ;;
+      template-migration-b) partition=1 ;;
+      template-migration-c) partition=2 ;;
+    esac
+    template_nodes=$(python3 - "$repository_root/backend/apps/core/tests/test_template_enrollment_migration.py" "$partition" <<'PARTITION'
+import ast
+import sys
+from pathlib import Path
+
+functions = [node.name for node in ast.parse(Path(sys.argv[1]).read_text()).body
+             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")]
+for index, name in enumerate(functions):
+    if index % 3 == int(sys.argv[2]):
+        print(f"apps/core/tests/test_template_enrollment_migration.py::{name}")
+PARTITION
+)
+    # Select whole functions so pytest retains every parametrized case.
+    # shellcheck disable=SC2086
+    set -- $template_nodes
+    ;;
   template-migration)
     set -- apps/core/tests/test_template_enrollment_migration.py
     ;;
@@ -107,7 +129,7 @@ case "$shard" in
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|template-migration|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac

@@ -10,7 +10,8 @@ version, image, production migration or Wiki publication is claimed.
   edits, file versions, signed publications and PDFs retain their meanings.
 - The template library shows current Git-backed section choices. Creation uses
   the reviewed source version; a changed or unavailable source requires another
-  review. Existing accounts and Workspace permissions still govern every action.
+  review. Successful creation opens the new document after releasing the completed
+  form, including after a slow response. Existing accounts and Workspace permissions still govern every action.
 - Enrolled documents offer template update checks and local copies of borrowed
   sections. Local edits remain conflicts for review. Pinned sections keep their
   selected text until an explicit update or local-copy action.

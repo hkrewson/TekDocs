@@ -31,6 +31,9 @@ The second attempt verified exact encrypted template recovery, then exposed a
 separate foundation-fixture transaction failure, a core-shard capacity limit and
 a template-apply browser synchronization defect. Reproductions and corrections
 are recorded in the slice; the original hosted apply timeout cause remains unknown.
+Subsequent validation added required template test partitions and stronger write/URL
+checks, which reproduced and fixed a completed-creation navigation-guard race.
+The final corrective source still requires its own complete hosted receipt.
 
 ## Shared-block development after 0.9.16
 

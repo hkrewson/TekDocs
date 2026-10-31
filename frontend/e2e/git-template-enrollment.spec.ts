@@ -8,7 +8,7 @@ const placement = crypto.randomUUID(), block = crypto.randomUUID()
 const endpoint = `/api/v1/workspaces/organizations/${organization}/documents`
 const location = `/workspaces/organizations/${organization}/documentation`
 
-async function setup(page: Page, baseURL: string, applyDelayMs = 0) {
+async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayMs = 0, createDelayMs = 0) {
   let created = false, applied = false, detached = false, sourceChanged = false, writes = 0, detaches = 0
   const record = () => ({
     id: document, content_id: content, title: 'Client enrollment guide', category: 'guide',
@@ -51,6 +51,7 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0) {
     }], count: 1, page: 1, page_size: 25, has_more: false } })
     if (url.pathname.endsWith('/from-template')) {
       expect((r.request().postDataJSON() as { expected_source_sha256: string }).expected_source_sha256).toBe('a'.repeat(64))
+      if (createDelayMs) await new Promise(resolve => setTimeout(resolve, createDelayMs))
       created = true
       return r.fulfill({ status: 201, json: record() })
     }
@@ -75,6 +76,7 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0) {
         expected_base: 'b'.repeat(40), expected_composition: 'c'.repeat(64), expected_applied_revision_id: revision,
       })
       if (detaches === 1) return r.fulfill({ status: 403, json: { detail: 'Template change denied.' } })
+      if (detachDelayMs) await new Promise(resolve => setTimeout(resolve, detachDelayMs))
       detached = true
       return r.fulfill({ json: record() })
     }
@@ -84,16 +86,19 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0) {
   return { writes: () => writes, detaches: () => detaches }
 }
 
-for (const [width, applyDelayMs] of [[320, 0], [1440, 0], [1440, 6000]] as const) {
-  test(`reviewed Git template creation, updates and detach at ${width}px${applyDelayMs ? ' with slow acknowledgement' : ''}`, async ({ page, baseURL }) => {
+for (const [width, applyDelayMs, detachDelayMs, createDelayMs] of [[320, 0, 0, 0], [1440, 0, 0, 0], [1440, 6000, 0, 0], [1440, 0, 6000, 0], [1440, 0, 0, 6000]] as const) {
+  test(`reviewed Git template creation, updates and detach at ${width}px${applyDelayMs ? ' with slow update acknowledgement' : ''}${detachDelayMs ? ' with slow local-copy acknowledgement' : ''}${createDelayMs ? ' with slow creation acknowledgement' : ''}`, async ({ page, baseURL }) => {
     await page.setViewportSize({ width, height: 900 })
-    const state = await setup(page, baseURL!, applyDelayMs)
+    const state = await setup(page, baseURL!, applyDelayMs, detachDelayMs, createDelayMs)
     await page.goto(location)
     await page.getByRole('button', { name: 'Templates from your MSP' }).click()
     await page.getByRole('button', { name: 'Use template' }).click()
     await expect(page.getByRole('heading', { name: 'Create from Approved Git template' })).toBeFocused()
     await page.getByLabel('Document title', { exact: true }).fill('Client enrollment guide')
+    const created = page.waitForResponse(response => response.url().endsWith('/from-template') && response.request().method() === 'POST')
     await page.getByRole('button', { name: 'Create document', exact: true }).click()
+    expect((await created).status()).toBe(201)
+    await expect(page).toHaveURL(new RegExp(`[?&]document=${document}(?:&|$)`))
     await expect(page.getByText('Local client introduction.')).toBeVisible()
     await page.getByRole('button', { name: 'Check template updates' }).click()
     await expect(page.getByRole('heading', { name: 'Template updates', exact: true })).toBeFocused()
@@ -114,7 +119,9 @@ for (const [width, applyDelayMs] of [[320, 0], [1440, 0], [1440, 6000]] as const
     await page.getByRole('button', { name: 'Make Shared procedure a local copy' }).click()
     await expect(page.getByRole('alert')).toContainText('Your account is not authorized to change documentation')
     expect(state.detaches()).toBe(1)
+    const detached = page.waitForResponse(response => /\/placements\/[^/]+\/detach$/.test(response.url()) && response.request().method() === 'POST')
     await page.getByRole('button', { name: 'Make Shared procedure a local copy' }).click()
+    expect((await detached).status()).toBe(200)
     await expect(page.getByRole('button', { name: 'Make Shared procedure a local copy' })).toHaveCount(0)
     await expect(page.getByText('Local client introduction.')).toBeVisible()
     expect(await page.evaluate(() => window.document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()

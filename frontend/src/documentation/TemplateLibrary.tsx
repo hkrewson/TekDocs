@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { CollectionPagination } from '../CollectionPagination'
 import { SanitizedMarkdown } from '../editor/SanitizedMarkdown'
 import { translate } from '../i18n/localization'
@@ -46,7 +47,10 @@ export function TemplateLibrary({ scope, workspaceName, client, onCreated, urlMa
       const document = draft.source.content_authority === 'repository'
         ? await client.instantiateTemplate(scope, draft.source.id, draft.title.trim(), draft.source.category, draft.rules, draft.source.definition_sha256 ?? undefined)
         : await client.instantiateTemplate(scope, draft.source.id, draft.title.trim(), draft.source.category, draft.rules)
-      setDraft(null); onCreated(document)
+      // Release this completed form's navigation guard before opening its document.
+      // The parent can change the route immediately after this callback.
+      flushSync(() => { setDraft(null); setBusy(false) })
+      onCreated(document)
     } catch { setError(translate('documentation.templateCreateFailed')) }
     finally { setBusy(false) }
   }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import tempfile
@@ -47,11 +48,36 @@ class PostgresShardPlanTests(unittest.TestCase):
             missing = combine()
             self.assertNotEqual(missing.returncode, 0)
             self.assertIn("template-migration", missing.stdout + missing.stderr)
-            (coverage / "coverage.template-migration").write_bytes(b"fixture")
+            for shard in ("template-migration-a", "template-migration-b", "template-migration-c"):
+                (coverage / f"coverage.{shard}").write_bytes(b"fixture")
             self.assertEqual(combine().returncode, 0)
-            (coverage / "coverage.template-migration").unlink()
+            for shard in ("template-migration-a", "template-migration-b", "template-migration-c"):
+                artifact = coverage / f"coverage.{shard}"
+                artifact.unlink()
+                self.assertNotEqual(combine().returncode, 0)
+                artifact.write_bytes(b"fixture")
+            for shard in ("template-migration-a", "template-migration-b", "template-migration-c"):
+                (coverage / f"coverage.{shard}").unlink()
             (coverage / "coverage.core").write_bytes(b"fixture")
             self.assertEqual(combine().returncode, 0)
+
+    def test_template_partitions_select_every_function_once(self) -> None:
+        source = "apps/core/tests/test_template_enrollment_migration.py"
+        tree = ast.parse((ROOT / "backend" / source).read_text())
+        expected = {
+            f"{source}::{node.name}" for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_")
+        }
+        selected: list[str] = []
+        with plan_environment() as environment:
+            for shard in ("template-migration-a", "template-migration-b", "template-migration-c"):
+                result = subprocess.run([str(RUNNER), shard], cwd=ROOT, check=True,
+                                        capture_output=True, text=True, env=environment)
+                nodes = [line for line in result.stdout.splitlines() if "::test_" in line]
+                self.assertTrue(nodes)
+                selected.extend(nodes)
+        self.assertEqual(set(selected), expected)
+        self.assertEqual(len(selected), len(expected))
 
     def test_diagram_unit_gate_overrides_inherited_production_settings(self) -> None:
         result = subprocess.run(
@@ -68,6 +94,7 @@ class PostgresShardPlanTests(unittest.TestCase):
             "route-access", "route-methods", "route-session", "accounts", "core",
             "core-a", "core-b", "core-c", "migration-foundation", "migration-isolation",
             "migration-guards", "runtime", "template-migration",
+            "template-migration-a", "template-migration-b", "template-migration-c",
         )
         with plan_environment() as environment:
             for shard in shards:
@@ -88,7 +115,7 @@ class PostgresShardPlanTests(unittest.TestCase):
 
         self.assertIn(
             "shard: [route-access, route-methods, route-session, accounts, "
-            "core-a, core-b, core-c, template-migration, migration-foundation, migration-isolation, "
+            "core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, migration-foundation, migration-isolation, "
             "migration-guards]",
             workflow,
         )

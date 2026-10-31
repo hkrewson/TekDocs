@@ -8,6 +8,9 @@ type DocumentKeysPanelProps = {
   bindingNameValid: boolean
   bindingQuery: string
   busy: boolean
+  readOnly?: boolean
+  phase?: 'idle' | 'loading' | 'ready' | 'error'
+  onRetry?: () => void
   keyBindings: DocumentKeyBinding[]
   keyReport: DocumentKeyReport | null
   mentionOptions: EntityMentionOption[]
@@ -28,6 +31,9 @@ export function DocumentKeysPanel({
   bindingNameValid,
   bindingQuery,
   busy,
+  readOnly = false,
+  phase = 'ready',
+  onRetry,
   keyBindings,
   keyReport,
   mentionOptions,
@@ -46,7 +52,11 @@ export function DocumentKeysPanel({
       <div><h2 id="document-keys-heading">{translate('documentation.keysPanel')}</h2></div>
       <button className="icon-button" type="button" aria-label={translate('documentation.closeKeys')} onClick={onClose}><X size={16} /></button>
     </div>
-    <div className="entity-mention-picker">
+    {(phase === 'loading' || phase === 'idle') && <p role="status">{translate('documentation.loadingKeys')}</p>}
+    {phase === 'error' && <div role="alert"><p>{translate('documentation.keysLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetry}>{translate('documentation.retryKeys')}</button></div>}
+    {phase === 'ready' && <>
+    {readOnly && <p>{translate('documentation.readOnlyBindings')}</p>}
+    {!readOnly && <div className="entity-mention-picker">
       <label>
         <span>{translate('documentation.declareBinding')}</span>
         <input type="text" value={bindingName} onChange={(event) => onBindingNameChange(event.target.value.toLowerCase())} placeholder="subject" aria-label={translate('documentation.declareBinding')} aria-describedby="binding-name-rule" aria-invalid={bindingName.length > 0 && !bindingNameValid} />
@@ -66,7 +76,7 @@ export function DocumentKeysPanel({
           </button>
         </li>
       })}</ul>}
-    </div>
+    </div>}
     {keyBindings.length > 0 && <div className="key-bindings" role="group" aria-label={translate('documentation.keyBindingsTable')}>
       <ul>{keyBindings.map((binding) => <li key={binding.id}>
         <span>
@@ -74,14 +84,14 @@ export function DocumentKeysPanel({
           <small>{binding.target_display_name} · {binding.target_entity_type.replaceAll('_', ' ')}</small>
           {binding.also_bound_by.length > 0 && <small className="key-where-used">{translate('documentation.alsoUsedBy')}: {binding.also_bound_by.map((item) => item.title).join(', ')}</small>}
         </span>
-        <div>
+        {readOnly ? <ul>{binding.addressable_fields.map((path) => <li key={path}><code>{binding.name}.{path}</code></li>)}</ul> : <div>
           <label className="sr-only" htmlFor={`key-field-${binding.id}`}>{binding.name}</label>
           <select id={`key-field-${binding.id}`} defaultValue="" onChange={(event) => { if (event.target.value) { onInsertKey(binding, event.target.value); event.target.value = '' } }}>
             <option value="">{translate('documentation.insertKey')}</option>
             {binding.addressable_fields.map((path) => <option key={path} value={path}>{path}</option>)}
           </select>
           <button className="icon-button" type="button" aria-label={`${translate('documentation.retireBinding')} ${binding.name}`} disabled={busy} onClick={() => onRetireBinding(binding.id)}><Trash2 size={15} /></button>
-        </div>
+        </div>}
       </li>)}</ul>
     </div>}
     {keyReport && keyReport.count > 0 && <div className="key-report" role="group" aria-label={translate('documentation.keyReportTable')}>
@@ -96,5 +106,6 @@ export function DocumentKeysPanel({
         <span><strong>{match.target_display_name}</strong><small>{match.document_title} · {match.name}</small></span>
       </li>)}</ul>}
     </div>
+    </>}
   </section>
 }

@@ -422,3 +422,39 @@ def test_organization_sync_removes_msp_directory_from_its_repository(manifest_te
 
     with pytest.raises(RepositoryFileNotFoundError):
         _content(repository, repository_manifests.ORGANIZATION_DIRECTORY_PATH)
+
+
+@pytest.mark.parametrize("current", [True, False])
+@pytest.mark.parametrize("client", [True, False])
+def test_manifest_changes_preserve_only_a_current_content_index(manifest_tenant, current, client):
+    from apps.core.content_index import index_repository_content
+
+    tenant, first, _, _ = manifest_tenant
+    repository = WorkspaceRepository.objects.get(
+        workspace=first.ownership_workspace if client else Workspace.objects.get(tenant=tenant, kind=WorkspaceKind.MSP)
+    )
+    repository_manifests.synchronize_workspace_manifests(repository.id)
+    index_repository_content(repository_id=repository.id)
+    repository.refresh_from_db()
+    indexed = repository.indexed_commit_id
+    if not current:
+        commit_repository_files(
+            repository_id=repository.id, expected_base=repository.accepted_commit.object_id,
+            changes={"unindexed.txt": b"Unreviewed repository change.\n"}, message="Leave an unindexed change",
+        )
+    # A metadata change must not make an otherwise healthy reader unavailable,
+    # or silently accept unrelated pending content.
+    tenant.name = "Renamed manifest MSP"
+    tenant.save(update_fields=["name"])
+    if client:
+        first.entity.display_name = "Renamed manifest client"
+        first.entity.save(update_fields=["display_name"])
+    result = repository_manifests.synchronize_workspace_manifests(repository.id)
+    repository.refresh_from_db()
+    assert result.created
+    if current:
+        assert repository.indexed_commit_id == repository.accepted_commit_id
+        assert repository.indexed_commit_id != indexed
+    else:
+        assert repository.indexed_commit_id == indexed
+        assert repository.indexed_commit_id != repository.accepted_commit_id

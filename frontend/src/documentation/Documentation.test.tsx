@@ -1001,6 +1001,42 @@ it('inserts a content key on its own Markdown line', async () => {
     .toBe('# Firewall\n\n<tekdocs://key/procedure.content>\n')
 })
 
+it('shows retained bindings and current key reports on a promoted document without configuration writes', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, declareKeyBinding, archiveKeyBinding } = clients()
+  documents.list = vi.fn().mockResolvedValue({
+    results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1,
+  })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+  expect(await screen.findByRole('heading', { name: 'Resolved keys' })).toBeVisible()
+  expect(within(screen.getByRole('group', { name: 'Declared key bindings' })).getByText('Edge firewall · client asset')).toBeVisible()
+  expect(within(screen.getByRole('group', { name: 'Keys used in this document' })).getByText('subject.serial_number')).toBeVisible()
+  expect(screen.queryByRole('textbox', { name: 'Declare' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Retire subject' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('combobox', { name: 'subject' })).not.toBeInTheDocument()
+  expect(declareKeyBinding).not.toHaveBeenCalled()
+  expect(archiveKeyBinding).not.toHaveBeenCalled()
+})
+
+it('retries a failed current key report while keeping the promoted document readable', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, listDocumentKeys } = clients()
+  documents.list = vi.fn().mockResolvedValue({
+    results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1,
+  })
+  listDocumentKeys.mockRejectedValueOnce(new Error('Current key report unavailable'))
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(await screen.findByRole('button', { name: /^Keys/ }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Keys could not be loaded')
+  expect(screen.getByRole('heading', { name: 'Canonical Git content' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Retry keys' }))
+  expect(await screen.findByRole('group', { name: 'Keys used in this document' })).toHaveTextContent('subject.serial_number')
+  expect(screen.queryByRole('button', { name: 'Retry keys' })).not.toBeInTheDocument()
+})
+
 it('answers a binding name the server would refuse before the request is made', async () => {
   const user = userEvent.setup()
   const { documents, workspaces, declareKeyBinding, searchMentionEntities } = clients()

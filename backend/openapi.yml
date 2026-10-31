@@ -1979,7 +1979,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Binding name already declared
+          description: Binding name already declared or configuration is read-only
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -2020,6 +2020,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Binding configuration is read-only
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/documents/{document_entity_id}/keys:
     get:
       operationId: document_keys_msp_list
@@ -21790,7 +21802,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Binding name already declared
+          description: Binding name already declared or configuration is read-only
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -21837,6 +21849,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Binding configuration is read-only
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/documents/{document_entity_id}/keys:
     get:
       operationId: document_keys_organization_list

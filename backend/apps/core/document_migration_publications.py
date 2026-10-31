@@ -94,7 +94,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v4",
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
-                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
             }
             or publication.audience != "msp_internal"
             or sum(item.kind == "pdf" for item in artifacts) != 1
@@ -148,7 +148,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
         try:
             if manifest.get("format") in {
                 "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
-                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+                "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
             }:
                 from .document_git_publications import verify_internal_git_publication
 
@@ -202,10 +202,13 @@ def publication_migration_evidence(
     The fingerprint binds a preview to retained history; it is neither permission
     to change authority nor a substitute for rechecking custody at execution.
     """
+    from .document_keys import key_targets_in_markdown
     from .document_migration_export import build_simple_document_export
     from .document_template_migration import TemplateMigrationError, template_enrollment_fingerprint
     from .documents import resolve_document
-    from .models import DocumentAttachment
+    from .models import DocumentAttachment, Entity
+    from .relationships import ENTITY_TYPE_VIEW_PERMISSION
+    from .rendering import entity_ids_in_markdown
     from .repository_publication_preflight import repository_publication_preflight
 
     report = (
@@ -220,16 +223,26 @@ def publication_migration_evidence(
         return None
     try:
         template_enrollment_fingerprint(document)
-        exported = build_simple_document_export(
+        build_simple_document_export(
             document, allow_repository_divergence=True, verify_attachments=True
         )
+        markdown = resolve_document(document).markdown
+        entity_ids = entity_ids_in_markdown(markdown)
+        if set(Entity.objects.filter(
+            id__in=entity_ids, tenant_id=workspace.tenant_id, workspace=workspace,
+            archived_at__isnull=True, entity_type__in=ENTITY_TYPE_VIEW_PERMISSION,
+        ).values_list("id", flat=True)) != entity_ids:
+            return None
+        # Import retains expressions and identities, not an audience resolution.
+        # The export above verifies portable field bindings; the actual publisher
+        # must separately authorize and freeze these dependencies for its actor.
         if (
-            exported.key_binding_ids
-            or exported.resolved_entity_links
-            or repository_publication_preflight(
-                markdown=resolve_document(document).markdown,
+            repository_publication_preflight(
+                markdown=markdown,
                 audience="msp_internal",
                 topic_type=document.topic_type,
+                frozen_entity_ids=entity_ids,
+                frozen_key_targets=set(key_targets_in_markdown(markdown)),
                 frozen_attachment_ids=set(
                     DocumentAttachment.objects.filter(document=document, archived_at__isnull=True)
                     .values_list("entity_id", flat=True)

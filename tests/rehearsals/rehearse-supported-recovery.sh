@@ -106,6 +106,13 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 template_cohort_sha=$(sed -n 's/^TEMPLATE_COHORT_SHA256=//p' "$template_cohort_log")
 printf '%s\n' "$template_cohort_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Enrolled template encrypted-recovery fixture created/p' "$template_cohort_log"
+addressed_recovery_log="$work_directory/addressed-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_KEY_ENTITY_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/key_entity_fixture.py" > "$addressed_recovery_log"
+addressed_recovery_sha=$(sed -n 's/^ADDRESSED_RECOVERY_SHA256=//p' "$addressed_recovery_log")
+printf '%s\n' "$addressed_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Addressed Git, bindings, file versions, signatures and PDFs verified/p' "$addressed_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -352,6 +359,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_TEMPLATE_RECOVERY_MODE=verify -e TEKDOCS_TEMPLATE_RECOVERY_SHA256="$template_cohort_sha" \
   migrate manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/template-cohort-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_KEY_ENTITY_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_ADDRESSED_RECOVERY_SHA256="$addressed_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/key_entity_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

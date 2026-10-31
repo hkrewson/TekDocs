@@ -13,6 +13,16 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Field-key/entity development after 0.9.16
+
+The [addressed-document slice](../migrations/key-entity-publication-migration.md)
+extends the internal migration path to exact-Workspace portable field keys and
+typed record links. [Development notes](key-entity-migration-notes.md) describe
+current values, frozen snapshots and readable bindings. Implementation, source review and local Docker/browser validation are complete. No new runtime source has complete
+hosted receipts yet; the preceding template receipts do not validate this slice.
+ADR 0117 records the proposed custody boundary. No release, deployment or live
+production migration is claimed.
+
 ## Template enrollment development after 0.9.16
 
 The [template enrollment slice](../migrations/template-enrollment-migration.md)

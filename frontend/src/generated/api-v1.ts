@@ -18877,7 +18877,7 @@ export interface operations {
                     readonly "application/json": components["schemas"]["KeyBindingResult"];
                 };
             };
-            /** @description Binding name already declared */
+            /** @description Binding name already declared or configuration is read-only */
             readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
@@ -18910,6 +18910,17 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Binding configuration is read-only */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };
@@ -33209,7 +33220,7 @@ export interface operations {
                     readonly "application/json": components["schemas"]["KeyBindingResult"];
                 };
             };
-            /** @description Binding name already declared */
+            /** @description Binding name already declared or configuration is read-only */
             readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
@@ -33243,6 +33254,17 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Binding configuration is read-only */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
             };
         };
     };

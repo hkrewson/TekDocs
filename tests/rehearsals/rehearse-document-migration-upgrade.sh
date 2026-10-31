@@ -55,6 +55,19 @@ cleanup() {
   [ -n "$work_directory" ] && [ -d "$work_directory" ] && rm -rf "$work_directory"
   exit "$status"
 }
+run_addressed_fixture() {
+  addressed_project=$1
+  addressed_environment=$2
+  addressed_directory=$3
+  addressed_mode=$4
+  addressed_legacy_sha=${5:-}
+  compose_for "$addressed_project" "$addressed_environment" "$addressed_directory" run --rm -T \
+    -e TEKDOCS_KEY_ENTITY_FIXTURE_MODE="$addressed_mode" \
+    -e TEKDOCS_ADDRESSED_LEGACY_SHA256="$addressed_legacy_sha" \
+    migrate python manage.py shell --no-imports \
+    < "$repository_root/backend/apps/core/tests/key_entity_fixture.py"
+}
+
 #=========================# MAIN #==========================#
 trap cleanup EXIT HUP INT TERM
 
@@ -80,6 +93,9 @@ echo "Creating legacy documents on isolated TekDocs 0.8.46"
 compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" build migrate
 compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" run --rm -T migrate
 run_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" create > "$work_directory/baseline-ids.json"
+run_addressed_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/addressed-legacy.log"
+addressed_upgrade_sha=$(sed -n 's/^ADDRESSED_LEGACY_SHA256=//p' "$work_directory/addressed-legacy.log")
+printf '%s\n' "$addressed_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 compose_for "$upgrade_project" "$upgrade_environment" "$baseline_directory" down --remove-orphans
 
 echo "Upgrading the preserved database and proving stable legacy identities"
@@ -90,15 +106,20 @@ cmp "$work_directory/baseline-ids.json" "$work_directory/upgraded-ids.json"
 compose_for "$upgrade_project" "$upgrade_environment" "$repository_root" run --rm -T migrate \
   python manage.py initialize_workspace_repositories >/dev/null
 run_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" exercise > "$work_directory/upgraded-result.json"
+run_addressed_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$addressed_upgrade_sha"
 
 echo "Running the identical migration workflow on a fresh installation"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" up -d --build --wait backend
 run_fixture "$fresh_project" "$fresh_environment" "$repository_root" create > "$work_directory/fresh-ids.json"
+run_addressed_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/addressed-fresh.log"
+addressed_fresh_sha=$(sed -n 's/^ADDRESSED_LEGACY_SHA256=//p' "$work_directory/addressed-fresh.log")
+printf '%s\n' "$addressed_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 run_fixture "$fresh_project" "$fresh_environment" "$repository_root" identity > "$work_directory/fresh-verified-ids.json"
 cmp "$work_directory/fresh-ids.json" "$work_directory/fresh-verified-ids.json"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" run --rm -T migrate \
   python manage.py initialize_workspace_repositories >/dev/null
 run_fixture "$fresh_project" "$fresh_environment" "$repository_root" exercise > "$work_directory/fresh-result.json"
+run_addressed_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$addressed_fresh_sha"
 cmp "$work_directory/upgraded-result.json" "$work_directory/fresh-result.json"
 
 echo "Document migration fresh/0.8.46 upgrade acceptance passed"

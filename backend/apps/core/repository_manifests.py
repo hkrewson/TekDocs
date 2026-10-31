@@ -417,13 +417,26 @@ def synchronize_workspace_manifests(repository_id: uuid.UUID) -> RepositoryCommi
                 changes[ORGANIZATION_DIRECTORY_PATH] = None
             accepted_commit = repository.accepted_commit
             expected_base = accepted_commit.object_id if accepted_commit is not None else None
+            was_indexed = accepted_commit is not None and repository.indexed_commit_id == accepted_commit.id
             try:
-                return commit_repository_files(
+                result = commit_repository_files(
                     repository_id=repository.id,
                     expected_base=expected_base,
                     changes=changes,
                     message=MANIFEST_COMMIT_MESSAGE,
                 )
+                if result.created and was_indexed:
+                    from .content_index import index_repository_content
+
+                    content_scope = DataScope.owner(repository.tenant, repository.workspace.organization)
+                    mode = (
+                        OrganizationRLSMode.ORGANIZATION
+                        if content_scope.organization_id is not None
+                        else OrganizationRLSMode.MSP_ONLY
+                    )
+                    with system_rls_scope_if_postgresql(content_scope, organization_mode=mode):
+                        index_repository_content(repository_id=repository.id)
+                return result
             except RepositoryConflictError as exc:
                 conflict = exc
     raise RepositoryConflictError("Repository manifests changed concurrently") from conflict

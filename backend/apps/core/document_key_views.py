@@ -27,7 +27,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey, entity_visible_to_audience
+from apps.accounts.policy import DataAudience, PermissionKey, entity_visible_to_audience
 
 from .document_key_fields import ADDRESSABLE_ENTITY_TYPES
 from .document_key_models import DocumentKeyBinding
@@ -59,9 +59,9 @@ from .document_key_serializers import (
 from .document_key_serializers import (
     WorkspaceKeyBindingSerializer as WorkspaceKeyBindingSerializer,
 )
-from .document_views import _document, _msp_workspace, _organization_workspace
+from .document_views import _document, _legacy_content_unavailable, _msp_workspace, _organization_workspace
 from .documents import documents_for_scope, resolve_document
-from .models import AuditEvent, Entity, workspace_for_owner
+from .models import AuditEvent, Document, Entity, workspace_for_owner
 from .workspaces import ResolvedWorkspace
 
 #: Bound on related documents reported per record, so one heavily reused asset
@@ -106,6 +106,7 @@ def _also_bound_by(bindings: Sequence[DocumentKeyBinding]) -> dict[UUID, list[di
     return usage
 
 
+@transaction.atomic
 def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
     document, records = _live_bindings(workspace, document_entity_id)
     if request.method != "POST":
@@ -119,6 +120,9 @@ def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: R
             }
         )
 
+    Document.objects.select_for_update().get(pk=document.pk)
+    if _legacy_content_unavailable(document):
+        return _read_only_binding_response()
     serializer = KeyBindingWriteSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     target = get_object_or_404(
@@ -171,8 +175,19 @@ def _bindings(workspace: ResolvedWorkspace, document_entity_id: UUID, request: R
     return Response(KeyBindingResultSerializer(binding).data, status=201)
 
 
+def _read_only_binding_response() -> Response:
+    return Response(
+        {"code": "repository_binding_read_only", "detail": "This document's binding configuration is read-only."},
+        status=409,
+    )
+
+
+@transaction.atomic
 def _archive_binding(workspace: ResolvedWorkspace, document_entity_id: UUID, binding_id: UUID, request: Request):  # type: ignore[no-untyped-def]
-    _document_record, records = _live_bindings(workspace, document_entity_id)
+    document, records = _live_bindings(workspace, document_entity_id)
+    Document.objects.select_for_update().get(pk=document.pk)
+    if _legacy_content_unavailable(document):
+        return _read_only_binding_response()
     binding = get_object_or_404(records, id=binding_id)
     with transaction.atomic():
         binding.archived_at = timezone.now()
@@ -191,7 +206,15 @@ def _archive_binding(workspace: ResolvedWorkspace, document_entity_id: UUID, bin
 
 def _key_report(workspace: ResolvedWorkspace, document_entity_id: UUID) -> Response:
     document = _document(workspace, document_entity_id)
-    markdown = resolve_document(document).markdown
+    if _legacy_content_unavailable(document):
+        from .content_read import document_detail
+
+        markdown = document_detail(
+            workspace=workspace, content_id=document.id,
+            audience="client_visible" if audience_for(workspace.member) == DataAudience.CLIENT_PORTAL else "all",
+        )["markdown"]
+    else:
+        markdown = resolve_document(document).markdown
     resolutions = resolve_markdown_keys(
         markdown,
         context=workspace.member,
@@ -223,14 +246,18 @@ class MSPDocumentKeyBindingListCreateView(APIView):
     @extend_schema(
         operation_id="document_key_bindings_msp_create",
         request=KeyBindingWriteSerializer,
-        responses={201: KeyBindingResultSerializer, 409: OpenApiResponse(description="Binding name already declared")},
+        responses={201: KeyBindingResultSerializer,
+                   409: OpenApiResponse(description="Binding name already declared or configuration is read-only")},
     )
     def post(self, request: Request, document_entity_id: UUID) -> Response:
         return _bindings(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, request)
 
 
 class MSPDocumentKeyBindingDetailView(APIView):
-    @extend_schema(operation_id="document_key_bindings_msp_archive", request=None, responses={204: None})
+    @extend_schema(
+        operation_id="document_key_bindings_msp_archive", request=None,
+        responses={204: None, 409: OpenApiResponse(description="Binding configuration is read-only")},
+    )
     def delete(self, request: Request, document_entity_id: UUID, binding_id: UUID) -> Response:
         return _archive_binding(
             _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), document_entity_id, binding_id, request
@@ -255,7 +282,8 @@ class OrganizationDocumentKeyBindingListCreateView(APIView):
     @extend_schema(
         operation_id="document_key_bindings_organization_create",
         request=KeyBindingWriteSerializer,
-        responses={201: KeyBindingResultSerializer, 409: OpenApiResponse(description="Binding name already declared")},
+        responses={201: KeyBindingResultSerializer,
+                   409: OpenApiResponse(description="Binding name already declared or configuration is read-only")},
     )
     def post(self, request: Request, organization_entity_id: UUID, document_entity_id: UUID) -> Response:
         return _bindings(
@@ -266,7 +294,10 @@ class OrganizationDocumentKeyBindingListCreateView(APIView):
 
 
 class OrganizationDocumentKeyBindingDetailView(APIView):
-    @extend_schema(operation_id="document_key_bindings_organization_archive", request=None, responses={204: None})
+    @extend_schema(
+        operation_id="document_key_bindings_organization_archive", request=None,
+        responses={204: None, 409: OpenApiResponse(description="Binding configuration is read-only")},
+    )
     def delete(
         self, request: Request, organization_entity_id: UUID, document_entity_id: UUID, binding_id: UUID
     ) -> Response:

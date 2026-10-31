@@ -25,27 +25,21 @@ from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import User
 from apps.accounts.policy import (
-    DataAudience,
     InstallationMemberContext,
     PermissionKey,
-    entity_visible_to_audience,
     require_permission,
 )
 
 from .content_index_models import ContentNode, ContentNodeKind
 from .content_publication_sources import pinned_git_document_dependencies
 from .document_attachments import copy_attachment_content
-from .document_key_freeze import KeyFreezeConflict, freeze_document_keys, verify_frozen_field_keys
-from .document_key_models import DocumentKeyBinding
+from .document_key_freeze import verify_frozen_field_keys
 from .document_keys import key_targets_in_markdown
-from .document_migration_keys import DocumentMigrationKeyError, portable_document_keys
-from .entity_mentions import resolve_entity_mentions
 from .models import (
     AuditEvent,
     Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
-    Entity,
     PublicationAudience,
     RepositoryEvidenceAttachment,
     RepositoryPublicationEvidence,
@@ -65,6 +59,11 @@ from .repository_primary_publication import (
     RepositoryPrimaryPublicationError,
     prepare_repository_primary_publication,
 )
+from .repository_publication_dependencies import (
+    RepositoryPublicationDependencyError,
+)
+from .repository_publication_dependencies import freeze_repository_entity_cards as _frozen_entity_cards
+from .repository_publication_dependencies import freeze_repository_key_snapshot as _frozen_key_snapshot
 from .repository_publication_preflight import PREFLIGHT_FORMAT, repository_publication_preflight
 from .repository_publication_render import (
     MAX_RENDERED_PDF_BYTES,
@@ -76,72 +75,11 @@ from .repository_publication_render import (
     verify_retained_rendered_snapshot,
 )
 from .topic_schemas import SCHEMAS
-from .workspaces import resolve_msp_workspace, resolve_organization_workspace
+
+RepositoryPublicationEvidenceError = RepositoryPublicationDependencyError
 
 EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v1"
 PRIMARY_EVIDENCE_FORMAT = "tekdocs-repository-publication-evidence/v2"
-
-
-class RepositoryPublicationEvidenceError(RuntimeError):
-    """A repository source cannot be retained as signed evidence."""
-
-
-def _frozen_entity_cards(
-    *,
-    repository: WorkspaceRepository,
-    markdown: str,
-    audience: str,
-    actor: User,
-    member: InstallationMemberContext,
-) -> list[dict[str, str]]:
-    """Freeze only permission-visible, exact-Workspace entity display cards."""
-
-    requested = entity_ids_in_markdown(markdown)
-    if not requested:
-        return []
-    if len(requested) > 200:
-        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.entity.limit")
-    organization = repository.workspace.organization
-    workspace = (
-        resolve_organization_workspace(actor, entity_id=organization.entity_id)
-        if organization is not None
-        else resolve_msp_workspace(actor)
-    )
-    projections = resolve_entity_mentions(workspace=workspace, markdown=markdown, lock=True)
-    if set(projections) != {str(entity_id) for entity_id in requested}:
-        raise RepositoryPublicationEvidenceError(
-            "Repository publication preflight blocked: repository.entity.unavailable"
-        )
-    records = {
-        entity.id: entity
-        for entity in Entity.objects.filter(
-            id__in=requested,
-            tenant_id=repository.tenant_id,
-            workspace_id=repository.workspace_id,
-            organization=organization,
-            archived_at__isnull=True,
-        )
-    }
-    data_audience = (
-        DataAudience.CLIENT_PORTAL if audience == PublicationAudience.CLIENT_VISIBLE else DataAudience.MSP_STAFF
-    )
-    if len(records) != len(requested) or any(
-        not entity_visible_to_audience(member, records[entity_id], audience=data_audience, organization=organization)
-        for entity_id in requested
-        if entity_id in records
-    ):
-        raise RepositoryPublicationEvidenceError(
-            "Repository publication preflight blocked: repository.entity.unavailable"
-        )
-    return [
-        {
-            "id": projections[str(entity_id)]["id"],
-            "display_name": projections[str(entity_id)]["display_name"],
-            "entity_type": projections[str(entity_id)]["entity_type"],
-            "workspace_label": projections[str(entity_id)]["workspace_label"],
-        }
-        for entity_id in sorted(requested)
-    ]
 
 
 def evidence_payload(*, manifest: dict[str, Any], markdown: str) -> bytes:
@@ -153,56 +91,6 @@ def evidence_payload(*, manifest: dict[str, Any], markdown: str) -> bytes:
         payload.extend(len(content).to_bytes(8, "big"))
         payload.extend(content)
     return bytes(payload)
-
-
-def _frozen_key_snapshot(
-    *, repository: WorkspaceRepository, node: ContentNode, document: Document | None,
-    markdown: str, audience: str, actor: User, signed_at: str,
-) -> dict[str, Any] | None:
-    """Freeze only portable field keys whose authored bindings match the live owner."""
-    if not key_targets_in_markdown(markdown):
-        return None
-    if document is None:
-        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.unavailable")
-    # Hold active binding identities stable through portable parity and resolution.
-    list(DocumentKeyBinding.objects.select_for_update().filter(document=document, archived_at__isnull=True))
-    try:
-        bindings, _identities = portable_document_keys(document, markdown)
-        if bindings != node.frontmatter.get("key_bindings", {}):
-            raise RepositoryPublicationEvidenceError(
-                "Repository publication preflight blocked: repository.key.binding_mismatch"
-            )
-        organization = repository.workspace.organization
-        workspace = (
-            resolve_organization_workspace(actor, entity_id=organization.entity_id)
-            if organization is not None else resolve_msp_workspace(actor)
-        )
-        frozen = freeze_document_keys(
-            workspace=workspace,
-            document=document,
-            markdown=markdown,
-            audience=(
-                DataAudience.CLIENT_PORTAL
-                if audience == PublicationAudience.CLIENT_VISIBLE
-                else DataAudience.MSP_STAFF
-            ),
-            resolved_at=signed_at,
-            lock=True,
-        )
-    except (DocumentMigrationKeyError, KeyFreezeConflict) as exc:
-        raise RepositoryPublicationEvidenceError(
-            "Repository publication preflight blocked: repository.key.unavailable"
-        ) from exc
-    if len(frozen.markdown.encode("utf-8")) > MAX_PUBLICATION_MARKDOWN_BYTES:
-        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.limit")
-    snapshot = {
-        "markdown": frozen.markdown,
-        "sha256": hashlib.sha256(frozen.markdown.encode("utf-8")).hexdigest(),
-        "records": list(frozen.manifest_records),
-    }
-    if not verify_frozen_field_keys(markdown, snapshot):
-        raise RepositoryPublicationEvidenceError("Repository publication preflight blocked: repository.key.unavailable")
-    return snapshot
 
 
 def retain_repository_publication_evidence(
@@ -233,7 +121,6 @@ def retain_repository_publication_evidence(
         for storage, name in stored_files:
             storage.delete(name)
         raise
-
 
 def _retain_pinned_evidence(
     *,
@@ -502,7 +389,6 @@ def _retain_pinned_evidence(
         )
         return evidence
 
-
 def _primary_evidence_valid(
     evidence: RepositoryPublicationEvidence, artifacts: dict[str, RepositoryEvidenceAttachment]
 ) -> bool:
@@ -584,7 +470,6 @@ def _primary_evidence_valid(
         previous_id = source_id
         previous_record_id = str(record.id)
     return primary.get("selected_source_id") == previous_id
-
 
 def verify_repository_publication_evidence(
     evidence: RepositoryPublicationEvidence, *, compare_current_renderer: bool = False

@@ -1102,3 +1102,14 @@ checks. ADR 0116 records the enrollment-specific library boundary. General
 cross-Workspace reuse, key/entity-dependent sections, repeated Block occurrences,
 client delivery and final 1.0 acceptance remain separate. Version remains 0.9.16;
 production deployment and live-data migration require separate authorization.
+
+
+### Field-key/entity publication migration — October 31, 2026
+
+The bounded #105/#106 [addressed-document slice](migrations/key-entity-publication-migration.md)
+adds exact-Workspace field keys and typed record mentions, frozen STATIC v9
+publications, readable current-Git key reports and binding configuration guards.
+Validation and review remain pending. Existing signatures/PDFs and file versions
+must survive rollback and encrypted recovery. Content keys, foreign record
+references, diagrams, client delivery and final 1.0 acceptance remain separate.
+Version remains 0.9.16; no release or production migration is authorized here.

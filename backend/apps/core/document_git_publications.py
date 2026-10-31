@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import uuid
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
@@ -18,6 +19,8 @@ from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
+from .document_addressed_publications import ADDRESSED_GIT_STATIC_FORMAT, verify_addressed_publication_manifest
+from .document_keys import key_targets_in_markdown
 from .document_migration_shape import owned_placement_tree
 from .document_publication_files import (
     FILE_GIT_STATIC_FORMAT,
@@ -53,11 +56,31 @@ from .publications import (
     verify_publication,
     verify_retained_publication_custody,
 )
-from .rendering import RenderedAttachment, render_markdown, render_pdf
+from .rendering import RenderedAttachment, RenderedEntityMention, entity_ids_in_markdown, render_markdown, render_pdf
+from .repository_publication_dependencies import (
+    RepositoryPublicationDependencyError,
+    freeze_repository_entity_cards,
+    freeze_repository_key_snapshot,
+)
 from .repository_publication_preflight import repository_publication_preflight
 from .workspaces import ResolvedWorkspace
 
 GIT_STATIC_FORMAT = "tekdocs-static-publication/v5"
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedGitPublication:
+    node: ContentNode
+    authored_markdown: str
+    markdown: str
+    preflight: dict[str, Any]
+    files: tuple[PublicationFile, ...]
+    key_snapshot: dict[str, Any] | None
+    entities: tuple[RenderedEntityMention, ...]
+
+    @property
+    def addressed(self) -> bool:
+        return self.key_snapshot is not None or bool(self.entities)
 
 
 def verify_git_publication_source(publication: DocumentPublication) -> bool:
@@ -66,11 +89,16 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         manifest = publication.manifest
         source = manifest["git_source"]
         sources = source["sources"]
-        shared = manifest["format"] in {SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT}
+        addressed = manifest["format"] == ADDRESSED_GIT_STATIC_FORMAT
+        shared = addressed or manifest["format"] in {SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT}
         return bool(
             manifest["format"] in {
                 GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT, SHARED_GIT_STATIC_FORMAT, TEMPLATE_GIT_STATIC_FORMAT,
+                ADDRESSED_GIT_STATIC_FORMAT,
             }
+            and (not addressed or verify_addressed_publication_manifest(
+                manifest, publication.document_id, publication.canonical_markdown,
+            ))
             and (manifest["format"] != TEMPLATE_GIT_STATIC_FORMAT
                  or verify_template_publication_manifest(manifest, publication.document_id))
             and (manifest["format"] != SHARED_GIT_STATIC_FORMAT
@@ -81,13 +109,16 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             )
             and publication.audience == manifest["audience"] == "msp_internal"
             and manifest["source_document_id"] == str(publication.document.entity_id)
-            and source["format"] == ("tekdocs.git-dependencies/v2"
-                                      if manifest["format"] == TEMPLATE_GIT_STATIC_FORMAT
-                                      else "tekdocs.git-dependencies/v1")
+            and (addressed or source["format"] == (
+                "tekdocs.git-dependencies/v2" if manifest["format"] == TEMPLATE_GIT_STATIC_FORMAT
+                else "tekdocs.git-dependencies/v1"
+            ))
             and source["content_id"] == str(publication.document_id)
             and source["workspace_id"] == str(publication.entity.workspace_id)
             and source["audience"] == "msp_internal"
-            and source["markdown_sha256"] == hashlib.sha256(publication.canonical_markdown.encode()).hexdigest()
+            and source["markdown_sha256"] == hashlib.sha256(
+                (manifest["authored_markdown"] if addressed else publication.canonical_markdown).encode()
+            ).hexdigest()
             and isinstance(sources, list)
             and (shared or len(sources) == 2)
             and sources[0]["id"] == str(publication.document_id)
@@ -116,8 +147,9 @@ def verify_internal_git_publication(publication: DocumentPublication) -> bool:
 
 
 def _validated_git_publication_content(
-    *, document: Document, repository: WorkspaceRepository, source: dict[str, Any]
-) -> tuple[ContentNode, str, dict[str, Any], tuple[PublicationFile, ...]]:
+    *, document: Document, repository: WorkspaceRepository, source: dict[str, Any],
+    actor: User | None = None, signed_at: str = "",
+) -> PreparedGitPublication:
     """Share the publisher's exact content and custody gates with readiness checks."""
     if (
         not DocumentAuthority.objects.filter(
@@ -175,10 +207,28 @@ def _validated_git_publication_content(
         files = prepare_publication_files(document=document, markdown=markdown)
     except (ValueError, OSError) as exc:
         raise PublicationConflict("Managed file custody is unavailable") from exc
+    key_snapshot = None
+    entities: list[RenderedEntityMention] = []
+    if key_targets_in_markdown(markdown) or entity_ids_in_markdown(markdown):
+        if actor is None:
+            raise PublicationConflict("Record dependencies require an authorized reader")
+        member = require_permission(actor, PermissionKey.DOCUMENTS_VIEW, organization=document.organization)
+        try:
+            key_snapshot = freeze_repository_key_snapshot(
+                repository=repository, node=node, document=document, markdown=markdown,
+                audience="msp_internal", actor=actor, signed_at=signed_at,
+            )
+            entities = freeze_repository_entity_cards(
+                repository=repository, markdown=markdown, audience="msp_internal", actor=actor, member=member,
+            )
+        except RepositoryPublicationDependencyError as exc:
+            raise PublicationConflict("Record dependencies are unavailable or outside the reviewed scope") from exc
     preflight = repository_publication_preflight(
         markdown=markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
         frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},
         frozen_primary_file=any(item.descriptor["purpose"] == "primary_file" for item in files),
+        frozen_entity_ids={uuid.UUID(item["id"]) for item in entities},
+        frozen_key_targets=set(key_targets_in_markdown(markdown)) if key_snapshot is not None else None,
     )
     if preflight["blockers"] or len(markdown.encode()) > 2 * 1024 * 1024:
         raise PublicationConflict("Publication contains unsupported or unavailable dependencies")
@@ -189,10 +239,16 @@ def _validated_git_publication_content(
         and publication_migration_evidence(workspace=document.entity.workspace, document=document) is None
     ):
         raise PublicationConflict("Retained publication history is unavailable or unsupported")
-    return node, markdown, preflight, files
+    return PreparedGitPublication(
+        node=node, authored_markdown=markdown,
+        markdown=key_snapshot["markdown"] if key_snapshot is not None else markdown,
+        preflight=preflight, files=files, key_snapshot=key_snapshot, entities=tuple(entities),
+    )
 
 
-def preflight_internal_git_document(*, document: Document, audience: str) -> dict[str, Any]:
+def preflight_internal_git_document(
+    *, document: Document, audience: str, workspace: ResolvedWorkspace | None = None,
+) -> dict[str, Any]:
     """Readiness only: callers authorize document visibility; publishing rechecks all gates."""
     findings = []
     digest = ""
@@ -208,11 +264,13 @@ def preflight_internal_git_document(*, document: Document, audience: str) -> dic
                 .select_related("entity")
                 .get(pk=document.pk, tenant_id=document.tenant_id, organization=document.organization)
             )
-            _node, _markdown, report, _files = _validated_git_publication_content(
-                document=locked, repository=repository, source=source
+            prepared = _validated_git_publication_content(
+                document=locked, repository=repository, source=source,
+                actor=workspace.member.user if workspace is not None else None,
+                signed_at=_timestamp(timezone.now()),
             )
             digest = source["composition_digest"]
-            for code in report["warnings"]:
+            for code in prepared.preflight["warnings"]:
                 severity, summary, remediation = FINDING_CATALOG.get(
                     code,
                     (
@@ -297,9 +355,12 @@ def publish_internal_git_document(
                     organization=workspace.organization,
                 )
             )
-            node, markdown, _preflight, files = _validated_git_publication_content(
-                document=locked, repository=repository, source=source
+            created_at = timezone.now()
+            prepared = _validated_git_publication_content(
+                document=locked, repository=repository, source=source, actor=actor,
+                signed_at=_timestamp(created_at),
             )
+            node, markdown, files = prepared.node, prepared.markdown, prepared.files
             predecessor = None
             if supersedes_entity_id is not None:
                 # Snapshots are immutable. FOR UPDATE hides them under runtime
@@ -317,13 +378,13 @@ def publish_internal_git_document(
                     or not verify_retained_publication_custody(predecessor)
                 ):
                     raise PublicationConflict("The selected Git publication cannot be superseded")
-            created_at = timezone.now()
             publication_id, entity_id = uuid.uuid4(), uuid.uuid4()
             rendered_files: dict[str, RenderedAttachment] = {f.descriptor["id"]: {
                 "id": f.descriptor["id"], "filename": f.descriptor["filename"], "size": f.descriptor["size"],
             } for f in files}
             pdf = render_pdf(
                 markdown, title=node.title, attachments=rendered_files,
+                entity_mentions={item["id"]: item for item in prepared.entities},
                 publication_id=str(entity_id) if files else "",
                 published_at=_timestamp(created_at) if files else "",
                 audience="msp_internal" if files else "", reason=reason if files else "",
@@ -352,7 +413,8 @@ def publish_internal_git_document(
                                   or len(source["sources"]) != 2
                                   or any(s["mode"] == "pinned" for s in source["sources"]))
             manifest = {
-                "format": (TEMPLATE_GIT_STATIC_FORMAT if source["format"] == "tekdocs.git-dependencies/v2"
+                "format": (ADDRESSED_GIT_STATIC_FORMAT if prepared.addressed
+                           else TEMPLATE_GIT_STATIC_FORMAT if source["format"] == "tekdocs.git-dependencies/v2"
                            else SHARED_GIT_STATIC_FORMAT if shared_composition
                            else FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT),
                 "publication_id": str(publication_id),
@@ -372,19 +434,26 @@ def publish_internal_git_document(
                 "published_by": str(actor.id),
                 "published_at": _timestamp(created_at),
                 "git_source": source,
+                **({"authored_markdown": prepared.authored_markdown,
+                    "key_bindings": node.frontmatter.get("key_bindings", {}),
+                    "key_snapshot": prepared.key_snapshot} if prepared.addressed else {}),
                 **({"template_source": template_source} if template_source is not None else {}),
                 "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files]],
-                **({"managed_files": [f.descriptor for f in files]} if files or shared_composition else {}),
-                "entities": [],
+                **({"managed_files": [f.descriptor for f in files]}
+                   if files or shared_composition or prepared.addressed else {}),
+                "entities": list(prepared.entities),
                 "attachments": [
                     {key: f.descriptor[key] for key in ("id", "filename", "media_type", "size", "checksum")}
                     for f in files
                 ],
                 "placements": [],
                 "diagrams": [],
-                "key_resolutions": [],
+                "key_resolutions": prepared.key_snapshot["records"] if prepared.key_snapshot is not None else [],
             }
-            html = render_markdown(markdown, attachments=rendered_files)
+            html = render_markdown(
+                markdown, attachments=rendered_files,
+                entity_mentions={item["id"]: item for item in prepared.entities},
+            )
             digest = hashlib.sha256(
                 snapshot_payload(manifest=manifest, markdown=markdown, sanitized_html=html)
             ).digest()

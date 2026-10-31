@@ -4899,7 +4899,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
         }:
             raise ValidationError("Publication manifest format is invalid")
         expected_identity = {
@@ -4937,7 +4937,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
         }:
             expected_lifecycle = {
                 "reason": self.reason,
@@ -4953,7 +4953,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
             "tekdocs-static-publication/v6",
-            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
+            "tekdocs-static-publication/v7", "tekdocs-static-publication/v8", "tekdocs-static-publication/v9",
         }:
             key_resolutions = self.manifest.get("key_resolutions")
             if not isinstance(key_resolutions, list):
@@ -5008,6 +5008,11 @@ class DocumentPublication(models.Model):
                 expressions.append(resolution["expression"])
             if expressions != sorted(set(expressions)):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
+        if self.manifest.get("format") == "tekdocs-static-publication/v9":
+            from .document_addressed_publications import verify_addressed_publication_manifest
+
+            if not verify_addressed_publication_manifest(self.manifest, self.document_id, self.canonical_markdown):
+                raise ValidationError("Addressed publication snapshot is invalid")
         if self.manifest.get("format") == "tekdocs-static-publication/v4":
             placements = self.manifest.get("placements")
             if not isinstance(placements, list) or not placements:

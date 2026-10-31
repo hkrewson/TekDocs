@@ -22,8 +22,10 @@ acceptance_compose() {
   docker compose -f "$repository_root/compose.yml" -f "$repository_root/compose.publication-browser.yml" "$@"
 }
 
-mark_browser_failed() {
-  printf '%s\n' '{"status":"failed"}' > "$work_directory/browser-finished.partial"
+mark_browser_finished() {
+  outcome=${1:-failed}
+  case "$outcome" in passed|failed) ;; *) return 1 ;; esac
+  printf '{"status":"%s"}\n' "$outcome" > "$work_directory/browser-finished.partial"
   chmod 0640 "$work_directory/browser-finished.partial"
   mv -f "$work_directory/browser-finished.partial" "$work_directory/browser-finished.json"
 }
@@ -32,7 +34,7 @@ cleanup() {
   status=$?
   trap - EXIT HUP INT TERM
   if [ -n "$pytest_pid" ]; then
-    mark_browser_failed
+    mark_browser_finished failed
     # Prefer normal fixture teardown; interrupt only this run's pytest if it
     # is still initializing its database and cannot see the browser marker.
     for attempt in $(seq 1 5); do
@@ -111,7 +113,9 @@ done
 browser_status=0
 acceptance_compose exec -T frontend npx playwright test --config=playwright.publication-live.config.ts || browser_status=$?
 if [ "$browser_status" -ne 0 ]; then
-  mark_browser_failed
+  mark_browser_finished failed
+else
+  mark_browser_finished passed
 fi
 # Only this value-free reporter output may be read by the host controller.
 acceptance_compose exec -T frontend sh -c \

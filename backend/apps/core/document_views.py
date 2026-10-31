@@ -694,7 +694,9 @@ def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: 
         from .document_git_publications import preflight_internal_git_document
 
         return Response(
-            preflight_internal_git_document(document=document, audience=serializer.validated_data["audience"])
+            preflight_internal_git_document(
+                document=document, audience=serializer.validated_data["audience"], workspace=workspace,
+            )
         )
     try:
         resolved = resolve_document(document, audience=serializer.validated_data["audience"])

@@ -148,3 +148,20 @@ forced-RLS tests. `make document-migration-upgrade-rehearsal` creates synthetic
 documents on 0.8.46, upgrades the preserved database, proves the original IDs
 and revisions remain, and compares first-wave copy, retry and rollback with a
 fresh installation. Both rehearsals use isolated test resources.
+
+## Field-key and typed-reference continuation
+
+The bounded internal/permanent migration path now preserves portable field-key
+bindings and exact-Workspace typed entity links (ADR 0117). Current Git expressions
+resolve permitted live values; STATIC v9 freezes those values and record cards
+alongside source and managed-file proof. Existing signatures and PDFs are never
+rewritten. The Keys panel reads the current Git report with retry after failure.
+Binding configuration remains read-only until legacy rollback; SQL and API writes
+serialize with authority handoff. Rollback restores raw expressions and original
+binding identities while preserving every supported file version and publication.
+
+Missing, archived, denied or foreign references block a new publication. Content
+keys and foreign record dependencies remain separate. See
+`planning/migrations/key-entity-publication-migration.md` for current validation;
+this document does not establish release, production migration or recovery
+acceptance independently of that record.

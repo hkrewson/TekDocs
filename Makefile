@@ -263,7 +263,7 @@ test-content-authoring:
 
 .PHONY: test-document-migration-inventory
 test-document-migration-inventory:
-	docker compose run --rm migrate pytest apps/core/tests/test_document_migration_inventory.py apps/core/tests/test_document_migration_publications.py apps/core/tests/test_document_publication_migration.py apps/core/tests/test_document_git_publications.py apps/core/tests/test_file_backed_publication_migration.py apps/core/tests/test_shared_block_publication_migration.py apps/core/tests/test_template_enrollment_migration.py apps/core/tests/test_template_library_composition.py apps/core/tests/test_runtime_rls.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_document_migration_inventory.py apps/core/tests/test_document_migration_publications.py apps/core/tests/test_document_publication_migration.py apps/core/tests/test_document_git_publications.py apps/core/tests/test_file_backed_publication_migration.py apps/core/tests/test_key_entity_publication_migration.py apps/core/tests/test_shared_block_publication_migration.py apps/core/tests/test_template_enrollment_migration.py apps/core/tests/test_template_library_composition.py apps/core/tests/test_runtime_rls.py -q
 
 .PHONY: document-migration-upgrade-rehearsal
 document-migration-upgrade-rehearsal:

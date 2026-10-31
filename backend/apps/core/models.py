@@ -4882,6 +4882,12 @@ class DocumentPublication(models.Model):
         raise ValidationError("Document publications are append-only")
 
     def clean(self) -> None:
+        from .document_diagram_publications import publication_content_manifest
+
+        try:
+            manifest = publication_content_manifest(self.manifest, self.canonical_markdown)
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise ValidationError("Diagram publication proof is invalid") from exc
         if self.document_id and (
             self.document.tenant_id != self.tenant_id or self.document.organization_id != self.organization_id
         ):
@@ -4892,7 +4898,7 @@ class DocumentPublication(models.Model):
             raise ValidationError("Publication entity must use the publication workspace scope")
         if self.entity_id and self.entity.entity_type != "document_publication":
             raise ValidationError("Publication entity must use the document_publication type")
-        if not isinstance(self.manifest, dict) or self.manifest.get("format") not in {
+        if not isinstance(manifest, dict) or manifest.get("format") not in {
             "tekdocs-static-publication/v1",
             "tekdocs-static-publication/v2",
             "tekdocs-static-publication/v3",
@@ -4908,9 +4914,9 @@ class DocumentPublication(models.Model):
             "publication_entity_id": str(self.entity_id),
             "source_document_id": str(self.document.entity_id) if self.document_id else "",
         }
-        if any(self.manifest.get(key) != value for key, value in expected_identity.items()):
+        if any(manifest.get(key) != value for key, value in expected_identity.items()):
             raise ValidationError("Publication manifest identity does not match the publication")
-        workspace = self.manifest.get("workspace")
+        workspace = manifest.get("workspace")
         organization = self.organization if self.organization_id else None
         expected_workspace = {
             "kind": "organization" if self.organization_id else "msp",
@@ -4932,7 +4938,7 @@ class DocumentPublication(models.Model):
             or supersedes.audience != self.audience
         ):
             raise ValidationError("A correction may supersede only a publication of the same document and workspace")
-        if self.manifest.get("format") in {
+        if manifest.get("format") in {
             "tekdocs-static-publication/v2",
             "tekdocs-static-publication/v3",
             "tekdocs-static-publication/v4",
@@ -4948,9 +4954,9 @@ class DocumentPublication(models.Model):
                 "retention_review_on": self.retention_review_on.isoformat() if self.retention_review_on else None,
                 "supersedes_id": str(supersedes.entity_id) if supersedes is not None else None,
             }
-            if any(self.manifest.get(key) != value for key, value in expected_lifecycle.items()):
+            if any(manifest.get(key) != value for key, value in expected_lifecycle.items()):
                 raise ValidationError("Publication manifest lifecycle metadata does not match the publication")
-        if self.manifest.get("format") in {
+        if manifest.get("format") in {
             "tekdocs-static-publication/v3",
             "tekdocs-static-publication/v4",
             "tekdocs-static-publication/v5",
@@ -4958,7 +4964,7 @@ class DocumentPublication(models.Model):
             "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
             "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
         }:
-            key_resolutions = self.manifest.get("key_resolutions")
+            key_resolutions = manifest.get("key_resolutions")
             if not isinstance(key_resolutions, list):
                 raise ValidationError("Publication key resolutions are invalid")
             expressions: list[str] = []
@@ -4976,7 +4982,7 @@ class DocumentPublication(models.Model):
                 "dependency_chain",
             }
             for resolution in key_resolutions:
-                content_git = (self.manifest.get("format") == "tekdocs-static-publication/v10"
+                content_git = (manifest.get("format") == "tekdocs-static-publication/v10"
                                and isinstance(resolution, dict) and resolution.get("kind") == "content")
                 expected_fields = required | {"git_source"} if content_git else required
                 if not isinstance(resolution, dict) or set(resolution) != expected_fields:
@@ -4990,7 +4996,7 @@ class DocumentPublication(models.Model):
                     or not resolution["value"]
                     or re.fullmatch(r"[0-9a-f]{64}", resolution["source_fingerprint"]) is None
                     or resolution["provenance"] not in {"local", "observed"}
-                    or resolution["resolved_at"] != self.manifest.get("published_at")
+                    or resolution["resolved_at"] != manifest.get("published_at")
                 ):
                     raise ValidationError("Publication key resolutions are invalid")
                 revision_id = resolution["source_revision_id"]
@@ -5016,13 +5022,13 @@ class DocumentPublication(models.Model):
                 expressions.append(resolution["expression"])
             if expressions != sorted(set(expressions)):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
-        if self.manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
+        if manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
             from .document_addressed_publications import verify_addressed_publication_manifest
 
-            if not verify_addressed_publication_manifest(self.manifest, self.document_id, self.canonical_markdown):
+            if not verify_addressed_publication_manifest(manifest, self.document_id, self.canonical_markdown):
                 raise ValidationError("Addressed publication snapshot is invalid")
-        if self.manifest.get("format") == "tekdocs-static-publication/v4":
-            placements = self.manifest.get("placements")
+        if manifest.get("format") == "tekdocs-static-publication/v4":
+            placements = manifest.get("placements")
             if not isinstance(placements, list) or not placements:
                 raise ValidationError("Publication placements are invalid")
             allowed_profiles = {PlacementAudienceProfile.SHARED, self.audience}

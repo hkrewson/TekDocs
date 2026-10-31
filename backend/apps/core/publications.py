@@ -87,6 +87,46 @@ class PendingArtifact:
     source_attachment: DocumentAttachment | None = None
 
 
+def prepare_diagram_artifacts(
+    diagrams: tuple[DiagramExportArtifact, ...],
+) -> tuple[list[dict[str, object]], list[PendingArtifact]]:
+    """Create the same retained graphic descriptors for legacy and Git snapshots."""
+    pending_artifacts: list[PendingArtifact] = []
+    diagram_records: list[dict[str, object]] = []
+    for item, record in zip(diagrams, diagram_manifest(diagrams), strict=True):
+        if item.svg is None or item.png is None:
+            raise PublicationConflict("A required diagram artifact is unavailable.")
+        svg_artifact = PendingArtifact(
+            id=uuid4(),
+            entity_id=uuid4(),
+            kind=PublicationArtifactKind.DIAGRAM_SVG,
+            filename=f"diagram-{item.source.index:03d}.svg",
+            media_type="image/svg+xml",
+            content=item.svg,
+            checksum=item.svg_checksum or "",
+        )
+        png_artifact = PendingArtifact(
+            id=uuid4(),
+            entity_id=uuid4(),
+            kind=PublicationArtifactKind.DIAGRAM_PNG,
+            filename=f"diagram-{item.source.index:03d}.png",
+            media_type="image/png",
+            content=item.png,
+            checksum=item.png_checksum or "",
+        )
+        pending_artifacts.extend((svg_artifact, png_artifact))
+        diagram_records.append(
+            {
+                **record,
+                "svg_artifact_id": str(svg_artifact.entity_id),
+                "svg_filename": svg_artifact.filename,
+                "png_artifact_id": str(png_artifact.entity_id),
+                "png_filename": png_artifact.filename,
+            }
+        )
+    return diagram_records, pending_artifacts
+
+
 def canonical_json(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
@@ -331,38 +371,8 @@ def publish_document(
                     checksum=hashlib.sha256(pdf_content).hexdigest(),
                 )
             ]
-            diagram_records: list[dict[str, object]] = []
-            for item, record in zip(diagrams, diagram_manifest(diagrams), strict=True):
-                if item.svg is None or item.png is None:
-                    raise PublicationConflict("A required diagram artifact is unavailable.")
-                svg_artifact = PendingArtifact(
-                    id=uuid4(),
-                    entity_id=uuid4(),
-                    kind=PublicationArtifactKind.DIAGRAM_SVG,
-                    filename=f"diagram-{item.source.index:03d}.svg",
-                    media_type="image/svg+xml",
-                    content=item.svg,
-                    checksum=item.svg_checksum or "",
-                )
-                png_artifact = PendingArtifact(
-                    id=uuid4(),
-                    entity_id=uuid4(),
-                    kind=PublicationArtifactKind.DIAGRAM_PNG,
-                    filename=f"diagram-{item.source.index:03d}.png",
-                    media_type="image/png",
-                    content=item.png,
-                    checksum=item.png_checksum or "",
-                )
-                pending_artifacts.extend((svg_artifact, png_artifact))
-                diagram_records.append(
-                    {
-                        **record,
-                        "svg_artifact_id": str(svg_artifact.entity_id),
-                        "svg_filename": svg_artifact.filename,
-                        "png_artifact_id": str(png_artifact.entity_id),
-                        "png_filename": png_artifact.filename,
-                    }
-                )
+            diagram_records, diagram_artifacts = prepare_diagram_artifacts(diagrams)
+            pending_artifacts.extend(diagram_artifacts)
             retained_size = 0
             for attachment in source_attachments:
                 try:
@@ -779,7 +789,7 @@ def verify_retained_publication_custody(publication: DocumentPublication) -> boo
     if manifest.get("format") in {
                 "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
-                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
             }:
         from .document_git_publications import verify_git_publication_source
         if not verify_git_publication_source(publication):

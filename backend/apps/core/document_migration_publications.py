@@ -9,7 +9,14 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .document_migration_shape import DocumentMigrationShapeError, owned_placement_tree
 from .models import Document, DocumentPublication, Workspace
-from .publications import _timestamp, canonical_json, verify_publication, verify_retained_publication_custody
+from .publications import (
+    PublicationConflict,
+    _timestamp,
+    canonical_json,
+    retained_publication_diagrams,
+    verify_publication,
+    verify_retained_publication_custody,
+)
 
 
 def publication_migration_actor_allowed(*, workspace: Workspace, actor_id: UUID) -> bool:
@@ -95,11 +102,11 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
-                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
             }
             or publication.audience != "msp_internal"
             or sum(item.kind == "pdf" for item in artifacts) != 1
-            or any(item.kind not in {"pdf", "attachment"} for item in artifacts)
+            or any(item.kind not in {"pdf", "attachment", "diagram_svg", "diagram_png"} for item in artifacts)
             or any(item.kind == "attachment" and (
                 item.source_attachment is None
                 or item.source_attachment.document_id != document.id
@@ -150,7 +157,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
             if manifest.get("format") in {
                 "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
-                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
             }:
                 from .document_git_publications import verify_internal_git_publication
 
@@ -158,9 +165,10 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                     reasons.add("publication_git_source_invalid")
             if not verify_publication(publication)["valid"]:
                 reasons.add("publication_signature_invalid")
+            retained_publication_diagrams(publication)
             if not verify_retained_publication_custody(publication):
                 reasons.add("publication_custody_invalid")
-        except (OSError, ValueError, TypeError, AttributeError, ImproperlyConfigured):
+        except (OSError, ValueError, TypeError, AttributeError, ImproperlyConfigured, PublicationConflict):
             reasons.add("publication_verification_unavailable")
         evidence.append(
             {
@@ -204,6 +212,7 @@ def publication_migration_evidence(
     The fingerprint binds a preview to retained history; it is neither permission
     to change authority nor a substitute for rechecking custody at execution.
     """
+    from .diagram_exports import diagram_sources
     from .document_keys import key_targets_in_markdown
     from .document_migration_export import build_simple_document_export
     from .document_template_migration import TemplateMigrationError, template_enrollment_fingerprint
@@ -243,6 +252,8 @@ def publication_migration_evidence(
                 markdown=markdown,
                 audience="msp_internal",
                 topic_type=document.topic_type,
+                # Copy preserves canonical source; the publisher separately renders and freezes it.
+                frozen_diagram_sources={item.source_checksum for item in diagram_sources(markdown)},
                 frozen_entity_ids=entity_ids,
                 frozen_key_targets=set(key_targets_in_markdown(markdown)),
                 frozen_attachment_ids=set(

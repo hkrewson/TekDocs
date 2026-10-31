@@ -120,6 +120,13 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 content_key_recovery_sha=$(sed -n 's/^CONTENT_KEY_RECOVERY_SHA256=//p' "$content_key_recovery_log")
 printf '%s\n' "$content_key_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Content-key graph, signed publications, file versions, PDFs and rollback verified/p' "$content_key_recovery_log"
+diagram_recovery_log="$work_directory/diagram-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_DIAGRAM_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/diagram_fixture.py" > "$diagram_recovery_log"
+diagram_recovery_sha=$(sed -n 's/^DIAGRAM_RECOVERY_SHA256=//p' "$diagram_recovery_log")
+printf '%s\n' "$diagram_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Diagram revisions, signed graphics, file versions, PDFs and rollback verified/p' "$diagram_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -374,6 +381,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_CONTENT_KEY_FIXTURE_MODE=recovery_verify \
   -e TEKDOCS_CONTENT_KEY_RECOVERY_SHA256="$content_key_recovery_sha" migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/content_key_fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_DIAGRAM_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_DIAGRAM_RECOVERY_SHA256="$diagram_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/diagram_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

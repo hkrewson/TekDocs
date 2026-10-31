@@ -10,6 +10,10 @@ TekDocs is human-directed and built with AI assistance, primarily using OpenAI S
 
 The historical security review used Claude Opus 5 (High) for three maintainer-directed automated passes culminating in commit `32c72c0`. The 1.0 candidate will receive a new commit-matched [automated security review](https://github.com/hkrewson/TekDocs/wiki/Security-model). TekDocs has not received an independent human security assessment, penetration test, compliance audit, certification, or independent assurance, and 1.0 does not claim otherwise.
 
+The bounded [diagram migration slice](planning/migrations/diagram-publication-migration.md)
+tracks preservation of source revisions and signed graphics alongside the existing
+Git-backed document migration workflow.
+
 ## Capabilities
 
 - MSP, client, vendor, manufacturer, and partner workspaces

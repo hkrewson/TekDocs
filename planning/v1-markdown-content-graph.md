@@ -1129,3 +1129,15 @@ passed Build, CodeQL and Extended validation, including fifteen database groups,
 bounded slice is complete; its record links the receipts. General
 cross-Workspace reuse, diagrams, client delivery and final 1.0 acceptance remain
 separate. No release or production change is claimed.
+
+
+### Diagram-bearing publication migration — October 31, 2026
+
+The maintainer authorized the [next #105/#106 slice](migrations/diagram-publication-migration.md)
+to preserve canonical Mermaid source revisions, signed graphic/PDF history and
+file versions through Git migration, publication, rollback and recovery. The
+bounded implementation uses STATIC v11 over existing content certificates;
+both source-review axes and local Docker/browser validation passed. Exact-source
+hosted validation remains pending. General
+cross-Workspace reuse, client delivery and final 1.0 acceptance remain separate.
+Version remains 0.9.16; no release or production migration is claimed.

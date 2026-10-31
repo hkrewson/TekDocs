@@ -13,6 +13,15 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Diagram development after 0.9.16
+
+The maintainer authorized the [diagram-bearing #105/#106 slice](../migrations/diagram-publication-migration.md),
+preserving source revisions, signed graphics, PDFs, file versions, rollback and
+recovery. Implementation, both source-review axes, local Docker validation and
+all four live-browser/server journeys passed. Exact-source hosted validation
+remains pending; no completed slice, release or production migration is claimed. [Development notes](diagram-migration-notes.md)
+describe the bounded behavior.
+
 ## Content-key development after 0.9.16
 
 The maintainer explicitly included content-key block substitution in the

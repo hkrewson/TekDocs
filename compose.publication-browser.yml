@@ -10,6 +10,7 @@ services:
       TEKDOCS_PUBLICATION_ACCEPTANCE_BASE_DATABASE: ${POSTGRES_DB:?Run make bootstrap}
       TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY: /acceptance
     volumes:
+      - diagram_jobs:/app/diagram-jobs
       - ./backend/apps:/app/apps
       - ./backend/tekdocs:/app/tekdocs
       - ./backend/pyproject.toml:/app/pyproject.toml:ro

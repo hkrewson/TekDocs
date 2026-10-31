@@ -239,7 +239,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [route-access, route-methods, route-session, accounts, core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, migration-foundation, migration-isolation, migration-guards]
+        shard: [route-access, route-methods, route-session, accounts, core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, migration-foundation, migration-isolation, migration-guards]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run isolated PostgreSQL shard

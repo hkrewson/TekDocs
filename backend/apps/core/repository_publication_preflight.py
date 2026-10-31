@@ -28,6 +28,7 @@ def repository_publication_preflight(
     frozen_entity_ids: set[UUID] | None = None,
     frozen_key_targets: set[str] | None = None,
     frozen_primary_file: bool = False,
+    frozen_diagram_sources: set[str] | None = None,
 ) -> dict[str, Any]:
     """Return deterministic, content-free blocker and warning codes."""
 
@@ -77,8 +78,14 @@ def repository_publication_preflight(
             )
 
     try:
-        if diagram_sources(markdown):
+        sources = diagram_sources(markdown)
+        if any(source.source_checksum not in (frozen_diagram_sources or set()) for source in sources):
             blockers.add("repository.diagram.unfrozen")
+        for source in sources:
+            if "acctitle:" not in source.source.casefold() or "accdescr:" not in source.source.casefold():
+                warnings.add("diagram.accessibility")
+            if source.family == "unsupported":
+                warnings.add("diagram.family.unsupported")
     except DiagramRenderError:
         blockers.add("repository.diagram.unfrozen")
 

@@ -10,6 +10,9 @@ coverage_directory="$repository_root/artifacts/postgres-coverage/$shard"
 matrix_file="apps/core/tests/test_permission_idor_matrix.py"
 
 shard_compose() {
+  if [ "$shard" = "diagram-migration" ]; then
+    set -- -f "$repository_root/tests/rehearsals/compose.diagram-migration.yml" "$@"
+  fi
   docker compose --project-name "$project_name" --env-file "$environment_file" \
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" "$@"
 }
@@ -62,7 +65,8 @@ case "$shard" in
       ! -name 'test_migration_stabilization.py' \
       ! -name 'test_permission_idor_matrix.py' \
       ! -name 'test_key_entity_publication_migration.py' \
-      ! -name 'test_content_key_publication_migration.py' -print | sort | \
+      ! -name 'test_content_key_publication_migration.py' \
+      ! -name 'test_diagram_publication_migration.py' -print | sort | \
       awk -v partition="$partition" \
         'NR % 3 == partition && $0 !~ /\/test_template_enrollment_migration\.py$/' | \
       sed "s|$repository_root/backend/||")
@@ -97,6 +101,9 @@ PARTITION
     ;;
   key-entity-migration)
     set -- apps/core/tests/test_key_entity_publication_migration.py
+    ;;
+  diagram-migration)
+    set -- apps/core/tests/test_diagram_publication_migration.py
     ;;
   content-key-migration)
     set -- apps/core/tests/test_content_key_publication_migration.py
@@ -137,7 +144,7 @@ PARTITION
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|key-entity-migration|content-key-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac
@@ -161,6 +168,9 @@ fi
 echo "Starting isolated PostgreSQL test shard: $shard"
 shard_compose build --quiet migrate
 shard_compose up -d db valkey mailpit --wait
+if [ "$shard" = "diagram-migration" ]; then
+  shard_compose up -d --build --wait diagram-renderer
+fi
 shard_compose run --rm migrate
 
 if [ "$shard" = "runtime" ]; then

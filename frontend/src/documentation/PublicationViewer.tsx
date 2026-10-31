@@ -14,6 +14,15 @@ export function PublicationViewer({ view, scope, client, section, onSectionChang
   const heading = useRef<HTMLHeadingElement>(null)
   useLayoutEffect(() => { heading.current?.focus() }, [view.phase])
   const record = view.record
+  const retainedDiagrams = Array.isArray(record?.manifest.diagrams) ? record.manifest.diagrams.slice(0, 20).map((diagram: unknown) => {
+    const descriptor = diagram && typeof diagram === 'object' ? diagram as Record<string, unknown> : {}
+    const artifact = record.artifacts.find((item) => item.kind === 'diagram_svg' && item.id === descriptor.svg_artifact_id)
+    return {
+      title: typeof descriptor.title === 'string' ? descriptor.title : artifact?.filename ?? '',
+      url: artifact ? client.publicationArtifactUrl(scope, view.sourceId, record.id, artifact.id) : '',
+    }
+  }) : []
+  const retainedFiles = record?.artifacts.filter((artifact) => artifact.kind !== 'pdf') ?? []
   return <section className="document-workspace static-publication" aria-label={translate('documentation.publication')}>
     <div className="document-edit-heading"><div><h2 ref={heading} tabIndex={-1}>{record?.title ?? translate('documentation.publication')}</h2><p>{translate('documentation.publicationHelp')}</p></div><button className="icon-button" type="button" aria-label={translate('documentation.closePublication')} onClick={onClose}><X size={19} /></button></div>
     {view.phase === 'loading' && <p className="empty-state" role="status">{translate('documentation.loadingPublication')}</p>}
@@ -29,7 +38,7 @@ export function PublicationViewer({ view, scope, client, section, onSectionChang
       <div className="publication-section-nav" role="group" aria-label={translate('documentation.publicationSections')}>
         {(['content', 'downloads', 'history'] as const).map((value) => <button key={value} className="secondary-button" type="button" aria-pressed={section === value} onClick={() => onSectionChange(value)}>{translate(`documentation.publicationSection.${value}`)}</button>)}
       </div>
-      {section === 'content' && <section className="publication-content" aria-label={translate('documentation.publicationSection.content')}><SanitizedMarkdown html={record.sanitized_html} /></section>}
+      {section === 'content' && <section className="publication-content" aria-label={translate('documentation.publicationSection.content')}><SanitizedMarkdown html={record.sanitized_html} retainedDiagrams={retainedDiagrams} /></section>}
       {section === 'downloads' && <section aria-labelledby="publication-downloads-heading">
         <h3 id="publication-downloads-heading">{translate('documentation.publicationSection.downloads')}</h3>
         <p>{translate('documentation.retainedDownloadHelp')}</p>
@@ -40,7 +49,7 @@ export function PublicationViewer({ view, scope, client, section, onSectionChang
           <a className="secondary-button" href={client.publicationExportUrl(scope, view.sourceId, record.id, 'docx')} title={translate('documentation.wordCompatibility')}><Download size={15} />{translate('documentation.downloadDocx')}</a>
           <a className="secondary-button" href={client.publicationManifestUrl(scope, view.sourceId, record.id)}><Download size={15} />{translate('documentation.downloadManifest')}</a>
         </div>
-        <section className="publication-artifacts" aria-labelledby="retained-artifacts-heading"><h3 id="retained-artifacts-heading">{translate('documentation.publishedFiles')}</h3>{!record.artifacts.some((artifact) => artifact.kind === 'attachment') && <p>{translate('documentation.noRetainedFiles')}</p>}<ul>{record.artifacts.filter((artifact) => artifact.kind === 'attachment').map((artifact) => <li key={artifact.id}><a href={client.publicationArtifactUrl(scope, view.sourceId, record.id, artifact.id)}><strong>{artifact.filename}</strong><small>{translate('documentation.retainedFileDetails', { type: artifact.media_type, size: artifact.size.toLocaleString(), checksum: artifact.checksum.slice(0, 12) })}</small></a></li>)}</ul></section>
+        <section className="publication-artifacts" aria-labelledby="retained-artifacts-heading"><h3 id="retained-artifacts-heading">{translate('documentation.publishedFiles')}</h3>{!retainedFiles.length && <p>{translate('documentation.noRetainedFiles')}</p>}<ul>{retainedFiles.map((artifact) => <li key={artifact.id}><a href={client.publicationArtifactUrl(scope, view.sourceId, record.id, artifact.id)}><strong>{artifact.filename}</strong><small>{translate('documentation.retainedFileDetails', { type: artifact.media_type, size: artifact.size.toLocaleString(), checksum: artifact.checksum.slice(0, 12) })}</small></a></li>)}</ul></section>
         <div className="publication-integrity"><ShieldCheck size={18} /><div><strong>{translate('documentation.verificationDetails')}</strong><span>{record.signature_algorithm} · {translate('documentation.publishedBy', { date: new Date(record.published_at).toLocaleString(), name: record.published_by ?? translate('documentation.systemActor') })}</span><code>{translate('documentation.publicationDigest', { digest: record.content_digest })}</code><code>{translate('documentation.publicationKey', { fingerprint: record.key_fingerprint })}</code></div></div>
       </section>}
       {section === 'history' && <>

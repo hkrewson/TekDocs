@@ -6,7 +6,7 @@ import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/d
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; files: { filename: string; sha256: string }[] }
-type State = { addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 
 async function downloadPdf(page: Page) {
@@ -246,14 +246,16 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
   await page.goto(`${path}?document=${fixture.document_id}`)
   await expect(page.locator('article')).toContainText(expected.current)
-  await page.getByRole('button', { name: /^Keys/ }).click()
-  const report = page.getByRole('group', { name: 'Keys used in this document' })
-  for (const key of expected.keys) {
-    await expect(report.getByText(key, { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: `Retire ${key.split('.')[0]}` })).toHaveCount(0)
+  if (expected.keys.length) {
+    await page.getByRole('button', { name: /^Keys/ }).click()
+    const report = page.getByRole('group', { name: 'Keys used in this document' })
+    for (const key of expected.keys) {
+      await expect(report.getByText(key, { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: `Retire ${key.split('.')[0]}` })).toHaveCount(0)
+    }
+    await expect(page.getByRole('textbox', { name: 'Declare', exact: true })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Close keys' }).click()
   }
-  await expect(page.getByRole('textbox', { name: 'Declare', exact: true })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Close keys' }).click()
 
   await page.getByRole('button', { name: 'Publish document', exact: true }).click()
   await page.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Retain current resolved instructions')
@@ -297,6 +299,11 @@ test('nested content keys retain signed substitutions, file versions and PDF his
     current: 'Current accepted reusable recovery instructions.', format: 'tekdocs-static-publication/v10',
     keys: ['procedure.content'],
   })
+  await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v10')
+})
+
+
+async function correctAndWithdraw(page: Page, publication: DocumentPublicationDetail, format: string) {
   await page.getByRole('button', { name: 'Publish correction', exact: true }).click()
   const form = page.locator('.publication-form')
   await form.getByRole('textbox', { name: 'Why are you publishing this?' }).fill('Correct retained content substitutions')
@@ -306,7 +313,7 @@ test('nested content keys retain signed substitutions, file versions and PDF his
   expect(response.status()).toBe(201)
   const correction = await response.json() as DocumentPublicationDetail
   expect(correction.supersedes_id).toBe(publication.id)
-  expect(correction.manifest.format).toBe('tekdocs-static-publication/v10')
+  expect(correction.manifest.format).toBe(format)
   expect(correction.verification.valid).toBe(true)
   await page.getByRole('button', { name: 'Withdraw publication' }).click()
   await page.getByRole('textbox', { name: 'Decision reason' }).fill('Retain withdrawn content-key history')
@@ -316,4 +323,32 @@ test('nested content keys retain signed substitutions, file versions and PDF his
   await expect(page.getByText('Retain withdrawn content-key history', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Downloads', exact: true }).click()
   await downloadPdf(page)
+}
+
+
+test('diagram revisions retain graphics, signed PDFs and file versions after migration', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const publication = await runKeyPublicationJourney(page, state, state.diagrams, {
+    initial: 'Original diagram recovery instructions.', retained: 'Original diagram recovery instructions.',
+    current: 'Current diagram recovery instructions.', format: 'tekdocs-static-publication/v11', keys: [],
+  })
+  await page.getByRole('button', { name: 'Content', exact: true }).click()
+  const diagram = page.locator('.mermaid-diagram-export').getByRole('img', { name: 'Recovery route' })
+  await expect(diagram).toBeVisible()
+  await expect.poll(() => diagram.evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+  expect(publication.manifest.diagrams).toHaveLength(1)
+  const graphics = publication.artifacts.filter(item => item.kind === 'diagram_svg' || item.kind === 'diagram_png')
+  expect(graphics).toHaveLength(2)
+  await page.getByRole('button', { name: 'Downloads', exact: true }).click()
+  for (const graphic of graphics) {
+    const promise = page.waitForEvent('download')
+    await page.locator('.publication-artifacts').getByRole('link').filter({ hasText: graphic.filename }).click()
+    const download = await promise
+    try {
+      expect(await download.failure()).toBeNull()
+      expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(graphic.checksum)
+    } finally { await download.delete() }
+  }
+  await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v11')
 })

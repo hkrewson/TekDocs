@@ -3,4 +3,5 @@
 services:
   migrate:
     volumes:
+      - diagram_jobs:/app/diagram-jobs
       - media_data:/app/media

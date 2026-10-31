@@ -19,8 +19,10 @@ from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
+from .diagram_exports import DiagramExportArtifact, embed_diagrams_in_html, render_diagram_exports
 from .document_addressed_publications import ADDRESSED_GIT_STATIC_FORMAT, verify_addressed_publication_manifest
 from .document_content_key_publications import CONTENT_KEY_GIT_STATIC_FORMAT
+from .document_diagram_publications import DIAGRAM_GIT_STATIC_FORMAT, publication_content_manifest
 from .document_keys import key_targets_in_markdown
 from .document_migration_shape import owned_placement_tree
 from .document_publication_files import (
@@ -52,6 +54,7 @@ from .publications import (
     PublicationConflict,
     _artifact_descriptor,
     _timestamp,
+    prepare_diagram_artifacts,
     publication_signing_key,
     snapshot_payload,
     verify_publication,
@@ -78,6 +81,7 @@ class PreparedGitPublication:
     files: tuple[PublicationFile, ...]
     key_snapshot: dict[str, Any] | None
     entities: tuple[RenderedEntityMention, ...]
+    diagrams: tuple[DiagramExportArtifact, ...]
 
     @property
     def addressed(self) -> bool:
@@ -87,7 +91,7 @@ class PreparedGitPublication:
 def verify_git_publication_source(publication: DocumentPublication) -> bool:
     """Check the signed source descriptor without consulting current Git state."""
     try:
-        manifest = publication.manifest
+        manifest = publication_content_manifest(publication.manifest, publication.canonical_markdown)
         source = manifest["git_source"]
         sources = source["sources"]
         addressed = manifest["format"] in {ADDRESSED_GIT_STATIC_FORMAT, CONTENT_KEY_GIT_STATIC_FORMAT}
@@ -226,9 +230,14 @@ def _validated_git_publication_content(
         files = prepare_publication_files(document=document, markdown=frozen_markdown)
     except (ValueError, OSError) as exc:
         raise PublicationConflict("Managed file custody is unavailable") from exc
+    try:
+        diagrams = render_diagram_exports(frozen_markdown, required=True)
+    except ValueError as exc:
+        raise PublicationConflict(str(exc)) from exc
     preflight = repository_publication_preflight(
         markdown=frozen_markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
         frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},
+        frozen_diagram_sources={item.source.source_checksum for item in diagrams},
         frozen_primary_file=any(item.descriptor["purpose"] == "primary_file" for item in files),
         frozen_entity_ids={uuid.UUID(item["id"]) for item in entities},
         frozen_key_targets=set(key_targets_in_markdown(markdown)) if key_snapshot is not None else None,
@@ -245,7 +254,7 @@ def _validated_git_publication_content(
     return PreparedGitPublication(
         node=node, authored_markdown=markdown,
         markdown=key_snapshot["markdown"] if key_snapshot is not None else markdown,
-        preflight=preflight, files=files, key_snapshot=key_snapshot, entities=tuple(entities),
+        preflight=preflight, files=files, key_snapshot=key_snapshot, entities=tuple(entities), diagrams=diagrams,
     )
 
 
@@ -385,8 +394,9 @@ def publish_internal_git_document(
             rendered_files: dict[str, RenderedAttachment] = {f.descriptor["id"]: {
                 "id": f.descriptor["id"], "filename": f.descriptor["filename"], "size": f.descriptor["size"],
             } for f in files}
+            diagram_records, diagram_artifacts = prepare_diagram_artifacts(prepared.diagrams)
             pdf = render_pdf(
-                markdown, title=node.title, attachments=rendered_files,
+                markdown, title=node.title, attachments=rendered_files, diagrams=prepared.diagrams,
                 entity_mentions={item["id"]: item for item in prepared.entities},
                 publication_id=str(entity_id) if files else "",
                 published_at=_timestamp(created_at) if files else "",
@@ -443,7 +453,8 @@ def publish_internal_git_document(
                     "key_bindings": node.frontmatter.get("key_bindings", {}),
                     "key_snapshot": prepared.key_snapshot} if prepared.addressed else {}),
                 **({"template_source": template_source} if template_source is not None else {}),
-                "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files]],
+                "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files],
+                              *[_artifact_descriptor(item) for item in diagram_artifacts]],
                 **({"managed_files": [f.descriptor for f in files]}
                    if files or shared_composition or prepared.addressed else {}),
                 "entities": list(prepared.entities),
@@ -452,13 +463,17 @@ def publish_internal_git_document(
                     for f in files
                 ],
                 "placements": [],
-                "diagrams": [],
+                "diagrams": diagram_records,
                 "key_resolutions": prepared.key_snapshot["records"] if prepared.key_snapshot is not None else [],
             }
+            if prepared.diagrams:
+                manifest["content_format"] = manifest["format"]
+                manifest["format"] = DIAGRAM_GIT_STATIC_FORMAT
             html = render_markdown(
                 markdown, attachments=rendered_files,
                 entity_mentions={item["id"]: item for item in prepared.entities},
             )
+            html = embed_diagrams_in_html(html, prepared.diagrams)
             digest = hashlib.sha256(
                 snapshot_payload(manifest=manifest, markdown=markdown, sanitized_html=html)
             ).digest()
@@ -510,7 +525,7 @@ def publish_internal_git_document(
                 )
                 event.full_clean()
                 event.save()  # type: ignore[no-untyped-call]
-            for retained in (pending, *(f.artifact for f in files)):
+            for retained in (pending, *(f.artifact for f in files), *diagram_artifacts):
                 artifact_entity = Entity.objects.create(
                     id=retained.entity_id,
                     tenant_id=locked.tenant_id,

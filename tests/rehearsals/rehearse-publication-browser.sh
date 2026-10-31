@@ -88,7 +88,7 @@ if docker compose ps --status running --services | grep -qx migrate; then
   exit 1
 fi
 if docker compose ps --status running --services | grep -qx frontend; then frontend_was_running=true; fi
-docker compose up -d --wait db
+docker compose up -d --wait db diagram-renderer
 restore_services=true
 acceptance_compose up -d --no-deps --build migrate frontend
 # Linux bind mounts retain the controller's host UID. Keep that owner and grant

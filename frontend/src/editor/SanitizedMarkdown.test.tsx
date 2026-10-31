@@ -44,3 +44,12 @@ describe('sanitized Markdown preview', () => {
     expect(view.container.querySelector('code.language-mermaid')).toBeNull()
   })
 })
+
+it('keeps retained source readable without rerendering it or trusting embedded images', () => {
+  const view = render(<SanitizedMarkdown retainedDiagrams={[]} html={'<figure class="mermaid-diagram-export"><figcaption>Retained route</figcaption><img src="data:image/svg+xml;base64,bad" onerror="alert(1)"><details><summary>Accessible diagram source</summary><pre><code class="language-mermaid">flowchart LR\nA--&gt;B</code></pre></details></figure><img src="https://untrusted.example.invalid/tracker">'} />)
+  expect(screen.getByText('Retained route')).toBeVisible()
+  expect(screen.getByText('Accessible diagram source')).toBeVisible()
+  expect(view.container.querySelector('code.language-mermaid')).toHaveTextContent('A-->B')
+  expect(screen.queryByText('Rendered diagram')).not.toBeInTheDocument()
+  expect(screen.queryByRole('img')).not.toBeInTheDocument()
+})

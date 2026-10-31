@@ -1,0 +1,5 @@
+# Use the existing project's isolated renderer for real diagram custody tests.
+services:
+  migrate:
+    volumes:
+      - diagram_jobs:/app/diagram-jobs

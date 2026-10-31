@@ -1606,3 +1606,38 @@ it('binds a Git template enrollment to the reviewed source definition', async ()
     { organizationId: 'org-1' }, 'doc-source', 'Acme — Shared checklist', 'policy', {}, 'a'.repeat(64),
   ))
 })
+
+it('offers retained diagram graphics alongside the signed publication downloads', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publication, getPublication } = clients()
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, publications: [publication], publication_count: 1 }], count: 1 })
+  getPublication.mockResolvedValue({ ...publication, artifacts: [
+    ...publication.artifacts,
+    { id: 'svg-1', kind: 'diagram_svg', filename: 'diagram-001.svg', media_type: 'image/svg+xml', size: 200, checksum: 'd'.repeat(64), source_attachment_id: null },
+    { id: 'png-1', kind: 'diagram_png', filename: 'diagram-001.png', media_type: 'image/png', size: 300, checksum: 'e'.repeat(64), source_attachment_id: null },
+  ] })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Published ·/ }))
+  await user.click(await screen.findByRole('button', { name: 'Downloads' }))
+  expect(screen.getByRole('link', { name: /diagram-001.svg/ })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/artifacts/svg-1/download')
+  expect(screen.getByRole('link', { name: /diagram-001.png/ })).toHaveAttribute('href', '/documents/doc-1/publications/publication-1/artifacts/png-1/download')
+  expect(screen.queryByText('No additional files were retained with this publication.')).not.toBeInTheDocument()
+})
+
+it('shows retained publication graphics from authorized artifact URLs with their accessible source', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publication, getPublication } = clients()
+  documents.list = vi.fn().mockResolvedValue({ results: [{ ...document, publications: [publication], publication_count: 1 }], count: 1 })
+  getPublication.mockResolvedValue({ ...publication,
+    manifest: { ...publication.manifest, diagrams: [{ title: 'Recovery route', svg_artifact_id: 'svg-1' }] },
+    sanitized_html: '<figure class="mermaid-diagram-export"><figcaption>Recovery route</figcaption><img alt="Recovery route" src="data:image/svg+xml;base64,dW50cnVzdGVk"><details><summary>Accessible diagram source</summary><pre><code>Client --&gt; Gateway</code></pre></details></figure><img src="https://untrusted.example.invalid/tracker" onerror="alert(1)">',
+    artifacts: [...publication.artifacts, { id: 'svg-1', kind: 'diagram_svg', filename: 'diagram-001.svg', media_type: 'image/svg+xml', size: 200, checksum: 'd'.repeat(64), source_attachment_id: null }],
+  })
+  render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Published ·/ }))
+  const image = await screen.findByRole('img', { name: 'Recovery route' })
+  expect(image).toHaveAttribute('src', '/documents/doc-1/publications/publication-1/artifacts/svg-1/download')
+  expect(screen.getAllByRole('img')).toHaveLength(1)
+  expect(screen.getByText('Accessible diagram source')).toBeVisible()
+  expect(window.document.querySelector('img[src^="data:"]')).toBeNull()
+})

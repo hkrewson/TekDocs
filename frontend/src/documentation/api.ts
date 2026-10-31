@@ -133,7 +133,7 @@ export type PublicationRetention = 'permanent' | 'review_on'
 export type PublicationLifecycleState = 'pending_approval' | 'published' | 'superseded' | 'review_due' | 'withdrawn'
 export type PublicationControlEvent = { id: string; action: 'submitted' | 'approved' | 'withdrawn'; reason: string; actor: string | null; occurred_at: string }
 export type PublicationAudienceProjection = { audience: 'msp_staff' | 'client_portal'; available: boolean; state: string }
-export type DocumentPublicationArtifact = { id: string; kind: 'pdf' | 'attachment'; filename: string; media_type: string; size: number; checksum: string; source_attachment_id: string | null }
+export type DocumentPublicationArtifact = { id: string; kind: 'pdf' | 'attachment' | 'diagram_svg' | 'diagram_png'; filename: string; media_type: string; size: number; checksum: string; source_attachment_id: string | null }
 export type DocumentPublicationInput = { reason: string; audience: PublicationAudience; retention: PublicationRetention; retention_review_on?: string | null; supersedes_id?: string | null }
 export type DocumentPublication = {
   id: string

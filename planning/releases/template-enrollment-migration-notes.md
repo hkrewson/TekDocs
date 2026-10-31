@@ -2,7 +2,8 @@
 
 Development after 0.9.16; implementation, source review and local Docker/browser
 validation are recorded in the [slice record](../migrations/template-enrollment-migration.md).
-Its containing commit requires its own hosted validation receipt. No new application
+Exact runtime source `4bb6bdd` passed Build, CodeQL and Extended validation;
+the slice record links the complete hosted receipt. No new application
 version, image, production migration or Wiki publication is claimed.
 
 - Reviewed migrations can move an approved MSP template and its enrolled client

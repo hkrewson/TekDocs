@@ -512,3 +512,46 @@ passed, retained bytes and authority rollback/re-promotion passed; template appl
 acknowledgement was 3882 ms. The harness removed its generated sessions and test
 database. The superseded hosted run's encrypted recovery and foundation exercise
 passed individually; complete acceptance requires the next exact-source run.
+
+## Final validation and closeout — October 31, 2026
+
+**Verified:** runtime source `4bb6bddc78abdb706656d76f1de2cda810729f84` passed
+all required hosted workflows:
+
+| Gate | Exact-source receipt | Result |
+| --- | --- | --- |
+| Build, test, and secure | [41169545095](https://github.com/hkrewson/TekDocs/actions/runs/41169545095) | Passed all PostgreSQL groups, frontend, real browser/server journey, diagram tests, production images, SBOMs and vulnerability policy. |
+| CodeQL | [41169552546](https://github.com/hkrewson/TekDocs/actions/runs/41169552546) | Both languages and commit-bound evidence passed. |
+| Extended validation | [41169552522](https://github.com/hkrewson/TekDocs/actions/runs/41169552522) | All desktop/mobile browsers, DAST, performance, supported upgrades, fresh/0.8.46 document migration, diagram upgrade and independent recovery passed. |
+
+All **109 template cases** passed in the three required partitions; merged backend
+coverage is **89%**, above the unchanged 80% gate. The real hosted journey completed
+with server verification of retained bytes and rollback/re-promotion; its template
+apply acknowledgement was **6371 ms**. Encrypted recovery reported exact recovery
+of template Git, enrollment, file versions, signatures and PDFs. The subsequent
+foundation composed acceptance and recurring-invoice restore also passed.
+
+The final local frontend run passed **776 tests / 127 files**, global coverage,
+lint, type checks, production build and bundle limits. All **15** normal/delayed
+template browser cases passed across three engines; documentation/navigation
+regressions passed **73** tests. Script validation passed **126 tests** with three
+existing skips; the final missing-each-partition coverage checks passed. Standards
+and Spec review reported **zero remaining findings**, including the reproduced
+creation-guard repair and final partitioning. Prior failures, unknown original
+browser timing causes, red/green reproductions and corrective sources remain in
+the failure ledger. Superseded Extended run 41166994240 was cancelled to validate
+the final source instead; it is not a passing aggregate receipt.
+
+**Inferred:** these development results do not establish operator acceptance of
+production data, a production deployment, client delivery or aggregate 1.0 readiness.
+Risk IDs retain their recurring owners; no dependency exception is extended.
+
+**Blocked locally:** independent-stack gates remain prohibited by the single
+local Compose-project rule. Hosted final-source runs above supplied those results.
+No required hosted gate remains pending for this runtime.
+
+The bounded template migration slice is validated. The version remains **0.9.16**;
+no release tag, image publication, deployment or live-data migration was performed.
+The required Wiki draft is prepared in the separate checkout; publication remains
+separate and its pre-existing edits are preserved. Subsequent evidence-only commits
+record this runtime receipt and make no new runtime claim.

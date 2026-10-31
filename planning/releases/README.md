@@ -20,9 +20,10 @@ extends migration to MSP sources and enrolled client documents together. Its
 [development notes](template-enrollment-migration-notes.md) describe creation,
 reviewed updates, local copies and retained history. Implementation, both source
 review axes and local Docker/browser validation are recorded in the slice.
-The containing commit's Build, CodeQL and Extended validation checks are the
-required hosted receipt; earlier release runs cannot stand in for them. No new
-release or deployment is claimed. ADR 0116 records the bounded library-custody decision.
+Runtime source `4bb6bdd` has the exact-source hosted receipt linked below;
+evidence-only closeout commits make no new runtime claim. Earlier release runs
+cannot substitute for those checks. No new release or deployment is claimed.
+ADR 0116 records the bounded library-custody decision.
 The first `d80983c` hosted attempt exposed settings, transaction-fixture, heading
 locator and restored-network harness defects. Their reproduced corrections and
 original failed runs are retained in the slice record and failure ledger; the
@@ -33,7 +34,12 @@ a template-apply browser synchronization defect. Reproductions and corrections
 are recorded in the slice; the original hosted apply timeout cause remains unknown.
 Subsequent validation added required template test partitions and stronger write/URL
 checks, which reproduced and fixed a completed-creation navigation-guard race.
-The final corrective source still requires its own complete hosted receipt.
+Exact runtime source `4bb6bdd` passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/41169545095),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41169552546) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/41169552522), including all
+109 template cases, 89% merged backend coverage, real browser/server verification,
+fresh/0.8.46 migration and independent encrypted recovery. The bounded slice is
+validated; later evidence-only commits carry no new runtime claim.
 
 ## Shared-block development after 0.9.16
 

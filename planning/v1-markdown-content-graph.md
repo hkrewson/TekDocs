@@ -1090,3 +1090,15 @@ existing managed-file boundary without rewriting earlier signatures or PDFs.
 Templates, repeated Block occurrences, cross-Workspace reuse, dynamic dependencies
 and client delivery remain open. This does not close #105/#106 or declare 1.0
 acceptance, a new release or a production migration.
+
+### Template source/enrollment migration — October 31, 2026
+
+The bounded #105/#106 [template cohort slice](migrations/template-enrollment-migration.md)
+migrates approved MSP sources and enrolled client documents together, preserving
+copy/live/pinned behavior, local edits, complete supported file versions and signed
+publications/PDFs. Reviewed creation, updates, detach, grouped rollback and encrypted
+recovery are validated on runtime `4bb6bdd` by complete Build, CodeQL and Extended
+checks. ADR 0116 records the enrollment-specific library boundary. General
+cross-Workspace reuse, key/entity-dependent sections, repeated Block occurrences,
+client delivery and final 1.0 acceptance remain separate. Version remains 0.9.16;
+production deployment and live-data migration require separate authorization.

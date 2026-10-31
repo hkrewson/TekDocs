@@ -191,7 +191,9 @@ The [template enrollment extension](planning/migrations/template-enrollment-migr
 supports approved MSP sources and their enrolled client documents as one cohort.
 Copy/live/pinned behavior, local edits, managed-file versions and signed
 publications/PDFs survive reviewed updates, rollback and recovery in the recorded
-Docker tests and real browser journey.
+Docker tests and real browser journey. Exact runtime source `4bb6bdd` passed
+Build, CodeQL and Extended validation, including fresh/upgraded migration and
+independent encrypted recovery.
 It adds no general cross-Workspace reuse or client delivery. The slice record
 separates verified evidence from outstanding work.
 

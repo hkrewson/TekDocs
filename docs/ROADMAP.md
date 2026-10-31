@@ -7,14 +7,13 @@ Production deployment is unconfirmed. The next 1.0 work is the reversible first
 MSP document authority handoff (#105/#106); external pilots remain removed from
 scope by the maintainer's October 20 decision.
 
-Current development after 0.9.16: the shared-block source `3495d96` passed its
-exact-source hosted gates. The next bounded #105/#106 slice is
-[template source/enrollment migration](../planning/migrations/template-enrollment-migration.md),
-including copy/live/pinned semantics, signed history, reviewed controls and
-rollback/recovery. Implementation, source review and local Docker/browser
-validation are recorded in the slice; the containing commit still requires its
-own hosted gates. This does not close aggregate 1.0 acceptance or authorize
-production migration.
+Current development after 0.9.16: shared-block source `3495d96` and template
+source/enrollment runtime `4bb6bdd` passed their exact-source hosted gates. The
+bounded #105/#106 [template migration slice](../planning/migrations/template-enrollment-migration.md)
+is validated for copy/live/pinned semantics, retained signed history/files/PDFs,
+reviewed controls, rollback and independent recovery. Its record links Build,
+CodeQL and Extended evidence and preserves failed attempts and reproduced fixes.
+This does not close aggregate 1.0 acceptance or authorize production migration.
 
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 

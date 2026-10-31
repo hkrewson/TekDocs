@@ -392,10 +392,10 @@ files/PDFs. Git refs and copied-file cleanup follow the final SQL outcome;
 source-and-client LIVE authority changes are atomic. Missing foreign Git custody
 fails closed. Full recovery still requires PostgreSQL, all accepted repositories,
 media and keys together; a client editable ZIP is not that recovery set.
-Fresh/0.8.46 upgrades, encrypted independent recovery, production-image checks
-and exact-source hosted CI must confirm the candidate. None is inferred from a
-local pass or workflow presence. No production recovery or aggregate 1.0 risk is
-closed by this development slice, and no dependency exception is extended.
+Exact runtime source `4bb6bdd` passed fresh/0.8.46 upgrades, encrypted independent
+recovery, production-image checks and its complete Build, CodeQL and Extended
+hosted gates; see the linked slice record. No production recovery or aggregate
+1.0 risk is closed by this development slice, and no dependency exception is extended.
 
 ## Release rule
 

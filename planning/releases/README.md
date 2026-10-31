@@ -16,12 +16,21 @@ Existing release records below remain historical evidence.
 ## Field-key/entity development after 0.9.16
 
 The [addressed-document slice](../migrations/key-entity-publication-migration.md)
-extends the internal migration path to exact-Workspace portable field keys and
-typed record links. [Development notes](key-entity-migration-notes.md) describe
-current values, frozen snapshots and readable bindings. Implementation, source review and local Docker/browser validation are complete. No new runtime source has complete
-hosted receipts yet; the preceding template receipts do not validate this slice.
-ADR 0117 records the proposed custody boundary. No release, deployment or live
-production migration is claimed.
+extends internal migration to exact-Workspace portable field keys and typed
+record links. [Development notes](key-entity-migration-notes.md) describe current
+values, frozen snapshots and readable bindings. Implementation, source review,
+local Docker/browser checks and exact-source hosted validation are complete.
+
+Runtime `6ce9519` passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/41185521728),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41185526785) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/41185528840),
+including 72 key/entity cases, 89% backend coverage, all browser groups,
+fresh/0.8.46 migration and exact encrypted recovery of bindings, file versions,
+signatures and PDFs. ADR 0117 records the bounded custody decision. The slice
+retains the reproduced fixture MFA correction, earlier unexplained WebKit failure
+and open development-tool advisories; passing the retest does not establish the
+original WebKit cause. Evidence-only closeout commits make no new runtime claim.
+Version remains 0.9.16; no release, deployment or live production migration is claimed.
 
 ## Template enrollment development after 0.9.16
 

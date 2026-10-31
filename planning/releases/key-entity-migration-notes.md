@@ -1,7 +1,10 @@
 # Field-key and entity-reference migration development notes
 
-Version remains 0.9.16. This is an unreleased #105/#106 continuation; local validation
-and source review are complete; exact-source hosted checks are pending in the [slice record](../migrations/key-entity-publication-migration.md).
+Version remains 0.9.16. This is an unreleased #105/#106 continuation. Source
+`6ce9519` passed Build, CodeQL and Extended validation, including fresh/0.8.46
+migration, real browser/server acceptance and exact encrypted recovery. The
+[slice record](../migrations/key-entity-publication-migration.md) binds receipts
+and preserves prior failures and open follow-ups.
 
 Supported internal documents can retain portable field bindings and typed links
 to records in their own Workspace while moving to Git. The live reader shows

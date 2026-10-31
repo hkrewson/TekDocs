@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-31
 
-**Status**: accepted for the bounded development slice; hosted validation pending
+**Status**: accepted for the bounded development slice; validated at `6ce9519`
 
 **Deciders**: TekDocs maintainer
 

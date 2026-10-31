@@ -24,7 +24,8 @@ Acceptance and agreed testing interfaces:
 
 First vertical: field keys and exact-Workspace entity mentions on documents with
 retained internal/permanent publication history. Content-key block substitution
-remains separate, following the recommended field-key scope in the clarification; no broader scope was authorized. General cross-Workspace reuse,
+remains separate under the recommended field-key scope; broader scope was not
+authorized. General cross-Workspace reuse,
 client delivery, diagrams and monitored sources are separate slices. No version
 bump, release publication, Wiki push, production deployment or live migration is
 included.
@@ -34,8 +35,10 @@ independent-stack gates remain hosted-only. Tests cross the migration operations
 publication/read/download HTTP interfaces, real browser journey and supported
 upgrade/recovery fixtures. Source review compares with starting commit `802d484`.
 
-Status: implementation, source review and local validation complete. Exact-source
-hosted validation is pending. Earlier template receipts do not validate this source.
+Status: the bounded slice is validated at exact runtime source
+`6ce9519eed92ff216a30582207692762ab503fd0`. Implementation, source review, local
+Docker/browser validation and all required hosted gates passed. The final receipt
+below supersedes earlier preparation status; no production acceptance is inferred.
 
 
 Reproduced failures during acceptance (before source review):
@@ -62,7 +65,7 @@ bypass did not reproduce: inherited v3 guards already require the key and string
 type; four passing negatives remain, with no speculative 0207 change. Final
 Standards and Spec re-reviews report zero remaining findings.
 
-Verified locally so far: both real-browser journeys plus constrained HTTP role,
+Verified locally: both real-browser journeys plus constrained HTTP role,
 server-side immutable-byte verification and authority rollback/re-promotion;
 18 responsive keyboard/retry/axe cases across Chromium/Firefox/WebKit at six
 widths; 778 frontend tests; lint/types/build and compressed budgets; 288 backend
@@ -73,7 +76,8 @@ critical findings; dependency license policy passes. No new dependency added.
 
 The complete local migration regression passed (311 cases). Independent fresh/0.8.46 upgrade
 and encrypted backup/restore remain hosted-only under the single-project rule.
-No exact-source hosted pass or production change is claimed yet.
+The final hosted receipt below supplies the independent-stack evidence. No
+production change is claimed.
 
 
 Additional risk disposition: the pinned application requirements audit is clean
@@ -81,8 +85,8 @@ and Bandit reports no issues. The installed development environment audit found
 preexisting filelock/msgpack/setuptools advisories; the [tooling observation](../releases/key-entity-tooling-audit.md)
 records the open follow-up, distinct from runtime scanning. It is not an accepted
 exception or a clean-toolchain claim. Independent local image/secret scanner
-containers are not started under the single-project rule; hosted gates must
-confirm source/image scanning at the exact pushed commit.
+containers were not started under the single-project rule; the final hosted
+source/image gates passed at the exact source recorded below.
 
 
 The complete Docker `test-document-migration-inventory` selection, adapted from
@@ -113,7 +117,8 @@ key and repository-evidence selection passed all 95 cases with that corrected fi
   repair restores verification. Schema guards reverse and reapply to migration head.
 - **Blocked locally by repository policy:** independent fresh/0.8.46 upgrade and
   encrypted source/restore stacks, independent image and secret-scanner containers.
-  Build and Extended validation must establish those at the exact pushed source.
+  Final Build and Extended validation supplied those results at the exact source
+  recorded below.
 - **Inferred only:** local results support the bounded development contract; they
   do not establish production acceptance, a new release or aggregate 1.0 readiness.
 
@@ -139,22 +144,24 @@ main after the complete local validation and both source-review axes passed.
 and [Extended 41181875866](https://github.com/hkrewson/TekDocs/actions/runs/41181875866)
 all name that exact source.
 
-Verified so far: all fourteen PostgreSQL partitions, **70 key/entity cases**,
+The completed Build verified all fourteen PostgreSQL partitions, **70 key/entity cases**,
 **89% merged backend coverage**, frontend tests, runtime/RLS, code/dependency/
-secret policy, diagram exports and the hosted real browser/server journeys passed.
-CodeQL and its downloaded commit-bound receipt passed. The encrypted-recovery
-rehearsal step passed; broader recovery, supported upgrades and final image gates
-are still in progress. This is not yet a passing aggregate receipt.
+secret policy, diagram exports and the hosted real browser/server journeys.
+CodeQL and its downloaded commit-bound receipt passed. The complete recovery
+and image gates passed. Extended later failed during the
+document-migration rehearsal as recorded below; this attempt is not a passing
+aggregate receipt.
 
 Extended attempt 1 failed one existing WebKit document-settings draft-protection
 case at 1024px (missing unsaved-changes dialog). Its other **410 cases passed**,
 including all six new Keys cases; four opt-in cases were skipped. Cause remains
 **unknown**. The unchanged case passed 40 development-server repetitions and 30
 repetitions against a fresh production bundle using the CI browser configuration.
-A complete unchanged production-build WebKit run is also in progress locally.
-No behavior, selector, assertion, timeout or retry setting changed. GitHub rejects
-a job rerun while the parent workflow is running; retry the failed job once the
-remaining workflow jobs finish. The original run and observation remain in
+A complete unchanged production-build WebKit run subsequently passed 410 cases;
+its separate backend-health limitation is recorded below.
+No behavior, selector, assertion, timeout or retry setting changed. GitHub
+rejected a job rerun while the parent workflow was running. The subsequent MFA
+fixture correction required a new exact-source replay instead. The original run and observation remain in
 `planning/releases/validation-failures.json`; passing a retry must not be called
 a demonstrated fix or a known cause.
 
@@ -186,6 +193,61 @@ HTTP502 from the preview proxy, with the backend service verified stopped. It is
 an explicitly limited reproduction, not a complete passing browser receipt.
 All **70** unchanged targeted repetitions also passed. The original hosted
 unsaved-dialog cause remains **unknown**; no UI behavior, selector, assertion,
-timeout or retry setting changed. The new exact-source hosted replay must cover
+timeout or retry setting changed. The final exact-source hosted replay covered
 both the corrected fixture and the unchanged WebKit journey. Earlier receipts
 remain supporting evidence and cannot validate the corrective source by themselves.
+
+
+## Corrective exact-source replay `6ce9519` (completed)
+
+Source `6ce9519eed92ff216a30582207692762ab503fd0` contains the test-only MFA
+preparation correction. The fresh [Build](https://github.com/hkrewson/TekDocs/actions/runs/41185521728),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41185526785) and
+[Extended](https://github.com/hkrewson/TekDocs/actions/runs/41185528840) runs all
+name this exact commit. CodeQL and its downloaded receipt passed; the key/entity
+partition passed **72 cases**. Hosted WebKit passed **411 cases** with four opt-in
+skips. Frontend source and the draft-protection assertion are unchanged from
+`3ae5ed8`, so this is a successful retest, not evidence that MFA preparation
+explains or fixes the original UI failure. Its cause remains unknown in the ledger.
+All Build and Extended data/image gates subsequently passed; the complete
+receipt follows.
+
+
+## Final validation and closeout — October 31, 2026
+
+**Verified:** exact runtime source `6ce9519eed92ff216a30582207692762ab503fd0`
+passed all required hosted workflows:
+
+| Gate | Exact-source receipt | Result |
+| --- | --- | --- |
+| Build, test, and secure | [41185521728](https://github.com/hkrewson/TekDocs/actions/runs/41185521728) | All fourteen PostgreSQL partitions, 72 key/entity cases, 89% merged backend coverage, frontend, constrained HTTP/browser acceptance, diagram exports and production images/SBOM/vulnerability policy passed. |
+| CodeQL | [41185526785](https://github.com/hkrewson/TekDocs/actions/runs/41185526785) | Both languages and downloaded commit-bound evidence passed. |
+| Extended validation | [41185528840](https://github.com/hkrewson/TekDocs/actions/runs/41185528840) | All five browser groups, DAST, performance, eight supported historical upgrade paths, fresh/0.8.46 migration, versioned diagram upgrade, independent encrypted recovery and evidence delivery passed. |
+
+The final upgrade logs confirm addressed Git, bindings, every fixture file version,
+signatures and PDFs on both fresh and 0.8.46-upgraded data. The recovery logs
+confirm these same retained inputs recovered exactly. The shared owner MFA factor
+is preserved rather than duplicated. The real hosted publication journeys passed
+with server-side custody verification and authority rollback/re-promotion; the
+template apply acknowledgement was 8590 ms. CodeQL, browser and upgrade evidence
+JSON files were downloaded and their `scope_commit` and passed status verified.
+
+**Inferred only:** this validates the bounded development contract, not production
+operator acceptance, a production deployment, client delivery, a new release or
+aggregate 1.0 readiness. Version remains **0.9.16**.
+
+**Blocked locally:** independent-stack gates remain prohibited by the single local
+Compose-project rule. Hosted exact-source runs above supplied those results; no
+required hosted gate remains pending for this runtime.
+
+Both source-review axes reported zero remaining findings. Original failures,
+reproductions and the MFA correction remain in the failure ledger. The earlier
+WebKit draft-dialog cause remains **unknown**, despite the later unchanged
+frontend/test passing all 411 hosted cases. No assertion, selector, timeout or retry
+was weakened. The existing development/build-tool advisories remain an open
+follow-up before final 1.0 validation; no exception is accepted or extended here.
+
+The required Wiki draft is local and unpublished in the separate checkout, with
+pre-existing edits preserved. Ignored AGENTS instructions remain private. Later
+evidence-only commits bind this receipt to runtime `6ce9519` and make no new
+runtime claim.

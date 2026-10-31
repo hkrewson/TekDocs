@@ -54,5 +54,7 @@ in this delta. No application MFA policy, UI, assertion, timeout or retry change
 The separate hosted WebKit draft-dialog failure remains unexplained. Seventy
 unchanged targeted runs passed, and the original case passed during a complete
 local production-bundle run; that run's separate backend-health failure is an
-explicit environment limitation, not a passing aggregate. The new exact-source
-hosted replay remains required; earlier source receipts cannot substitute for it.
+explicit environment limitation, not a passing aggregate. The complete
+exact-source hosted replay passed at `6ce9519`; the slice binds
+its Build, CodeQL and Extended receipts. Earlier failed attempts and the unknown
+original WebKit cause remain recorded.

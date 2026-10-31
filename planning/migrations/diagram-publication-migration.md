@@ -32,7 +32,7 @@ locally. Independent upgrade/recovery stacks remain hosted-only. No broader
 client delivery, cross-Workspace reuse or new diagram family is included.
 
 Status: implementation and both source-review axes are complete. Local Docker
-validation passed; exact-source hosted validation remains pending. The
+validation and exact-source hosted validation passed at `5b7a9314`. The
 [source-review record](../releases/diagram-source-review.md) preserves actual
 reproductions and their corrections.
 
@@ -67,10 +67,56 @@ readiness. Existing CSP/COEP/KaTeX ownership and expiry, and open development-to
 advisories, are unchanged; no exception is accepted or renewed.
 
 **Blocked locally:** independent fresh/0.8.46 upgrade, encrypted restore and
-production-image stacks are prohibited by the single-project rule. Required
-exact-source hosted Build, CodeQL and Extended gates must supply these results.
-The two skipped opt-in renderer checks must also be confirmed by the hosted
-renderer rehearsal rather than inferred from local unit selection. A required Wiki
+production-image stacks are prohibited by the single-project rule. Exact-source
+hosted Build, CodeQL and Extended gates supplied these results. The hosted
+renderer rehearsal also passed deterministic-byte, sandbox and cleanup checks;
+the skipped local runtime checks are not treated as unit-test passes. A required Wiki
 page is drafted locally in the separate checkout and remains unpublished.
-Ignored AGENTS files remain private. No source commit or hosted completion is
-claimed until its identity and receipts are recorded.
+Ignored AGENTS files remain private. Exact runtime source and checked receipts
+are recorded below; no required hosted gate remains pending for this runtime.
+
+
+## Final exact-source validation — October 31, 2026
+
+**Verified:** runtime `5b7a9314866156ad731ee6e3c49c921b437a8e0a` passed every
+required hosted workflow:
+
+| Gate | Exact-source receipt | Result |
+| --- | --- | --- |
+| Build, test, and secure | [41228928621](https://github.com/hkrewson/TekDocs/actions/runs/41228928621) | All sixteen PostgreSQL groups, all 33 diagram cases, 89% merged backend coverage, frontend, four live publication/browser journeys with server custody and authority round-trip checks, renderer determinism/sandbox/cleanup, production images, SBOMs and vulnerability policy passed. |
+| CodeQL | [41228934806](https://github.com/hkrewson/TekDocs/actions/runs/41228934806) | Both languages and the downloaded commit-bound receipt passed. |
+| Extended validation | [41228937218](https://github.com/hkrewson/TekDocs/actions/runs/41228937218) | All five browser groups, DAST, performance, eight historical upgrade paths, fresh/0.8.46 document migration, versioned diagram upgrade, independent encrypted recovery and final evidence delivery passed. |
+
+The upgrade log confirms diagram revisions, signed graphics, file versions, PDFs
+and rollback on both fresh and 0.8.46-upgraded data. Legacy publications were
+created by the old publisher using the maintained isolated renderer in the same
+rehearsal project. Its two seeded graphs have distinct source/SVG/PNG checksums;
+all original block revision metadata and signed artifact bytes remain retained.
+The independent network-isolated encrypted restore confirms these revisions,
+SVG/PNG, files and PDFs recovered exactly, including signed manifests, control
+events and Git object fingerprints. The hosted four-journey acceptance also
+confirmed graphic loading, download hashes and authority rollback/re-promotion.
+
+Downloaded CodeQL, browser, DAST, access-boundary, dependency/license/secret,
+image-scan, upgrade, recovery and diagram upgrade/restore evidence records all
+name this exact source and passed status. No receipt is inferred from a different
+source or a cancelled run.
+
+The application feature is `d8e9b392`; the only subsequent runtime-source delta
+in `5b7a9314` supplies the same renderer setup to the supported combined-core
+runner. Both review axes cleared that corrective delta. Initial-source runs
+41228633907, 41228636478 and 41228638894 were intentionally cancelled as
+superseded and remain recorded as cancellations, not failed tests or passes.
+No selector, assertion, retry or timeout was weakened.
+
+**Inferred only:** this completes the bounded development slice, not production
+operator acceptance, deployment, a new release, general cross-Workspace reuse,
+client delivery or aggregate 1.0 readiness. Version remains **0.9.16**. Existing
+CSP/COEP/KaTeX ownership and expiry, and open development/build-tool advisories,
+are unchanged; no exception is accepted or renewed.
+
+**Blocked locally:** separate-stack gates were left to hosted CI as required.
+Their exact-source results are now complete; no required runtime gate remains
+pending. The required Wiki update remains a local unpublished draft, with
+pre-existing edits preserved. Later evidence-only commits retain this tested
+runtime identity and make no new runtime claim.

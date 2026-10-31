@@ -97,3 +97,12 @@ assertions and pre-existing matrix behavior are unchanged. Both reviewers cleare
 exact-source CI must validate its new commit. Initial-source runs 41228633907,
 41228636478 and 41228638894 were intentionally cancelled as superseded, rather
 than being reported as failed tests or complete validation.
+
+
+Final exact-source validation subsequently completed at
+`5b7a9314866156ad731ee6e3c49c921b437a8e0a`: Build 41228928621, CodeQL
+41228934806 and Extended 41228937218 all passed. The slice record links the
+checked receipts, including all 33 diagram cases, four live journeys,
+fresh/0.8.46 migration and independent encrypted recovery. Historical pending
+statements above describe the review-time boundary; no required gate remains
+pending for this runtime.

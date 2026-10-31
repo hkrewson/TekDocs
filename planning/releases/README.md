@@ -18,9 +18,16 @@ Existing release records below remain historical evidence.
 The maintainer authorized the [diagram-bearing #105/#106 slice](../migrations/diagram-publication-migration.md),
 preserving source revisions, signed graphics, PDFs, file versions, rollback and
 recovery. Implementation, both source-review axes, local Docker validation and
-all four live-browser/server journeys passed. Exact-source hosted validation
-remains pending; no completed slice, release or production migration is claimed. [Development notes](diagram-migration-notes.md)
-describe the bounded behavior.
+all four live-browser/server journeys passed. Exact runtime source `5b7a9314`
+passed [Build](https://github.com/hkrewson/TekDocs/actions/runs/41228928621),
+[CodeQL](https://github.com/hkrewson/TekDocs/actions/runs/41228934806) and
+[Extended validation](https://github.com/hkrewson/TekDocs/actions/runs/41228937218),
+including all sixteen database groups, 33 diagram cases, 89% backend coverage,
+fresh/0.8.46 migration and independent encrypted recovery of diagram revisions,
+signed graphics, file versions and PDFs. [Development notes](diagram-migration-notes.md)
+describe the bounded behavior. The slice is complete; version remains 0.9.16.
+No release or production migration is claimed. Later evidence-only commits make
+no new runtime claim.
 
 ## Content-key development after 0.9.16
 

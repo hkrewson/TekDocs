@@ -2,7 +2,7 @@
 
 **Date**: 2026-10-31
 
-**Status**: accepted for the bounded development slice; local validation passed, exact-source hosted validation pending
+**Status**: accepted for the bounded development slice; local and exact-source hosted validation complete at `5b7a9314`
 
 **Deciders**: TekDocs maintainer
 

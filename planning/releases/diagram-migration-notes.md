@@ -15,7 +15,10 @@ and rollback; renderer or source failure blocks publication without partial file
 Local validation passed: 524 backend cases (two existing opt-in skips), three
 additional cases, all 33 diagram cases, 781 frontend tests and four real-browser
 journeys with server-side custody and rollback verification. Both source reviews
-have zero remaining findings. Exact-source hosted upgrade/recovery and remaining
-CI receipts are pending. The existing
+have zero remaining findings. Runtime `5b7a9314` passed complete Build, CodeQL
+and Extended validation, including all sixteen database groups, 33 diagram cases,
+89% backend coverage, fresh/0.8.46 migration and independent encrypted recovery.
+The slice record links the exact-source receipts and retained-byte verification.
+The bounded development slice is complete. The existing
 CSP/COEP/KaTeX dispositions and development/build-tool findings retain their
 ownership and expiry; this slice accepts or renews no exception.

@@ -1137,7 +1137,9 @@ The maintainer authorized the [next #105/#106 slice](migrations/diagram-publicat
 to preserve canonical Mermaid source revisions, signed graphic/PDF history and
 file versions through Git migration, publication, rollback and recovery. The
 bounded implementation uses STATIC v11 over existing content certificates;
-both source-review axes and local Docker/browser validation passed. Exact-source
-hosted validation remains pending. General
+both source-review axes and local Docker/browser validation passed. Exact runtime
+`5b7a9314` passed Build, CodeQL and Extended validation, including sixteen database
+groups, 33 diagram cases, 89% coverage, fresh/0.8.46 migration and independent
+encrypted recovery. The bounded slice is complete; its record links the receipts. General
 cross-Workspace reuse, client delivery and final 1.0 acceptance remain separate.
 Version remains 0.9.16; no release or production migration is claimed.

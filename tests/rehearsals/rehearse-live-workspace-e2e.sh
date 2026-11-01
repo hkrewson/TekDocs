@@ -24,9 +24,32 @@ live_compose() {
     -f "$repository_root/compose.yml" -f "$repository_root/compose.test.yml" "$@"
 }
 
+failure_diagnostics() {
+  echo "Value-minimized workspace delivery diagnostics follow." >&2
+  for service in worker scheduler valkey; do
+    service_ids=$(live_compose ps --all --quiet "$service" 2>/dev/null) || service_ids=""
+    if [ -z "$service_ids" ]; then
+      python3 "$repository_root/scripts/live_workspace_diagnostics.py" service "$service" < /dev/null >&2 || true
+      continue
+    fi
+    for service_id in $service_ids; do
+      docker inspect --format '{"running":{{.State.Running}},"restarting":{{.State.Restarting}},"oom_killed":{{.State.OOMKilled}},"exit_code":{{.State.ExitCode}}}' "$service_id" 2>/dev/null \
+        | python3 "$repository_root/scripts/live_workspace_diagnostics.py" service "$service" >&2 || true
+    done
+  done
+  live_compose logs --no-color --tail=200 worker scheduler 2>/dev/null \
+    | python3 "$repository_root/scripts/live_workspace_diagnostics.py" logs >&2 || true
+  if ! live_compose exec -T -e PGCONNECT_TIMEOUT=3 db sh -c \
+    'exec psql -X -qAt -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+    < "$repository_root/scripts/live_workspace_diagnostics.sql" >&2 2>/dev/null; then
+    printf '%s\n' '{"schema_version":1,"database":"unavailable"}' >&2
+  fi
+}
+
 cleanup() {
   status=$?
   if [ "$status" -ne 0 ]; then
+    failure_diagnostics || true
     echo "Live workspace journey failed; recent backend logs follow." >&2
     live_compose logs --no-color --tail=200 migrate backend >&2 || true
     echo "Recent frontend access logs follow." >&2

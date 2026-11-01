@@ -13,6 +13,19 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Post-publication 0.9.17 CI investigation
+
+The later documentation commit `1d903780` failed the workspace browser gate in
+[Build 41282154536](https://github.com/hkrewson/TekDocs/actions/runs/41282154536):
+the client inbox stayed empty for the original 75-second notification assertion.
+The [follow-up](0.9.17-portal-notification-follow-up.md) preserves that unknown
+cause, passing unchanged local replays and the reproduced loss of worker evidence.
+The bounded correction adds failure-only service/task/count diagnostics before
+teardown; it makes no application-fix claim. The complete unchanged hosted retry passed on attempt 2, including the
+workspace/server and five publication/server journeys plus production-image scans.
+Exact-source validation of the diagnostic correction remains pending. Published release identities
+below are unchanged; latest-main validation is tracked separately.
+
 ## Published 0.9.17: migration consolidation
 
 The [0.9.17 release notes and risk decision](0.9.17-candidate.md) consolidate the

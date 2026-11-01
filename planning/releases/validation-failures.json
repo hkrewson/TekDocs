@@ -1206,6 +1206,19 @@
       "fix_commit": null,
       "retest_run": "41275992112",
       "retest_attempt": 2
+    },
+    {
+      "run_id": "41282154536",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "job_id": "124777096783",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Post-publication documentation source 1d903780e9fb79b0921f059a8aa7f0bedc22915a failed live-workspace.spec.ts:1070: the portal notification titles remained empty for the unchanged 75000ms predicate instead of containing Portal access ready and Documentation published. Portal documents had become available. Focused Docker notification API and runtime-role worker/API probes passed. A complete unchanged production-bundle browser replay in existing tekdocs services passed in 3.4m, followed by the original retained-data verification. No local missing-notification failure reproduced.",
+      "cause": "unknown. The failed rehearsal cleanup retained backend/migration/frontend logs but omitted worker/scheduler/queue state. Neither an empty API result nor a passing replay establishes whether events were unprocessed, processing failed, or read-time authorization filtered notifications.",
+      "next_action": "Unchanged attempt-2 live job 124887027737 passed: workspace 4.3m plus retained-data verification, five publication journeys 3.6m plus retained-byte/rollback/re-promotion and artifact hygiene. Complete Build 41282154536 passed on attempt 2, including production-image scans. Exact-source validation of the diagnostic correction remains required. The reproduced diagnostic evidence-loss gap is corrected with bounded service/task signals and read-only aggregate SQL through the running database service before teardown. Original selectors/assertions/deadlines/retries are unchanged. The original notification cause remains unknown; no application fix is claimed.",
+      "fix_commit": null,
+      "retest_run": "41282154536",
+      "retest_attempt": 2
     }
   ]
 }

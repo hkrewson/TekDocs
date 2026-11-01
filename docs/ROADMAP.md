@@ -7,6 +7,13 @@ Production deployment is unconfirmed. The next 1.0 work is the reversible first
 MSP document authority handoff (#105/#106); external pilots remain removed from
 scope by the maintainer's October 20 decision.
 
+Current release preparation: [0.9.17](../planning/releases/0.9.17-candidate.md)
+consolidates the completed migration slices. Version metadata advances to 0.9.17;
+release review and local preparation passed; the maintainer accepted the bounded
+candidate CSP/COEP/KaTeX disposition and authorized commit/push. Hosted release
+validation and automatic receipt delivery remain mandatory.
+This does not publish a release or authorize production migration.
+
 Current development after 0.9.16: shared-block source `3495d96` and template
 source/enrollment runtime `4bb6bdd` passed their exact-source hosted gates. The
 bounded #105/#106 [template migration slice](../planning/migrations/template-enrollment-migration.md)

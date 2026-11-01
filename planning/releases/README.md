@@ -13,6 +13,19 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Preparing 0.9.17: migration consolidation
+
+The maintainer authorized [0.9.17 preparation](0.9.17-candidate.md) to package the
+completed file, shared-block, enrolled-template, field/content-key, diagram and
+monitored-source slices. Version metadata is advanced. Both source reviews and
+local preparation passed, including 793 frontend cases, 30 health/API/RLS cases,
+128 tooling checks and five real browser/server preservation journeys. The maintainer
+accepted the bounded 0.9.17 CSP/COEP/KaTeX disposition and authorized commit/push.
+Separate tooling findings remain open. Prior slice receipts
+remain supporting evidence. The exact release push must complete the single-push
+pipeline, including automatic application/receipt tags and image verification.
+Production deployment, live migration and Wiki publication remain separate.
+
 ## Monitored-source development after 0.9.16
 
 The maintainer authorized the [monitored-source #105/#106 slice](../migrations/monitored-source-publication-migration.md)

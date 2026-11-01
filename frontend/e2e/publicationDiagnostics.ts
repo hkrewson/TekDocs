@@ -3,7 +3,7 @@ import type { Page, Request, Response } from '@playwright/test'
 type Options = { scenario?: string; now?: () => number; write?: (line: string) => void }
 type Entry = { phase: string; at: number }
 type Event = { event: string; phase: string; ms: number; status?: number; elapsed_ms?: number }
-const scenarios = new Set(['history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
+const scenarios = new Set(['templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
 const milestones = new Set(['template', 'pdf_download', 'monitored', 'keyed'])
 const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload'] as const
 

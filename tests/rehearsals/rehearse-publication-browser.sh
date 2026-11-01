@@ -90,6 +90,8 @@ fi
 if docker compose ps --status running --services | grep -qx frontend; then frontend_was_running=true; fi
 docker compose up -d --wait db diagram-renderer
 restore_services=true
+cp "$repository_root/frontend/publication-browser-budget.json" "$work_directory/browser-budget.json"
+chmod 0644 "$work_directory/browser-budget.json"
 acceptance_compose up -d --no-deps --build migrate frontend
 # Linux bind mounts retain the controller's host UID. Keep that owner and grant
 # only the image's service group access; secret session inputs still use 0600.

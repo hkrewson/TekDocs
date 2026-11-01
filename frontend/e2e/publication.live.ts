@@ -12,7 +12,7 @@ const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('migrated signed') ? 'history_templates'
+  const scenario = info.title.startsWith('template sources') ? 'templates' : info.title.startsWith('migrated signed') ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -259,6 +259,13 @@ test('migrated signed history survives real publishing, correction, withdrawal a
   expect(retained.manifest).toEqual(original.manifest)
   expect(retained.canonical_markdown).toBe(original.canonical_markdown)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+})
+
+test('template sources retain copy, live and pinned enrollments through publication and rollback', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  page.on('dialog', dialog => void dialog.accept())
+  await page.setViewportSize({ width: 390, height: 844 })
   await templateJourney(page, state)
 })
 

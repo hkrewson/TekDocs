@@ -1,0 +1,5 @@
+{
+  "test_timeout_ms": 120000,
+  "suite_timeout_ms": 900000,
+  "controller_grace_ms": 60000
+}

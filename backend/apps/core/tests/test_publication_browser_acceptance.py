@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 import secrets
-import time
 import uuid
 from copy import deepcopy
 from pathlib import Path
@@ -44,6 +43,7 @@ from apps.core.publications import (
 )
 from apps.core.rendering import render_pdf
 from apps.core.rls_contract import RUNTIME_ROLE
+from apps.core.tests.publication_acceptance_protocol import completion_timeout_seconds, wait_for_browser_completion
 from apps.core.workspaces import resolve_msp_workspace
 
 pytestmark = [
@@ -62,17 +62,9 @@ def _write_state(path: Path, value: dict[str, object]) -> None:
     temporary.replace(path)
 
 
-def _wait(path: Path) -> dict[str, str]:
-    deadline = time.monotonic() + 240
-    while time.monotonic() < deadline:
-        if path.exists():
-            return json.loads(path.read_text())  # type: ignore[no-any-return]
-        time.sleep(0.1)
-    raise AssertionError("The browser did not complete its acceptance phase")
-
-
 def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_role):
     state = Path(os.environ["TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY"])
+    completion_timeout = completion_timeout_seconds(state / "browser-budget.json")
     with override_settings(
         TEKDOCS_REPOSITORY_ROOT=str(tmp_path / "repositories"),
         MEDIA_ROOT=str(tmp_path / "media"),
@@ -295,7 +287,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             connection_created.connect(record_http_connection, weak=False)
             try:
                 _write_state(state / "ready.json", prepared_state)
-                result = _wait(state / "browser-finished.json")
+                result = wait_for_browser_completion(state / "browser-finished.json", completion_timeout)
                 assert result.get("status") == "passed", "Browser acceptance failed"
             finally:
                 server.stop()

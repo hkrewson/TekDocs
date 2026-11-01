@@ -15,6 +15,13 @@ Existing release records below remain historical evidence.
 
 ## Post-publication 0.9.17 CI investigation
 
+The subsequent closing run `41325634983` passed workspace notifications but failed
+publication acceptance. The [publication follow-up](0.9.17-publication-ci-follow-up.md)
+records a reproduced premature server shutdown and the bounded coordination fix.
+The delayed HTTP replay, six browser/server cases and standard publication Make
+gate passed locally; both source-review axes are clear. Exact-source hosted
+validation is required after push.
+
 The later documentation commit `1d903780` failed the workspace browser gate in
 [Build 41282154536](https://github.com/hkrewson/TekDocs/actions/runs/41282154536):
 the client inbox stayed empty for the original 75-second notification assertion.

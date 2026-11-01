@@ -1219,6 +1219,18 @@
       "fix_commit": null,
       "retest_run": "41282154536",
       "retest_attempt": 2
+    },
+    {
+      "run_id": "41325634983",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "job_id": "124906932721",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Closing documentation source 8195f05476e62c29732a8fa5586462ec8674c81e passed the original workspace notification assertion and server verification, then publication acceptance had three passes and two 120s timeouts. Signed history completed before the appended template workflow; the pending template read began at 117876ms and the test timed out 2079ms later. The later monitored PDF request returned 502 in 2ms at 31147ms into that case. The server handoff helper has a 240s wait for the entire serial browser suite.",
+      "cause": "Verified premature server shutdown: controlled real HTTP replay with no browser cases returned 200 initially and 502 after 245165ms because the fixture waits only 240s for the whole serial suite. The hosted late 502 coincides with this deadline; exact hosted shutdown timestamp is unavailable. Independent history and template cohorts also shared one 120s case, exhausting its cumulative budget. This is separate from the original unknown portal-notification cause.",
+      "next_action": "Reviewed correction uses a shared finite 15-minute suite budget plus 1-minute controller handoff, preserving 120s per-case limits and zero retries. Delayed real HTTP replay stayed200 after245175ms and all six browser cases passed in2.2m, followed by original custody/rollback/recovery checks. Standard make test-publication-browser-live separately passed six cases in2.0m and server verification. Tooling140/3optional skips, frontend793 and two source-review axes passed. Exact-source hosted Build remains required after the authorized direct-main push; original failed artifact is retained.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

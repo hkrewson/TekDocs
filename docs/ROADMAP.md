@@ -15,6 +15,10 @@ broader reuse, recurring browser stability, tooling remediation and aggregate 1.
 acceptance remain open. The bounded candidate risk decision is unchanged.
 The [post-publication portal-notification CI investigation](../planning/releases/0.9.17-portal-notification-follow-up.md)
 retains its unknown original cause; the diagnostic correction does not close it.
+The subsequent [publication CI lifetime correction](../planning/releases/0.9.17-publication-ci-follow-up.md)
+addresses a reproduced four-minute server shutdown and separates independent
+history/template browser cases. Delayed HTTP and standard six-case browser/server
+validation passed locally with zero retries; exact-source hosted validation follows.
 
 Development slices included in 0.9.17: shared-block source `3495d96` and template
 source/enrollment runtime `4bb6bdd` passed their exact-source hosted gates. The

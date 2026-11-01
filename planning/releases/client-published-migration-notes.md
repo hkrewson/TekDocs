@@ -105,3 +105,30 @@ hygiene passed. Both source-review axes are clear.
   upgrade, encrypted restore, image rehearsals and Actionlint confirmation. Hosted
   Build, CodeQL and Extended validation must establish those results on the
   feature commit. This is part of delivery, not a request for operator follow-up.
+
+## Hosted browser contract follow-up
+
+Feature source `b7db480a` passed the dedicated 24-case client-publication group,
+795 frontend cases, static/policy/runtime checks and both CodeQL analyses plus
+commit-bound evidence. Extended Chromium, Firefox and WebKit exposed the older mocked organization
+publication journey's `disabled` audience/retention assumptions at 320px and
+1440px. Both cases reproduced unchanged in the existing frontend container with
+zero retries before any test edit. The fixture is an organization Workspace, and
+the real server journey plus runtime-role tests independently establish the
+intended audience capability; no application authorization defect is inferred.
+
+The focused correction tests enabled client selection and review-date retention,
+then restores the internal/permanent selection and retains exact request checks,
+permission-denial recovery, correction/withdrawal/history/PDF/accessibility
+assertions. Correction audience is explicitly required to remain disabled and
+unchanged. No assertion deadline or retry policy changes. The failure ledger
+preserves the original run and the red/green reproduction; follow-up hosted gates
+must validate the exact corrected source. Earlier passing source results do not
+substitute for that confirmation.
+
+The focused corrected file passed all 12 Chromium/Firefox/WebKit cases with zero
+retries in the existing frontend service, plus lint/typecheck and both review
+axes. The superseded source's incomplete Build/Extended runs are not passing
+evidence; their logs and original Chromium artifact remain retained. Final
+corrected-source Build, CodeQL and Extended runs must complete all gates, including
+independent fresh/upgrade/recovery, before delivery closes.

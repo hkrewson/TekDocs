@@ -1231,6 +1231,42 @@
       "next_action": "Reviewed correction uses a shared finite 15-minute suite budget plus 1-minute controller handoff, preserving 120s per-case limits and zero retries. Delayed real HTTP replay stayed200 after245175ms and all six browser cases passed in2.2m, followed by original custody/rollback/recovery checks. Standard make test-publication-browser-live separately passed six cases in2.0m and server verification. Tooling140/3optional skips, frontend793 and two source-review axes passed. Exact-source hosted Build remains required after the authorized direct-main push; original failed artifact is retained.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41345341552",
+      "job": "Browser (chromium)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs frontend container and Vite: playwright test --config=playwright.compose.config.ts --project=chromium e2e/git-document-publication.spec.ts --grep \"promoted document publication workflow\" --workers=1 --retries=0. Both unchanged 320px/1440px cases reproduced Expected disabled / Received enabled at the audience selector.",
+      "cause": "The mocked promoted-organization publication journey retained the previous internal/permanent-only UI assertions. The authorized client/audience and review-retention extension intentionally enables those selectors for new publications. The real browser journey and backend authorization cases passed; this is an obsolete browser contract, not permission enforcement through a disabled control.",
+      "next_action": "Reviewed browser-contract correction passed all 12 focused Chromium/Firefox/WebKit cases with zero retries, lint/typecheck and both source-review axes. Existing exact internal request fields, denial recovery, lifecycle/history/PDF/accessibility checks remain; correction audience stays locked. Preserve the failed source evidence, supersede the incomplete Build41345334709 and failed Extended41345341552 with exact corrected-source Build/CodeQL/Extended runs. No incomplete upgrade/restore result is claimed.",
+      "fix_commit": null,
+      "retest_run": null,
+      "run_attempt": 1,
+      "job_id": "124963856146"
+    },
+    {
+      "run_id": "41345341552",
+      "job": "Browser (firefox)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs frontend container and Vite: playwright test --config=playwright.compose.config.ts --project=chromium e2e/git-document-publication.spec.ts --grep \"promoted document publication workflow\" --workers=1 --retries=0. Both unchanged 320px/1440px cases reproduced Expected disabled / Received enabled at the audience selector. The completed hosted job showed the identical disabled/enabled assertion at both widths; the corrected full file passed locally on this engine with zero retries.",
+      "cause": "The mocked promoted-organization publication journey retained the previous internal/permanent-only UI assertions. The authorized client/audience and review-retention extension intentionally enables those selectors for new publications. The real browser journey and backend authorization cases passed; this is an obsolete browser contract, not permission enforcement through a disabled control.",
+      "next_action": "Reviewed browser-contract correction passed all 12 focused Chromium/Firefox/WebKit cases with zero retries, lint/typecheck and both source-review axes. Existing exact internal request fields, denial recovery, lifecycle/history/PDF/accessibility checks remain; correction audience stays locked. Preserve the failed source evidence, supersede the incomplete Build41345334709 and failed Extended41345341552 with exact corrected-source Build/CodeQL/Extended runs. No incomplete upgrade/restore result is claimed.",
+      "fix_commit": null,
+      "retest_run": null,
+      "run_attempt": 1,
+      "job_id": "124963856283"
+    },
+    {
+      "run_id": "41345341552",
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs frontend container and Vite: playwright test --config=playwright.compose.config.ts --project=chromium e2e/git-document-publication.spec.ts --grep \"promoted document publication workflow\" --workers=1 --retries=0. Both unchanged 320px/1440px cases reproduced Expected disabled / Received enabled at the audience selector. The completed hosted job showed the identical disabled/enabled assertion at both widths; the corrected full file passed locally on this engine with zero retries.",
+      "cause": "The mocked promoted-organization publication journey retained the previous internal/permanent-only UI assertions. The authorized client/audience and review-retention extension intentionally enables those selectors for new publications. The real browser journey and backend authorization cases passed; this is an obsolete browser contract, not permission enforcement through a disabled control.",
+      "next_action": "Reviewed browser-contract correction passed all 12 focused Chromium/Firefox/WebKit cases with zero retries, lint/typecheck and both source-review axes. Existing exact internal request fields, denial recovery, lifecycle/history/PDF/accessibility checks remain; correction audience stays locked. Preserve the failed source evidence, supersede the incomplete Build41345334709 and failed Extended41345341552 with exact corrected-source Build/CodeQL/Extended runs. No incomplete upgrade/restore result is claimed.",
+      "fix_commit": null,
+      "retest_run": null,
+      "run_attempt": 1,
+      "job_id": "124963856134"
     }
   ]
 }

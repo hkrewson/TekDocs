@@ -110,6 +110,7 @@ for attempt in $(seq 1 240); do
   sleep 1
 done
 [ "$ready" = true ] || { echo "Publication acceptance server did not become ready." >&2; exit 1; }
+acceptance_compose exec -T frontend npm run test:publication-diagnostics
 browser_status=0
 acceptance_compose exec -T frontend npx playwright test --config=playwright.publication-live.config.ts || browser_status=$?
 if [ "$browser_status" -ne 0 ]; then

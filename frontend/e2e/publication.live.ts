@@ -3,13 +3,48 @@ import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
+import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
 type State = { monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
+const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
+
+test.beforeEach(({ page }, info) => {
+  const scenario = info.title.startsWith('migrated signed') ? 'history_templates'
+    : info.title.startsWith('field keys') ? 'field_keys'
+      : info.title.startsWith('nested content') ? 'content_keys'
+        : info.title.startsWith('diagram revisions') ? 'diagrams'
+          : info.title.startsWith('monitored sources') ? 'monitored_sources' : 'unknown'
+  diagnostics.set(page, attachPublicationDiagnostics(page, { scenario }))
+})
+
+test.afterEach(async ({ page }, info) => {
+  const diagnostic = diagnostics.get(page)
+  if (!diagnostic) return
+  try {
+    const visible: Record<string, unknown> = {}
+    if (info.status !== 'passed' && info.status !== 'skipped' && !page.isClosed()) {
+      try {
+        const [prompts, creates, templates, pdfs] = await Promise.all([
+          page.locator('dialog.unsaved-changes-dialog[open]').count(),
+          page.getByRole('button', { name: 'Create document', exact: true }).count(),
+          page.getByRole('button', { name: 'Use template', exact: true }).count(),
+          page.getByRole('link', { name: 'Download PDF', exact: true }).count(),
+        ])
+        Object.assign(visible, { navigationPrompt: prompts > 0, createTemplate: creates > 0, useTemplate: templates > 0, pdfDownload: pdfs > 0 })
+      } catch {
+        // A timed-out navigation may already have destroyed the page. Retain
+        // request timings without replacing the original failure with a probe error.
+      }
+    }
+    diagnostic.finish(info.status ?? 'unknown', visible)
+  } finally { diagnostic.dispose(); diagnostics.delete(page) }
+})
 
 async function downloadPdf(page: Page) {
+  diagnostics.get(page)?.mark('pdf_download')
   const promise = page.waitForEvent('download')
   await page.getByRole('link', { name: 'Download PDF', exact: true }).click()
   const download = await promise
@@ -22,6 +57,7 @@ async function downloadPdf(page: Page) {
 }
 
 async function templateJourney(page: Page, state: State) {
+  diagnostics.get(page)?.mark('template')
   const fixture = state.template
   const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
   await page.goto(`/documentation?repository=${fixture.source_fragment_id}`)
@@ -227,6 +263,7 @@ test('migrated signed history survives real publishing, correction, withdrawal a
 })
 
 async function runKeyPublicationJourney(page: Page, state: State, fixture: AddressedState, expected: { initial: string; retained: string; current: string; format: string; keys: string[] }) {
+  diagnostics.get(page)?.mark(fixture.observation_id ? 'monitored' : 'keyed')
   page.on('dialog', dialog => void dialog.accept())
   const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
   await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])

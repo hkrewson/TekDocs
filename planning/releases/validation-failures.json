@@ -1115,6 +1115,70 @@
       "fix_commit": null,
       "retest_run": "41243684051",
       "retest_attempt": 2
+    },
+    {
+      "run_id": "41266996039",
+      "run_attempt": 1,
+      "job": "PostgreSQL shard (core-b)",
+      "job_id": "124731857688",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Exact 0.9.17 source 524d1d753d4f9113008cf99880065b4c99fa3f31: hosted frontend image construction failed before core-b pytest started. apk upgrade --no-cache could not fetch Alpine v3.24 main APKINDEX and exited 99 with stale/unavailable repositories. A parallel local rehearsal is prohibited by repository policy; retain the failed hosted build and retry unchanged in CI.",
+      "cause": "Underlying network cause unknown. The failed image-build log reports I/O error fetching https://dl-cdn.alpinelinux.org/alpine/v3.24/main/x86_64/APKINDEX.tar.gz. No code, schema, package policy, test assertion or timeout defect is demonstrated.",
+      "next_action": "Unchanged attempt 2 job 124747895758 passed 591 cases (one deselected). Retain the original pre-pytest Alpine I/O failure; underlying network cause is unknown and no code/package-policy fix is attributed. The release remains blocked by the separately recorded repeated live-gate timeouts.",
+      "fix_commit": null,
+      "retest_run": "41266996039",
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "41266996039",
+      "run_attempt": 1,
+      "job": "release-extended / Browser (webkit)",
+      "job_id": "124731857795",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Exact release source 524d1d753d4f9113008cf99880065b4c99fa3f31: hosted WebKit document-publication.spec.ts:103 document-wide draft protection at 320px failed at line 113 because getByRole(dialog) was absent after changing Title and clicking Files (1). Original 5000ms assertion retained. Existing frontend service: exact development-server test passed once (5.6s), twenty unchanged two-worker repeats passed (43.3s), twenty production-bundle repeats passed (38.0s), and all eighteen production WebKit publication-file cases passed (32.5s), with retries disabled. No local failure reproduced. Earlier run 41181875866 had the same missing-dialog symptom at 1024px; its original cause also remains unknown.",
+      "cause": "unknown; the log establishes a missing draft-protection dialog, not a demonstrated source or test cause. No assertion, selector, timeout or application change has been made.",
+      "next_action": "Unchanged attempt 2 job 124747895607 passed 411 cases with four existing skips. Retain this missing-dialog failure and earlier 1024px symptom as unknown; no assertion/selector/deadline fix is attributed. Investigate WebKit stability before final 1.0 acceptance. The separate live gate remains blocked.",
+      "fix_commit": null,
+      "retest_run": "41266996039",
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "41266996039",
+      "run_attempt": 1,
+      "job": "Live browser-to-PostgreSQL journey",
+      "job_id": "124732716303",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The real owner/workspace phase passed. The five publication journeys then had three passes and two existing 120-second timeouts: first at templateJourney Use template (publication.live.ts:76), second waiting for a retained-file download in monitored-source runKeyPublicationJourney (line 314). The complete local 0.9.17 gate had passed before push. An unchanged full local replay after the hosted failure passed all five journeys in 2.0m (first/template 58.8s, monitored 19.9s), plus server retained-byte/rollback/re-promotion and artifact hygiene checks. Original limits and assertions were unchanged; no local failure reproduced.",
+      "cause": "unknown; timeout stacks name the pending actions, not demonstrated application or harness causes. No code, selector, assertion, deadline or retry policy has been changed.",
+      "next_action": "Retry all failed release jobs on unchanged source once the original run completes, then require the full exact-source live gate. Preserve both timed-out actions as unknown; no pass is attributed to a code fix. Investigate recurrence and final 1.0 browser stability without weakening limits or assertions.",
+      "fix_commit": null,
+      "retest_run": "41266996039",
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "41266996039",
+      "run_attempt": 1,
+      "job": "release-extended / Assign validation failure follow-up",
+      "job_id": "124743948663",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The completed diagnostic step exited 1 for the original failed release attempt after its named browser failure; core-b and live browser failures also remain recorded independently.",
+      "cause": "Diagnostic cascade from original failed validation; no separate application defect identified.",
+      "next_action": "Retain this diagnostic cascade and original failures. The unchanged failed-job retry was accepted as attempt 2; complete all release gates and receipt delivery.",
+      "fix_commit": null,
+      "retest_run": "41266996039",
+      "retest_attempt": 2
+    },
+    {
+      "run_id": "41266996039",
+      "run_attempt": 2,
+      "job": "Live browser-to-PostgreSQL journey",
+      "job_id": "124747895201",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Unchanged attempt 2 again passed the real owner/workspace phase and three publication cases, then hit the same existing 120-second limit in two cases: first waiting for POST /from-template response, monitored-source waiting for its newly published PDF. Both are near the original timeout locations but not identical actions. The complete unchanged local replay passed all five plus server custody checks. A value-minimized timing replay with frontend/migrate capped at 0.5 CPU after fixture startup also passed all five in 2.4m plus server checks; normal response/download events were observed. The temporary probe was removed and resource limits restored. No local timeout reproduced.",
+      "cause": "unknown; two hosted attempts repeat the two long-journey timeouts. No demonstrated cause or correction yet. Another blind hosted retry is not being used.",
+      "next_action": "The reviewed follow-up adds bounded failure-only phase/status/timing/control-presence diagnostics and six privacy/resource contract tests, without modifying original selectors/assertions/deadlines/retries/server verification. Complete local integrated validation and push the reviewed diagnostic candidate for exact-source hosted evidence. Original timeout causes remain unknown; no application fix is claimed. Publication is blocked.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

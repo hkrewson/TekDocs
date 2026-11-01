@@ -24,6 +24,11 @@ accepted the bounded 0.9.17 CSP/COEP/KaTeX disposition and authorized commit/pus
 Separate tooling findings remain open. Prior slice receipts
 remain supporting evidence. The exact release push must complete the single-push
 pipeline, including automatic application/receipt tags and image verification.
+Initial source `524d1d75` failed the live publication gate twice; all seventeen
+database groups, 89% coverage, CodeQL, browser-matrix retest, upgrades and recovery
+passed across the retained attempts. The [diagnostic follow-up](0.9.17-live-validation-follow-up.md)
+preserves the original timeouts and adds bounded failure-only timing evidence.
+The release remains unpublished pending exact-source validation and receipt delivery.
 Production deployment, live migration and Wiki publication remain separate.
 
 ## Monitored-source development after 0.9.16

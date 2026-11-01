@@ -14,6 +14,7 @@
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "test:publication-diagnostics": "node --test scripts/tests/publicationDiagnostics.test.mjs",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:all": "playwright test",
     "preview": "vite preview --host 0.0.0.0"

@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from allauth.mfa.models import Authenticator
 from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
@@ -40,8 +40,15 @@ PRIVATE = "MSP-only migration instructions."
 PUBLIC = "Client-only migration instructions."
 
 
+class _RetainedJSONEncoder(DjangoJSONEncoder):
+    # The standalone seed also runs on 0.8.46. Keep every stored microsecond;
+    # Django's ordinary JSON encoder truncates datetime output to milliseconds.
+    def default(self, value):
+        return value.isoformat() if isinstance(value, datetime) else super().default(value)
+
+
 def _digest(value):
-    return hashlib.sha256(json.dumps(value, cls=DjangoJSONEncoder, sort_keys=True).encode()).hexdigest()
+    return hashlib.sha256(json.dumps(value, cls=_RetainedJSONEncoder, sort_keys=True).encode()).hexdigest()
 
 
 def _cohort(owner):

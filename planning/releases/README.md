@@ -13,6 +13,19 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## 0.9.18 candidate: client-published migration
+
+The maintainer authorized [0.9.18 preparation](0.9.18-candidate.md), validation,
+source/security review and direct-main push with automatic image, tag and durable
+receipt delivery. Baseline is 6963608b; its Build, CodeQL and Extended gates passed.
+The [current review](0.9.18-source-review.md), fresh local checks and bounded risk
+decision precede the release push. Exact-source hosted release validation and
+verified CI receipt delivery are required. Local preparation and both review axes
+passed; the maintainer accepted the candidate-specific CSP/COEP/KaTeX boundary.
+Hosted delivery remains required. No 0.9.18 publication, production
+deployment or live-data migration is claimed yet.
+The pinned candidate manifest above remains historical evidence.
+
 ## Client-published migration development after 0.9.17
 
 The maintainer authorized the [#105/#106 client-published slice](../migrations/client-published-document-migration.md),

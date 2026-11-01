@@ -945,3 +945,40 @@ def test_client_guard_migration_round_trip_preserves_history_and_restores_head(p
     with connection.cursor() as cursor:
         cursor.execute("SELECT pg_get_functiondef('tekdocs_validate_document_publication()'::regprocedure)")
         assert "Git publication audience proof is invalid" in cursor.fetchone()[0]
+
+
+def test_recovery_fingerprint_preserves_microsecond_notification_history(client_history):
+    from datetime import timedelta
+
+    from apps.core.models import Document, InboxNotification
+    from apps.core.tests.client_publication_fixture import (
+        TITLE,
+        client_publication_recovery_fingerprint,
+        exercise_client_publication_fixture,
+        seed_client_publication_fixture,
+    )
+
+    installation, *_rest = client_history
+    seed_client_publication_fixture(installation.owner)
+    exercise_client_publication_fixture(installation.owner)
+    document = Document.objects.get(tenant=installation.tenant, entity__display_name=TITLE)
+    notification = (
+        InboxNotification.objects.filter(
+            tenant=installation.tenant,
+            organization=document.organization,
+            recipient=installation.owner,
+            surface="msp",
+        )
+        .order_by("id")
+        .first()
+    )
+    assert notification is not None
+    original = notification.read_at
+    try:
+        timestamp = (notification.created_at + timedelta(days=1)).replace(microsecond=100001)
+        InboxNotification.objects.filter(pk=notification.pk).update(read_at=timestamp)
+        before = client_publication_recovery_fingerprint(installation.owner)
+        InboxNotification.objects.filter(pk=notification.pk).update(read_at=timestamp + timedelta(microseconds=1))
+        assert client_publication_recovery_fingerprint(installation.owner) != before
+    finally:
+        InboxNotification.objects.filter(pk=notification.pk).update(read_at=original)

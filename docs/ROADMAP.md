@@ -1,5 +1,11 @@
 # Release Roadmap
 
+The maintainer-authorized [0.9.18 candidate](../planning/releases/0.9.18-candidate.md)
+packages the completed client-published migration slice. Version metadata is
+0.9.18; preparation/security review and exact-source automatic release delivery
+are required before publication. Production migration and aggregate 1.0 acceptance
+remain separate.
+
 0.9.17 is published with the completed document-migration checkpoint, four
 verified images and automatic updater-receipt delivery. See the
 [publication closeout](../planning/releases/0.9.17-operational-closeout.md) for exact

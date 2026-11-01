@@ -14,6 +14,15 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
+## 0.9.18 candidate: client-published migration
+
+The [0.9.18 candidate](planning/releases/0.9.18-candidate.md) packages validated
+client-publication migration, audience-specific sections, retained signatures,
+PDFs/files and portal workflows, with independent approval and verified authority
+rollback/recovery. Preparation and source/security review are in progress.
+Automatic image/tag/receipt delivery requires exact-source hosted release gates;
+production deployment and live-data migration remain separate.
+
 ## Published 0.9.17 checkpoint
 
 The [0.9.17 candidate](planning/releases/0.9.17-candidate.md) consolidates the

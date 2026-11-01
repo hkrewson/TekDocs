@@ -1,20 +1,20 @@
 # Release Roadmap
 
-0.9.12 is published with dependency security fixes and automatic CI delivery of
-four images, verified provenance and updater receipts. See
-[publication closeout](../planning/releases/0.9.12-operational-closeout.md).
-Production deployment is unconfirmed. The next 1.0 work is the reversible first
-MSP document authority handoff (#105/#106); external pilots remain removed from
-scope by the maintainer's October 20 decision.
+0.9.17 is published with the completed document-migration checkpoint, four
+verified images and automatic updater-receipt delivery. See the
+[publication closeout](../planning/releases/0.9.17-operational-closeout.md) for exact
+source `835c4ff4`, successful hosted validation and retained failure boundaries.
+Production deployment and live-data promotion remain separately authorized actions.
+External pilots remain removed from scope by the maintainer's October 20 decision.
 
-Current release preparation: [0.9.17](../planning/releases/0.9.17-candidate.md)
-consolidates the completed migration slices. Version metadata advances to 0.9.17;
-release review and local preparation passed; the maintainer accepted the bounded
-candidate CSP/COEP/KaTeX disposition and authorized commit/push. Hosted release
-validation and automatic receipt delivery remain mandatory.
-This does not publish a release or authorize production migration.
+The [0.9.17 notes](../planning/releases/0.9.17-candidate.md) consolidate supported
+file, shared-block, enrolled-template, field/content-key, diagram and monitored-
+source migration. Rollback and exact recovery passed; copying/promoting documents
+remains an explicit reviewed action. Client-published legacy-document migration,
+broader reuse, recurring browser stability, tooling remediation and aggregate 1.0
+acceptance remain open. The bounded candidate risk decision is unchanged.
 
-Current development after 0.9.16: shared-block source `3495d96` and template
+Development slices included in 0.9.17: shared-block source `3495d96` and template
 source/enrollment runtime `4bb6bdd` passed their exact-source hosted gates. The
 bounded #105/#106 [template migration slice](../planning/migrations/template-enrollment-migration.md)
 is validated for copy/live/pinned semantics, retained signed history/files/PDFs,
@@ -22,7 +22,7 @@ reviewed controls, rollback and independent recovery. Its record links Build,
 CodeQL and Extended evidence and preserves failed attempts and reproduced fixes.
 This does not close aggregate 1.0 acceptance or authorize production migration.
 
-Current authorized continuation: [monitored-source migration](../planning/migrations/monitored-source-publication-migration.md)
+Monitored-source slice included in 0.9.17: [monitored-source migration](../planning/migrations/monitored-source-publication-migration.md)
 preserves settings, observations, local edits, signed history/PDFs and all file
 versions. The implementation adds reviewed Git updates and the promoted-reader
 source controls. Both source-review axes and five live browser/server journeys
@@ -32,7 +32,8 @@ database groups, 33 monitored cases, 89% backend coverage and five live publicat
 journeys. Hosted fresh/0.8.46 migration and encrypted recovery passed. Extended
 attempt 2 passed after an unchanged mobile Chromium retry following an infrastructure
 failure. The bounded slice is complete.
-The slice record owns the exact-source receipts and original failure. Version remains 0.9.16.
+The slice record owns its pre-release receipts and original failure. The bounded
+slice is included in the published 0.9.17 checkpoint above.
 
 The authoritative product scope is `docs/PRODUCT_CHARTER.md`. Patch releases are small, independently testable roadmap slices. Minor releases are stabilization checkpoints: they add no major capability and validate that the preceding patch line works as a coherent subsystem.
 

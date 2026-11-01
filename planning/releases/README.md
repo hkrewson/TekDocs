@@ -13,23 +13,32 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Preparing 0.9.17: migration consolidation
+## Published 0.9.17: migration consolidation
 
-The maintainer authorized [0.9.17 preparation](0.9.17-candidate.md) to package the
+The [0.9.17 release notes and risk decision](0.9.17-candidate.md) consolidate the
 completed file, shared-block, enrolled-template, field/content-key, diagram and
-monitored-source slices. Version metadata is advanced. Both source reviews and
-local preparation passed, including 793 frontend cases, 30 health/API/RLS cases,
-128 tooling checks and five real browser/server preservation journeys. The maintainer
-accepted the bounded 0.9.17 CSP/COEP/KaTeX disposition and authorized commit/push.
-Separate tooling findings remain open. Prior slice receipts
-remain supporting evidence. The exact release push must complete the single-push
-pipeline, including automatic application/receipt tags and image verification.
-Initial source `524d1d75` failed the live publication gate twice; all seventeen
-database groups, 89% coverage, CodeQL, browser-matrix retest, upgrades and recovery
-passed across the retained attempts. The [diagnostic follow-up](0.9.17-live-validation-follow-up.md)
-preserves the original timeouts and adds bounded failure-only timing evidence.
-The release remains unpublished pending exact-source validation and receipt delivery.
-Production deployment, live migration and Wiki publication remain separate.
+monitored-source slices. The [publication closeout](0.9.17-operational-closeout.md)
+records exact application `835c4ff4`, successful
+[Build 41275992112](https://github.com/hkrewson/TekDocs/actions/runs/41275992112)
+attempt 2, four published images, eight attestation verifications and automatic
+application/receipt tag delivery. Receipt commit is `63225d49`; independent
+read-only checks reconciled both tags, receipt contents and all four registry
+version aliases. The updater receipt needs no manual follow-up.
+
+All seventeen database groups, 89% combined backend coverage, 793 frontend cases,
+five browser configurations, five real publication journeys with server custody
+checks, supported upgrades and encrypted recovery passed on the exact release
+source. The performance retry passed four constrained-browser cases without
+browser retries after an MCR image retrieval failure. Successful source checks
+retain attempt-1 evidence; performance and delivery have attempt-2 provenance.
+
+Initial source `524d1d75` failed two live journeys twice. The reviewed
+[diagnostic follow-up](0.9.17-live-validation-follow-up.md) preserves those unknown
+causes and adds bounded failure-only timing evidence without weakening checks.
+The [failure ledger](validation-failures.json) retains every failed attempt;
+recurring browser stability and separate tooling findings remain 1.0 obligations.
+The maintainer's bounded CSP/COEP/KaTeX decision is unchanged. Production deployment,
+live migration and Wiki publication remain separate.
 
 ## Monitored-source development after 0.9.16
 

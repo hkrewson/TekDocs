@@ -14,14 +14,16 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
-## 0.9.17 release checkpoint
+## Published 0.9.17 checkpoint
 
 The [0.9.17 candidate](planning/releases/0.9.17-candidate.md) consolidates the
 validated file, shared-block, enrolled-template, field/content-key, diagram and
 monitored-source migration slices. It preserves retained signed publications,
 PDFs and file versions, with explicit migration, rollback and recovery controls.
-Release preparation is not publication or production deployment. Client-published
-document migration and final 1.0 acceptance remain separate work.
+The [publication closeout](planning/releases/0.9.17-operational-closeout.md) records
+passing release validation, four verified images and automatic updater-receipt
+delivery. Production deployment, client-published document migration and final
+1.0 acceptance remain separate work.
 
 ## Capabilities
 

@@ -21,10 +21,15 @@ the client inbox stayed empty for the original 75-second notification assertion.
 The [follow-up](0.9.17-portal-notification-follow-up.md) preserves that unknown
 cause, passing unchanged local replays and the reproduced loss of worker evidence.
 The bounded correction adds failure-only service/task/count diagnostics before
-teardown; it makes no application-fix claim. The complete unchanged hosted retry passed on attempt 2, including the
-workspace/server and five publication/server journeys plus production-image scans.
-Exact-source validation of the diagnostic correction remains pending. Published release identities
-below are unchanged; latest-main validation is tracked separately.
+teardown; it makes no application-fix claim. The complete unchanged baseline retry
+passed on attempt 2. Exact diagnostic source `844d3673` passed
+[Build 41322102488](https://github.com/hkrewson/TekDocs/actions/runs/41322102488)
+on attempt 1, including all seventeen database groups, 89% coverage, 793 frontend
+cases, the workspace and five publication/server journeys, production-image
+rehearsals and scans. All original assertions and deadlines are unchanged. Causal
+diagnosis of the original notification failure remains blocked by lost evidence
+and no reproduced recurrence. Published release identities below are unchanged;
+later evidence-only commits make no new application-validation claim.
 
 ## Published 0.9.17: migration consolidation
 

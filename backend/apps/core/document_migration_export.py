@@ -122,7 +122,7 @@ def _source(frontmatter: dict[str, object], markdown: str) -> bytes:
 
 
 def _include_source(placement: DocumentPlacement, pinned_commits: dict[uuid.UUID, str]) -> dict[str, str]:
-    source = {"id": str(placement.block_id), "mode": "live", "audience": "shared"}
+    source = {"id": str(placement.block_id), "mode": "live", "audience": placement.audience_profile}
     if placement.resolution_mode == PlacementResolutionMode.PINNED:
         source.update({"mode": "pinned", "commit": pinned_commits[placement.block_id]})
     if placement.block.organization_id != placement.organization_id:

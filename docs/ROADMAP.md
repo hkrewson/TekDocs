@@ -20,6 +20,14 @@ addresses a reproduced four-minute server shutdown and separates independent
 history/template browser cases. Delayed HTTP and standard six-case browser/server
 validation passed locally with zero retries; exact-source hosted validation follows.
 
+The maintainer-authorized [client-published migration continuation](../planning/migrations/client-published-document-migration.md)
+includes MSP-only/client-only section profiles, retained client access, signatures,
+PDFs, file versions, portal controls, isolation, rollback and encrypted recovery.
+Implementation, both source-review axes and local gates passed after 0.9.17.
+Exact-source hosted checks and commit-bound artifacts establish upgrade/recovery
+delivery; see the linked slice evidence. This does not authorize live-data
+migration or close aggregate 1.0 acceptance.
+
 Development slices included in 0.9.17: shared-block source `3495d96` and template
 source/enrollment runtime `4bb6bdd` passed their exact-source hosted gates. The
 bounded #105/#106 [template migration slice](../planning/migrations/template-enrollment-migration.md)

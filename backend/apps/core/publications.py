@@ -248,16 +248,15 @@ def publish_document(
         content_id=document.id,
         authority=DocumentAuthorityMode.REPOSITORY,
     ).exists():
-        from .document_git_publications import publish_internal_git_document
+        from .document_git_publications import publish_git_document
 
-        if audience != PublicationAudience.MSP_INTERNAL or retention != "permanent" or retention_review_on is not None:
-            raise PublicationConflict("Publication parity supports internal permanent Git snapshots only")
         try:
-            return publish_internal_git_document(
+            return publish_git_document(
                 workspace=workspace,
                 document=document,
                 actor=User.objects.get(pk=actor_id),
                 reason=reason,
+                audience=audience, retention=retention, retention_review_on=retention_review_on,
                 supersedes_entity_id=supersedes_entity_id,
             )
         except PublicationConflict as exc:

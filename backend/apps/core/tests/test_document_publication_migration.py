@@ -473,7 +473,7 @@ def test_history_authority_transition_enforces_operator_and_reader_identity(publ
     )
 
 
-def test_valid_history_with_review_retention_still_requires_broader_parity(published_context):
+def test_valid_review_retention_history_has_migration_parity(published_context):
     from datetime import timedelta
 
     from django.utils import timezone
@@ -490,5 +490,4 @@ def test_valid_history_with_review_retention_still_requires_broader_parity(publi
         supersedes_entity_id=original.entity_id,
     )
     assert assess_retained_publications(workspace=workspace, document=document)["state"] == "verified"
-    with pytest.raises(DocumentMigrationBlocked, match="publication_parity_required"):
-        prepare_document_import(workspace=workspace, document_id=document.id)
+    assert prepare_document_import(workspace=workspace, document_id=document.id).publication_evidence_sha256

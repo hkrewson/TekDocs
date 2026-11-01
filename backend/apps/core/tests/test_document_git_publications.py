@@ -571,3 +571,22 @@ def test_stale_approved_review_cannot_publish_changed_git(promoted):
             retention="permanent",
             retention_review_on=None,
         )
+
+
+@pytest.mark.parametrize("sources", [[], None, {}, [None]])
+def test_malformed_retained_git_source_is_rejected_without_raising(promoted, sources):
+    from copy import copy, deepcopy
+
+    from apps.core.document_git_publications import verify_git_publication_source
+
+    installation, _workspace, _repository, document, reader = promoted
+    publication = publish_internal_git_document(
+        workspace=reader, document=document, actor=installation.owner,
+        reason="Malformed retained proof fixture", audience="msp_internal", retention="permanent",
+        retention_review_on=None,
+    )
+    assert verify_git_publication_source(publication)
+    damaged = copy(publication)
+    damaged.manifest = deepcopy(publication.manifest)
+    damaged.manifest["git_source"]["sources"] = sources
+    assert verify_git_publication_source(damaged) is False

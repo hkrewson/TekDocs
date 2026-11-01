@@ -60,7 +60,7 @@ class PublicationAcceptanceProtocolTests(unittest.TestCase):
     def test_shared_budget_preserves_case_limit_and_bounds_suite(self):
         budget = json.loads(self.budget.read_text())
         self.assertEqual(budget["test_timeout_ms"], 120000)
-        self.assertGreater(budget["suite_timeout_ms"], 6 * budget["test_timeout_ms"])
+        self.assertGreater(budget["suite_timeout_ms"], 7 * budget["test_timeout_ms"])
         self.assertEqual(protocol.completion_timeout_seconds(self.budget), 960)
 
     def test_invalid_or_unbounded_budget_is_rejected(self):

@@ -107,6 +107,19 @@ run_monitored_source_fixture() {
     < "$repository_root/backend/apps/core/tests/monitored_source_fixture.py"
 }
 
+run_client_publication_fixture() {
+  client_publication_project=$1
+  client_publication_environment=$2
+  client_publication_directory=$3
+  client_publication_mode=$4
+  client_publication_legacy_sha=${5:-}
+  compose_for "$client_publication_project" "$client_publication_environment" "$client_publication_directory" run --rm -T \
+    -e TEKDOCS_CLIENT_PUBLICATION_FIXTURE_MODE="$client_publication_mode" \
+    -e TEKDOCS_CLIENT_PUBLICATION_LEGACY_SHA256="$client_publication_legacy_sha" \
+    migrate python manage.py shell --no-imports \
+    < "$repository_root/backend/apps/core/tests/client_publication_fixture.py"
+}
+
 #=========================# MAIN #==========================#
 trap cleanup EXIT HUP INT TERM
 
@@ -143,6 +156,9 @@ printf '%s\n' "$content_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 compose_for "$upgrade_project" "$upgrade_environment" "$repository_root" up -d --build --wait diagram-renderer
 run_diagram_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/diagram-legacy.log"
 run_monitored_source_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/monitored_source-legacy.log"
+run_client_publication_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/client-publication-upgrade.log"
+client_publication_upgrade_sha=$(sed -n 's/^CLIENT_PUBLICATION_LEGACY_SHA256=//p' "$work_directory/client-publication-upgrade.log")
+printf '%s\n' "$client_publication_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 diagram_upgrade_sha=$(sed -n 's/^DIAGRAM_LEGACY_SHA256=//p' "$work_directory/diagram-legacy.log")
 monitored_source_upgrade_sha=$(sed -n 's/^MONITORED_SOURCE_LEGACY_SHA256=//p' "$work_directory/monitored_source-legacy.log")
 printf '%s\n' "$diagram_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
@@ -161,6 +177,7 @@ run_addressed_fixture "$upgrade_project" "$upgrade_environment" "$repository_roo
 run_content_key_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$content_upgrade_sha"
 run_diagram_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$diagram_upgrade_sha"
 run_monitored_source_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$monitored_source_upgrade_sha"
+run_client_publication_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$client_publication_upgrade_sha"
 
 echo "Running the identical migration workflow on a fresh installation"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" up -d --build --wait backend
@@ -171,6 +188,9 @@ printf '%s\n' "$addressed_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 run_content_key_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/content-fresh.log"
 run_diagram_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/diagram-fresh.log"
 run_monitored_source_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/monitored_source-fresh.log"
+run_client_publication_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/client-publication-fresh.log"
+client_publication_fresh_sha=$(sed -n 's/^CLIENT_PUBLICATION_LEGACY_SHA256=//p' "$work_directory/client-publication-fresh.log")
+printf '%s\n' "$client_publication_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 diagram_fresh_sha=$(sed -n 's/^DIAGRAM_LEGACY_SHA256=//p' "$work_directory/diagram-fresh.log")
 monitored_source_fresh_sha=$(sed -n 's/^MONITORED_SOURCE_LEGACY_SHA256=//p' "$work_directory/monitored_source-fresh.log")
 printf '%s\n' "$diagram_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
@@ -187,6 +207,7 @@ run_addressed_fixture "$fresh_project" "$fresh_environment" "$repository_root" p
 run_content_key_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$content_fresh_sha"
 run_diagram_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$diagram_fresh_sha"
 run_monitored_source_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$monitored_source_fresh_sha"
+run_client_publication_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$client_publication_fresh_sha"
 cmp "$work_directory/upgraded-result.json" "$work_directory/fresh-result.json"
 
 echo "Document migration fresh/0.8.46 upgrade acceptance passed"

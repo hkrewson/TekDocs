@@ -104,7 +104,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
                 "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
             }
-            or publication.audience != "msp_internal"
+            or publication.audience not in {"msp_internal", "client_visible"}
+            or (publication.audience == "client_visible" and workspace.organization_id is None)
             or sum(item.kind == "pdf" for item in artifacts) != 1
             or any(item.kind not in {"pdf", "attachment", "diagram_svg", "diagram_png"} for item in artifacts)
             or any(item.kind == "attachment" and (
@@ -159,9 +160,9 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
                 "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
             }:
-                from .document_git_publications import verify_internal_git_publication
+                from .document_git_publications import verify_git_publication
 
-                if not verify_internal_git_publication(publication):
+                if not verify_git_publication(publication):
                     reasons.add("publication_git_source_invalid")
             if not verify_publication(publication)["valid"]:
                 reasons.add("publication_signature_invalid")
@@ -207,7 +208,7 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
 def publication_migration_evidence(
     *, workspace: Workspace, document: Document, assessment: dict[str, object] | None = None
 ) -> str | None:
-    """Verify the internal, permanent, reversible-composition migration boundary.
+    """Verify retained history and the reversible-composition migration boundary.
 
     The fingerprint binds a preview to retained history; it is neither permission
     to change authority nor a substitute for rechecking custody at execution.
@@ -227,10 +228,7 @@ def publication_migration_evidence(
     )
     if report["state"] != "verified" or not isinstance(report["evidence_sha256"], str):
         return None
-    if (
-        document.archived_at is not None
-        or DocumentPublication.objects.filter(document=document).exclude(retention="permanent").exists()
-    ):
+    if document.archived_at is not None:
         return None
     try:
         template_enrollment_fingerprint(document)

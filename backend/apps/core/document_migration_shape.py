@@ -28,7 +28,8 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
         raise DocumentMigrationShapeError("composed_or_missing_placements")
     if len(placements) + 1 > MAX_COMPOSITION_NODES:
         raise DocumentMigrationShapeError("composition_node_limit_exceeded")
-    placement_ids = {placement.id for placement in placements}
+    placements_by_id = {placement.id: placement for placement in placements}
+    placement_ids = set(placements_by_id)
     if len(placement_ids) != len(placements) or len({placement.block_id for placement in placements}) != len(
         placements
     ):
@@ -49,7 +50,7 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
             placement.document_id != document.id
             or placement.tenant_id != document.tenant_id
             or placement.organization_id != document.organization_id
-            or placement.audience_profile != PlacementAudienceProfile.SHARED
+            or placement.audience_profile not in PlacementAudienceProfile.values
         ):
             raise DocumentMigrationShapeError("non_primary_or_pinned_placement")
         if placement.resolution_mode == PlacementResolutionMode.LIVE:
@@ -72,6 +73,15 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
             raise DocumentMigrationShapeError("cross_workspace_reference")
         if placement.parent_id is not None and placement.parent_id not in placement_ids:
             raise DocumentMigrationShapeError("unsupported_placement_graph")
+        if placement.parent_id is not None:
+            parent = placements_by_id[placement.parent_id]
+            if (
+                parent.audience_profile != PlacementAudienceProfile.SHARED
+                and parent.audience_profile != placement.audience_profile
+            ):
+                raise DocumentMigrationShapeError("unsupported_placement_graph")
+        elif placement.position == 0 and placement.audience_profile != PlacementAudienceProfile.SHARED:
+            raise DocumentMigrationShapeError("non_primary_or_pinned_placement")
         children.setdefault(placement.parent_id, []).append(placement)
     ordered_children: dict[uuid.UUID | None, tuple[DocumentPlacement, ...]] = {}
     for parent_id, siblings in children.items():

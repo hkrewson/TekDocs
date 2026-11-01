@@ -247,7 +247,16 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         monitored_source_legacy = monitored_source_retained_state(installation.owner)
         promote_monitored_source_fixture(installation.owner)
 
+        from apps.core.tests.client_publication_fixture import (
+            client_publication_browser_state,
+            prepare_client_publication_fixture,
+            seed_client_publication_fixture,
+        )
+
+        seed_client_publication_fixture(installation.owner)
+        client_publication_legacy = prepare_client_publication_fixture(installation.owner)
         prepared_state = {
+            "client_publication": client_publication_browser_state(installation.owner),
             "addressed": addressed_fixture.browser,
             "content_keys": content_key_browser_state(installation.owner),
             "diagrams": diagram_browser_state(installation.owner),
@@ -354,3 +363,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.monitored_source_fixture import verify_monitored_source_browser_fixture
 
         verify_monitored_source_browser_fixture(installation.owner, monitored_source_legacy)
+
+        from apps.core.tests.client_publication_fixture import verify_client_publication_fixture
+
+        verify_client_publication_fixture(installation.owner, client_publication_legacy)

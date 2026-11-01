@@ -1715,3 +1715,39 @@ it('shows retained publication graphics from authorized artifact URLs with their
   expect(screen.getByText('Accessible diagram source')).toBeVisible()
   expect(window.document.querySelector('img[src^="data:"]')).toBeNull()
 })
+
+it('publishes a promoted organization document for its client with review retention', async () => {
+  const user = userEvent.setup()
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const { documents, workspaces, publish } = clients()
+  documents.list = vi.fn().mockResolvedValue({
+    results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1,
+  })
+  render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
+  await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  await user.selectOptions(screen.getByLabelText('Who can see it?'), 'client_visible')
+  await user.selectOptions(screen.getByLabelText('How long should it be kept?'), 'review_on')
+  await user.type(screen.getByLabelText('Review date'), '2027-01-15')
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Reviewed client release')
+  await user.click(screen.getByRole('button', { name: 'Publish' }))
+  await waitFor(() => expect(publish).toHaveBeenCalledWith({ organizationId: 'org-1' }, 'doc-1', {
+    reason: 'Reviewed client release', audience: 'client_visible', retention: 'review_on',
+    retention_review_on: '2027-01-15', supersedes_id: null,
+  }))
+})
+
+it('uses the correction submit control for a retained promoted client publication', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces, publication } = clients()
+  documents.list = vi.fn().mockResolvedValue({
+    results: [{ ...document, content_authority: 'repository', content_id: 'content-1' }], count: 1,
+  })
+  documents.getPublication = vi.fn().mockResolvedValue({ ...publication, audience: 'client_visible' })
+  testingRender(<ApplicationRouter initialPath="/workspaces/organizations/org-1/documentation?document=doc-1&publication=publication-1"><Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} initialDocumentId="doc-1" /></ApplicationRouter>)
+  await user.click(await screen.findByRole('button', { name: 'Publish correction' }))
+  await user.type(screen.getByLabelText('Why are you publishing this?'), 'Correct retained client publication')
+  expect(screen.getByLabelText('Who can see it?')).toHaveValue('client_visible')
+  expect(screen.getByRole('button', { name: 'Publish correction' })).toBeEnabled()
+  expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+})

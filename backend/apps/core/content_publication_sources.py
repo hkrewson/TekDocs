@@ -136,7 +136,7 @@ def freeze_git_document_dependencies(
         ):
             raise ContentPublicationSourceError("Indexed repository metadata differs from its accepted source")
         variant = variants[content_id][audience]
-        if node.composition_variants.get(audience) != variant:
+        if node.composition_variants != variants[content_id]:
             raise ContentPublicationSourceError("Indexed repository composition differs from its accepted source")
 
         evidence = [

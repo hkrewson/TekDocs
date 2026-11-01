@@ -7,12 +7,14 @@ import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
-type State = { monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type ClientPublicationState = { organization_id: string; document_id: string; content_id: string; original_id: string; original_pdf_filename: string; original_pdf_sha256: string; review_on: string; companion_publication_id: string; sessions: { approver: string; client: string }; files: { filename: string; sha256: string }[] }
+type State = { client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
+const additionalDiagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>[]>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('template sources') ? 'templates' : info.title.startsWith('migrated signed') ? 'history_templates'
+  const scenario = info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : info.title.startsWith('migrated signed') ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -40,7 +42,11 @@ test.afterEach(async ({ page }, info) => {
       }
     }
     diagnostic.finish(info.status ?? 'unknown', visible)
-  } finally { diagnostic.dispose(); diagnostics.delete(page) }
+  } finally {
+    for (const extra of additionalDiagnostics.get(page) ?? []) { extra.finish(info.status ?? 'unknown'); extra.dispose() }
+    additionalDiagnostics.delete(page)
+    diagnostic.dispose(); diagnostics.delete(page)
+  }
 })
 
 async function downloadPdf(page: Page) {
@@ -447,4 +453,85 @@ test('monitored sources preserve local edits, require a fresh review and retain 
   })
   expect(publication.canonical_markdown).toContain('Local recovery note must survive.')
   await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v6')
+})
+
+
+test('client publications retain portal access, independent approval, audience files and withdrawal', async ({ page, browser }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const fixture = state.client_publication
+  const path = `/workspaces/organizations/${fixture.organization_id}/documentation?document=${fixture.document_id}`
+  const endpoint = `/api/v1/workspaces/organizations/${fixture.organization_id}/documents/${fixture.document_id}/publications`
+  const portal = '/api/v1/portal/documents'
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  page.on('dialog', dialog => void dialog.accept())
+  await page.setViewportSize({ width: 390, height: 844 })
+  const client = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  const approver = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  try {
+    await client.addCookies([{ name: state.session_name, value: fixture.sessions.client, url: 'http://localhost:8080' }])
+    await approver.addCookies([{ name: state.session_name, value: fixture.sessions.approver, url: 'http://localhost:8080' }])
+    const clientPage = await client.newPage(), approverPage = await approver.newPage()
+    approverPage.on('dialog', dialog => void dialog.accept())
+    additionalDiagnostics.set(page, [clientPage, approverPage].map(selected => attachPublicationDiagnostics(selected, { scenario: 'client_publications' })))
+    await clientPage.goto(`/portal?section=documents&document=${fixture.original_id}`)
+    await expect(clientPage.getByRole('heading', { name: 'Client publication migration acceptance guide', exact: true })).toBeVisible()
+    await expect(clientPage.getByText('Retained shared client instructions.', { exact: true })).toBeVisible()
+    await expect(clientPage.getByText('MSP-only migration instructions.', { exact: true })).toHaveCount(0)
+    const downloadFile = async (filename: string, checksum: string) => {
+      const waiting = clientPage.waitForEvent('download')
+      await clientPage.getByRole('link', { name: filename, exact: true }).click()
+      const download = await waiting
+      try {
+        expect(await download.failure()).toBeNull()
+        expect(createHash('sha256').update(await readFile(await download.path())).digest('hex')).toBe(checksum)
+      } finally { await download.delete() }
+    }
+    await downloadFile(fixture.original_pdf_filename, fixture.original_pdf_sha256)
+    await page.goto(`${path}&publication=${fixture.original_id}`)
+    await page.getByRole('button', { name: 'Publish correction', exact: true }).click()
+    await page.getByLabel('Why are you publishing this?').fill('Client browser correction')
+    await expect(page.getByLabel('Who can see it?')).toHaveValue('client_visible')
+    await page.getByLabel('How long should it be kept?').selectOption('review_on')
+    await page.getByLabel('Review date', { exact: true }).fill(fixture.review_on)
+    await expect(page.getByRole('button', { name: 'Publish correction', exact: true })).toBeEnabled()
+    const creating = page.waitForResponse(response => new URL(response.url()).pathname === endpoint && response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Publish correction', exact: true }).click()
+    const created = await creating
+    expect(created.status()).toBe(201)
+    const publication = await created.json() as DocumentPublicationDetail
+    expect(publication.lifecycle_state).toBe('pending_approval')
+    expect(publication.verification.valid).toBe(true)
+    expect((await clientPage.request.get(`${portal}/${publication.id}`)).status()).toBe(404)
+    expect((await clientPage.request.get(`${portal}/${fixture.original_id}`)).status()).toBe(200)
+    await approverPage.goto(`${path}&publication=${publication.id}`)
+    await approverPage.getByRole('button', { name: 'History', exact: true }).click()
+    await approverPage.getByRole('button', { name: 'Approve publication', exact: true }).click()
+    await approverPage.getByLabel('Decision reason').fill('Independent client browser approval')
+    const approving = approverPage.waitForResponse(response => response.url().endsWith(`/publications/${publication.id}/approve`) && response.request().method() === 'POST')
+    await approverPage.getByRole('button', { name: 'Approve', exact: true }).click()
+    expect((await approving).status()).toBe(200)
+    await clientPage.goto(`/portal?section=documents&document=${publication.id}`)
+    await expect(clientPage.getByText('Current shared client instructions.', { exact: true })).toBeVisible()
+    await expect(clientPage.getByText('Client-only migration instructions.', { exact: true })).toBeVisible()
+    expect(await clientPage.locator('body').innerText()).not.toContain('Staff publication fixture site')
+    await expect(clientPage.getByRole('link', { name: 'staff-checklist.txt', exact: true })).toHaveCount(0)
+    for (const file of fixture.files) await downloadFile(file.filename, file.sha256)
+    const pdf = publication.artifacts.find(item => item.kind === 'pdf')
+    if (!pdf) throw new Error('The signed publication PDF descriptor is missing')
+    await downloadFile(pdf.filename, pdf.checksum)
+    expect((await clientPage.request.get(`${portal}/${fixture.original_id}`)).status()).toBe(404)
+    expect(await clientPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+    await approverPage.getByRole('button', { name: 'History', exact: true }).click()
+    await approverPage.getByRole('button', { name: 'Withdraw publication', exact: true }).click()
+    await approverPage.getByLabel('Decision reason').fill('Client browser withdrawal')
+    const withdrawing = approverPage.waitForResponse(response => response.url().endsWith(`/publications/${publication.id}/withdraw`) && response.request().method() === 'POST')
+    await approverPage.getByRole('button', { name: 'Withdraw', exact: true }).click()
+    expect((await withdrawing).status()).toBe(200)
+    expect((await clientPage.request.get(`${portal}/${publication.id}`)).status()).toBe(404)
+    expect((await clientPage.request.get(`${portal}/${publication.id}/artifacts/${pdf.id}/download`)).status()).toBe(404)
+    expect((await clientPage.request.get(`${portal}/${fixture.original_id}`)).status()).toBe(404)
+    await clientPage.goto('/portal?section=documents')
+    await expect(clientPage.getByRole('button', { name: /^Client publication recovery companion / })).toBeVisible()
+    await expect(clientPage.getByRole('button', { name: /^Client publication migration acceptance guide / })).toHaveCount(0)
+  } finally { await client.close(); await approver.close() }
 })

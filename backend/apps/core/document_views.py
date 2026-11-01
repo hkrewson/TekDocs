@@ -691,10 +691,10 @@ def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: 
     serializer.is_valid(raise_exception=True)
     document = _document(workspace, document_entity_id)
     if _legacy_content_unavailable(document):
-        from .document_git_publications import preflight_internal_git_document
+        from .document_git_publications import preflight_git_document
 
         return Response(
-            preflight_internal_git_document(
+            preflight_git_document(
                 document=document, audience=serializer.validated_data["audience"], workspace=workspace,
             )
         )

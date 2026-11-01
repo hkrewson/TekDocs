@@ -12,6 +12,7 @@ from .document_attachments import copy_attachment_content
 from .document_migration_attachments import portable_document_attachments
 from .models import Document, DocumentAttachment
 from .publications import MAX_RETAINED_ATTACHMENT_BYTES, MAX_RETAINED_ATTACHMENTS, PendingArtifact
+from .rendering import attachment_ids_in_markdown
 
 FILE_GIT_STATIC_FORMAT = "tekdocs-static-publication/v6"
 
@@ -22,7 +23,9 @@ class PublicationFile:
     descriptor: dict[str, Any]
 
 
-def prepare_publication_files(*, document: Document, markdown: str) -> tuple[PublicationFile, ...]:
+def prepare_publication_files(
+    *, document: Document, markdown: str, audience_filtered: bool = False,
+) -> tuple[PublicationFile, ...]:
     # Callers hold the repository and document locks, shared with upload/replace.
     portable_document_attachments(document, markdown)
     records = list(
@@ -31,6 +34,9 @@ def prepare_publication_files(*, document: Document, markdown: str) -> tuple[Pub
         .select_related("replaces")
         .order_by("purpose", "version_number", "entity_id")
     )
+    if audience_filtered:
+        requested = attachment_ids_in_markdown(markdown)
+        records = [record for record in records if record.purpose == "primary_file" or record.entity_id in requested]
     if len(records) > MAX_RETAINED_ATTACHMENTS:
         raise ValueError("Publication file count exceeds its retained limit")
     result = []

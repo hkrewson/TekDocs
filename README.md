@@ -25,6 +25,16 @@ passing release validation, four verified images and automatic updater-receipt
 delivery. Production deployment, client-published document migration and final
 1.0 acceptance remain separate work.
 
+## Client-published migration development
+
+The [client-published migration slice](planning/migrations/client-published-document-migration.md)
+extends the reviewed authority handoff to retained client publications and
+MSP-only/client-only section profiles. It preserves client links and signed
+artifacts while using the existing independent approval, correction and withdrawal
+workflow. Implementation, source review and local validation are complete after
+the published 0.9.17 checkpoint; exact-source hosted gates confirm delivery. See
+[development notes](planning/releases/client-published-migration-notes.md).
+
 ## Capabilities
 
 - MSP, client, vendor, manufacturer, and partner workspaces

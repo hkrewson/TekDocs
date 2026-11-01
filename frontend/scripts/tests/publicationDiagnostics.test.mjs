@@ -3,6 +3,35 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import { attachPublicationDiagnostics } from '../../e2e/publicationDiagnostics.ts'
 
+test('client workflow failures identify the boundary without retaining identities or session values', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'client_publications', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['GET', '/workspaces/organizations/private-organization'],
+    ['GET', '/portal/documents/private-publication'],
+    ['POST', '/workspaces/organizations/private-organization/documents/private-document/publications/private-publication/approve'],
+    ['POST', '/workspaces/organizations/private-organization/documents/private-document/publications/private-publication/withdraw'],
+  ]) {
+    const request = {
+      url: () => `http://localhost/api/v1${path}?private-key=private-value`, method: () => method,
+      headers: () => { throw new Error('Session headers must not be read') },
+      postData: () => { throw new Error('Content must not be read') },
+    }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 404 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'client_publications')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => [event.phase, event.status]), [
+    ['workspace_read', 404], ['portal_read', 404], ['publication_approve', 404], ['publication_withdraw', 404],
+  ])
+  assert.ok(!lines[0].includes('private-'))
+  assert.ok(!lines[0].includes('localhost'))
+  diagnostic.dispose()
+})
+
 test('failed acceptance reports public phase timings without request values', () => {
   const page = new EventEmitter()
   const lines = []

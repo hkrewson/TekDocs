@@ -3,7 +3,7 @@ import type { Page, Request, Response } from '@playwright/test'
 type Options = { scenario?: string; now?: () => number; write?: (line: string) => void }
 type Entry = { phase: string; at: number }
 type Event = { event: string; phase: string; ms: number; status?: number; elapsed_ms?: number }
-const scenarios = new Set(['templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
+const scenarios = new Set(['client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
 const milestones = new Set(['template', 'pdf_download', 'monitored', 'keyed'])
 const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload'] as const
 
@@ -18,6 +18,10 @@ function requestPhase(request: Request) {
   if (path.includes('/observations/') && path.endsWith('/apply')) return 'source_apply'
   if (path.endsWith('/remote-source') && method === 'PUT') return 'source_settings'
   if (path.endsWith('/content-graph/authoring')) return 'git_write'
+  if (/^\/api\/v1\/workspaces\/organizations\/[^/]+$/.test(path)) return 'workspace_read'
+  if (path.startsWith('/api/v1/portal/documents')) return 'portal_read'
+  if (path.includes('/publications/') && path.endsWith('/approve')) return 'publication_approve'
+  if (path.includes('/publications/') && path.endsWith('/withdraw')) return 'publication_withdraw'
   if (path.endsWith('/publications') && method === 'POST') return 'publication_create'
   if (path.includes('/export') || path.includes('/artifacts/')) return url.searchParams.get('export_format') === 'pdf' ? 'download_pdf' : 'download_file'
   if (path.includes('template')) return 'template_read'

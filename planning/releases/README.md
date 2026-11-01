@@ -13,6 +13,21 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Client-published migration development after 0.9.17
+
+The maintainer authorized the [#105/#106 client-published slice](../migrations/client-published-document-migration.md),
+including MSP-only and client-only sections. Preserve client access, signed
+publications, PDFs and all file versions; verify portal workflows, isolation,
+rollback and independent recovery. [Development notes](client-published-migration-notes.md)
+and ADR 0121 define the bounded behavior. Implementation, both source-review axes
+and local validation passed: 623 combined Docker cases, ten final portal/edge
+cases, 795 frontend cases and seven real browser/server journeys. Exact-source
+Actions checks and commit-bound artifacts on the feature commit following
+`34f7b864` establish hosted Build, CodeQL, fresh/0.8.46 upgrade and independent
+encrypted recovery. These are delivery gates, not an operator-requested follow-up.
+Version remains 0.9.17; release preparation and production changes are
+separate. Existing risk decisions and original unknown browser causes remain open.
+
 ## Post-publication 0.9.17 CI investigation
 
 The subsequent closing run `41325634983` passed workspace notifications but failed

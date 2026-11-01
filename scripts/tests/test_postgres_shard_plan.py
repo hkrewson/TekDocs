@@ -35,7 +35,7 @@ class PostgresShardPlanTests(unittest.TestCase):
             coverage = Path(directory)
             for shard in (
                 "route-access", "route-methods", "route-session", "accounts", "core-a", "core-b", "core-c",
-                "migration-foundation", "migration-isolation", "migration-guards", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration",
+                "migration-foundation", "migration-isolation", "migration-guards", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration",
             ):
                 (coverage / f"coverage.{shard}").write_bytes(b"fixture")
 
@@ -51,7 +51,7 @@ class PostgresShardPlanTests(unittest.TestCase):
             for shard in ("template-migration-a", "template-migration-b", "template-migration-c"):
                 (coverage / f"coverage.{shard}").write_bytes(b"fixture")
             self.assertEqual(combine().returncode, 0)
-            for shard in ("template-migration-a", "template-migration-b", "template-migration-c", "content-key-migration", "diagram-migration", "monitored-migration"):
+            for shard in ("template-migration-a", "template-migration-b", "template-migration-c", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration"):
                 artifact = coverage / f"coverage.{shard}"
                 artifact.unlink()
                 self.assertNotEqual(combine().returncode, 0)
@@ -108,7 +108,7 @@ class PostgresShardPlanTests(unittest.TestCase):
             "route-access", "route-methods", "route-session", "accounts", "core",
             "core-a", "core-b", "core-c", "migration-foundation", "migration-isolation",
             "migration-guards", "runtime", "template-migration",
-            "template-migration-a", "template-migration-b", "template-migration-c", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration",
+            "template-migration-a", "template-migration-b", "template-migration-c", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration",
         )
         with plan_environment() as environment:
             for shard in shards:
@@ -129,7 +129,7 @@ class PostgresShardPlanTests(unittest.TestCase):
 
         self.assertIn(
             "shard: [route-access, route-methods, route-session, accounts, "
-            "core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, migration-foundation, migration-isolation, "
+            "core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, "
             "migration-guards]",
             workflow,
         )
@@ -138,7 +138,7 @@ class PostgresShardPlanTests(unittest.TestCase):
         selected: list[str] = []
 
         with plan_environment() as environment:
-            for shard in ("core-a", "core-b", "core-c", "template-migration", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration"):
+            for shard in ("core-a", "core-b", "core-c", "template-migration", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration"):
                 result = subprocess.run(
                     [str(RUNNER), shard], cwd=ROOT, check=True,
                     capture_output=True, text=True, env=environment,
@@ -155,6 +155,19 @@ class PostgresShardPlanTests(unittest.TestCase):
 
         self.assertEqual(sorted(selected), expected)
         self.assertEqual(len(selected), len(set(selected)))
+
+    def test_client_publication_has_a_required_dedicated_partition(self) -> None:
+        with plan_environment() as environment:
+            result = subprocess.run(
+                [str(RUNNER), "client-publication-migration"], cwd=ROOT,
+                capture_output=True, text=True, env=environment,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            [line for line in result.stdout.splitlines() if line.endswith(".py")],
+            ["apps/core/tests/test_client_published_migration.py"],
+        )
+        self.assertIn("--ds=tekdocs.settings.test", result.stdout.splitlines())
 
 
 if __name__ == "__main__":

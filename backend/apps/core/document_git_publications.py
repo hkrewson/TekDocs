@@ -1,4 +1,4 @@
-"""Internal STATIC snapshots for supported promoted documents and shared sources."""
+"""Audience-scoped STATIC snapshots for supported promoted documents."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import base64
 import hashlib
 import uuid
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any
 
 from cryptography.hazmat.primitives import serialization
@@ -112,7 +112,9 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
                 manifest["format"] != FILE_GIT_STATIC_FORMAT
                 or verify_publication_file_manifest(manifest, publication.document_id)
             )
-            and publication.audience == manifest["audience"] == "msp_internal"
+            and publication.audience == manifest["audience"]
+            and publication.audience in {"msp_internal", "client_visible"}
+            and (publication.audience != "client_visible" or publication.organization_id is not None)
             and manifest["source_document_id"] == str(publication.document.entity_id)
             and (addressed or source["format"] == (
                 "tekdocs.git-dependencies/v2" if manifest["format"] == TEMPLATE_GIT_STATIC_FORMAT
@@ -120,11 +122,19 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             ))
             and source["content_id"] == str(publication.document_id)
             and source["workspace_id"] == str(publication.entity.workspace_id)
-            and source["audience"] == "msp_internal"
+            and source["audience"] == publication.audience
+            and isinstance(sources, list)
+            and len(sources) > 0
+            and isinstance(sources[0], dict)
+            and sources[0]["audience"] == publication.audience
+            and ("audience_filtered" not in source or source["audience_filtered"] is True)
+            and (publication.audience != "client_visible" or (
+                source.get("audience_filtered") is True
+                and manifest["format"] not in {GIT_STATIC_FORMAT, FILE_GIT_STATIC_FORMAT}
+            ))
             and source["markdown_sha256"] == hashlib.sha256(
                 (manifest["authored_markdown"] if addressed else publication.canonical_markdown).encode()
             ).hexdigest()
-            and isinstance(sources, list)
             and (shared or len(sources) == 2)
             and sources[0]["id"] == str(publication.document_id)
             and (shared
@@ -142,7 +152,7 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
         return False
 
 
-def verify_internal_git_publication(publication: DocumentPublication) -> bool:
+def verify_git_publication(publication: DocumentPublication) -> bool:
     """Verify retained bytes and signed identity independently of live Git."""
     return bool(
         verify_git_publication_source(publication)
@@ -153,7 +163,7 @@ def verify_internal_git_publication(publication: DocumentPublication) -> bool:
 
 def _validated_git_publication_content(
     *, document: Document, repository: WorkspaceRepository, source: dict[str, Any],
-    actor: User | None = None, signed_at: str = "",
+    actor: User | None = None, signed_at: str = "", audience: str = "msp_internal",
 ) -> PreparedGitPublication:
     """Share the publisher's exact content and custody gates with readiness checks."""
     if (
@@ -179,7 +189,8 @@ def _validated_git_publication_content(
     except ValueError as exc:
         raise PublicationConflict("Publication shape is not supported") from exc
     if (not any(p.block.source_document_id == document.id for p in placements)
-        or {item["id"] for item in source["sources"]} != {str(document.id), *(str(p.block_id) for p in placements)}):
+        or {item["id"] for item in source["sources"]} != {str(document.id), *(str(p.block_id) for p in placements
+                                              if p.audience_profile in {"shared", audience})}):
         raise PublicationConflict("Publication dependencies exceed the supported shape")
     from .document_template_migration import template_enrollment_evidence
 
@@ -199,14 +210,16 @@ def _validated_git_publication_content(
     if retired_ids != live_ids:
         raise PublicationConflict("Shared live content requires a complete authority handoff")
     node = ContentNode.objects.get(repository=repository, content_id=document.id)
-    variant = node.composition_variants.get("msp_internal", {})
+    variant = node.composition_variants.get(audience, {})
     markdown = variant.get("markdown")
     if not isinstance(markdown, str) or (
         variant.get("digest") != source["composition_digest"]
         or hashlib.sha256(markdown.encode()).hexdigest() != source["markdown_sha256"]
     ):
         raise PublicationConflict("Indexed composition does not match the pinned Git source")
-    if document.review_state == "approved" and document.review_content_sha256 != source["markdown_sha256"]:
+    if document.review_state == "approved" and document.review_content_sha256 != hashlib.sha256(
+        node.composition_variants["all"]["markdown"].encode()
+    ).hexdigest():
         raise PublicationConflict("Approved review does not match the pinned Git content")
     key_snapshot = None
     entities: list[RenderedEntityMention] = []
@@ -217,17 +230,20 @@ def _validated_git_publication_content(
         try:
             key_snapshot = freeze_repository_key_snapshot(
                 repository=repository, node=node, document=document, markdown=markdown,
-                audience="msp_internal", actor=actor, signed_at=signed_at,
+                audience=audience, actor=actor, signed_at=signed_at,
             )
             entities = freeze_repository_entity_cards(
                 repository=repository, markdown=key_snapshot["markdown"] if key_snapshot is not None else markdown,
-                audience="msp_internal", actor=actor, member=member,
+                audience=audience, actor=actor, member=member,
             )
         except RepositoryPublicationDependencyError as exc:
             raise PublicationConflict("Record dependencies are unavailable or outside the reviewed scope") from exc
     frozen_markdown = key_snapshot["markdown"] if key_snapshot is not None else markdown
     try:
-        files = prepare_publication_files(document=document, markdown=frozen_markdown)
+        files = prepare_publication_files(
+            document=document, markdown=frozen_markdown,
+            audience_filtered=audience == "client_visible" or any(p.audience_profile != "shared" for p in placements),
+        )
     except (ValueError, OSError) as exc:
         raise PublicationConflict("Managed file custody is unavailable") from exc
     try:
@@ -235,7 +251,7 @@ def _validated_git_publication_content(
     except ValueError as exc:
         raise PublicationConflict(str(exc)) from exc
     preflight = repository_publication_preflight(
-        markdown=frozen_markdown, audience="msp_internal", topic_type=node.topic_type or "unstructured",
+        markdown=frozen_markdown, audience=audience, topic_type=node.topic_type or "unstructured",
         frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},
         frozen_diagram_sources={item.source.source_checksum for item in diagrams},
         frozen_primary_file=any(item.descriptor["purpose"] == "primary_file" for item in files),
@@ -258,15 +274,17 @@ def _validated_git_publication_content(
     )
 
 
-def preflight_internal_git_document(
+def preflight_git_document(
     *, document: Document, audience: str, workspace: ResolvedWorkspace | None = None,
 ) -> dict[str, Any]:
     """Readiness only: callers authorize document visibility; publishing rechecks all gates."""
     findings = []
     digest = ""
     try:
-        if audience != "msp_internal":
-            raise PublicationConflict("Only internal snapshots are supported")
+        if audience not in {"msp_internal", "client_visible"} or (
+            audience == "client_visible" and document.organization_id is None
+        ):
+            raise PublicationConflict("The selected publication audience is unavailable")
         repository = WorkspaceRepository.objects.get(workspace=document.entity.workspace, tenant_id=document.tenant_id)
         with pinned_git_document_dependencies(
             repository_id=repository.id, content_id=document.id, audience=audience
@@ -279,7 +297,7 @@ def preflight_internal_git_document(
             prepared = _validated_git_publication_content(
                 document=locked, repository=repository, source=source,
                 actor=workspace.member.user if workspace is not None else None,
-                signed_at=_timestamp(timezone.now()),
+                signed_at=_timestamp(timezone.now()), audience=audience,
             )
             digest = source["composition_digest"]
             for code in prepared.preflight["warnings"]:
@@ -329,15 +347,18 @@ def preflight_internal_git_document(
     }
 
 
-def publish_internal_git_document(
+def publish_git_document(
     *,
     workspace: ResolvedWorkspace,
     document: Document,
     actor: User,
     reason: str,
     supersedes_entity_id: uuid.UUID | None = None,
+    audience: str = "msp_internal",
+    retention: str = "permanent",
+    retention_review_on: date | None = None,
 ) -> DocumentPublication:
-    """Append a signed internal snapshot for the bounded promoted shape."""
+    """Append an audience-scoped snapshot; client approval remains independent."""
     member = require_permission(actor, PermissionKey.DOCUMENTS_PUBLISH, organization=workspace.organization)
     owner = document.entity.workspace
     if (
@@ -347,6 +368,10 @@ def publish_internal_git_document(
         or owner.tenant_id != document.tenant_id
     ):
         raise PublicationConflict("Publication scope does not match the document")
+    if audience not in {"msp_internal", "client_visible"} or (
+        audience == "client_visible" and owner.organization_id is None
+    ):
+        raise PublicationConflict("The selected publication audience is unavailable")
     repository = WorkspaceRepository.objects.get(workspace=owner, tenant_id=member.tenant.id)
     stored = []
     try:
@@ -354,7 +379,7 @@ def publish_internal_git_document(
             pinned_git_document_dependencies(
                 repository_id=repository.id,
                 content_id=document.id,
-                audience="msp_internal",
+                audience=audience,
             ) as source,
             transaction.atomic(),
         ):
@@ -370,7 +395,7 @@ def publish_internal_git_document(
             created_at = timezone.now()
             prepared = _validated_git_publication_content(
                 document=locked, repository=repository, source=source, actor=actor,
-                signed_at=_timestamp(created_at),
+                signed_at=_timestamp(created_at), audience=audience,
             )
             node, markdown, files = prepared.node, prepared.markdown, prepared.files
             predecessor = None
@@ -385,6 +410,7 @@ def publish_internal_git_document(
                 ).first()
                 if (
                     predecessor is None
+                    or predecessor.audience != audience
                     or predecessor.lifecycle_state not in {"published", "review_due", "withdrawn"}
                     or not verify_publication(predecessor)["valid"]
                     or not verify_retained_publication_custody(predecessor)
@@ -400,7 +426,7 @@ def publish_internal_git_document(
                 entity_mentions={item["id"]: item for item in prepared.entities},
                 publication_id=str(entity_id) if files else "",
                 published_at=_timestamp(created_at) if files else "",
-                audience="msp_internal" if files else "", reason=reason if files else "",
+                audience=audience if files else "", reason=reason if files else "",
             )
             if not pdf.startswith(b"%PDF-") or len(pdf) > 8 * 1024 * 1024:
                 raise PublicationConflict("Publication PDF is unavailable or exceeds its limit")
@@ -422,9 +448,19 @@ def publish_internal_git_document(
                     "content_id": str(locked.id), "revision": str(version.id), "checksum": version.checksum,
                 }
                 source = {**source, "format": "tekdocs.git-dependencies/v2"}
-            shared_composition = (source["format"] == "tekdocs.git-dependencies/v2"
-                                  or len(source["sources"]) != 2
+            if audience == "client_visible" or locked.placements.exclude(audience_profile="shared").exists():
+                source = {**source, "audience_filtered": True}
+            shared_composition = (retention != "permanent" or source.get("audience_filtered") is True
+                                  or source["format"] == "tekdocs.git-dependencies/v2"
+                                  or locked.placements.count() != 1 or len(source["sources"]) != 2
                                   or any(s["mode"] == "pinned" for s in source["sources"]))
+            key_bindings = node.frontmatter.get("key_bindings", {})
+            if source.get("audience_filtered") is True:
+                used = {
+                    record["expression"].split(".", 1)[0]
+                    for record in (prepared.key_snapshot["records"] if prepared.key_snapshot is not None else [])
+                }
+                key_bindings = {name: target for name, target in key_bindings.items() if name in used}
             manifest = {
                 "format": (CONTENT_KEY_GIT_STATIC_FORMAT if prepared.key_snapshot is not None
                            and any(item["kind"] == "content" for item in prepared.key_snapshot["records"])
@@ -442,15 +478,15 @@ def publish_internal_git_document(
                 "title": node.title,
                 "category": locked.category,
                 "reason": reason,
-                "audience": "msp_internal",
-                "retention": "permanent",
-                "retention_review_on": None,
+                "audience": audience,
+                "retention": retention,
+                "retention_review_on": retention_review_on.isoformat() if retention_review_on else None,
                 "supersedes_id": str(predecessor.entity_id) if predecessor else None,
                 "published_by": str(actor.id),
                 "published_at": _timestamp(created_at),
                 "git_source": source,
                 **({"authored_markdown": prepared.authored_markdown,
-                    "key_bindings": node.frontmatter.get("key_bindings", {}),
+                    "key_bindings": key_bindings,
                     "key_snapshot": prepared.key_snapshot} if prepared.addressed else {}),
                 **({"template_source": template_source} if template_source is not None else {}),
                 "artifacts": [_artifact_descriptor(pending), *[_artifact_descriptor(f.artifact) for f in files],
@@ -486,7 +522,7 @@ def publish_internal_git_document(
                 workspace=owner,
                 entity_type="document_publication",
                 display_name=node.title,
-                visibility="msp_private",
+                visibility="client_visible" if audience == "client_visible" else "msp_private",
             )
             publication = DocumentPublication(
                 id=publication_id,
@@ -497,8 +533,9 @@ def publish_internal_git_document(
                 title=node.title,
                 category=locked.category,
                 reason=reason,
-                audience="msp_internal",
-                retention="permanent",
+                audience=audience,
+                retention=retention,
+                retention_review_on=retention_review_on,
                 supersedes=predecessor,
                 canonical_markdown=markdown,
                 sanitized_html=html,
@@ -513,7 +550,7 @@ def publish_internal_git_document(
             )
             publication.full_clean()
             publication.save()  # type: ignore[no-untyped-call]
-            for action in ("submitted", "approved"):
+            for action in (("submitted", "approved") if audience == "msp_internal" else ("submitted",)):
                 event = DocumentPublicationControlEvent(
                     tenant_id=locked.tenant_id,
                     organization=workspace.organization,
@@ -533,7 +570,7 @@ def publish_internal_git_document(
                     workspace=owner,
                     entity_type="document_publication_artifact",
                     display_name=retained.filename,
-                    visibility="msp_private",
+                    visibility="client_visible" if audience == "client_visible" else "msp_private",
                 )
                 artifact = DocumentPublicationArtifact(
                     id=retained.id,
@@ -575,3 +612,10 @@ def publish_internal_git_document(
         if isinstance(exc, ContentPublicationSourceError | ContentNode.DoesNotExist | WorkspaceRepository.DoesNotExist):
             raise PublicationConflict("Git publication source is unavailable") from exc
         raise
+
+
+# Compatibility names used by retained internal migration fixtures.
+publish_internal_git_document = publish_git_document
+preflight_internal_git_document = preflight_git_document
+
+verify_internal_git_publication = verify_git_publication

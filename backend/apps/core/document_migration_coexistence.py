@@ -105,10 +105,18 @@ def document_coexistence_status(
             repository_read = document_detail(
                 workspace=reader_workspace, content_id=document.id, audience="msp_internal"
             )
-            legacy_markdown = resolve_document(document).markdown
+            legacy_markdown = resolve_document(document, audience="msp_internal").markdown
             legacy_references = _visible_legacy_references(document=document, reader_workspace=reader_workspace)
             legacy_html = _render_legacy_document(
                 document=document, reader_workspace=reader_workspace, markdown=legacy_markdown
+            )
+            variants = ContentNode.objects.get(
+                repository__workspace=workspace, content_id=document.id
+            ).composition_variants
+            audiences_match = isinstance(variants, dict) and all(
+                isinstance(variants.get(audience), dict)
+                and variants[audience].get("markdown") == resolve_document(document, audience=audience).markdown
+                for audience in ("msp_internal", "client_visible")
             )
         except (
             Http404,
@@ -116,6 +124,7 @@ def document_coexistence_status(
             PlacementConflict,
             RepositoryContentNotIndexed,
             DocumentMigrationRelationshipError,
+            ContentNode.DoesNotExist,
         ):
             response["read_projection_state"] = "unavailable"
         else:
@@ -130,6 +139,7 @@ def document_coexistence_status(
                 and repository_read["markdown"] == legacy_markdown
                 and repository_read["sanitized_html"] == legacy_html
                 and repository_references == legacy_references
+                and audiences_match
                 else "different"
             )
     blockers = []

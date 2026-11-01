@@ -36,6 +36,10 @@ def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id:
             or manifest["git_source"]["markdown_sha256"] != hashlib.sha256(authored.encode()).hexdigest()
         ):
             return False
+        if manifest["git_source"].get("audience_filtered") is True and set(bindings) != {
+            record["expression"].split(".", 1)[0] for record in (snapshot["records"] if snapshot is not None else [])
+        }:
+            return False
         for name, target in bindings.items():
             if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,39}", name):
                 return False

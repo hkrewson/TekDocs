@@ -26,6 +26,8 @@ def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, libr
     try:
         source = manifest["git_source"]
         sources = source["sources"]
+        if any(item["audience"] != "shared" for item in sources[1:]) and source.get("audience_filtered") is not True:
+            return False
         object_pattern = r"[0-9a-f]{40}" if source["object_format"] == "sha1" else r"[0-9a-f]{64}"
         if source["object_format"] not in {"sha1", "sha256"} or not re.fullmatch(
             object_pattern,
@@ -73,7 +75,7 @@ def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, libr
                     identity != document_id
                     or path
                     or item["mode"] != "root"
-                    or item["audience"] != "msp_internal"
+                    or item["audience"] != manifest["audience"]
                     or item["commit"] != source["accepted_commit"]
                     or item["path"] != f"docs/{document_id}.md"
                 ):
@@ -81,7 +83,7 @@ def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, libr
             elif (
                 not path
                 or item["mode"] not in {"live", "pinned"}
-                or item["audience"] != "shared"
+                or item["audience"] not in {"shared", manifest["audience"]}
                 or item["path"] not in (
                     {f"fragments/{identity}.md", f"template-snapshots/{revision_id}/fragments/{identity}.content"}
                     if foreign and item["mode"] == "pinned" else {f"fragments/{identity}.md"}
@@ -112,10 +114,15 @@ def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, libr
             return False
         if paths != sorted(paths) or len(set(paths)) != len(paths):
             return False
-        for parent in paths:
-            ordinals = [path[-1] for path in paths if path and path[:-1] == parent]
-            if ordinals != list(range(len(ordinals))):
+        if source.get("audience_filtered") is True:
+            # Paths retain their original authoring ordinals after filtering.
+            if len(paths) < 2 or paths[1] != (0,):
                 return False
+        else:
+            for parent in paths:
+                ordinals = [path[-1] for path in paths if path and path[:-1] == parent]
+                if ordinals != list(range(len(ordinals))):
+                    return False
         if manifest["managed_files"]:
             return verify_publication_file_manifest(manifest, document_id)
         return bool(

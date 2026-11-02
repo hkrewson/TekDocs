@@ -57,9 +57,9 @@ case "$shard" in
     set -- $core_files "$matrix_file" -k \
       "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
     ;;
-  core-a|core-b|core-c)
+  core-a|core-a-1|core-a-2|core-b|core-c)
     case "$shard" in
-      core-a) partition=1 ;;
+      core-a|core-a-1|core-a-2) partition=1 ;;
       core-b) partition=2 ;;
       core-c) partition=0 ;;
     esac
@@ -74,6 +74,14 @@ case "$shard" in
       awk -v partition="$partition" \
         'NR % 3 == partition && $0 !~ /\/test_template_enrollment_migration\.py$/' | \
       sed "s|$repository_root/backend/||")
+    # Keep the original aggregate selector available, but divide its complete
+    # modules between two CI jobs so each retains headroom under the same limit.
+    case "$shard" in
+      core-a-1|core-a-2)
+        case "$shard" in core-a-1) subpartition=1 ;; core-a-2) subpartition=0 ;; esac
+        core_files=$(printf '%s\n' "$core_files" | awk -v partition="$subpartition" 'NR % 2 == partition')
+        ;;
+    esac
     # shellcheck disable=SC2086
     set -- $core_files
     if [ "$shard" = "core-c" ]; then
@@ -154,7 +162,7 @@ PARTITION
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|monitored-migration|client-publication-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-a-1|core-a-2|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|monitored-migration|client-publication-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac

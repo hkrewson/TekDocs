@@ -1276,9 +1276,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "docker compose build diagram-renderer reproduced Renderer expected Chromium 155.x but Alpine provided Chromium 156.0.8078.79 Alpine Linux before application execution.",
       "cause": "The Alpine package repository advanced to Chromium 156 while the deliberate renderer build assertion still required series 155.",
-      "next_action": "Keep the strict version assertion and advance the reviewed series to 156. Validate actual isolated rendering, deterministic output, sandbox, licenses and dependency contract locally; corrected-source hosted production-image, DAST and full Build/CodeQL/Extended gates remain mandatory.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "The strict Chromium series guard was advanced to 156 in b8afcca6 after local red/green image builds and 110 diagram/document cases. Corrected-source Extended 41499026415 attempt 1 passed DAST and every other Extended job on 3e275779, including encrypted recovery and supported upgrades. Preserve the original failed image-build attempt.",
+      "fix_commit": "b8afcca644b0dc0b9da57589da5ed66837da56f0",
+      "retest_run": "41499026415"
     },
     {
       "run_id": "41479563043",
@@ -1288,9 +1288,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Existing tekdocs migrate service, test database td_ci_cross_workspace_all: pytest test_cross_workspace_reuse_migration.py::test_cross_workspace_recovery_verifies_after_later_msp_fixture_writes reproduced cross_workspace_fixture.py recovery_verify AssertionError after one unrelated MSP document write, before any backup/restore. Diagnostic comparison showed only accepted Git heads differed; all other fingerprint categories and source blobs matched.",
       "cause": "Cross-Workspace recovery_create recorded the shared MSP accepted commit before later repository-content/publication fixtures finished source setup. Those fixtures advance the shared MSP head before backup, so the recorded baseline predates the backed-up state; corrected-source independent recovery remains mandatory.",
-      "next_action": "Capture the complete unchanged fingerprint through recovery_record immediately before the normal backup after final source setup. Keep exact commit/body/pin/authority/publication/file comparisons. Regression proves stale baseline denial, final baseline acceptance, and post-baseline source-change denial. Complete corrected-source hosted recovery, Build, CodeQL and Extended gates.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Corrected-source Extended 41499026415 attempt 1 passed independent encrypted recovery, repository-foundation acceptance, recurring invoice restore, upgrades and all other Extended jobs on 3e275779. Artifact 13170302459 was downloaded and its source/category/run/status binding verified. Preserve this original failed attempt. Overall Build and its separate unknown slowdown/loading causes have their own records.",
+      "fix_commit": "3e27577941b1b1f7ab6f883daf6e6680f929b969",
+      "retest_run": "41499026415"
     },
     {
       "run_id": "41479563043",
@@ -1300,7 +1300,55 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Hosted failure-summary job reports the failed Supported backup and restore job in the same run; it is an aggregate follow-up failure rather than a separate application failure.",
       "cause": "Expected failure-summary result because supported recovery failed its stale pre-backup fingerprint assertion.",
-      "next_action": "Retain this failed attempt and require successful corrected-source recovery and complete Extended validation.",
+      "next_action": "Corrected-source Extended 41499026415 attempt 1 passed independent encrypted recovery, repository-foundation acceptance, recurring invoice restore, upgrades and all other Extended jobs on 3e275779. Artifact 13170302459 was downloaded and its source/category/run/status binding verified. Preserve this original failed attempt. Overall Build and its separate unknown slowdown/loading causes have their own records.",
+      "fix_commit": "3e27577941b1b1f7ab6f883daf6e6680f929b969",
+      "retest_run": "41499026415"
+    },
+    {
+      "run_id": "41499000231",
+      "run_attempt": 1,
+      "job_id": "125461681942",
+      "job": "PostgreSQL shard (core-a)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted attempt 1 log and exact-source unchanged retest. No local application failure or diagnosis is claimed from the cancellation. The unchanged local browser gate passed all nine journeys and server custody checks. The existing-service core-a assertion replay passed 537 tests with three optional runtime skips in 616.50s; hosted coverage/provisioning differs, so this does not reproduce the cancellation.",
+      "cause": "unknown underlying slowdown; the hosted group was cancelled at its configured 30-minute job limit after passing progress through 53%, with no assertion failure recorded. The preceding source passed this group in about 26 minutes.",
+      "next_action": "Attempt 2 repeated both incomplete outcomes. Preserve both attempts. Split core-a into two disjoint whole-module jobs under the unchanged 30-minute limit and 80% combined coverage requirement. Synchronize functional publication acceptance with its exact scoped GET 200 and transfer completion before the unchanged DOM assertion; the original hosted latency cause remains unconfirmed. The real-response six-second delivery regression reproduced the loading failure before the synchronization fix. Require corrected-source Build, CodeQL and Extended validation.",
+      "fix_commit": null,
+      "retest_run": "41499000231"
+    },
+    {
+      "run_id": "41499000231",
+      "run_attempt": 1,
+      "job_id": "125465020061",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Replay the unchanged make test-publication-browser-live in the existing tekdocs services with its generated test database; exact-source hosted Build attempt 2 reruns the failed/incomplete jobs without changing assertions, deadlines or retries. The unchanged local browser gate passed all nine journeys and server custody checks. The existing-service core-a assertion replay passed 537 tests with three optional runtime skips in 616.50s; hosted coverage/provisioning differs, so this does not reproduce the cancellation.",
+      "cause": "unknown; the ninth cross-Workspace browser journey still displayed Loading Git-backed document at its existing five-second assertion. Earlier eight journeys passed. The value-free diagnostics show workspace metadata success but do not establish the pending document-read cause.",
+      "next_action": "Attempt 2 repeated both incomplete outcomes. Preserve both attempts. Split core-a into two disjoint whole-module jobs under the unchanged 30-minute limit and 80% combined coverage requirement. Synchronize functional publication acceptance with its exact scoped GET 200 and transfer completion before the unchanged DOM assertion; the original hosted latency cause remains unconfirmed. The real-response six-second delivery regression reproduced the loading failure before the synchronization fix. Require corrected-source Build, CodeQL and Extended validation.",
+      "fix_commit": null,
+      "retest_run": "41499000231"
+    },
+    {
+      "run_id": "41499000231",
+      "run_attempt": 2,
+      "job_id": "125482495552",
+      "job": "PostgreSQL shard (core-a)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Build 41499000231 attempt 2 repeated the cancellation on exact source 3e275779. Split-selection tests went red before implementation, then proved the two groups preserve every original module exactly once and require both coverage results.",
+      "cause": "unknown underlying slowdown; the unchanged retest again reached the configured 30-minute limit, with passing progress through 40% and no assertion failure recorded. The full 38-module local assertion replay passed 537 tests with three optional runtime skips in 616.50s; hosted provisioning and coverage differ.",
+      "next_action": "Preserve the unsuccessful attempts and their original timing uncertainty. Validate corrected-source CI after the complete local selection, privacy, browser/server, lint and type gates. Existing content assertions, configured test budgets, retry count and production permission/data behavior remain unchanged. Network completion now precedes the five-second DOM check, so this is functional synchronization, not an unchanged five-second end-to-end latency allowance.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41499000231",
+      "run_attempt": 2,
+      "job_id": "125482492866",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing-service focused cross-Workspace journey with the real Git response delayed six seconds: expected First retained library edition, received Loading Git-backed document at 5000ms, with git_document_read still pending. After synchronization, the complete nine-case Make browser/server gate passed, including the same delay, retained bytes, signatures, files and authority round-trip.",
+      "cause": "original hosted latency cause unconfirmed; the ninth cross-Workspace case repeated the five-second loading-state failure. A controlled real HTTP 200 response held for six seconds reproduced the same assertion at the public browser boundary, demonstrating the functional readiness race. This does not diagnose the original machine/network timing or claim faster application reads.",
+      "next_action": "Preserve the unsuccessful attempts and their original timing uncertainty. Validate corrected-source CI after the complete local selection, privacy, browser/server, lint and type gates. Existing content assertions, configured test budgets, retry count and production permission/data behavior remain unchanged. Network completion now precedes the five-second DOM check, so this is functional synchronization, not an unchanged five-second end-to-end latency allowance.",
       "fix_commit": null,
       "retest_run": null
     }

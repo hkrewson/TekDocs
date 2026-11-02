@@ -25,6 +25,11 @@ function requestPhase(request: Request) {
   if (path.endsWith('/publications') && method === 'POST') return 'publication_create'
   if (path.includes('/export') || path.includes('/artifacts/')) return url.searchParams.get('export_format') === 'pdf' ? 'download_pdf' : 'download_file'
   if (path.includes('template')) return 'template_read'
+  if (method === 'GET') {
+    if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/documents\/[^/]+$/.test(path)) return 'git_document_read'
+    if (/^\/api\/v1\/(?:workspaces\/organizations\/[^/]+\/)?documents$/.test(path)) return 'document_list'
+    if (/^\/api\/v1\/(?:workspaces\/organizations\/[^/]+\/)?documents\/[^/]+$/.test(path)) return 'document_read'
+  }
   return null
 }
 

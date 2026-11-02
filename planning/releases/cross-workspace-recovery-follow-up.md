@@ -57,6 +57,87 @@ Full independent encrypted restore provisions separate source/restore stacks;
 the single-local-project rule leaves it to corrected-source hosted CI.
 Local regression evidence does not establish independent restore success.
 
+## Corrected-source hosted recovery
+
+Runtime source `3e27577941b1b1f7ab6f883daf6e6680f929b969` passed the full
+[supported recovery job](https://github.com/hkrewson/TekDocs/actions/runs/41499026415/job/125461412208)
+on attempt 1, including encrypted recovery, repository-foundation acceptance
+and recurring invoice history after restore. Downloaded artifact 13170302459,
+`tekdocs-security-evidence-backup-and-restore-3e27577941b1b1f7ab6f883daf6e6680f929b969-1`,
+contains `backup_and_restore`, `status: passed`, the exact source commit and
+immutable identifier `41499026415:1:supported-recovery`. Its source/category/run
+binding was checked directly. This closes the reproduced stale-baseline recovery
+failure; overall CI and the original additional CI outcomes are separate.
+
+Build 41499000231 attempt 1 passed 24 jobs, but core-a was cancelled at the
+30-minute limit and the ninth live-browser journey still showed the Git-backed
+loading state at its unchanged five-second assertion. Neither outcome is a pass.
+The complete unchanged local browser replay passed all nine journeys (3.3m),
+server custody/authority round-trip and artifact hygiene. Original slowdown and
+loading causes remain unknown. Build attempt 2 repeated both outcomes on the
+same source: core-a job 125482495552 was cancelled after passing progress through
+40%, while live-browser job 125482492866 repeated the ninth-case loading failure.
+The original timing causes remain unconfirmed; neither attempt is a pass.
+
+The core-a assertion replay in the existing migrate service selected the same
+38 modules and passed 537 tests with three optional runtime skips in 616.50s.
+This reused the separate test database without provisioning a new environment;
+coverage and provisioning were not identical to the hosted job, so it does not
+reproduce or explain the 30-minute cancellation.
+
+CodeQL 41499022087 and the complete Extended 41499026415 passed this exact
+runtime source. Extended includes eleven successful jobs, all five browser
+configurations, DAST, performance, supported upgrades, independent
+encrypted recovery and commit-bound evidence. Its failure-triage job was
+correctly skipped. The failed Build outcomes remain separately recorded.
+
+## Bounded CI validation corrections
+
+Current CI divides the original core-a module list into two disjoint groups,
+`core-a-1` and `core-a-2`. Each selects nineteen complete modules. The legacy
+aggregate selector remains available. The other groups, 30-minute job limit
+and 80% combined coverage threshold are unchanged. Coverage requires both new
+artifacts unless the complete legacy aggregate is supplied. New selection and
+missing-artifact regressions failed before implementation; all ten plan tests
+then passed. Actual Docker collection found 242 and 298 cases, preserving all
+540 original cases by test function and parameter-case count; generated labels
+are not stable across independent collection processes.
+
+The browser correction was reproduced at the existing HTTP/UI boundary: hold
+the real successful Git reply for six seconds without replacing its body.
+The original test failed at the same 5000ms article assertion, showing the
+loading state while `git_document_read` remained pending. Functional acceptance
+now waits for the exact Workspace/content GET to return 200 and finish, then
+checks the original content. The delay and loading-state check remain in the
+cross-Workspace journey as a regression.
+
+Timing distinction: the five-second DOM check starts after network completion.
+The request uses Playwright's existing response-wait budget within the unchanged
+120-second test / 900-second suite budgets. Effective navigation-to-content
+allowance therefore changes. This is functional synchronization, not a
+five-second end-to-end latency guarantee, a performance improvement, or a
+diagnosis of the original hosted slowdown. The performance gates remain
+unchanged and the original timing uncertainty remains in the failure ledger.
+
+Failure-only diagnostics now include fixed document-list, document-read and
+Git-read phases. A regression first demonstrated that those requests were
+absent; all eight privacy cases now pass without retaining URLs, query values,
+identities, headers or content. Resource probes found expensive repeated scoped
+reads, but a stronger CPU constraint also broke unrelated earlier journeys and
+was rejected as the original reproduction. No authorization/query or production
+application code changed. Temporary CPU settings and development services were
+restored, reusing the retained database volume.
+
+The final standard Make browser/server gate passed all nine journeys (3.2m),
+including delayed delivery, signed/file/PDF custody, authority rollback and
+artifact hygiene. Lint, type checking, shell syntax and 145 tooling cases
+(three optional skips) passed. Both source-review axes found no actionable code
+findings and required the timing distinction above. Corrected-source hosted
+Build, CodeQL and Extended validation remain required after push; local results
+do not establish those future runs. Workflow lint remains a hosted Prepare
+gate: the normal local target creates an extra tool container and no native
+actionlint executable was available under the single-project constraint.
+
 ## Immediate scope and later product direction
 
 The [1.0 closeout plan](../1.0-closeout-plan.md) makes the remaining three

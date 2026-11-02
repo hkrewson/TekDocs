@@ -35,6 +35,17 @@ requirements. The [immediate 1.0 plan](../1.0-closeout-plan.md) now orders recov
 document contract freeze, required migration completion and candidate acceptance;
 the distinct interface rework is the first post-1.0 priority.
 
+Corrected runtime `3e275779` passed CodeQL 41499022087 and all of Extended
+41499026415, including independent encrypted recovery and supported upgrades.
+Build 41499000231 repeated a core-a capacity cancellation and a live-browser
+loading assertion in attempts 1 and 2. The follow-up preserves both unsuccessful
+attempts and original timing uncertainty. Local corrections split the complete
+core-a test set under the same job/coverage limits and synchronize functional
+browser checks with completed scoped Git reads. All nine final browser/server
+journeys, privacy/selection checks, lint and types passed; corrected-source
+hosted validation follows the next authorized push. No production data or
+permission behavior changed.
+
 ## Repeated shared-block migration development after 0.9.18
 
 The maintainer authorized [#105/#106 repeated shared-block migration](../migrations/repeated-shared-block-migration.md),

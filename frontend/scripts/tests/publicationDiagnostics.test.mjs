@@ -3,6 +3,40 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import { attachPublicationDiagnostics } from '../../e2e/publicationDiagnostics.ts'
 
+test('a pending Git document read is visible without retaining document or query values', () => {
+  const page = new EventEmitter(), lines = []
+  let time = 0
+  const diagnostic = attachPublicationDiagnostics(page, {
+    scenario: 'history_templates', now: () => time, write: line => lines.push(line),
+  })
+  for (const path of [
+    '/api/v1/workspaces/organizations/private-organization/documents',
+    '/api/v1/workspaces/organizations/private-organization/documents/private-document',
+  ]) {
+    const request = { url: () => `http://localhost${path}?caption=private-caption`, method: () => 'GET' }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 200 })
+    page.emit('requestfinished', request)
+  }
+  const request = {
+    url: () => 'http://localhost/api/v1/workspaces/organizations/private-organization/content-graph/documents/private-content?caption=private-caption',
+    method: () => 'GET',
+    headers: () => { throw new Error('Session headers must not be read') },
+    postData: () => { throw new Error('Content must not be read') },
+  }
+  time = 100
+  page.emit('request', request)
+  time = 5100
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.deepEqual(report.events.filter(event => event.event === 'request').map(event => event.phase), [
+    'document_list', 'document_read', 'git_document_read',
+  ])
+  assert.deepEqual(report.pending, [{ phase: 'git_document_read', age_ms: 5000 }])
+  for (const value of ['localhost', 'private-', 'caption', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
 test('client workflow failures identify the boundary without retaining identities or session values', () => {
   const page = new EventEmitter(), lines = []
   const diagnostic = attachPublicationDiagnostics(page, { scenario: 'client_publications', write: line => lines.push(line) })

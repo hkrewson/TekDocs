@@ -281,7 +281,16 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
   await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto(`${path}?document=${fixture.document_id}`)
+  const readPath = `/api/v1/workspaces/organizations/${fixture.organization_id}/content-graph/documents/${fixture.content_id}`
+  const openCurrentDocument = async () => {
+    const [response] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === readPath && response.request().method() === 'GET'),
+      page.goto(`${path}?document=${fixture.document_id}`),
+    ])
+    expect(response.status()).toBe(200)
+    expect(await response.finished()).toBeNull()
+  }
+  await openCurrentDocument()
   await expect(page.locator('article')).toContainText(expected.initial)
   await page.goto(`${path}?document=${fixture.document_id}&publication=${fixture.original_id}`)
   await expect(page.getByText(expected.retained, { exact: true })).toBeVisible()
@@ -306,7 +315,7 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
   expect((await saved).status()).toBe(200)
   await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
-  await page.goto(`${path}?document=${fixture.document_id}`)
+  await openCurrentDocument()
   await expect(page.locator('article')).toContainText(expected.current)
   if (fixture.observation_id) {
     await page.getByRole('button', { name: 'Web source', exact: true }).click()
@@ -553,6 +562,16 @@ test('repeated shared blocks retain distinct pins, live updates, file versions a
 
 test('cross-Workspace reuse retains distinct pins, live updates, file versions and signed PDFs', async ({ page }) => {
   const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const readPath = `/api/v1/workspaces/organizations/${state.cross_workspace.organization_id}/content-graph/documents/${state.cross_workspace.content_id}`
+  await page.route(url => url.pathname === readPath, async route => {
+    const response = await route.fetch()
+    expect(response.status()).toBe(200)
+    await expect(page.locator('article')).toContainText('Loading Git-backed document…')
+    // Keep a valid read in flight beyond the DOM assertion's default budget.
+    // The workflow must synchronize with the scoped response before rendering.
+    await new Promise(resolve => setTimeout(resolve, 6000))
+    await route.fulfill({ response })
+  }, { times: 1 })
   const publication = await runKeyPublicationJourney(page, state, state.cross_workspace, {
     initial: 'First retained library edition.', retained: 'First retained library edition.',
     current: 'Updated live library edition.', format: 'tekdocs-static-publication/v13', keys: [],

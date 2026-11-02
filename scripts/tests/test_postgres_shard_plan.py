@@ -30,6 +30,48 @@ def plan_environment() -> Iterator[dict[str, str]]:
 
 
 class PostgresShardPlanTests(unittest.TestCase):
+    def test_split_core_a_groups_preserve_every_original_module_once(self) -> None:
+        with plan_environment() as environment:
+            def modules(shard: str) -> list[str]:
+                result = subprocess.run([str(RUNNER), shard], cwd=ROOT, check=True,
+                                        capture_output=True, text=True, env=environment)
+                return [line for line in result.stdout.splitlines() if line.endswith(".py")]
+
+            original = modules("core-a")
+            first, second = modules("core-a-1"), modules("core-a-2")
+        self.assertTrue(first)
+        self.assertTrue(second)
+        self.assertEqual(sorted(first + second), sorted(original))
+        self.assertEqual(len(first + second), len(set(first + second)))
+        self.assertLessEqual(abs(len(first) - len(second)), 1)
+
+    def test_combined_coverage_requires_both_split_core_a_results(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, plan_environment() as environment:
+            coverage = Path(directory)
+            for shard in (
+                "route-access", "route-methods", "route-session", "accounts",
+                "core-a-1", "core-a-2", "core-b", "core-c",
+                "template-migration-a", "template-migration-b", "template-migration-c",
+                "migration-foundation", "migration-isolation", "migration-guards",
+                "key-entity-migration", "content-key-migration", "diagram-migration",
+                "monitored-migration", "client-publication-migration",
+            ):
+                (coverage / f"coverage.{shard}").write_bytes(b"fixture")
+
+            def combine() -> subprocess.CompletedProcess[str]:
+                return subprocess.run([str(ROOT / "scripts/combine-postgres-coverage.sh"), directory],
+                                      cwd=ROOT, capture_output=True, text=True, env=environment)
+
+            self.assertEqual(combine().returncode, 0)
+            for shard in ("core-a-1", "core-a-2"):
+                with self.subTest(shard=shard):
+                    artifact = coverage / f"coverage.{shard}"
+                    artifact.unlink()
+                    missing = combine()
+                    self.assertNotEqual(missing.returncode, 0)
+                    self.assertIn(shard, missing.stdout + missing.stderr)
+                    artifact.write_bytes(b"fixture")
+
     def test_partitioned_coverage_requires_the_template_migration_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory, plan_environment() as environment:
             coverage = Path(directory)
@@ -106,7 +148,7 @@ class PostgresShardPlanTests(unittest.TestCase):
     def test_all_shard_plans_override_inherited_production_settings(self) -> None:
         shards = (
             "route-access", "route-methods", "route-session", "accounts", "core",
-            "core-a", "core-b", "core-c", "migration-foundation", "migration-isolation",
+            "core-a", "core-a-1", "core-a-2", "core-b", "core-c", "migration-foundation", "migration-isolation",
             "migration-guards", "runtime", "template-migration",
             "template-migration-a", "template-migration-b", "template-migration-c", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration",
         )
@@ -129,10 +171,11 @@ class PostgresShardPlanTests(unittest.TestCase):
 
         self.assertIn(
             "shard: [route-access, route-methods, route-session, accounts, "
-            "core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, "
+            "core-a-1, core-a-2, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, "
             "migration-guards]",
             workflow,
         )
+        self.assertIn("timeout-minutes: 30", workflow)
 
     def test_local_core_partitions_cover_each_core_file_once(self) -> None:
         selected: list[str] = []

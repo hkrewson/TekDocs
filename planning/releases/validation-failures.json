@@ -1279,6 +1279,30 @@
       "next_action": "Keep the strict version assertion and advance the reviewed series to 156. Validate actual isolated rendering, deterministic output, sandbox, licenses and dependency contract locally; corrected-source hosted production-image, DAST and full Build/CodeQL/Extended gates remain mandatory.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41479563043",
+      "run_attempt": 1,
+      "job_id": "125401376862",
+      "job": "Supported backup and restore",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing tekdocs migrate service, test database td_ci_cross_workspace_all: pytest test_cross_workspace_reuse_migration.py::test_cross_workspace_recovery_verifies_after_later_msp_fixture_writes reproduced cross_workspace_fixture.py recovery_verify AssertionError after one unrelated MSP document write, before any backup/restore. Diagnostic comparison showed only accepted Git heads differed; all other fingerprint categories and source blobs matched.",
+      "cause": "Cross-Workspace recovery_create recorded the shared MSP accepted commit before later repository-content/publication fixtures finished source setup. Those fixtures advance the shared MSP head before backup, so the recorded baseline predates the backed-up state; corrected-source independent recovery remains mandatory.",
+      "next_action": "Capture the complete unchanged fingerprint through recovery_record immediately before the normal backup after final source setup. Keep exact commit/body/pin/authority/publication/file comparisons. Regression proves stale baseline denial, final baseline acceptance, and post-baseline source-change denial. Complete corrected-source hosted recovery, Build, CodeQL and Extended gates.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41479563043",
+      "run_attempt": 1,
+      "job_id": "125438200638",
+      "job": "Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted failure-summary job reports the failed Supported backup and restore job in the same run; it is an aggregate follow-up failure rather than a separate application failure.",
+      "cause": "Expected failure-summary result because supported recovery failed its stale pre-backup fingerprint assertion.",
+      "next_action": "Retain this failed attempt and require successful corrected-source recovery and complete Extended validation.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

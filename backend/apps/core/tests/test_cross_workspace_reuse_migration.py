@@ -394,6 +394,77 @@ def test_cross_workspace_upgrade_and_recovery_fixture_retains_complete_custody(p
     assert recovery_fingerprint(installation.owner) == digest
 
 
+def test_cross_workspace_recovery_records_final_backup_state_after_later_writes(
+    published_context, monkeypatch, capsys,
+):
+    import uuid
+
+    from apps.core.content_authoring import author_content, read_authored_content
+    from apps.core.tests.cross_workspace_fixture import (
+        documents,
+        exercise_cross_workspace_fixture,
+        run_cross_workspace_fixture_mode,
+        seed_cross_workspace_fixture,
+    )
+
+    installation, workspace, _document, _publication = published_context
+    seed_cross_workspace_fixture(installation.owner)
+    early_digest = exercise_cross_workspace_fixture(installation.owner)
+    workspace.repository.refresh_from_db()
+    author_content(
+        repository=workspace.repository,
+        actor_id=installation.owner.id,
+        request_id=None,
+        operation="create",
+        content_id=uuid.uuid4(),
+        base_commit=workspace.repository.accepted_commit.object_id,
+        base_blob=None,
+        kind="document",
+        path="docs/later-recovery-guide.md",
+        title="Later recovery fixture",
+        markdown="Unrelated retained recovery guide.\n",
+        metadata_patch={},
+    )
+    # A later fixture advances the shared MSP repository before backup. The
+    # original baseline must still fail: dropping commit checks would hide it.
+    monkeypatch.setenv("TEKDOCS_CROSS_WORKSPACE_RECOVERY_SHA256", early_digest)
+    with pytest.raises(AssertionError):
+        run_cross_workspace_fixture_mode("recovery_verify")
+    capsys.readouterr()
+    run_cross_workspace_fixture_mode("recovery_record")
+    output = capsys.readouterr().out.strip()
+    prefix = "CROSS_WORKSPACE_RECOVERY_SHA256="
+    assert output.startswith(prefix)
+    backup_digest = output.removeprefix(prefix)
+    assert len(backup_digest) == 64 and backup_digest != early_digest
+    monkeypatch.setenv("TEKDOCS_CROSS_WORKSPACE_RECOVERY_SHA256", backup_digest)
+    run_cross_workspace_fixture_mode("recovery_verify")
+    assert "recovered exactly" in capsys.readouterr().out
+
+    # A real source change after the backup baseline still invalidates custody.
+    source, _consumer = documents(installation.owner)
+    fragment = read_authored_content(
+        repository=source.entity.workspace.repository,
+        content_id=source.placements.get(position=1).block_id,
+    )
+    author_content(
+        repository=source.entity.workspace.repository,
+        actor_id=installation.owner.id,
+        request_id=None,
+        operation="update",
+        content_id=fragment.content_id,
+        base_commit=fragment.accepted_commit,
+        base_blob=fragment.source_blob,
+        kind=None,
+        path=None,
+        title=None,
+        markdown="Unexpected source change after backup.\n",
+        metadata_patch={},
+    )
+    with pytest.raises(AssertionError):
+        run_cross_workspace_fixture_mode("recovery_verify")
+
+
 @pytest.mark.parametrize("kind", ["template_without_enrollment", "client_listing"])
 def test_other_valid_legacy_sharing_paths_migrate_without_changing_their_access(ordinary_library, kind):
     from apps.core.documents import add_document_placement, add_listing_reference, remove_document_placement

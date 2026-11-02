@@ -14,6 +14,11 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
+The [immediate 1.0 closeout plan](planning/1.0-closeout-plan.md) orders recovery,
+document-scope decisions, remaining migration work and final acceptance. A
+distinct TekDocs [interface rework](planning/post-1.0-interface-rework.md) is the
+first post-1.0 priority.
+
 ## Cross-Workspace reuse migration development
 
 The [remaining-gap audit](planning/migrations/remaining-migration-audit.md) starts

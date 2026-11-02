@@ -1,5 +1,16 @@
 # Release Roadmap
 
+## Immediate route to 1.0
+
+The maintainer-authorized [closeout plan](../planning/1.0-closeout-plan.md) orders
+the remaining work: repair current recovery validation, freeze the document
+support matrix, complete required migration gaps, then finish candidate
+acceptance and the 1.0 compatibility decision. Full completion of the current
+migration scope remains an option; no valid legacy shape is silently deferred.
+The first post-1.0 priority is a distinct TekDocs
+[end-to-end interface rework](../planning/post-1.0-interface-rework.md), covering
+copy, controls/forms, workflow simplification, navigation and visual identity.
+
 The maintainer-authorized [remaining-gap audit](../planning/migrations/remaining-migration-audit.md)
 now starts with [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md).
 It covers ordinary library and client-listing references, unenrolled template
@@ -1831,9 +1842,10 @@ document model.
   and network-isolated restore on the candidate. Verify organization
   isolation, document authority, content/index consistency, retained files,
   publication evidence, and restore without GitHub access.
-- [ ] **Pilot and release evidence:** Complete the planned pilot against the
-  Git-backed candidate, reconcile findings, and record exact commit/image
-  digests with links to each gate.
+- [ ] **Maintainer and release evidence:** Complete maintainer-led acceptance
+  against the Git-backed candidate, reconcile findings, and record exact
+  commit/image digests with links to each gate. External pilots are excluded
+  by the maintainer's October 20, 2026 scope decision.
 
 Each checkbox requires dated evidence for the candidate commit or image.
 Historical responsive acceptance, prior local rehearsals, and CI from another

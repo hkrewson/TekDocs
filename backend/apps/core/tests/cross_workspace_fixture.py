@@ -423,6 +423,11 @@ def run_cross_workspace_fixture_mode(mode):
         if mode == "recovery_create":
             print("CROSS_WORKSPACE_RECOVERY_SHA256=" + digest)
         print("Cross-Workspace isolation, pins, signed publications, files, PDFs and rollback verified")
+    elif mode == "recovery_record":
+        # Other source fixtures share the MSP repository and can advance its
+        # accepted head. Bind recovery to the final state immediately before
+        # backup, while retaining every exact commit and custody comparison.
+        print("CROSS_WORKSPACE_RECOVERY_SHA256=" + recovery_fingerprint(owner))
     elif mode == "recovery_verify":
         assert recovery_fingerprint(owner) == os.environ["TEKDOCS_CROSS_WORKSPACE_RECOVERY_SHA256"]
         print("Cross-Workspace sources, pins, signed publications, file versions and PDFs recovered exactly")

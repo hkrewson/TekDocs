@@ -152,8 +152,6 @@ cross_workspace_recovery_log="$work_directory/cross-workspace-recovery.log"
 compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
   -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
-cross_workspace_recovery_sha=$(sed -n 's/^CROSS_WORKSPACE_RECOVERY_SHA256=//p' "$cross_workspace_recovery_log")
-printf '%s\n' "$cross_workspace_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Cross-Workspace isolation, pins, signed publications, files, PDFs and rollback verified/p' "$cross_workspace_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
@@ -229,6 +227,14 @@ fi
 [ ! -e "$limited_backup" ]
 [ -z "$(find "$work_directory" -maxdepth 1 -name 'limited-backup.partial.*' -print -quit)" ]
 compose_for "$source_environment" "$source_secrets" up -d --wait backend
+
+# Final source setup has advanced the shared MSP repository since the library
+# fixture was exercised. Capture its exact custody at the backup boundary.
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_record migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
+cross_workspace_recovery_sha=$(sed -n 's/^CROSS_WORKSPACE_RECOVERY_SHA256=//p' "$cross_workspace_recovery_log")
+printf '%s\n' "$cross_workspace_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"

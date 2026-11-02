@@ -27,6 +27,14 @@ artifacts provide its hosted validation record. Version remains 0.9.18.
 Source-bound hosted upgrade and independent encrypted restore are required;
 historical release acceptance does not stand in for this development source.
 
+Follow-up source `b8afcca6` passed Build 41479545080 and CodeQL 41479558453.
+Extended 41479563043 passed its browser, performance, DAST and supported-upgrade
+jobs but failed supported recovery. The [recovery follow-up](cross-workspace-recovery-follow-up.md)
+records the reproduced baseline-timing defect and corrected-source validation
+requirements. The [immediate 1.0 plan](../1.0-closeout-plan.md) now orders recovery,
+document contract freeze, required migration completion and candidate acceptance;
+the distinct interface rework is the first post-1.0 priority.
+
 ## Repeated shared-block migration development after 0.9.18
 
 The maintainer authorized [#105/#106 repeated shared-block migration](../migrations/repeated-shared-block-migration.md),

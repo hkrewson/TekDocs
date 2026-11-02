@@ -1267,6 +1267,18 @@
       "retest_run": null,
       "run_attempt": 1,
       "job_id": "124963856134"
+    },
+    {
+      "run_id": "41477660290",
+      "run_attempt": 1,
+      "job_id": "125387398485",
+      "job": "Dynamic application security test",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker compose build diagram-renderer reproduced Renderer expected Chromium 155.x but Alpine provided Chromium 156.0.8078.79 Alpine Linux before application execution.",
+      "cause": "The Alpine package repository advanced to Chromium 156 while the deliberate renderer build assertion still required series 155.",
+      "next_action": "Keep the strict version assertion and advance the reviewed series to 156. Validate actual isolated rendering, deterministic output, sandbox, licenses and dependency contract locally; corrected-source hosted production-image, DAST and full Build/CodeQL/Extended gates remain mandatory.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

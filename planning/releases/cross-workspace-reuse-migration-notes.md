@@ -135,3 +135,30 @@ configuration/data issues remain in the audit ledger. Existing security-risk
 decisions, tooling advisories and unknown historical browser causes are unchanged;
 formal final 1.0 security acceptance is separate. The required Wiki update is a
 local draft; public Wiki publication and production migration are separate.
+
+## Hosted renderer prerequisite follow-up
+
+The first pushed source `2f742c90` reached Extended validation, where
+[DAST job 125387398485](https://github.com/hkrewson/TekDocs/actions/runs/41477660290/job/125387398485)
+failed before application tests: Alpine supplied Chromium 156.0.8078.79 while
+the renderer asserted series 155. `docker compose build diagram-renderer`
+reproduced that exact assertion locally. Updating only the expected series to
+156 preserves the build-time version guard; Mermaid, Puppeteer, sandbox
+configuration and retained publication bytes are unchanged. This is a CI
+prerequisite correction within final validation, not a new release or a migration
+behavior change.
+
+The full production-image and DAST rehearsals provision separate environments;
+under the single-local-project rule they remain hosted gates. Their failure
+records and corrected-source retest must remain distinct.
+
+Corrected local evidence: the original build command passes and the running
+renderer reports Chromium 156.0.8078.79, matching its build record. All 110
+diagram-export/document cases passed, including five rendered diagram families
+and repeated SVG/PNG byte equality. Runtime inspection confirms UID/GID 10001,
+no network, read-only root, dropped capabilities and no-new-privileges; transient
+job cleanup passed. Six dependency-contract cases, supply-chain pins and licenses
+for all 187 installed renderer package versions passed. The prior 704 combined
+cases and nine browser/server journeys cover the unchanged application code;
+they are not relabeled as full-suite tests of a new renderer image.
+Both source-review axes found no actionable issues in the correction.

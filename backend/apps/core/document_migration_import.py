@@ -220,6 +220,7 @@ def apply_document_import(
     protected = (
         prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
         or prepared.export.template_source_sha256 is not None or prepared.export.monitored_source_sha256 is not None
+        or bool(prepared.export.library_references)
     )
     if protected and not publication_migration_actor_allowed(
         workspace=workspace, actor_id=actor_id
@@ -227,6 +228,7 @@ def apply_document_import(
         raise DocumentMigrationBlocked(
             "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
             else "monitored_source_migration_not_authorized" if prepared.export.monitored_source_sha256 is not None
+            else "library_migration_not_authorized" if prepared.export.library_references
             else "template_migration_not_authorized"
         )
     if protected and (
@@ -281,11 +283,13 @@ def rollback_document_import(
     protected = (
         prepared.publication_evidence_sha256 is not None or prepared.export.template_enrollment_sha256 is not None
         or prepared.export.template_source_sha256 is not None or prepared.export.monitored_source_sha256 is not None
+        or bool(prepared.export.library_references)
     )
     if protected and not publication_migration_actor_allowed(workspace=workspace, actor_id=actor_id):
         raise DocumentMigrationBlocked(
             "publication_migration_not_authorized" if prepared.publication_evidence_sha256 is not None
             else "monitored_source_migration_not_authorized" if prepared.export.monitored_source_sha256 is not None
+            else "library_migration_not_authorized" if prepared.export.library_references
             else "template_migration_not_authorized"
         )
     if not prepared.already_present:

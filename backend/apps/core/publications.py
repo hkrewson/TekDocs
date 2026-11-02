@@ -790,6 +790,7 @@ def verify_retained_publication_custody(publication: DocumentPublication) -> boo
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
                 "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
                 "tekdocs-static-publication/v11", "tekdocs-static-publication/v12",
+                "tekdocs-static-publication/v13",
             }:
         from .document_git_publications import verify_git_publication_source
         if not verify_git_publication_source(publication):

@@ -123,15 +123,25 @@ def guard_reversible_migration_write(
             owner = owned_blocks[block_id].source_document
             if owner is None:
                 raise ReversibleShapeError("rollback_content_identity_changed")
+            from django.db import connection
+
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT tekdocs_library_has_live_clients(%s, %s, 'block')", [
+                    repository.tenant_id, block_id,
+                ])
+                foreign_live = cursor.fetchone()[0]
             if (
-                owner.is_template and owner.library_visible and owned_blocks[block_id].library_visible
-                and not owner.placements.filter(block_id=block_id, parent__isnull=True, position=0).exists()
+                (foreign_live or owner.is_template and owner.library_visible and owned_blocks[block_id].library_visible
+                 and not owner.placements.filter(block_id=block_id, parent__isnull=True, position=0).exists())
                 and (attachment_ids_in_markdown(body) or key_targets_in_markdown(body) or entity_ids_in_markdown(body))
             ):
                 # Borrowable template sections must remain portable even when
                 # enrolled LIVE clients are hidden from this source Workspace.
                 # The always-copied introduction keeps its owned file support.
-                raise ReversibleShapeError("template_library_section_requires_text")
+                raise ReversibleShapeError(
+                    "template_library_section_requires_text" if owner.is_template
+                    else "shared_library_section_requires_text"
+                )
             portable_document_attachments(owner, body)
             if owner.id in content_key_documents:
                 portable_document_keys(owner, body)
@@ -161,6 +171,11 @@ def guard_reversible_migration_write(
             "This migrated document is kept reversible. File links must refer to its own verified files."
         ) from exc
     except ReversibleShapeError as exc:
+        if str(exc) == "shared_library_section_requires_text":
+            raise RepositoryInputError(
+                "This migrated shared section supports live client reuse. "
+                "File, key and entity links require a client-owned copy."
+            ) from exc
         if str(exc) == "template_library_section_requires_text":
             raise RepositoryInputError(
                 "This migrated template section supports live reuse. "

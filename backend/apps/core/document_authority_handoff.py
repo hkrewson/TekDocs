@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import cast
 from uuid import UUID
 
@@ -74,6 +76,53 @@ def prepare_rollback_markdown_projection(*, workspace: Workspace, document: Docu
     return markdown_by_block
 
 
+@contextmanager
+def _editable_handoff_scope(workspace: Workspace, actor_id: UUID) -> Iterator[None]:
+    from rest_framework.exceptions import APIException
+
+    from .workspace_scope import editable_workspace_scope
+
+    try:
+        with editable_workspace_scope(workspace, actor_id):
+            yield
+    except APIException as exc:
+        raise DocumentAuthorityHandoffError("publication_migration_not_authorized") from exc
+
+
+def _authorize_document_handoff_actor(
+    *, workspace: Workspace, document_id: UUID, actor_id: UUID, reader_workspace: ResolvedWorkspace,
+) -> None:
+    from .document_migration_publications import publication_migration_actor_allowed
+    from .document_source_models import DocumentRemoteSource
+    from .models import DocumentPublication, DocumentTemplateEnrollment
+    with _editable_handoff_scope(workspace, actor_id), connection.cursor() as cursor:
+        document = Document.objects.filter(
+            tenant_id=workspace.tenant_id, organization=workspace.organization,
+            entity__workspace=workspace, pk=document_id,
+        ).first()
+        if document is None:
+            raise DocumentAuthorityHandoffError("document_unavailable")
+        if (reader_workspace.member.user.id != actor_id
+            or reader_workspace.member.tenant.id != workspace.tenant_id
+            or (reader_workspace.organization.id if reader_workspace.organization else None)
+            != workspace.organization_id):
+            raise DocumentAuthorityHandoffError("publication_migration_not_authorized")
+        cursor.execute("SELECT tekdocs_document_is_library_participant(%s, %s, %s)", [
+            workspace.tenant_id, workspace.id, document.id,
+        ])
+        library_participant = cursor.fetchone()[0]
+        protected = (
+            library_participant or document.is_template
+            or DocumentTemplateEnrollment.objects.filter(
+                tenant_id=workspace.tenant_id, destination_document=document, archived_at__isnull=True,
+            ).exists()
+            or DocumentRemoteSource.objects.filter(tenant_id=workspace.tenant_id, document=document).exists()
+            or DocumentPublication.objects.filter(tenant_id=workspace.tenant_id, document=document).exists()
+        )
+        if protected and not publication_migration_actor_allowed(workspace=workspace, actor_id=actor_id):
+            raise DocumentAuthorityHandoffError("publication_migration_not_authorized")
+
+
 def transition_document_authority(
     *,
     workspace: Workspace,
@@ -82,6 +131,11 @@ def transition_document_authority(
     target: str,
     reader_workspace: ResolvedWorkspace,
 ) -> str:
+    if target not in {DocumentAuthorityMode.LEGACY, DocumentAuthorityMode.REPOSITORY}:
+        raise DocumentAuthorityHandoffError("unsupported_authority_target")
+    _authorize_document_handoff_actor(
+        workspace=workspace, document_id=document_id, actor_id=actor_id, reader_workspace=reader_workspace,
+    )
     repository = WorkspaceRepository.objects.filter(workspace=workspace, tenant_id=workspace.tenant_id).first()
     if repository is None:
         raise DocumentAuthorityHandoffError("repository_missing")
@@ -130,28 +184,33 @@ def _transition_document_authority_locked(
     )
     if document is None:
         raise DocumentAuthorityHandoffError("document_unavailable")
+    # Foreign placement writers serialize on the source Block. Classification
+    # must remain stable through authority changes, including PINNED-only reuse.
+    list(Block.objects.select_for_update().filter(
+        tenant_id=locked_workspace.tenant_id, source_document=document,
+    ).order_by("id"))
+    _authorize_document_handoff_actor(
+        workspace=locked_workspace, document_id=document.id, actor_id=actor_id, reader_workspace=reader_workspace,
+    )
     from .document_source_models import DocumentRemoteSource
 
-    monitored = DocumentRemoteSource.objects.select_for_update().filter(document=document).first()
+    DocumentRemoteSource.objects.select_for_update().filter(
+        tenant_id=locked_workspace.tenant_id, document=document,
+    ).first()
     key_edges = content_key_authority_edges(locked_workspace, (document.id,))
     members = set(_group_members) if _group_members else {document.id}
+    with _editable_handoff_scope(locked_workspace, actor_id), connection.cursor() as cursor:
+        cursor.execute("SELECT tekdocs_library_pinned_cohort_closed(%s, %s::uuid[], %s)", [
+            locked_workspace.tenant_id, sorted(members), target,
+        ])
+        if not cursor.fetchone()[0]:
+            raise DocumentAuthorityHandoffError("library_pinned_dependency_group_incomplete")
     neighbors = {identity for edge in key_edges for identity in edge} - members
     same_target = set(DocumentAuthority.objects.filter(
         workspace=locked_workspace, content_id__in=neighbors, authority=target,
     ).values_list("content_id", flat=True))
     if neighbors != same_target:
         raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
-    from .document_migration_publications import publication_migration_actor_allowed
-    from .models import DocumentPublication
-
-    if (monitored is not None or DocumentPublication.objects.filter(document=document).exists()) and (
-        not publication_migration_actor_allowed(workspace=locked_workspace, actor_id=actor_id)
-        or reader_workspace.member.user.id != actor_id
-        or reader_workspace.member.tenant.id != locked_workspace.tenant_id
-        or (reader_workspace.organization.id if reader_workspace.organization else None)
-        != locked_workspace.organization_id
-    ):
-        raise DocumentAuthorityHandoffError("publication_migration_not_authorized")
     status = document_coexistence_status(
         workspace=locked_workspace, document=document, reader_workspace=reader_workspace
     )
@@ -187,6 +246,15 @@ def _transition_document_authority_locked(
                 content_id=source.id, authority=DocumentAuthorityMode.REPOSITORY,
             ).exists():
                 retired_owners.add(source.id)
+        from .shared_library_scope import ordinary_library_placements
+
+        for placement in ordinary_library_placements(document):
+            library_owner = placement.block.source_document
+            if library_owner is not None and library_owner.id in live_owners and DocumentAuthority.objects.filter(
+                tenant_id=document.tenant_id, workspace_id=library_owner.entity.workspace_id,
+                content_id=library_owner.id, authority=DocumentAuthorityMode.REPOSITORY,
+            ).exists():
+                retired_owners.add(library_owner.id)
         if live_owners != retired_owners:
             raise DocumentAuthorityHandoffError("live_dependency_group_incomplete")
     blockers = cast(list[str], status["handoff_blockers"])

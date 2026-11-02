@@ -1,5 +1,14 @@
 # Release Roadmap
 
+The maintainer-authorized [remaining-gap audit](../planning/migrations/remaining-migration-audit.md)
+now starts with [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md).
+It covers ordinary library and client-listing references, unenrolled template
+reuse, reviewed pre-Git pin custody and distinct signed source proof. Both review
+axes, 704 combined Docker cases and nine real browser/server journeys passed.
+Exact-source hosted upgrade/recovery artifacts remain required. Other valid
+structural, local-history and relationship shapes remain
+explicit audit work; this is development at 0.9.18, not aggregate 1.0 acceptance.
+
 The maintainer-authorized [repeated shared-block slice](../planning/migrations/repeated-shared-block-migration.md)
 continues #105/#106 after published 0.9.18 (`81fed48f`, release CI 41362859970).
 Acceptance preserves distinct pinned/live occurrences, signed publications, PDFs

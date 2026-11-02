@@ -104,6 +104,7 @@ class ParsedInclude:
     ordinal: int
     library_workspace_id: uuid.UUID | None = None
     library_revision_id: uuid.UUID | None = None
+    library_source_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,11 +294,15 @@ def _parse_includes(value: Any) -> tuple[ParsedInclude, ...]:
         mode = item.get("mode")
         expected_fields = {"id", "mode", "audience", "commit"} if mode == "pinned" else {"id", "mode", "audience"}
         if "library_workspace" in item:
-            if "library_revision" not in item:
+            if "library_revision" not in item and ("library_source" not in item or mode == "pinned"):
                 raise ContentProfileError(
                     "include.library_revision", "Library references require a template revision UUID"
                 )
-            expected_fields.update({"library_workspace", "library_revision"})
+            expected_fields.add("library_workspace")
+            if "library_revision" in item:
+                expected_fields.add("library_revision")
+            if "library_source" in item:
+                expected_fields.add("library_source")
         if set(item) != expected_fields or mode not in INCLUDE_MODES:
             raise ContentProfileError("include.shape", "Include fields or resolution mode are invalid")
         audience = item.get("audience")
@@ -328,9 +333,14 @@ def _parse_includes(value: Any) -> tuple[ParsedInclude, ...]:
                 library_revision_id=(
                     _uuid(
                         item["library_revision"], code="include.library_revision",
-                        message="Template revision must be a UUID",
+                        message="Library revision must be a UUID",
                     )
-                    if "library_workspace" in item else None
+                    if "library_revision" in item else None
+                ),
+                library_source_id=(
+                    _uuid(item["library_source"], code="include.library_source",
+                          message="Library source Document must be a UUID")
+                    if "library_source" in item else None
                 ),
             )
         )

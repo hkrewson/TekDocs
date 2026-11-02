@@ -411,8 +411,10 @@ def _projection_payload(
                     "id": str(include.target_content_id),
                     "mode": include.mode,
                     "ordinal": include.ordinal,
-                    **({"library_workspace": str(include.library_workspace_id),
-                        "library_revision": str(include.library_revision_id)} if include.library_workspace_id else {}),
+                    **({"library_workspace": str(include.library_workspace_id)}
+                       if include.library_workspace_id else {}),
+                    **({"library_revision": str(include.library_revision_id)} if include.library_revision_id else {}),
+                    **({"library_source": str(include.library_source_id)} if include.library_source_id else {}),
                 }
                 for include in parsed.includes
             ],
@@ -650,6 +652,7 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                         target_content_id=include.target_content_id,
                         library_workspace_id=include.library_workspace_id,
                         library_revision_id=include.library_revision_id,
+                        library_source_id=include.library_source_id,
                         ordinal=include.ordinal,
                         resolution_mode=include.mode,
                         audience_profile=include.audience,
@@ -714,11 +717,13 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                 "projection_digest": projection_digest,
             },
         )
-        from .template_library_projection import project_template_source_content
+        from .template_library_projection import project_library_source_content
 
-        project_template_source_content(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
         locked.indexed_commit = commit
         locked.save(update_fields=("indexed_commit", "updated_at"))
+        # The projection uses the new rows above while this transaction remains
+        # invisible to readers. A projection failure rolls back this pointer too.
+        project_library_source_content(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
 
     logger.info(
         "content_index_accepted repository=%s commit=%s nodes=%s links=%s",

@@ -265,7 +265,18 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         seed_repeated_block_fixture(installation.owner)
         repeated_legacy = prepare_repeated_block_fixture(installation.owner)
+        from apps.core.tests.cross_workspace_fixture import (
+            browser_state as cross_workspace_browser_state,
+        )
+        from apps.core.tests.cross_workspace_fixture import (
+            prepare_cross_workspace_fixture,
+            seed_cross_workspace_fixture,
+        )
+
+        seed_cross_workspace_fixture(installation.owner)
+        cross_workspace_legacy = prepare_cross_workspace_fixture(installation.owner)
         prepared_state = {
+            "cross_workspace": cross_workspace_browser_state(installation.owner),
             "repeated": repeated_browser_state(installation.owner),
             "client_publication": client_publication_browser_state(installation.owner),
             "addressed": addressed_fixture.browser,
@@ -381,3 +392,6 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.repeated_block_fixture import exercise_repeated_block_fixture
 
         exercise_repeated_block_fixture(installation.owner, repeated_legacy)
+        from apps.core.tests.cross_workspace_fixture import exercise_cross_workspace_fixture
+
+        exercise_cross_workspace_fixture(installation.owner, cross_workspace_legacy)

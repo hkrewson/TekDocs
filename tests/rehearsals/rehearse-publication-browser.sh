@@ -70,8 +70,9 @@ cleanup() {
       docker compose -f "$repository_root/compose.yml" start frontend >/dev/null 2>&1 || true
     fi
   fi
-  if [ "$status" -ne 0 ] && [ -f "$work_directory/server.log" ]; then
-    tail -60 "$work_directory/server.log" >&2
+  if [ "$status" -ne 0 ] && [ -f "$work_directory/server-failure.json" ]; then
+    python3 "$repository_root/backend/apps/core/tests/publication_acceptance_protocol.py" \
+      "$work_directory/server-failure.json" >&2 || true
   fi
   rm -rf "$work_directory"
   exit "$status"
@@ -102,7 +103,8 @@ acceptance_compose exec -T --user 0:0 migrate sh -c \
 acceptance_compose exec -T migrate sh -c \
   'POSTGRES_DB="$TEKDOCS_PUBLICATION_ACCEPTANCE_BASE_DATABASE" python manage.py provision_runtime_role'
 acceptance_compose exec -T migrate sh -c \
-  'printf "%s\n" "$$" > /acceptance/server.pid; exec pytest "$@"' sh apps/core/tests/test_publication_browser_acceptance.py \
+  'printf "%s\n" "$$" > /acceptance/server.pid; exec python -m pytest "$@"' sh apps/core/tests/test_publication_browser_acceptance.py \
+  -p apps.core.tests.publication_failure_reporter \
   --liveserver=0.0.0.0:8081 --tb=short -q > "$work_directory/server.log" 2>&1 &
 pytest_pid=$!
 ready=false

@@ -78,13 +78,14 @@ def _ensure_legacy_content_authority(document: Document) -> None:
 
 
 def _ensure_legacy_block_authority(block: Block) -> None:
-    """Prevent legacy placement and revision services from changing a Git-owned fragment."""
+    """Reject Git-owned fragments, including roots visible through library RLS."""
 
+    content_ids = (block.id,) if block.source_document_id is None else (block.id, block.source_document_id)
     if DocumentAuthority.objects.filter(
         tenant_id=block.tenant_id,
         organization_id=cast(UUID, block.organization_id),
         workspace_id=block.entity.workspace_id,
-        content_id=block.id,
+        content_id__in=content_ids,
         authority=DocumentAuthorityMode.REPOSITORY,
     ).exists():
         raise PlacementConflict("This fragment is Git-authoritative and cannot be changed here.")
@@ -1392,7 +1393,13 @@ def add_block_placement(
     _ensure_legacy_content_authority(locked_document)
     if locked_document.placements.count() >= 500:
         raise PlacementConflict("Document composition cannot exceed 500 blocks.")
-    block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
+    block = Block.objects.select_related("current_revision").get(pk=block.pk, tenant_id=locked_document.tenant_id)
+    foreign_source = block.organization_id != locked_document.organization_id
+    if not foreign_source:
+        block = Block.objects.select_for_update(of=("self",)).select_related("current_revision").get(pk=block.pk)
+    # A borrowed MSP Block is SELECT-only. The placement INSERT's reviewed
+    # SECURITY DEFINER trigger locks it; availability is rechecked under that
+    # lock below rather than granting the client an UPDATE policy.
     from .template_git_operation import permits_template_reference
 
     if not permits_template_reference(locked_document, block.source_document_id):
@@ -1441,6 +1448,20 @@ def add_block_placement(
         pinned_revision=pinned_revision,
         audience_profile=audience_profile,
     )
+    if foreign_source:
+        from .shared_library_scope import ordinary_library_placements
+        from .workspace_scope import editable_workspace_scope
+
+        block = Block.objects.select_related("current_revision").get(
+            pk=block.pk, tenant_id=locked_document.tenant_id,
+        )
+        with editable_workspace_scope(locked_document.entity.workspace, actor_id):
+            allowed = any(item.id == placement.id for item in ordinary_library_placements(locked_document))
+        if block.archived_at is not None or not allowed:
+            raise PlacementConflict("The selected shared block is unavailable for this document.")
+        if not permits_template_reference(locked_document, block.source_document_id):
+            _ensure_legacy_block_authority(block)
+        placement.block = block
     AuditEvent.objects.create(
         tenant=locked_document.tenant,
         actor_id=actor_id,

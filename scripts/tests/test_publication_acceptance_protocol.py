@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import secrets
 import tempfile
 import unittest
 from pathlib import Path
@@ -76,3 +77,27 @@ class PublicationAcceptanceProtocolTests(unittest.TestCase):
                 path.write_text(json.dumps(value))
                 with self.assertRaisesRegex(ValueError, "Invalid publication browser budget"):
                     protocol.completion_timeout_seconds(path)
+
+    def test_server_failure_locations_survive_without_private_exception_values(self):
+        value = secrets.token_hex(24)
+        path = ROOT / "backend/apps/core/tests/cross_workspace_fixture.py"
+        try:
+            exec(compile("raise AssertionError(value)", str(path), "exec"), {"value": value})
+        except AssertionError as error:
+            report = protocol.safe_failure_report(error, "call")
+        checked = protocol.validate_failure_report(report)
+        self.assertEqual(checked["category"], "assertion")
+        self.assertIn({"file": "apps/core/tests/cross_workspace_fixture.py", "line": 1}, checked["locations"])
+        self.assertNotIn(value, json.dumps(checked))
+        self.assertNotIn("message", checked)
+
+    def test_server_failure_report_rejects_values_unknown_fields_and_escaping_paths(self):
+        report = {"version": 1, "phase": "call", "category": "assertion", "locations": []}
+        for candidate in (
+            {**report, "message": secrets.token_hex(24)},
+            {**report, "phase": "private-value"},
+            {**report, "locations": [{"file": "../.env", "line": 1}]},
+            {**report, "locations": [{"file": "apps/core/tests/cross_workspace_fixture.py", "line": True}]},
+        ):
+            with self.subTest(candidate=candidate), self.assertRaises(ValueError):
+                protocol.validate_failure_report(candidate)

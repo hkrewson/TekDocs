@@ -13,6 +13,20 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Cross-Workspace reuse and remaining-gap audit after 0.9.18
+
+The maintainer authorized the [remaining migration audit](../migrations/remaining-migration-audit.md),
+starting with [cross-Workspace reuse](../migrations/cross-workspace-reuse-migration.md),
+preserving signed publications, PDFs and file versions with isolation, rollback
+and recovery. [Development notes](cross-workspace-reuse-migration-notes.md) record
+the reproduced library/listing, compound publication, source projection and
+read/write isolation gaps. Implementation, both source-review axes, 704 combined
+Docker cases and nine final real browser/server journeys passed. Deliver this
+reviewed continuation directly to main; exact-source Build, CodeQL and Extended
+artifacts provide its hosted validation record. Version remains 0.9.18.
+Source-bound hosted upgrade and independent encrypted restore are required;
+historical release acceptance does not stand in for this development source.
+
 ## Repeated shared-block migration development after 0.9.18
 
 The maintainer authorized [#105/#106 repeated shared-block migration](../migrations/repeated-shared-block-migration.md),

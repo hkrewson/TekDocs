@@ -666,6 +666,7 @@ def test_runtime_client_reads_only_its_enrolled_library_git_fragment(library_enr
             principal_mode=RLSPrincipalMode.USER,
         )
         selected = read_template_library_fragment(
+            tenant_id=context.source.tenant_id,
             destination_document_id=document.id,
             library_workspace_id=source.entity.workspace_id,
             source_block_id=source_section.id,
@@ -880,6 +881,7 @@ def test_runtime_library_read_cannot_use_another_client_enrollment(indexed_libra
         )
         with pytest.raises(RepositoryInputError, match="unavailable"):
             read_template_library_fragment(
+                tenant_id=context.source.tenant_id,
                 destination_document_id=documents[1].id,
                 library_workspace_id=context.source.entity.workspace_id,
                 source_block_id=context.source.placements.get(position=1).block_id,
@@ -1423,16 +1425,16 @@ def test_template_library_authority_handoff_promotes_source_and_all_clients_toge
 
 
 
-@pytest.mark.parametrize("side", ["source", "live_client"])
+@pytest.mark.parametrize("side", ["source", "live_client", "source_sql"])
 def test_template_source_cannot_roll_back_without_repository_live_clients(prepared_template_library, side):
-    from django.db import IntegrityError
+    from django.db import IntegrityError, connection, transaction
 
-    from apps.core.document_authority_handoff import transition_document_authority
+    from apps.core.document_authority_handoff import DocumentAuthorityHandoffError, transition_document_authority
     from apps.core.document_template_migration import (
         prepare_template_library_handoff,
         transition_template_library_authority,
     )
-    from apps.core.models import DocumentAuthority
+    from apps.core.models import Block, DocumentAuthority
     from apps.core.workspaces import resolve_msp_workspace
 
     context, documents = prepared_template_library
@@ -1442,14 +1444,41 @@ def test_template_source_cannot_roll_back_without_repository_live_clients(prepar
     )
     plan = prepare_template_library_handoff(**args)
     transition_template_library_authority(**args, plan_sha256=plan.plan_sha256)
-    with pytest.raises(IntegrityError, match="live repository consumers"):
-        transition_document_authority(
-            workspace=context.source.entity.workspace if side == "source" else context.workspace,
-            document_id=context.source.id if side == "source" else documents[1].id, actor_id=context.owner.id,
-            target="legacy",
-            reader_workspace=resolve_msp_workspace(context.owner) if side == "source" else context.reader,
-        )
-    assert DocumentAuthority.objects.get(content_id=context.source.id).authority == "repository"
+    retained = (deepcopy(context.publication.manifest), context.publication.signature,
+                read_publication_artifact(context.publication.artifacts.get(kind="pdf")))
+    if side == "source":
+        # The service now rejects the omitted pinned clients before attempting
+        # a transition. The separate SQL case retains the LIVE database proof.
+        with pytest.raises(DocumentAuthorityHandoffError, match="library_pinned_dependency_group_incomplete"):
+            transition_document_authority(
+                workspace=context.source.entity.workspace, document_id=context.source.id, actor_id=context.owner.id,
+                target="legacy", reader_workspace=resolve_msp_workspace(context.owner),
+            )
+    elif side == "source_sql":
+        with pytest.raises(IntegrityError, match="live repository consumers"), transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL tekdocs.document_authority_transition = 'on'")
+            DocumentAuthority.objects.filter(
+                tenant_id=context.source.tenant_id, workspace=context.source.entity.workspace,
+                content_id=context.source.id,
+            ).update(authority="legacy")
+    else:
+        with pytest.raises(IntegrityError, match="live repository consumers"):
+            transition_document_authority(
+                workspace=context.workspace, document_id=documents[1].id, actor_id=context.owner.id,
+                target="legacy", reader_workspace=context.reader,
+            )
+    roots = {context.source.id, *(document.id for document in documents)}
+    identities = roots | set(Block.objects.filter(
+        tenant_id=context.source.tenant_id, source_document_id__in=roots,
+    ).values_list("id", flat=True))
+    states = list(DocumentAuthority.objects.filter(
+        tenant_id=context.source.tenant_id, content_id__in=identities,
+    ).values_list("authority", flat=True))
+    assert len(states) == len(identities) and set(states) == {"repository"}
+    context.publication.refresh_from_db()
+    assert (context.publication.manifest, context.publication.signature,
+            read_publication_artifact(context.publication.artifacts.get(kind="pdf"))) == retained
 
 
 def test_template_library_group_can_roll_back_without_rewriting_signed_history(prepared_template_library):
@@ -2392,6 +2421,8 @@ def test_operator_command_reviews_and_transitions_the_explicit_template_cohort(p
 def test_assigned_workspace_editor_creates_and_detaches_template_without_msp_write(
     prepared_template_library, django_runtime_role, mode,
 ):
+    from django.db import DatabaseError, connection
+
     from apps.accounts.models import (
         BuiltInRole,
         MembershipWorkspaceScope,
@@ -2402,6 +2433,7 @@ def test_assigned_workspace_editor_creates_and_detaches_template_without_msp_wri
         prepare_template_library_handoff,
         transition_template_library_authority,
     )
+    from apps.core.models import Block
     from apps.core.repository_service import coordinated_repository_transaction
     from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_scope
     from apps.core.scoping import DataScope
@@ -2433,25 +2465,37 @@ def test_assigned_workspace_editor_creates_and_detaches_template_without_msp_wri
     block = context.source.placements.get(position=1).block
     context.source.entity.workspace.repository.refresh_from_db()
     source_head = context.source.entity.workspace.repository.accepted_commit_id
-    with django_runtime_role(), coordinated_repository_transaction():
-        bind_local_rls_scope(
-            DataScope.organization(context.source.tenant, context.document.organization),
-            organization_mode=OrganizationRLSMode.ORGANIZATION,
-            actor_user_id=actor.id, principal_mode=RLSPrincipalMode.USER,
-        )
-        created = instantiate_git_template(
-            source=context.source, workspace=context.workspace, actor_id=actor.id,
-            title="Client authorized enrollment", category="guide", placement_rules={str(block.entity_id): mode},
-            expected_source_sha256=definition,
-        )
-        if mode != "copy":
-            preview = preview_git_template_rollout(document=created, actor_id=actor.id)
-            detached = detach_git_template_section(
-                document=created, placement_id=created.placements.get(position=1).id, actor_id=actor.id,
-                expected_base=preview["base_commit"], expected_composition=preview["composition_digest"],
-                expected_applied_revision_id=created.template_enrollment.applied_revision_id,
+    probe = connection.copy(alias="reusable_block_lock_probe")
+    try:
+        with django_runtime_role(), coordinated_repository_transaction():
+            bind_local_rls_scope(
+                DataScope.organization(context.source.tenant, context.document.organization),
+                organization_mode=OrganizationRLSMode.ORGANIZATION,
+                actor_user_id=actor.id, principal_mode=RLSPrincipalMode.USER,
             )
-            assert detached.block.source_document_id == created.id
+            created = instantiate_git_template(
+                source=context.source, workspace=context.workspace, actor_id=actor.id,
+                title="Client authorized enrollment", category="guide", placement_rules={str(block.entity_id): mode},
+                expected_source_sha256=definition,
+            )
+            assert Block.objects.filter(pk=block.pk).update(kind=block.kind) == 0
+            if mode != "copy":
+                # The INSERT trigger must serialize reuse without MSP UPDATE rights.
+                with probe.cursor() as cursor:
+                    cursor.execute("SELECT count(*) FROM core_block WHERE id=%s", [block.id])
+                    assert cursor.fetchone()[0] == 1
+                    with pytest.raises(DatabaseError) as denied:
+                        cursor.execute("SELECT id FROM core_block WHERE id=%s FOR UPDATE NOWAIT", [block.id])
+                    assert denied.value.__cause__.sqlstate == "55P03"
+                preview = preview_git_template_rollout(document=created, actor_id=actor.id)
+                detached = detach_git_template_section(
+                    document=created, placement_id=created.placements.get(position=1).id, actor_id=actor.id,
+                    expected_base=preview["base_commit"], expected_composition=preview["composition_digest"],
+                    expected_applied_revision_id=created.template_enrollment.applied_revision_id,
+                )
+                assert detached.block.source_document_id == created.id
+    finally:
+        probe.close()
     context.source.entity.workspace.repository.refresh_from_db()
     assert context.source.entity.workspace.repository.accepted_commit_id == source_head
 

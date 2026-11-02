@@ -19,6 +19,7 @@ class DocumentMigrationShapeError(ValueError):
 class OwnedPlacementTree:
     ordered: tuple[DocumentPlacement, ...]
     children: dict[uuid.UUID | None, tuple[DocumentPlacement, ...]]
+    library_revisions: dict[uuid.UUID, uuid.UUID]
 
 
 def owned_placement_tree(document: Document, placements: list[DocumentPlacement]) -> OwnedPlacementTree:
@@ -37,6 +38,7 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
         # One authored fragment cannot encode two different owned child trees.
         raise DocumentMigrationShapeError("unsupported_placement_graph")
     library_placements: set[uuid.UUID] = set()
+    library_revisions: dict[uuid.UUID, uuid.UUID] = {}
     if any(item.block.organization_id != document.organization_id for item in placements):
         from .document_template_migration import TemplateMigrationError, template_enrollment_evidence
 
@@ -46,6 +48,12 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
             raise DocumentMigrationShapeError("cross_workspace_reference") from exc
         if evidence is not None:
             library_placements.update(evidence.library_placement_ids)
+            library_revisions.update(
+                (identity, evidence.applied_revision_id) for identity in evidence.library_placement_ids
+            )
+        from .shared_library_scope import ordinary_library_placements
+
+        library_placements.update(item.id for item in ordinary_library_placements(document))
     children: dict[uuid.UUID | None, list[DocumentPlacement]] = {}
     for placement in placements:
         if (
@@ -116,4 +124,4 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
         visit(root, 0)
     if len(ordered) != len(placements):
         raise DocumentMigrationShapeError("unsupported_placement_graph")
-    return OwnedPlacementTree(ordered=tuple(ordered), children=ordered_children)
+    return OwnedPlacementTree(ordered=tuple(ordered), children=ordered_children, library_revisions=library_revisions)

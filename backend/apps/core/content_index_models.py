@@ -206,6 +206,7 @@ class ContentInclude(models.Model):
     target_content_id = models.UUIDField()
     library_workspace_id = models.UUIDField(null=True, blank=True)
     library_revision_id = models.UUIDField(null=True, blank=True)
+    library_source_id = models.UUIDField(null=True, blank=True)
     ordinal = models.PositiveIntegerField()
     resolution_mode = models.CharField(max_length=12, choices=ContentIncludeMode.choices)
     audience_profile = models.CharField(max_length=24, choices=ContentAudienceProfile.choices)
@@ -220,8 +221,16 @@ class ContentInclude(models.Model):
         ordering = ("source_id", "ordinal", "id")
         constraints = [
             models.CheckConstraint(
-                condition=(models.Q(library_workspace_id__isnull=True, library_revision_id__isnull=True)
-                           | models.Q(library_workspace_id__isnull=False, library_revision_id__isnull=False)),
+                condition=(
+                    models.Q(library_workspace_id__isnull=True, library_revision_id__isnull=True,
+                             library_source_id__isnull=True)
+                    | models.Q(library_workspace_id__isnull=False, library_revision_id__isnull=False,
+                               library_source_id__isnull=True)
+                    | models.Q(library_workspace_id__isnull=False, library_source_id__isnull=False,
+                               library_revision_id__isnull=True, resolution_mode="live")
+                    | models.Q(library_workspace_id__isnull=False, library_source_id__isnull=False,
+                               library_revision_id__isnull=False, resolution_mode="pinned")
+                ),
                 name="content_include_library_identity_pair",
             ),
             models.UniqueConstraint(fields=("source", "ordinal"), name="content_include_ordinal_unique"),

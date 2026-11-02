@@ -148,6 +148,13 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 repeated_block_recovery_sha=$(sed -n 's/^REPEATED_BLOCK_RECOVERY_SHA256=//p' "$repeated_block_recovery_log")
 printf '%s\n' "$repeated_block_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Repeated shared occurrences, distinct pins, signatures, file versions, PDFs and rollback verified/p' "$repeated_block_recovery_log"
+cross_workspace_recovery_log="$work_directory/cross-workspace-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
+cross_workspace_recovery_sha=$(sed -n 's/^CROSS_WORKSPACE_RECOVERY_SHA256=//p' "$cross_workspace_recovery_log")
+printf '%s\n' "$cross_workspace_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
+sed -n '/Cross-Workspace isolation, pins, signed publications, files, PDFs and rollback verified/p' "$cross_workspace_recovery_log"
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -418,6 +425,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_REPEATED_BLOCK_FIXTURE_MODE=recovery_verify \
   -e TEKDOCS_REPEATED_BLOCK_RECOVERY_SHA256="$repeated_block_recovery_sha" migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/repeated_block_fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_CROSS_WORKSPACE_RECOVERY_SHA256="$cross_workspace_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"

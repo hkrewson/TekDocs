@@ -1,4 +1,10 @@
-# Legacy document copy during 0.9.6
+# Legacy document copy and reversible Git handoff
+
+Current development: [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md)
+and the [remaining-gap audit](../planning/migrations/remaining-migration-audit.md).
+Historical examples below retain their original version context. Local
+development commands use the existing tekdocs services with `compose exec`;
+independent fresh/upgrade/recovery environments run in hosted validation.
 
 This is a bounded, operator-directed **copy** from PostgreSQL-authored
 documents to the exact workspace's managed local Git repository. It does not
@@ -190,3 +196,43 @@ attachments and every primary-file version remain unchanged. See
 at version 0.9.18; published v0.9.18 remains the earlier validated release source.
 Final-source hosted upgrade/recovery validation and separately authorized
 production migration remain required.
+
+## Cross-Workspace library continuation after 0.9.18
+
+Import approved MSP sources before their client consumers. An ordinary library
+reference requires both sharing opt-ins; an existing client listing retains its
+primary-block authorization. A source being a template does not imply that each
+use is enrolled. Private client sources and other tenants remain unavailable.
+Each selected source contributes its Block body, including when the source itself
+has children; it does not insert those source children into the client document.
+
+After the source copy, review immutable revision custody before importing pins:
+
+```sh
+docker compose exec -T migrate python manage.py migrate_shared_library --workspace <msp-workspace-uuid> --source <source-document-uuid> --actor <operator-uuid> --operation history
+docker compose exec -T migrate python manage.py migrate_shared_library --workspace <msp-workspace-uuid> --source <source-document-uuid> --actor <operator-uuid> --operation history --plan-sha256 <reviewed-history-hash> --apply
+```
+
+The history step archives checksum-verified revisions without changing current
+source bodies. Template sources also retain their complete definition archives.
+Then preview/import each client document using the existing copy commands.
+Copying alone retains legacy authority. Review the connected source/consumer
+closure explicitly; repeat `--document` for every additional source or consumer:
+
+```sh
+docker compose exec -T migrate python manage.py migrate_shared_library --workspace <msp-workspace-uuid> --source <source-document-uuid> --actor <operator-uuid> --operation promote --document <consumer-document-uuid>
+docker compose exec -T migrate python manage.py migrate_shared_library --workspace <msp-workspace-uuid> --source <source-document-uuid> --actor <operator-uuid> --operation promote --document <consumer-document-uuid> --plan-sha256 <reviewed-cohort-hash> --apply
+```
+
+Every Workspace requires edit permission and MFA. Approved template operations
+can reuse sources without MSP write access; source locking grants no data writes.
+Ordinary legacy writers cannot consume the cache of a Git-owned source. Missing members, changed
+publications or files, stale heads, unavailable history and invalid sharing block
+handoff. To return to legacy authority, preview the same complete group with
+`--operation rollback`, then apply its fresh reviewed hash. Rollback projects
+current owned Git bodies before checking clients, preserving immutable revisions,
+publications/PDFs and all file versions. New v13 publications preserve ordinary
+Block-revision provenance separately from enrolled template definitions. Their
+verification and retained downloads do not require current source Git storage.
+A compatible application/schema and complete encrypted recovery set are required
+for full installation recovery; authority rollback is not a binary downgrade.

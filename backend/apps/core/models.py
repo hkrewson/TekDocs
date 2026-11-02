@@ -5024,10 +5024,11 @@ class DocumentPublication(models.Model):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
         if manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
             from .document_addressed_publications import verify_addressed_publication_manifest
+            from .document_diagram_publications import has_repeated_source_envelope
 
             if not verify_addressed_publication_manifest(
                 manifest, self.document_id, self.canonical_markdown,
-                allow_repeated=self.manifest.get("format") == "tekdocs-static-publication/v12",
+                allow_repeated=has_repeated_source_envelope(self.manifest),
             ):
                 raise ValidationError("Addressed publication snapshot is invalid")
         if manifest.get("format") == "tekdocs-static-publication/v4":

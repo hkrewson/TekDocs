@@ -11,7 +11,15 @@ from .diagram_exports import MAX_PNG_BYTES, MAX_SVG_BYTES, RENDERER_REPORT, diag
 
 DIAGRAM_GIT_STATIC_FORMAT = "tekdocs-static-publication/v11"
 OCCURRENCE_GIT_STATIC_FORMAT = "tekdocs-static-publication/v12"
+LIBRARY_GIT_STATIC_FORMAT = "tekdocs-static-publication/v13"
 CONTENT_FORMATS = frozenset(f"tekdocs-static-publication/v{version}" for version in range(5, 11))
+
+
+def has_repeated_source_envelope(manifest: dict[str, Any]) -> bool:
+    selected = manifest.get("library_format") if manifest.get("format") == LIBRARY_GIT_STATIC_FORMAT else (
+        manifest.get("format")
+    )
+    return selected == OCCURRENCE_GIT_STATIC_FORMAT
 
 
 def publication_content_manifest(manifest: dict[str, Any], markdown: str) -> dict[str, Any]:
@@ -21,6 +29,19 @@ def publication_content_manifest(manifest: dict[str, Any], markdown: str) -> dic
     the original manifest including occurrence/diagram descriptors and formats.
     No current renderer, database record or Git source is consulted here.
     """
+    if "ordinary_library" in manifest:
+        raise ValueError("Reserved library validation marker")
+    if manifest.get("format") == LIBRARY_GIT_STATIC_FORMAT:
+        source = manifest["git_source"]
+        if (manifest.get("library_format") not in {
+            f"tekdocs-static-publication/v{version}" for version in range(7, 13)
+        } or source.get("format") != "tekdocs.git-dependencies/v3"
+            or not any("library_source" in item for item in source["sources"])):
+            raise ValueError("Ordinary library publication envelope is invalid")
+        manifest = {**manifest, "format": manifest["library_format"], "ordinary_library": True,
+                    "git_source": {**source, "format": "tekdocs.git-dependencies/v2"}}
+    elif any("library_source" in item for item in manifest.get("git_source", {}).get("sources", [])):
+        raise ValueError("Historical formats cannot admit ordinary library proof")
     if manifest.get("format") == OCCURRENCE_GIT_STATIC_FORMAT:
         if manifest.get("occurrence_format") not in {
             f"tekdocs-static-publication/v{version}" for version in range(7, 12)

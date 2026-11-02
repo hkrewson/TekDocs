@@ -160,7 +160,12 @@ class ContentCompositionResolver:
                         "title": target.title,
                         **(
                             {"workspace": str(include.library_workspace_id),
-                             "template_revision": str(include.library_revision_id)}
+                             **({"template_revision": str(include.library_revision_id)}
+                                if include.library_source_id is None else {
+                                    "library_source": str(include.library_source_id),
+                                    **({"block_revision": str(include.library_revision_id)}
+                                       if include.library_revision_id else {}),
+                                })}
                             if include.library_workspace_id else {}
                         ),
                     }

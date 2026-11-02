@@ -90,6 +90,7 @@ def portable_node_projection_matches(
             if (
                 included.library_workspace_id != expected_include.library_workspace_id
                 or included.library_revision_id != expected_include.library_revision_id
+                or included.library_source_id != expected_include.library_source_id
                 or included.target_id is not None or included.ordinal != expected_include.ordinal
                 or included.target_content_id != expected_include.target_content_id
                 or included.resolution_mode != expected_include.mode

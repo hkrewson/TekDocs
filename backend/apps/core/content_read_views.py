@@ -44,6 +44,10 @@ class ContentReadQuerySerializer(serializers.Serializer):
 
 
 class ContentReadItemSerializer(serializers.Serializer):
+    repository_native = serializers.BooleanField(
+        help_text="No retained legacy Document row exists for this exact Workspace/content identity, "
+                  "including archived rows."
+    )
     id = serializers.UUIDField()
     kind = serializers.CharField()
     title = serializers.CharField()

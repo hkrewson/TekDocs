@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from django.db import connection, transaction
@@ -921,6 +922,43 @@ def read_accepted_repository_markdown_files(
                 raise RepositoryResourceLimitError("Accepted repository exceeds the byte limit")
             files.append((path, source))
         return commit, tuple(files)
+
+
+def read_accepted_repository_file_dates(
+    *, repository_id: uuid.UUID, expected_commit: str, paths: Sequence[str],
+) -> dict[str, tuple[datetime, datetime]]:
+    """Return first/latest verified path-change dates at one exact accepted head."""
+    if not paths or len(paths) > 1024:
+        raise RepositoryInputError("File-date inventory is outside the supported bound")
+    selected = {_validate_path(path) for path in paths}
+    repository, root, repository_path, object_format = _load_repository(repository_id)
+    with _repository_lock(root, repository.id, exclusive=False):
+        repository.refresh_from_db(fields=("accepted_commit",))
+        accepted = _accepted_object(repository, object_format)
+        if accepted != expected_commit:
+            raise RepositoryConflictError("Repository changed before discovery")
+        git = _GitRepository(repository.id, repository_path, object_format)
+        # NUL framing keeps quoted/unicode filenames distinct from commit headers.
+        _, output = git._run("read_file_dates", (
+            "--literal-pathspecs", "log", "-z", "--first-parent", "--format=%x00%H", "--name-only", "--no-renames",
+            expected_commit, "--", *sorted(selected),
+        ))
+        changes: dict[str, tuple[str, str]] = {}
+        commit_id = ""
+        for token in output.decode("utf-8").split("\0"):
+            token = token.lstrip("\n")
+            if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", token):
+                commit_id = _validate_object_id(token, object_format)
+            elif token in selected and commit_id:
+                latest = changes.get(token, (commit_id, commit_id))[1]
+                changes[token] = (commit_id, latest)
+        identities = {identity for pair in changes.values() for identity in pair}
+        dates = dict(RepositoryCommit.objects.filter(
+            repository=repository, object_id__in=identities,
+        ).values_list("object_id", "created_at"))
+        if set(changes) != selected or set(dates) != identities:
+            raise RepositoryInputError("Verified file history is unavailable")
+        return {path: (dates[first], dates[last]) for path, (first, last) in changes.items()}
 
 
 def list_accepted_repository_history(

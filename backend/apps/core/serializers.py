@@ -517,6 +517,11 @@ class EntityMentionResultSerializer(serializers.Serializer):
 
 
 class DocumentSerializer(serializers.Serializer):
+    repository_native = serializers.BooleanField(
+        read_only=True, default=False,
+        help_text="Native-only discovery summary; open by content_id in the repository editor. "
+                  "Legacy lifecycle fields are not populated; repository APIs provide files and publication evidence.",
+    )
     id = serializers.UUIDField(source="entity_id")
     content_id = serializers.UUIDField(source="id", read_only=True)
     title = serializers.CharField(source="entity.display_name")

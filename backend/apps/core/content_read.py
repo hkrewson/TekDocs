@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import APIException
@@ -201,6 +201,9 @@ def document_collection(
     nodes = nodes.distinct().order_by("title", "content_id")
     count = nodes.count()
     offset = (page - 1) * page_size
+    nodes = nodes.annotate(_has_legacy_document=Exists(Document.objects.filter(
+        tenant=workspace.member.tenant, entity__workspace_id=repository.workspace_id, id=OuterRef("content_id"),
+    )))
     selected = list(nodes[offset : offset + page_size + 1])
     results = [
         {
@@ -210,6 +213,7 @@ def document_collection(
             "path": node.source_path,
             "topic": node.topic_type or None,
             "finding_count": ContentFinding.objects.filter(node=node).count(),
+            "repository_native": not node._has_legacy_document,
         }
         for node in selected[:page_size]
     ]

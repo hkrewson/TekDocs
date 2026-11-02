@@ -10369,6 +10369,8 @@ export interface components {
             readonly findings: readonly components["schemas"]["ContentFindingRead"][];
         };
         readonly ContentReadItem: {
+            /** @description No retained legacy Document row exists for this exact Workspace/content identity, including archived rows. */
+            readonly repository_native: boolean;
             /** Format: uuid */
             readonly id: string;
             readonly kind: string;
@@ -10872,6 +10874,11 @@ export interface components {
             readonly last_checked_at: number | null;
         };
         readonly Document: {
+            /**
+             * @description Native-only discovery summary; open by content_id in the repository editor. Legacy lifecycle fields are not populated; repository APIs provide files and publication evidence.
+             * @default false
+             */
+            readonly repository_native: boolean;
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */
@@ -11503,6 +11510,11 @@ export interface components {
             readonly note: string;
         };
         readonly DocumentSearchHit: {
+            /**
+             * @description Native-only discovery summary; open by content_id in the repository editor. Legacy lifecycle fields are not populated; repository APIs provide files and publication evidence.
+             * @default false
+             */
+            readonly repository_native: boolean;
             /** Format: uuid */
             readonly id: string;
             /** Format: uuid */

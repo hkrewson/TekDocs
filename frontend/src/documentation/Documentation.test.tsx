@@ -230,6 +230,25 @@ it('paginates the library and gives an opened document a focused workspace', asy
   ))
 })
 
+it('opens a discovered native document in the repository editor without legacy detail calls', async () => {
+  const originalLocation = window.location.pathname + window.location.search
+  try {
+    const user = userEvent.setup()
+    const { documents, workspaces, getDocument } = clients()
+    vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, repository_native: true, content_authority: 'repository', content_id: 'native-content' }], count: 1 })
+    const { browserRepositoryClient } = await import('./repositoryApi')
+    vi.spyOn(browserRepositoryClient, 'list').mockResolvedValue({ results: [], accepted_commit: null, indexed_commit: null, count: 0, has_more: false })
+    const source = vi.spyOn(browserRepositoryClient, 'source').mockResolvedValue({ content_id: 'native-content', title: 'Native guide', kind: 'document', path: 'docs/native.md', markdown: 'Native saved body', source: '', source_blob: 'blob', accepted_commit: null, indexed_commit: null })
+    render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+    await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Native saved body')
+    expect(source).toHaveBeenCalledWith('native-content', undefined, expect.any(AbortSignal))
+    expect(getDocument).not.toHaveBeenCalled()
+  } finally {
+    window.history.replaceState(null, '', originalLocation)
+  }
+})
+
 it.each([false, true])('reads repository-owned documents by content identity (organization scope: %s)', async (organizationScope) => {
   const user = userEvent.setup()
   const { documents, workspaces } = clients()

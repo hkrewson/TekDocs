@@ -4,6 +4,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
+import { rehearseRepositoryContent } from './repository-live-journey'
 
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { source_msp?: boolean; organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
@@ -126,6 +127,12 @@ async function templateJourney(page: Page, state: State) {
   await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
 }
+
+test('native documents appear in the library and reopen through the repository editor', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  await rehearseRepositoryContent(page, state.template.organization_id)
+})
 
 test('migrated signed history survives real publishing, correction, withdrawal and PDF downloads', async ({ page, browser }) => {
   const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State

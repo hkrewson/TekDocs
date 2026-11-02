@@ -33,6 +33,11 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   await page.getByLabel('Markdown body').fill(initialBody)
   const created = await saveToGit(page, endpoint)
   expect(created.markdown).toBe(initialBody)
+  // A fresh Git-only document is discoverable in the ordinary library too.
+  await page.goto(documentation)
+  await page.getByRole('button', { name: /Live Git setup guide/ }).click()
+  await expect(page.getByLabel('Markdown body')).toHaveValue(initialBody)
+  await expect(page).toHaveURL(new RegExp(`repository=${created.content_id}`))
   const directLink = `${documentation}?repository=${created.content_id}`
 
   // Reopening must read the saved Git file, including after a browser reload.

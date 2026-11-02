@@ -38407,6 +38407,10 @@ components:
     ContentReadItem:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          description: No retained legacy Document row exists for this exact Workspace/content
+            identity, including archived rows.
         id:
           type: string
           format: uuid
@@ -38426,6 +38430,7 @@ components:
       - id
       - kind
       - path
+      - repository_native
       - title
       - topic
     ContentTemplateSource:
@@ -39612,6 +39617,13 @@ components:
     Document:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          readOnly: true
+          default: false
+          description: Native-only discovery summary; open by content_id in the repository
+            editor. Legacy lifecycle fields are not populated; repository APIs provide
+            files and publication evidence.
         id:
           type: string
           format: uuid
@@ -39873,6 +39885,7 @@ components:
       - primary_file_versions
       - publication_count
       - publications
+      - repository_native
       - resolved_markdown
       - review_decided_at
       - review_due_on
@@ -41108,6 +41121,13 @@ components:
     DocumentSearchHit:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          readOnly: true
+          default: false
+          description: Native-only discovery summary; open by content_id in the repository
+            editor. Legacy lifecycle fields are not populated; repository APIs provide
+            files and publication evidence.
         id:
           type: string
           format: uuid
@@ -41373,6 +41393,7 @@ components:
       - primary_file_versions
       - publication_count
       - publications
+      - repository_native
       - resolved_markdown
       - review_decided_at
       - review_due_on

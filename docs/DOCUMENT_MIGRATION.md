@@ -165,3 +165,28 @@ keys and foreign record dependencies remain separate. See
 `planning/migrations/key-entity-publication-migration.md` for current validation;
 this document does not establish release, production migration or recovery
 acceptance independently of that record.
+
+
+## Repeated shared-leaf continuation after 0.9.18
+
+The authorized [repeated-occurrence slice](../planning/migrations/repeated-shared-block-migration.md)
+extends guarded copy to repeated same-Workspace shared leaves, including different
+pins of one Block and mixed live/pinned uses. Each occurrence retains its ordinal,
+audience and selected version. Preview referenced_blocks entries additionally
+identify placement_id, ordinal_path, mode and audience. Review and apply the exact
+current plan; a changed selection, source, file or accepted head requires a new
+preview.
+
+Pins require exact represented accepted Git history. Missing history remains
+blocked, and migration does not infer a pin or regenerate a signed PDF. Repeated
+owned structures and general cross-Workspace reuse remain unsupported. Complete
+live dependency groups still transition together; authority rollback preserves
+pins while projecting only supported owned Markdown edits.
+
+New repeated-source publications use signed v12 occurrence envelopes over their
+existing content/diagram certificate. Historical signed manifests, retained PDFs,
+attachments and every primary-file version remain unchanged. See
+[ADR 0122](adr/0122-repeated-shared-block-occurrence-custody.md). This is development
+at version 0.9.18; published v0.9.18 remains the earlier validated release source.
+Final-source hosted upgrade/recovery validation and separately authorized
+production migration remain required.

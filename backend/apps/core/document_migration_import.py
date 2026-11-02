@@ -78,6 +78,11 @@ def fingerprint_document_import(
             for entity, block, revision, digest in export.key_content_sources
         ],
         "pinned_commits": [(str(content_id), commit) for content_id, commit in export.pinned_commits],
+        "reference_occurrences": [
+            (str(item.placement_id), str(item.content_id), item.digest, item.mode,
+             item.audience, item.ordinal_path, item.pinned_commit)
+            for item in export.reference_occurrences
+        ],
         "reference_commit": export.reference_commit,
         "files": [(path, hashlib.sha256(source).hexdigest()) for path, source in export.files],
         "resolved_entity_links": export.resolved_entity_links,
@@ -195,16 +200,9 @@ def _verify_projection(prepared: PreparedDocumentImport, commit: str) -> bool:
     manifest = composition.get("manifest")
     if not isinstance(manifest, list):
         return False
-    pinned = dict(prepared.export.pinned_commits)
     if any(
-        not any(
-            isinstance(item, dict)
-            and item.get("id") == str(content_id)
-            and item.get("digest") == digest
-            and (content_id not in pinned or item.get("commit") == pinned[content_id])
-            for item in manifest
-        )
-        for content_id, digest in prepared.export.referenced_digests
+        not any(isinstance(item, dict) and reference.matches(item) for item in manifest)
+        for reference in prepared.export.reference_occurrences
     ):
         return False
     return (

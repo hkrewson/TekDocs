@@ -22,7 +22,11 @@ from .content_publication_sources import ContentPublicationSourceError, pinned_g
 from .diagram_exports import DiagramExportArtifact, embed_diagrams_in_html, render_diagram_exports
 from .document_addressed_publications import ADDRESSED_GIT_STATIC_FORMAT, verify_addressed_publication_manifest
 from .document_content_key_publications import CONTENT_KEY_GIT_STATIC_FORMAT
-from .document_diagram_publications import DIAGRAM_GIT_STATIC_FORMAT, publication_content_manifest
+from .document_diagram_publications import (
+    DIAGRAM_GIT_STATIC_FORMAT,
+    OCCURRENCE_GIT_STATIC_FORMAT,
+    publication_content_manifest,
+)
 from .document_keys import key_targets_in_markdown
 from .document_migration_shape import owned_placement_tree
 from .document_publication_files import (
@@ -91,6 +95,7 @@ class PreparedGitPublication:
 def verify_git_publication_source(publication: DocumentPublication) -> bool:
     """Check the signed source descriptor without consulting current Git state."""
     try:
+        repeated = publication.manifest.get("format") == OCCURRENCE_GIT_STATIC_FORMAT
         manifest = publication_content_manifest(publication.manifest, publication.canonical_markdown)
         source = manifest["git_source"]
         sources = source["sources"]
@@ -102,12 +107,12 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
                 ADDRESSED_GIT_STATIC_FORMAT, CONTENT_KEY_GIT_STATIC_FORMAT,
             }
             and (not addressed or verify_addressed_publication_manifest(
-                manifest, publication.document_id, publication.canonical_markdown,
+                manifest, publication.document_id, publication.canonical_markdown, allow_repeated=repeated,
             ))
             and (manifest["format"] != TEMPLATE_GIT_STATIC_FORMAT
-                 or verify_template_publication_manifest(manifest, publication.document_id))
+                 or verify_template_publication_manifest(manifest, publication.document_id, allow_repeated=repeated))
             and (manifest["format"] != SHARED_GIT_STATIC_FORMAT
-                 or verify_shared_publication_manifest(manifest, publication.document_id))
+                 or verify_shared_publication_manifest(manifest, publication.document_id, allow_repeated=repeated))
             and (
                 manifest["format"] != FILE_GIT_STATIC_FORMAT
                 or verify_publication_file_manifest(manifest, publication.document_id)
@@ -145,8 +150,8 @@ def verify_git_publication_source(publication: DocumentPublication) -> bool:
             and source["root_title"] == publication.title == manifest["title"]
             and manifest["publication_id"] == str(publication.id)
             and manifest["publication_entity_id"] == str(publication.entity_id)
-            and len({(item.get("library_workspace", source["workspace_id"]), item["id"])
-                     for item in sources}) == len(sources)
+            and (repeated or len({(item.get("library_workspace", source["workspace_id"]), item["id"])
+                                 for item in sources}) == len(sources))
         )
     except (KeyError, TypeError, ValueError, AttributeError, OSError, ImproperlyConfigured):
         return False
@@ -505,6 +510,10 @@ def publish_git_document(
             if prepared.diagrams:
                 manifest["content_format"] = manifest["format"]
                 manifest["format"] = DIAGRAM_GIT_STATIC_FORMAT
+            if len({(item.get("library_workspace", source["workspace_id"]), item["id"])
+                    for item in source["sources"]}) != len(source["sources"]):
+                manifest["occurrence_format"] = manifest["format"]
+                manifest["format"] = OCCURRENCE_GIT_STATIC_FORMAT
             html = render_markdown(
                 markdown, attachments=rendered_files,
                 entity_mentions={item["id"]: item for item in prepared.entities},

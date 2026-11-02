@@ -23,9 +23,11 @@ Independent-stack gates run only in hosted CI. Reproduce failures before fixes.
 Templates/enrollments, cross-Workspace reuse, dynamic keys/entity dependencies,
 shared fragments containing files owned by another document, diagrams, client
 delivery and structural editing remain excluded rather than flattened or lost.
-The existing copy model permits one occurrence of each block per document;
-repeated occurrences, including different pins of one block, remain explicitly
-blocked as `unsupported_placement_graph`. Proof is never collapsed by UUID to
+The initial copy model permitted one occurrence of each block per document;
+that initial slice blocked repeated occurrences, including different pins of one
+block, as `unsupported_placement_graph`. The maintainer-authorized
+[repeated-occurrence continuation](repeated-shared-block-migration.md) extends
+same-Workspace shared leaves with distinct occurrence proof. Proof is never collapsed by UUID to
 silently merge such occurrences.
 Current supported bounds and file custody checks remain enforced.
 

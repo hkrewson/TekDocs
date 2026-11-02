@@ -102,7 +102,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
                 "tekdocs-static-publication/v5",
                 "tekdocs-static-publication/v6",
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
-                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
+                "tekdocs-static-publication/v11", "tekdocs-static-publication/v12",
             }
             or publication.audience not in {"msp_internal", "client_visible"}
             or (publication.audience == "client_visible" and workspace.organization_id is None)
@@ -158,7 +159,8 @@ def assess_retained_publications(*, workspace: Workspace, document: Document) ->
             if manifest.get("format") in {
                 "tekdocs-static-publication/v5", "tekdocs-static-publication/v6",
                 "tekdocs-static-publication/v7", "tekdocs-static-publication/v8",
-                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10", "tekdocs-static-publication/v11",
+                "tekdocs-static-publication/v9", "tekdocs-static-publication/v10",
+                "tekdocs-static-publication/v11", "tekdocs-static-publication/v12",
             }:
                 from .document_git_publications import verify_git_publication
 

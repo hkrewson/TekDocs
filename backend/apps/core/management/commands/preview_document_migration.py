@@ -106,7 +106,6 @@ class Command(BaseCommand):
             except (DocumentMigrationExportError, RepositoryServiceError) as exc:
                 result.update({"eligible": False, "blockers": [type(exc).__name__]})
             else:
-                pinned_commits = dict(export.pinned_commits)
                 result.update(
                     {
                         "eligible": True,
@@ -126,15 +125,14 @@ class Command(BaseCommand):
                         ],
                         "referenced_blocks": [
                             {
-                                "block_id": str(content_id),
-                                "content_digest": digest,
-                                **(
-                                    {"pinned_commit": pinned_commits[content_id]}
-                                    if content_id in pinned_commits
-                                    else {}
-                                ),
+                                "block_id": str(item.content_id),
+                                "placement_id": str(item.placement_id),
+                                "content_digest": item.digest,
+                                "mode": item.mode, "audience": item.audience,
+                                "ordinal_path": list(item.ordinal_path),
+                                **({"pinned_commit": item.pinned_commit} if item.pinned_commit else {}),
                             }
-                            for content_id, digest in export.referenced_digests
+                            for item in export.reference_occurrences
                         ],
                         "resolved_markdown_sha256": export.resolved_markdown_sha256,
                         "attachment_count": len(export.attachment_digests),

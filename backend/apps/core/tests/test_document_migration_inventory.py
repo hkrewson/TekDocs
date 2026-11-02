@@ -2372,7 +2372,9 @@ def test_pinned_same_workspace_leaf_retains_exact_snapshot_after_source_changes(
             stdout=historical_rollback_output,
         )
         assert json.loads(historical_rollback_output.getvalue())["status"] == "rolled_back"
-        assert build_simple_document_export(target).pinned_commits == ((source_placement.block_id, source_commit),)
+        assert build_simple_document_export(target).pinned_commits == (
+            (target.placements.get(resolution_mode="pinned").id, source_commit),
+        )
         assert browser.get(target_status_url).json()["content_copy_state"] == "in_sync"
         assert (
             ContentNode.objects.get(repository=workspace.repository, content_id=target.id).composition_variants["all"][

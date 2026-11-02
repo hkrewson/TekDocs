@@ -1,4 +1,4 @@
-"""Offline diagram custody layered over existing Git content certificates."""
+"""Offline occurrence and diagram envelopes over existing Git content certificates."""
 
 from __future__ import annotations
 
@@ -6,19 +6,34 @@ import re
 from typing import Any
 from uuid import UUID
 
+from .content_composition import MAX_COMPOSITION_NODES
 from .diagram_exports import MAX_PNG_BYTES, MAX_SVG_BYTES, RENDERER_REPORT, diagram_sources
 
 DIAGRAM_GIT_STATIC_FORMAT = "tekdocs-static-publication/v11"
+OCCURRENCE_GIT_STATIC_FORMAT = "tekdocs-static-publication/v12"
 CONTENT_FORMATS = frozenset(f"tekdocs-static-publication/v{version}" for version in range(5, 11))
 
 
 def publication_content_manifest(manifest: dict[str, Any], markdown: str) -> dict[str, Any]:
-    """Validate the diagram layer, then expose its unchanged content certificate.
+    """Validate envelope layers, then expose their unchanged content certificate.
 
     The returned view is only for structural validation. Signatures always cover
-    the original manifest including every diagram descriptor and content format.
+    the original manifest including occurrence/diagram descriptors and formats.
     No current renderer, database record or Git source is consulted here.
     """
+    if manifest.get("format") == OCCURRENCE_GIT_STATIC_FORMAT:
+        if manifest.get("occurrence_format") not in {
+            f"tekdocs-static-publication/v{version}" for version in range(7, 12)
+        }:
+            raise ValueError("Occurrence publication content format is invalid")
+        sources = manifest["git_source"]["sources"]
+        if not isinstance(sources, list) or not 3 <= len(sources) <= MAX_COMPOSITION_NODES:
+            raise ValueError("Occurrence publication source count is invalid")
+        identities = {(item.get("library_workspace", manifest["git_source"]["workspace_id"]), item["id"])
+                      for item in sources}
+        if len(identities) == len(sources):
+            raise ValueError("Occurrence publication requires repeated source identities")
+        manifest = {**manifest, "format": manifest["occurrence_format"]}
     if manifest.get("format") != DIAGRAM_GIT_STATIC_FORMAT:
         return manifest
     if manifest.get("content_format") not in CONTENT_FORMATS:

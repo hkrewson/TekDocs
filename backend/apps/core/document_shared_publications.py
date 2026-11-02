@@ -13,16 +13,22 @@ SHARED_GIT_STATIC_FORMAT = "tekdocs-static-publication/v7"
 TEMPLATE_GIT_STATIC_FORMAT = "tekdocs-static-publication/v8"
 
 
-def verify_shared_publication_manifest(manifest: dict[str, Any], document_id: UUID) -> bool:
+def verify_shared_publication_manifest(
+    manifest: dict[str, Any], document_id: UUID, *, allow_repeated: bool = False,
+) -> bool:
     """Use only signed inputs: current placements, index and Git are not evidence."""
-    return _verify_shared_manifest(manifest, document_id, library=False)
+    return _verify_shared_manifest(manifest, document_id, library=False, allow_repeated=allow_repeated)
 
 
-def verify_template_publication_manifest(manifest: dict[str, Any], document_id: UUID) -> bool:
-    return _verify_shared_manifest(manifest, document_id, library=True)
+def verify_template_publication_manifest(
+    manifest: dict[str, Any], document_id: UUID, *, allow_repeated: bool = False,
+) -> bool:
+    return _verify_shared_manifest(manifest, document_id, library=True, allow_repeated=allow_repeated)
 
 
-def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, library: bool) -> bool:
+def _verify_shared_manifest(
+    manifest: dict[str, Any], document_id: UUID, *, library: bool, allow_repeated: bool,
+) -> bool:
     try:
         source = manifest["git_source"]
         sources = source["sources"]
@@ -62,7 +68,7 @@ def _verify_shared_manifest(manifest: dict[str, Any], document_id: UUID, *, libr
                 foreign_count += 1
             key = (namespace, identity)
             if (
-                key in identities
+                (key in identities and not allow_repeated)
                 or not isinstance(path, list)
                 or any(type(value) is not int or value < 0 for value in path)
                 or not re.fullmatch(source_pattern, item["commit"])

@@ -10,3 +10,4 @@ transition review.
 | [0115](0115-explicit-per-document-git-authority-handoff.md) | Explicit per-document Git authority handoff | proposed | 2026-10-10 |
 | [0117](0117-addressed-git-publication-custody.md) | Addressed Git publication custody | accepted | 2026-10-31 |
 | [0116](0116-enrolled-template-library-git-custody.md) | Enrolled template library Git custody | proposed | 2026-10-30 |
+| [0122](0122-repeated-shared-block-occurrence-custody.md) | Repeated shared-block occurrence custody | accepted | 2026-11-01 |

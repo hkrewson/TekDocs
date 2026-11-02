@@ -255,7 +255,18 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         seed_client_publication_fixture(installation.owner)
         client_publication_legacy = prepare_client_publication_fixture(installation.owner)
+        from apps.core.tests.repeated_block_fixture import (
+            browser_state as repeated_browser_state,
+        )
+        from apps.core.tests.repeated_block_fixture import (
+            prepare_repeated_block_fixture,
+            seed_repeated_block_fixture,
+        )
+
+        seed_repeated_block_fixture(installation.owner)
+        repeated_legacy = prepare_repeated_block_fixture(installation.owner)
         prepared_state = {
+            "repeated": repeated_browser_state(installation.owner),
             "client_publication": client_publication_browser_state(installation.owner),
             "addressed": addressed_fixture.browser,
             "content_keys": content_key_browser_state(installation.owner),
@@ -367,3 +378,6 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.client_publication_fixture import verify_client_publication_fixture
 
         verify_client_publication_fixture(installation.owner, client_publication_legacy)
+        from apps.core.tests.repeated_block_fixture import exercise_repeated_block_fixture
+
+        exercise_repeated_block_fixture(installation.owner, repeated_legacy)

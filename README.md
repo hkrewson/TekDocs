@@ -14,14 +14,26 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
-## 0.9.18 candidate: client-published migration
+## Repeated shared-block migration development
 
-The [0.9.18 candidate](planning/releases/0.9.18-candidate.md) packages validated
+The [#105/#106 continuation](planning/migrations/repeated-shared-block-migration.md)
+extends migration to repeated same-Workspace shared leaves, including separate
+pinned editions and mixed live/pinned occurrences. Each placement keeps its own
+ordered source proof; new v12 publication envelopes preserve the constraints of
+historical signed formats. Missing represented Git pin history and ambiguous
+owned composition remain explicit blockers. Both source-review axes and local runtime/browser gates passed; exact-source
+hosted upgrade/recovery gates follow the authorized push. Version remains 0.9.18
+and production migration is separately authorized.
+
+## Published 0.9.18: client-published migration
+
+The [0.9.18 checkpoint](planning/releases/0.9.18-candidate.md) packages validated
 client-publication migration, audience-specific sections, retained signatures,
-PDFs/files and portal workflows, with independent approval and verified authority
-rollback/recovery. Preparation and source/security review are in progress.
-Automatic image/tag/receipt delivery requires exact-source hosted release gates;
-production deployment and live-data migration remain separate.
+PDFs/files and portal workflows. Release source `81fed48f` passed
+[CI on attempt 1](https://github.com/hkrewson/TekDocs/actions/runs/41362859970),
+including upgrade/recovery, four image scans and eight attestation verifications.
+Application and receipt tags were delivered automatically; receipt commit is
+`b36334b1`. Production deployment and live-data migration remain separate.
 
 ## Published 0.9.17 checkpoint
 

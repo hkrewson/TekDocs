@@ -13,18 +13,32 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## 0.9.18 candidate: client-published migration
+## Repeated shared-block migration development after 0.9.18
 
-The maintainer authorized [0.9.18 preparation](0.9.18-candidate.md), validation,
-source/security review and direct-main push with automatic image, tag and durable
-receipt delivery. Baseline is 6963608b; its Build, CodeQL and Extended gates passed.
-The [current review](0.9.18-source-review.md), fresh local checks and bounded risk
-decision precede the release push. Exact-source hosted release validation and
-verified CI receipt delivery are required. Local preparation and both review axes
-passed; the maintainer accepted the candidate-specific CSP/COEP/KaTeX boundary.
-Hosted delivery remains required. No 0.9.18 publication, production
-deployment or live-data migration is claimed yet.
-The pinned candidate manifest above remains historical evidence.
+The maintainer authorized [#105/#106 repeated shared-block migration](../migrations/repeated-shared-block-migration.md),
+including distinct pins, retained signed publications/PDFs/file versions and
+verified rollback/recovery. Commit and push directly to main after validation.
+Implementation, both source-review axes, 644 broad Docker cases, 17 final cases,
+795 frontend cases and eight real browser/server journeys passed. Exact-source
+hosted upgrade and independent restore remain mandatory. Version remains 0.9.18. Historical release
+acceptance does not substitute for exact-source development validation.
+
+## Published 0.9.18: client-published migration
+
+Application `81fed48fd2d4810542af43e703f5842589ed0ff4` passed
+[Build 41362859970](https://github.com/hkrewson/TekDocs/actions/runs/41362859970)
+on attempt 1, including reusable CodeQL/Extended gates, eighteen database groups,
+89% coverage, 795 frontend cases, seven live publication journeys, all five browser
+configurations, supported upgrades and independent encrypted recovery. Four tested
+images were published and all eight attestations verified. CI delivered v0.9.18
+and receipts/v0.9.18 atomically; receipt commit is
+`b36334b1b8fa860dead425461eb4517188a4b36c`. Independent read-only checks reconciled
+both tags, exact artifact/Git receipt bytes, sole parent/path, verification identities
+and all four registry version/commit aliases. The
+[candidate notes](0.9.18-candidate.md) and [source review](0.9.18-source-review.md)
+retain preparation and bounded maintainer risk acceptance. Production deployment,
+live-data migration and final 1.0 acceptance remain separate. The pinned manifest
+still names historical 0.9.12 evidence.
 
 ## Client-published migration development after 0.9.17
 

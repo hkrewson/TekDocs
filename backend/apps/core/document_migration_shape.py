@@ -30,9 +30,11 @@ def owned_placement_tree(document: Document, placements: list[DocumentPlacement]
         raise DocumentMigrationShapeError("composition_node_limit_exceeded")
     placements_by_id = {placement.id: placement for placement in placements}
     placement_ids = set(placements_by_id)
-    if len(placement_ids) != len(placements) or len({placement.block_id for placement in placements}) != len(
-        placements
-    ):
+    if len(placement_ids) != len(placements):
+        raise DocumentMigrationShapeError("unsupported_placement_graph")
+    owned = [item.block_id for item in placements if item.block.source_document_id == document.id]
+    if len(set(owned)) != len(owned):
+        # One authored fragment cannot encode two different owned child trees.
         raise DocumentMigrationShapeError("unsupported_placement_graph")
     library_placements: set[uuid.UUID] = set()
     if any(item.block.organization_id != document.organization_id for item in placements):

@@ -1159,3 +1159,14 @@ Hosted fresh/0.8.46 migration and exact encrypted recovery passed. Extended atte
 The bounded slice is complete. The slice record preserves the original failure and receipt attempt boundaries. This does
 not close #105/#106 or aggregate 1.0 acceptance.
 Version remains 0.9.16; no release or production migration is claimed.
+
+
+### Repeated shared occurrences after 0.9.18
+
+The maintainer authorized the [#105/#106 continuation](migrations/repeated-shared-block-migration.md)
+for repeated shared leaves and different pins. It preserves ordered occurrence
+proof, signed history, PDFs and file versions with rollback/recovery validation.
+Local runtime/browser validation and both source-review axes passed; exact-source
+hosted upgrade/recovery gates remain mandatory. This continuation does not expand general
+cross-Workspace reuse or arbitrary owned structural authoring, freeze 1.x, or
+authorize production migration. Version remains 0.9.18.

@@ -5025,7 +5025,10 @@ class DocumentPublication(models.Model):
         if manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
             from .document_addressed_publications import verify_addressed_publication_manifest
 
-            if not verify_addressed_publication_manifest(manifest, self.document_id, self.canonical_markdown):
+            if not verify_addressed_publication_manifest(
+                manifest, self.document_id, self.canonical_markdown,
+                allow_repeated=self.manifest.get("format") == "tekdocs-static-publication/v12",
+            ):
                 raise ValidationError("Addressed publication snapshot is invalid")
         if manifest.get("format") == "tekdocs-static-publication/v4":
             placements = manifest.get("placements")

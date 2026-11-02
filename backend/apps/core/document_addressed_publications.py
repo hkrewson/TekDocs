@@ -17,7 +17,9 @@ from .rendering import entity_ids_in_markdown
 ADDRESSED_GIT_STATIC_FORMAT = "tekdocs-static-publication/v9"
 
 
-def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id: UUID, markdown: str) -> bool:
+def verify_addressed_publication_manifest(
+    manifest: dict[str, Any], document_id: UUID, markdown: str, *, allow_repeated: bool = False,
+) -> bool:
     """The signed authored source, binding map and frozen projection must agree."""
     try:
         authored = manifest["authored_markdown"]
@@ -80,10 +82,10 @@ def verify_addressed_publication_manifest(manifest: dict[str, Any], document_id:
         if len(set(identities)) != len(identities) or set(identities) != entity_ids_in_markdown(markdown):
             return False
         if manifest["git_source"]["format"] == "tekdocs.git-dependencies/v2":
-            return verify_template_publication_manifest(manifest, document_id)
+            return verify_template_publication_manifest(manifest, document_id, allow_repeated=allow_repeated)
         return bool(
             manifest["git_source"]["format"] == "tekdocs.git-dependencies/v1"
-            and verify_shared_publication_manifest(manifest, document_id)
+            and verify_shared_publication_manifest(manifest, document_id, allow_repeated=allow_repeated)
         )
     except (KeyError, TypeError, ValueError, AttributeError):
         return False

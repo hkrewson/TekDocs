@@ -303,16 +303,9 @@ def _document_copy_status(*, workspace: Workspace, document: Document) -> dict[s
     composition = root.composition_variants.get("all")
     markdown = composition.get("markdown") if isinstance(composition, dict) else None
     manifest = composition.get("manifest") if isinstance(composition, dict) else None
-    pinned = dict(export.pinned_commits)
     if not isinstance(manifest, list) or any(
-        not any(
-            isinstance(item, dict)
-            and item.get("id") == str(content_id)
-            and item.get("digest") == digest
-            and (content_id not in pinned or item.get("commit") == pinned[content_id])
-            for item in manifest
-        )
-        for content_id, digest in export.referenced_digests
+        not any(isinstance(item, dict) and reference.matches(item) for item in manifest)
+        for reference in export.reference_occurrences
     ):
         response["content_copy_state"] = "diverged"
         return response

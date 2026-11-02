@@ -8,13 +8,13 @@ import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
 type ClientPublicationState = { organization_id: string; document_id: string; content_id: string; original_id: string; original_pdf_filename: string; original_pdf_sha256: string; review_on: string; companion_publication_id: string; sessions: { approver: string; client: string }; files: { filename: string; sha256: string }[] }
-type State = { client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
 const additionalDiagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>[]>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : info.title.startsWith('migrated signed') ? 'history_templates'
+  const scenario = info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared')) ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -534,4 +534,18 @@ test('client publications retain portal access, independent approval, audience f
     await expect(clientPage.getByRole('button', { name: /^Client publication recovery companion / })).toBeVisible()
     await expect(clientPage.getByRole('button', { name: /^Client publication migration acceptance guide / })).toHaveCount(0)
   } finally { await client.close(); await approver.close() }
+})
+
+
+test('repeated shared blocks retain distinct pins, live updates, file versions and signed PDFs', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const publication = await runKeyPublicationJourney(page, state, state.repeated, {
+    initial: 'First pinned shared edition.', retained: 'First pinned shared edition.',
+    current: 'Updated live shared edition.', format: 'tekdocs-static-publication/v12', keys: [],
+  })
+  for (const text of ['First pinned shared edition.', 'Second pinned shared edition.', 'Updated live shared edition.']) {
+    expect(publication.canonical_markdown.split(text)).toHaveLength(2)
+  }
+  expect(publication.canonical_markdown).not.toContain('Current live shared edition.')
+  await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v12')
 })

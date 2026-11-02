@@ -74,13 +74,31 @@ MAX_MIGRATION_PIN_HISTORY_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
+class ReferenceOccurrence:
+    placement_id: uuid.UUID
+    content_id: uuid.UUID
+    digest: str
+    mode: str
+    audience: str
+    ordinal_path: tuple[int, ...]
+    pinned_commit: str
+
+    def matches(self, item: dict[str, object]) -> bool:
+        return (
+            item.get("id") == str(self.content_id) and item.get("digest") == self.digest
+            and item.get("mode") == self.mode and item.get("audience") == self.audience
+            and item.get("ordinal_path") == list(self.ordinal_path)
+            and (not self.pinned_commit or item.get("commit") == self.pinned_commit)
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class SimpleDocumentExport:
     document_id: uuid.UUID
     blocks: tuple[tuple[uuid.UUID, uuid.UUID], ...]
-    referenced_digests: tuple[tuple[uuid.UUID, str], ...]
+    reference_occurrences: tuple[ReferenceOccurrence, ...]
     attachment_digests: tuple[tuple[uuid.UUID, str], ...]
     key_binding_ids: tuple[tuple[str, uuid.UUID, uuid.UUID], ...]
-    pinned_commits: tuple[tuple[uuid.UUID, str], ...]
     reference_commit: str | None
     files: tuple[tuple[str, bytes], ...]
     resolved_markdown_sha256: str
@@ -92,9 +110,21 @@ class SimpleDocumentExport:
     key_content_sources: tuple[tuple[uuid.UUID, uuid.UUID, uuid.UUID, str], ...] = ()
 
     @property
+    def referenced_digests(self) -> tuple[tuple[uuid.UUID, str], ...]:
+        return tuple((item.content_id, item.digest) for item in self.reference_occurrences)
+
+    @property
+    def pinned_commits(self) -> tuple[tuple[uuid.UUID, str], ...]:
+        """Pins are keyed by placement, never by the reusable Block identity."""
+        return tuple((item.placement_id, item.pinned_commit)
+                     for item in self.reference_occurrences if item.pinned_commit)
+
+    @property
     def indexed_content_ids(self) -> tuple[uuid.UUID, ...]:
         foreign = {item[0] for item in self.library_references}
-        return (self.document_id, *(block_id for block_id, _revision in self.blocks if block_id not in foreign))
+        return tuple(dict.fromkeys(
+            (self.document_id, *(block_id for block_id, _revision in self.blocks if block_id not in foreign))
+        ))
 
     @property
     def block_id(self) -> uuid.UUID:
@@ -124,7 +154,7 @@ def _source(frontmatter: dict[str, object], markdown: str) -> bytes:
 def _include_source(placement: DocumentPlacement, pinned_commits: dict[uuid.UUID, str]) -> dict[str, str]:
     source = {"id": str(placement.block_id), "mode": "live", "audience": placement.audience_profile}
     if placement.resolution_mode == PlacementResolutionMode.PINNED:
-        source.update({"mode": "pinned", "commit": pinned_commits[placement.block_id]})
+        source.update({"mode": "pinned", "commit": pinned_commits[placement.id]})
     if placement.block.organization_id != placement.organization_id:
         source_document = placement.block.source_document
         if source_document is None:
@@ -270,7 +300,8 @@ def _existing_references(
             selected_commit = source_repository.accepted_commit.object_id
             if prior_library_root is not None:
                 previous_include = next(
-                    (item for item in prior_library_root.includes if item.target_content_id == placement.block_id),
+                    (item for item in prior_library_root.includes if item.ordinal == placement.position
+                     and item.target_content_id == placement.block_id),
                     None,
                 )
                 if previous_include is None:
@@ -295,9 +326,9 @@ def _existing_references(
                     )
             except ContentCompositionError as exc:
                 raise DocumentMigrationReferenceError("template_library_source_unavailable") from exc
-            parsed_references[placement.block_id] = parsed_library
+            parsed_references[placement.id] = parsed_library
             if placement.resolution_mode == "pinned":
-                pinned_commits[placement.block_id] = object_id
+                pinned_commits[placement.id] = object_id
     for placement in references:
         source_document_id = placement.block.source_document_id
         if source_document_id is None:
@@ -332,7 +363,8 @@ def _existing_references(
             if prior_root is not None:
                 prior = (
                     next(
-                        (item for item in prior_parent.includes if item.target_content_id == placement.block_id),
+                        (item for item in prior_parent.includes if item.ordinal == placement.position
+                         and item.target_content_id == placement.block_id),
                         None,
                     )
                     if prior_parent is not None
@@ -378,7 +410,7 @@ def _existing_references(
                 if historical is None:
                     raise DocumentMigrationReferenceError("pinned_source_snapshot_required")
                 parsed = historical
-            pinned_commits[placement.block_id] = pinned_commit
+            pinned_commits[placement.id] = pinned_commit
         from .models import DocumentAuthority
 
         repository_live_source = (
@@ -399,7 +431,7 @@ def _existing_references(
             raise DocumentMigrationReferenceError(
                 "pinned_source_snapshot_required" if pinned_commit else "cross_document_source_drift"
             )
-        parsed_references[placement.block_id] = parsed
+        parsed_references[placement.id] = parsed
     return accepted_object_id, parsed_references, pinned_commits
 
 
@@ -494,7 +526,8 @@ def build_simple_document_export(
         "",
     )
     files = ((f"docs/{document.id}.md", root), *fragments)
-    parsed = dict(referenced)
+    parsed = {item.content_id: item for placement_id, item in referenced.items()
+              if placement_id not in pinned_commits}
     for _path, source in files:
         content = parse_content(source)
         parsed[content.content_id] = content
@@ -509,9 +542,9 @@ def build_simple_document_export(
         library_loader=template_library_loader(repository) if repository is not None else None,
         loader=lambda object_id: (
             {
-                content_id: content
-                for content_id, content in referenced.items()
-                if pinned_commits.get(content_id) == object_id
+                content.content_id: content
+                for placement_id, content in referenced.items()
+                if pinned_commits.get(placement_id) == object_id
             }
         ),
     ).resolve(content_id=document.id, audience=None)
@@ -529,16 +562,23 @@ def build_simple_document_export(
         source_state = monitored_source_fingerprint(document)
     except MonitoredSourceStateError as exc:
         raise DocumentMigrationExportError(str(exc)) from exc
+    paths: dict[uuid.UUID | None, tuple[int, ...]] = {None: ()}
+    occurrences = []
+    for placement in tree.ordered:
+        paths[placement.id] = (*paths[placement.parent_id], placement.position)
+        if placement.id in referenced:
+            occurrences.append(ReferenceOccurrence(
+                placement.id, placement.block_id, referenced[placement.id].content_digest,
+                placement.resolution_mode, placement.audience_profile, paths[placement.id],
+                pinned_commits.get(placement.id, ""),
+            ))
     return SimpleDocumentExport(
         document_id=document.id,
         blocks=tuple(blocks),
-        referenced_digests=tuple(
-            (content_id, parsed.content_digest) for content_id, parsed in sorted(referenced.items())
-        ),
+        reference_occurrences=tuple(occurrences),
         attachment_digests=attachment_digests,
         key_binding_ids=key_binding_ids,
         key_content_sources=key_content_sources,
-        pinned_commits=tuple(sorted(pinned_commits.items())),
         reference_commit=reference_commit,
         files=tuple(files),
         resolved_markdown_sha256=hashlib.sha256(legacy.encode("utf-8")).hexdigest(),

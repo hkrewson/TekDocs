@@ -1,10 +1,19 @@
 # Release Roadmap
 
-The maintainer-authorized [0.9.18 candidate](../planning/releases/0.9.18-candidate.md)
-packages the completed client-published migration slice. Version metadata is
-0.9.18; preparation/security review and exact-source automatic release delivery
-are required before publication. Production migration and aggregate 1.0 acceptance
-remain separate.
+The maintainer-authorized [repeated shared-block slice](../planning/migrations/repeated-shared-block-migration.md)
+continues #105/#106 after published 0.9.18 (`81fed48f`, release CI 41362859970).
+Acceptance preserves distinct pinned/live occurrences, signed publications, PDFs
+and file versions, with rollback and independent recovery. Implementation, source
+review and local runtime/browser validation passed; exact-source hosted gates
+remain required; no new release or production migration is claimed.
+General cross-Workspace reuse, ambiguous owned structure and aggregate 1.0
+acceptance remain separate.
+
+The [0.9.18 checkpoint](../planning/releases/0.9.18-candidate.md) is published
+at source `81fed48f`. Release CI 41362859970 passed on attempt 1 and delivered four
+verified images, eight attestation verifications and application/receipt tags.
+It includes the client-published migration slice. Production migration and
+aggregate 1.0 acceptance remain separate.
 
 0.9.17 is published with the completed document-migration checkpoint, four
 verified images and automatic updater-receipt delivery. See the
@@ -16,9 +25,9 @@ External pilots remain removed from scope by the maintainer's October 20 decisio
 The [0.9.17 notes](../planning/releases/0.9.17-candidate.md) consolidate supported
 file, shared-block, enrolled-template, field/content-key, diagram and monitored-
 source migration. Rollback and exact recovery passed; copying/promoting documents
-remains an explicit reviewed action. Client-published legacy-document migration,
-broader reuse, recurring browser stability, tooling remediation and aggregate 1.0
-acceptance remain open. The bounded candidate risk decision is unchanged.
+remains an explicit reviewed action. Client-published legacy-document migration
+was subsequently included in 0.9.18. Broader reuse, recurring browser stability,
+tooling remediation and aggregate 1.0 acceptance remain open. The bounded candidate risk decision is unchanged.
 The [post-publication portal-notification CI investigation](../planning/releases/0.9.17-portal-notification-follow-up.md)
 retains its unknown original cause; the diagnostic correction does not close it.
 The subsequent [publication CI lifetime correction](../planning/releases/0.9.17-publication-ci-follow-up.md)

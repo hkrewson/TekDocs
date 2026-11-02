@@ -675,24 +675,30 @@ def test_group_operator_command_round_trip_and_reversible_schema(published_conte
     assert verify_retained_publication_custody(publication)
 
 
-def test_repeated_shared_block_occurrences_are_explicitly_blocked(published_context):
-    from apps.core.document_migration_import import DocumentMigrationBlocked
-
+@pytest.mark.parametrize("modes", [("live", "live"), ("pinned", "pinned"), ("pinned", "live")])
+@pytest.mark.parametrize("nested", [False, True])
+def test_repeated_shared_block_occurrences_preserve_live_and_pinned_includes(published_context, modes, nested):
     installation, workspace, source, _original = published_context
     TOTP.activate(installation.owner, generate_totp_secret())
-    consumer = _consumer(installation, source, "pinned")
-    add_document_placement(
-        document=consumer,
-        source_document=source,
-        actor_id=installation.owner.id,
-        resolution_mode="live",
-        pinned_revision_id=None,
-        parent_id=None,
-        position=2,
+    consumer = create_document(
+        tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+        title="Repeated shared consumer", markdown="Consumer instructions.\n",
     )
+    parent_id = consumer.placements.get().id if nested else None
+    for position, mode in enumerate(modes):
+        add_document_placement(
+            document=consumer, source_document=source, actor_id=installation.owner.id,
+            resolution_mode=mode, pinned_revision_id=source.placements.get().block.current_revision_id
+            if mode == "pinned" else None, parent_id=parent_id, position=position if nested else position + 1,
+        )
     _copy(workspace, source, installation.owner)
-    with pytest.raises(DocumentMigrationBlocked, match="unsupported_placement_graph"):
-        prepare_document_import(workspace=workspace, document_id=consumer.id)
+    _copy(workspace, consumer, installation.owner)
+    from apps.core.content_read import document_detail
+
+    detail = document_detail(
+        workspace=resolve_msp_workspace(installation.owner), content_id=consumer.id, audience="msp_internal",
+    )
+    assert detail["markdown"].count("Historical instructions.") == 2
 
 
 def test_database_authority_transition_serializes_with_placement_destination(published_context):
@@ -816,3 +822,88 @@ def test_source_file_link_edits_preserve_shared_consumer_rollback(published_cont
         == "transitioned"
     )
     assert verify_retained_publication_custody(original)
+
+
+def test_distinct_pins_publish_and_rollback_without_changing_retained_evidence(published_context):
+    from apps.core.content_read import document_detail
+    from apps.core.document_authority_groups import prepare_authority_group, transition_authority_group
+    from apps.core.document_migration_import import rollback_document_import
+    from apps.core.documents import resolve_document, update_document
+
+    installation, workspace, source, original = published_context
+    owner = installation.owner
+    TOTP.activate(owner, generate_totp_secret())
+    first_revision = source.placements.get().block.current_revision_id
+    first_copy = _copy(workspace, source, owner)
+    assert rollback_document_import(
+        workspace=workspace, document_id=source.id, expected_commit=first_copy.commit, actor_id=owner.id,
+    ).status == "rolled_back"
+    update_document(
+        document=source, actor_id=owner.id, title=source.entity.display_name,
+        markdown="Second shared edition.\n", base_revision_id=first_revision,
+    )
+    second_copy = _copy(workspace, source, owner)
+    consumer = _consumer(installation, source, "pinned")
+    second_pin = consumer.placements.get(resolution_mode="pinned")
+    from apps.core.documents import update_document_placement
+
+    update_document_placement(
+        placement=second_pin, actor_id=owner.id, resolution_mode="pinned", pinned_revision_id=first_revision,
+    )
+    second_revision = source.placements.get().block.current_revision_id
+    for position, mode in ((2, "pinned"), (3, "live")):
+        add_document_placement(
+            document=consumer, source_document=source, actor_id=owner.id, resolution_mode=mode,
+            pinned_revision_id=second_revision if mode == "pinned" else None, parent_id=None, position=position,
+        )
+    reader = resolve_msp_workspace(owner)
+    retained = publish_document(
+        workspace=reader, document=consumer, actor_id=owner.id, reason="Retain distinct shared editions",
+        audience="msp_internal", retention="permanent", retention_review_on=None,
+    )
+    retained_bytes = (deepcopy(retained.manifest), retained.signature,
+                      read_publication_artifact(retained.artifacts.get(kind="pdf")))
+    _copy(workspace, consumer, owner)
+    expected = ("Consumer instructions.\n\nHistorical instructions.\n\n"
+                "Second shared edition.\n\nSecond shared edition.\n")
+    assert document_detail(workspace=reader, content_id=consumer.id, audience="msp_internal")["markdown"] == expected
+    members = (source.id, consumer.id)
+    plan = prepare_authority_group(
+        workspace=workspace, document_ids=members, actor_id=owner.id, target="repository", reader_workspace=reader,
+    )
+    assert transition_authority_group(
+        workspace=workspace, document_ids=plan.document_ids, actor_id=owner.id, target="repository",
+        reader_workspace=reader, plan_sha256=plan.plan_sha256,
+    ) == "transitioned"
+    snapshot = publish_document(
+        workspace=reader, document=consumer, actor_id=owner.id, reason="Freeze distinct Git editions",
+        audience="msp_internal", retention="permanent", retention_review_on=None,
+    )
+    proof = snapshot.manifest["git_source"]["sources"]
+    assert [item["ordinal_path"] for item in proof] == [[], [0], [1], [2], [3]]
+    assert [item["commit"] for item in proof[2:4]] == [first_copy.commit, second_copy.commit]
+    assert snapshot.canonical_markdown == expected
+    assert verify_retained_publication_custody(snapshot)
+    from apps.core.content_authoring import author_content, read_authored_content
+
+    fragment = read_authored_content(repository=workspace.repository, content_id=source.placements.get().block_id)
+    author_content(
+        repository=workspace.repository, actor_id=owner.id, request_id=None, operation="update",
+        content_id=fragment.content_id, base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
+        kind=None, path=None, title=None, markdown="Third live edition.\n", metadata_patch={},
+    )
+    changed = expected.rsplit("Second shared edition.", 1)[0] + "Third live edition.\n"
+    assert document_detail(workspace=reader, content_id=consumer.id, audience="msp_internal")["markdown"] == changed
+    plan = prepare_authority_group(
+        workspace=workspace, document_ids=members, actor_id=owner.id, target="legacy", reader_workspace=reader,
+    )
+    assert transition_authority_group(
+        workspace=workspace, document_ids=plan.document_ids, actor_id=owner.id, target="legacy",
+        reader_workspace=reader, plan_sha256=plan.plan_sha256,
+    ) == "transitioned"
+    assert resolve_document(consumer).markdown == changed
+    retained.refresh_from_db()
+    assert (retained.manifest, retained.signature,
+            read_publication_artifact(retained.artifacts.get(kind="pdf"))) == retained_bytes
+    assert verify_retained_publication_custody(original)
+    assert verify_retained_publication_custody(snapshot)

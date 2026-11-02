@@ -461,3 +461,38 @@ def test_invalid_required_diagram_does_not_create_publication_or_files(promoted_
         publish_diagram(promoted_diagram)
     assert document.publications.count() == count
     assert sorted(path for path in Path(settings.MEDIA_ROOT).rglob("*") if path.is_file()) == files
+
+
+@pytest.mark.renderer_runtime
+def test_occurrence_envelope_composes_with_content_keys_and_retained_diagrams(published_context):
+    from apps.core.document_key_models import DocumentKeyBinding
+    from apps.core.documents import update_document
+    from apps.core.publications import verify_retained_publication_custody
+    from apps.core.tests.repeated_block_fixture import (
+        documents,
+        prepare_repeated_block_fixture,
+        publish,
+        seed_repeated_block_fixture,
+    )
+
+    installation, _workspace, _document, _publication = published_context
+    owner = installation.owner
+    seed_repeated_block_fixture(owner)
+    source, consumer = documents(owner)
+    DocumentKeyBinding.objects.create(
+        tenant=consumer.tenant, organization=consumer.organization, workspace=consumer.entity.workspace,
+        document=consumer, name="setup", target_entity=source.placements.get().block.entity, created_by=owner,
+    )
+    update_document(
+        document=consumer, actor_id=owner.id, title=consumer.entity.display_name,
+        markdown=("Repeated recovery graph.\n\n<tekdocs://key/setup.content>\n\n```mermaid\ngraph TD\n"
+                  "accTitle: Repeated recovery route\naccDescr: Recovery follows the retained route\nA --> B\n```\n"),
+        base_revision_id=consumer.placements.get(block__source_document=consumer).block.current_revision_id,
+    )
+    prepare_repeated_block_fixture(owner)
+    snapshot = publish(owner, consumer, "Freeze repeated editions, substituted content and diagram proof")
+    assert snapshot.manifest["format"] == "tekdocs-static-publication/v12"
+    assert snapshot.manifest["occurrence_format"] == "tekdocs-static-publication/v11"
+    assert snapshot.manifest["content_format"] == "tekdocs-static-publication/v10"
+    assert {item.kind for item in snapshot.artifacts.all()} == {"pdf", "attachment", "diagram_svg", "diagram_png"}
+    assert verify_retained_publication_custody(snapshot)

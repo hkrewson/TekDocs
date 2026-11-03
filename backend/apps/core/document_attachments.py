@@ -142,8 +142,11 @@ def create_repository_document_attachment(
     )
 
 
-class RepositoryPrimaryFileConflict(Exception):
-    """The primary-file source authority or predecessor is no longer current."""
+class RepositoryPrimaryFileConflict(ValidationError):
+    """Invalid primary-file state; HTTP adapters translate this validation failure to 409."""
+
+    def __str__(self) -> str:
+        return str(self.detail[0])
 
 
 def require_repository_primary_file_authority(*, repository: WorkspaceRepository, content_id: UUID) -> None:

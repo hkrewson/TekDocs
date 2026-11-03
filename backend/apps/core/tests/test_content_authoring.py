@@ -110,6 +110,7 @@ def test_git_only_primary_file_versions_are_retained_and_compare_and_swap(author
         assert first.json()["is_current"] is True
         stale = browser.post(primary_url, {"file": SimpleUploadedFile("stale.txt", b"Stale version\n")})
         assert stale.status_code == 409
+        assert stale.json()["detail"] == "The current primary-file version changed."
         assert DocumentAttachment.objects.filter(
             owner_content_id=document.content_id, purpose=DocumentAttachmentPurpose.PRIMARY_FILE
         ).count() == 1

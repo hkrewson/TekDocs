@@ -182,11 +182,13 @@ def test_file_backed_signed_document_migrates_and_rolls_back_with_all_versions(p
             assert [row["is_current"] for row in primary_history.json()["results"]] == [True, False]
         else:
             assert primary_history.status_code == 409
+            assert primary_history.json()["detail"] == "Legacy content remains authoritative for this document."
             blocked = browser.post(reverse("msp-content-authoring-primary-file", args=[document.id]), {
                 "file": SimpleUploadedFile("shadow.txt", b"Unreviewed shadow version\n"),
                 "expected_current_id": str(second.entity_id),
             })
             assert blocked.status_code == 409
+            assert blocked.json()["detail"] == "Legacy content remains authoritative for this document."
             assert DocumentAttachment.objects.filter(document=document, purpose="primary_file").count() == 2
         for item, content in (
             (first, b"Original primary file.\n"),

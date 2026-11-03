@@ -114,3 +114,26 @@ Inferred: no further causal claim is made for timing behavior outside the
 reproduced route-selection and measured sidebar-transition failures above.
 Blocked: no local blocker remains; exact-source hosted validation is outstanding.
 The public Wiki change is a local Documentation draft, not separately published.
+
+## Hosted service-contract regression and correction
+
+Initial main push `dbd55ae2ffd3b833233fd0908569045597bcf474` failed Build
+41672338029, core-b job 126044144090. Its existing
+`test_copied_legacy_document_cannot_acquire_native_file_owner` expected the
+service's DRF ValidationError contract, while the new authority guard raised a
+plain RepositoryPrimaryFileConflict. The exact existing Docker test reproduced
+that failure before correction (`/tmp/tekdocs-primary-owner-red.log`). The guard
+still denied ownership; the regression was its exception compatibility, not a
+permitted upload. The focused initial local suite had omitted this owner module.
+
+RepositoryPrimaryFileConflict now specializes the existing ValidationError
+contract; HTTP adapters still catch that specific class and return 409. A first
+corrected run passed all 62 ownership/authoring/file-migration cases. Review then
+identified the changed DRF string representation. New exact HTTP-detail
+assertions reproduced both list-style conflict messages before their correction
+(`/tmp/tekdocs-primary-message-red.log`). The specialized exception now retains
+plain message formatting. Neither the original owner assertion nor authority,
+CAS, scanner, storage or recovery checks were relaxed. The final full three-module
+run passed all 62 cases, including exact plain conflict messages and the original
+owner denial. Ruff and mypy passed; both final review axes have zero findings.
+Final-source hosted validation remains required after the correction push.

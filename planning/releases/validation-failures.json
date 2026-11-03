@@ -1391,6 +1391,18 @@
       "next_action": "Divide only the former second branch into disjoint core-a-2/core-a-3 groups; require every coverage output at the unchanged 80% aggregate threshold and unchanged 30-minute deadline. Keep complete union/disjointness and baseline-family tests. Added verbose module progress retains better evidence if capacity fails again. Both full groups, 160 tooling cases and both review axes passed locally. Exact-source hosted CI must confirm startup/execution headroom.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41672338029",
+      "run_attempt": 1,
+      "job_id": "126044144090",
+      "job": "PostgreSQL shard (core-b)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing-service Docker test_document_attachment_owner.py::test_copied_legacy_document_cannot_acquire_native_file_owner reproduced the exact expected-ValidationError versus plain-RepositoryPrimaryFileConflict failure before correction. The first corrected full owner/authoring/file-migration replay passed all 62 cases. New exact HTTP-detail assertions then reproduced DRF list-style messages before preserving plain formatting.",
+      "cause": "The new shared primary-file authority guard preserved the upload denial but changed the existing service validation exception contract. The focused local slice suite omitted the legacy-owner module. Specializing the conflict as the existing DRF ValidationError restores service compatibility while the specific HTTP adapters continue returning 409; explicit string formatting preserves the existing detail messages.",
+      "next_action": "Final Docker owner/authoring/file-migration replay passed all 62 cases, exact plain conflict-message assertions passed, Ruff/mypy passed and both reviews are clear. Push the bounded correction directly to main and require exact-source Build, CodeQL, supported upgrades and independent encrypted restore. Preserve the failed first run; no test assertion or deadline was weakened.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

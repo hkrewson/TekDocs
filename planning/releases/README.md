@@ -30,7 +30,11 @@ reproduced compatibility correction. The final combined authoring gate passed
 196 cases; all thirteen clean browser journeys passed without retries, followed
 by retained-byte/authority verification and artifact hygiene. Exact-source hosted
 Build, CodeQL, upgrade and independent encrypted restore remain required before
-closeout. Version remains 0.9.18 development. No deployment,
+closeout. Initial Build 41672338029 failed the existing core-b owner-validation
+contract; the exact Docker test reproduced the exception-type regression. Its
+bounded correction preserves validation compatibility, HTTP 409 and plain error
+messages. All 62 owner/authoring/file-migration cases and both final reviews passed;
+final-source hosted validation is still required. Version remains 0.9.18 development. No deployment,
 release/tag publication or existing-data change is authorized by this slice.
 
 ## Native staff and client publication controls after discovery/export

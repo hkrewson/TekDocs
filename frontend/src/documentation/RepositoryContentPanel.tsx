@@ -3,6 +3,7 @@ import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
 import { RepositoryPrimaryFiles } from './RepositoryPrimaryFiles'
+import { RepositoryKeys } from './RepositoryKeys'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -50,11 +51,41 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
   const [primaryEditing, setPrimaryEditing] = useState(false)
+  const [keysEditing, setKeysEditing] = useState(false)
   const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
     || draft.path !== source.path || draft.metadataText !== '{}'
   ), [draft, source])
+  const bindingDraft = useMemo((): { invalid: boolean; bindings?: Record<string, string> } => {
+    try {
+      const metadata = JSON.parse(draft?.metadataText ?? '{}') as Record<string, unknown>
+      if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return { invalid: true }
+      if (!Object.hasOwn(metadata, 'key_bindings')) return { invalid: false }
+      if (metadata.key_bindings === null) return { invalid: false, bindings: {} }
+      const bindings = metadata.key_bindings
+      if (!bindings || typeof bindings !== 'object' || Array.isArray(bindings)
+        || Object.keys(bindings).length > 64 || !Object.entries(bindings).every(([name, id]) =>
+          /^[a-z][a-z0-9_]{0,39}$/.test(name) && typeof id === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id))) return { invalid: true }
+      return { invalid: false, bindings: Object.fromEntries(Object.entries(bindings).map(([name, id]) => [name, (id as string).toLowerCase()])) }
+    } catch { return { invalid: true } }
+  }, [draft])
+
+  function changeBindings(bindings: Record<string, string>) {
+    if (!draft) return
+    try {
+      const metadata = JSON.parse(draft.metadataText) as Record<string, unknown>
+      setDraft({ ...draft, metadataText: JSON.stringify({ ...metadata, key_bindings: bindings }, null, 2) })
+    } catch { setError(translate('repository.metadataInvalid')) }
+  }
+
+  function insertReference(value: string) {
+    if (!source) return
+    setDraft(current => current?.id === source.content_id ? {
+      ...current, markdown: `${current.markdown}${current.markdown && !current.markdown.endsWith('\n') ? '\n\n' : ''}${value}\n`,
+    } : current)
+  }
+
   const canDownloadSaved = source?.kind === 'document' && !!source.accepted_commit
     && source.accepted_commit === source.indexed_commit
   const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null)
@@ -362,8 +393,9 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
         {source?.kind === 'document' && source.accepted_commit && <>
+          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
           <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy} onEditingChange={setPrimaryEditing} />
-          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing} />
+          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing} />
         </>}
       </section>
     </div>

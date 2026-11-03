@@ -23,7 +23,6 @@ from apps.core import content_authoring, repository_service, repository_storage
 from apps.core.content_authoring import (
     ContentAuthoringConflict,
     ContentAuthoringError,
-    _validate_patch,
     author_content,
     read_authored_content,
     resolve_authored_path,
@@ -33,7 +32,9 @@ from apps.core.document_attachments import create_document_attachment
 from apps.core.documents import create_document
 from apps.core.models import (
     AuditEvent,
+    Block,
     ContentNode,
+    Document,
     DocumentAttachment,
     DocumentAttachmentPurpose,
     Entity,
@@ -55,9 +56,20 @@ from apps.core.tasks import reconcile_content_indexes
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
-def test_managed_authoring_does_not_change_legacy_key_bindings():
-    with pytest.raises(ContentAuthoringError, match="unsupported fields"):
-        _validate_patch({"key_bindings": {"subject": str(uuid.uuid4())}})
+def test_managed_authoring_keeps_legacy_key_bindings_read_only(authoring_context):
+    installation, repository = authoring_context
+    document = create_document(
+        tenant=installation.tenant, organization=None, actor_id=installation.owner.id,
+        title="Legacy binding owner", markdown="Legacy body.\n",
+    )
+    with pytest.raises(ContentAuthoringError, match="Legacy key bindings remain read-only"):
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=document.id, base_commit=None, base_blob=None,
+            kind=None, path=None, title=None, markdown=None,
+            metadata_patch={"key_bindings": {"subject": str(uuid.uuid4())}},
+        )
+    assert not document.key_bindings.exists()
 
 
 def test_authoring_legacy_identity_guard_is_workspace_scoped(authoring_context):
@@ -93,6 +105,346 @@ def test_authoring_legacy_identity_guard_is_workspace_scoped(authoring_context):
     )
     authored = _create(installation, repository, content_id=foreign.id)
     assert authored.content_id == foreign.id
+
+
+def test_native_key_bindings_can_be_authored_without_legacy_records(authoring_context):
+    installation, repository = authoring_context
+    fragment_id = uuid.uuid4()
+    author_content(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        operation="create", content_id=fragment_id,
+        base_commit=repository.accepted_commit.object_id if repository.accepted_commit else None,
+        base_blob=None, kind="fragment", path=None, title="Native key procedure",
+        markdown="Native recovery instructions.\n", metadata_patch={},
+    )
+    document = _create(installation, repository, title="Native key consumer")
+    saved = author_content(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        operation="update", content_id=document.content_id,
+        base_commit=document.accepted_commit, base_blob=document.source_blob,
+        kind=None, path=None, title=None, markdown="<tekdocs://key/recovery.content>\n",
+        metadata_patch={"key_bindings": {"recovery": str(fragment_id)}},
+    )
+    assert 'recovery:' in saved.source
+    assert not Document.objects.filter(id=document.content_id).exists()
+    assert not Block.objects.filter(id=fragment_id).exists()
+
+
+def test_native_repository_key_publication_freezes_without_a_legacy_owner(authoring_context, tmp_path):
+    from apps.core.repository_publication_evidence import (
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    target = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name="Native frozen organization",
+        legal_name="Native frozen organization", website="", classifications=["client"],
+    )
+    document = _create(installation, repository, title="Native frozen key")
+    source = (
+        f'---\nschema: tekdocs.content/v1\nid: {document.content_id}\nkind: document\n'
+        f'title: Native frozen key\nkey_bindings:\n  subject: {target.entity_id}\n---\n'
+        'Organization <tekdocs://key/subject.name>\n'
+    ).encode()
+    repository_service.commit_repository_files(
+        repository_id=repository.id, expected_base=document.accepted_commit,
+        changes={document.path: source}, message="Synthetic native key source",
+        attribution=repository_service.RepositoryAuditAttribution(
+            actor_id=installation.owner.id, action="content.native_key_test",
+        ),
+    )
+    index_repository_content(repository_id=repository.id)
+    with override_settings(MEDIA_ROOT=str(tmp_path / "native-key-media")):
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience="msp_internal", actor=installation.owner,
+        )
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        assert "Native frozen organization" in evidence.manifest["key_snapshot"]["markdown"]
+    assert not Document.objects.filter(id=document.content_id).exists()
+
+
+def _native_key_site(installation, organization=None, name="Native key site"):
+    from apps.core.sites import create_site
+
+    return create_site(
+        tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+        name=name, code="KEY", address_line_1="", address_line_2="", city="", region="",
+        postal_code="", country_code="", timezone="UTC", phone="",
+    )
+
+
+def _native_key_fragment(installation, repository, markdown):
+    repository.refresh_from_db()
+    return author_content(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        operation="create", content_id=uuid.uuid4(),
+        base_commit=repository.accepted_commit.object_id, base_blob=None,
+        kind="fragment", path=None, title="Native nested instructions", markdown=markdown,
+        metadata_patch={"properties": {"lifecycle": "active"}},
+    )
+
+
+def _save_native_keys(installation, repository, authored, bindings, markdown=None):
+    return author_content(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        operation="update", content_id=authored.content_id,
+        base_commit=authored.accepted_commit, base_blob=authored.source_blob,
+        kind=None, path=None, title=None, markdown=markdown,
+        metadata_patch={"key_bindings": bindings},
+    )
+
+
+def _native_key_document(installation, repository):
+    site = _native_key_site(installation)
+    document = _create(installation, repository, title="Native nested consumer")
+    fragment = _native_key_fragment(
+        installation, repository,
+        f'Nested location <tekdocs://key/site.name>\n\n[Site](tekdocs://entity/{site.entity_id})\n',
+    )
+    saved = _save_native_keys(
+        installation, repository, document,
+        {"site": str(site.entity_id), "steps": str(fragment.content_id)},
+        markdown="# Native key consumer\n\n<tekdocs://key/steps.content>\n",
+    )
+    return saved, fragment, site
+
+
+def test_native_nested_keys_freeze_entities_and_remain_valid_after_live_edits(authoring_context, tmp_path):
+    from copy import deepcopy
+
+    from apps.core.repository_key_evidence import verify_native_key_evidence
+    from apps.core.repository_publication_evidence import (
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    document, fragment, site = _native_key_document(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    keys_url = reverse("msp-content-authoring-keys", args=[document.content_id])
+    state = browser.get(keys_url)
+    assert state.status_code == 200, state.content
+    assert state.json()["read_only"] is False
+    assert {row["expression"] for row in state.json()["report"]} == {"site.name", "steps.content"}
+    assert all(row["state"] == "resolved" for row in state.json()["report"])
+    detail_url = reverse("msp-content-document-detail", args=[document.content_id])
+    assert 'Native key site' in browser.get(detail_url).json()["sanitized_html"]
+    assert not Document.objects.filter(id=document.content_id).exists()
+    assert not Block.objects.filter(id=fragment.content_id).exists()
+    with override_settings(MEDIA_ROOT=str(tmp_path / "nested-key-media")):
+        original = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience="msp_internal", actor=installation.owner,
+        )
+        assert verify_repository_publication_evidence(original)["valid"]
+        assert original.manifest["format"] == "tekdocs-repository-publication-evidence/v3"
+        assert original.manifest["entity_cards"][0]["display_name"] == "Native key site"
+        assert 'Nested location Native key site' in original.manifest["key_snapshot"]["markdown"]
+        assert '<tekdocs://key/' not in original.manifest["key_snapshot"]["markdown"]
+        manifest = deepcopy(original.manifest)
+        signature = original.signature
+        with original.pdf_file.open('rb') as stream:
+            pdf = stream.read()
+        bad = deepcopy(manifest)
+        bad['key_bindings']['site'] = str(uuid.uuid4())
+        assert not verify_native_key_evidence(original.canonical_markdown, bad)
+        bad = deepcopy(manifest)
+        bad['key_source']['source'] += 'Tampered root bytes.\n'
+        assert not verify_native_key_evidence(original.canonical_markdown, bad)
+        bad = deepcopy(manifest)
+        bad['key_source']['blob'] = '0' * len(bad['key_source']['blob'])
+        assert not verify_native_key_evidence(original.canonical_markdown, bad)
+        bad = deepcopy(manifest)
+        content = next(row for row in bad['key_snapshot']['records'] if row['kind'] == 'content')
+        content['git_source']['workspace_id'] = str(uuid.uuid4())
+        assert not verify_native_key_evidence(original.canonical_markdown, bad)
+        Entity.objects.filter(pk=site.entity_id).update(display_name="Changed native site", updated_at=timezone.now())
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=fragment.content_id,
+            base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
+            kind=None, path=None, title=None, markdown="Changed native procedure.\n", metadata_patch={},
+        )
+        assert 'Changed native procedure.' in browser.get(detail_url).json()["sanitized_html"]
+        assert verify_repository_publication_evidence(original)["valid"]
+        original.refresh_from_db()
+        assert (original.manifest, original.signature) == (manifest, signature)
+        with original.pdf_file.open('rb') as stream:
+            assert stream.read() == pdf
+        later = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience="msp_internal", actor=installation.owner,
+        )
+        assert verify_repository_publication_evidence(later)["valid"]
+        assert "Changed native procedure." in later.manifest["key_snapshot"]["markdown"]
+
+
+def test_native_content_key_docx_uses_the_expanded_saved_body(authoring_context):
+    installation, repository = authoring_context
+    document, _fragment, _site = _native_key_document(installation, repository)
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(reverse("msp-content-document-docx-export", args=[document.content_id]))
+    assert response.status_code == 200, response.content
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        text = archive.read('word/document.xml').decode()
+    assert 'Nested location' in text
+    assert 'Native key site' in text
+
+
+@pytest.mark.parametrize('invalid', ['missing', 'cycle', 'inline', 'archived'])
+def test_native_keys_fail_closed_for_unresolved_content(authoring_context, tmp_path, invalid):
+    from apps.core.models import RepositoryPublicationEvidence
+    from apps.core.repository_publication_evidence import (
+        RepositoryPublicationEvidenceError,
+        retain_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    document, fragment, _site = _native_key_document(installation, repository)
+    if invalid in {'cycle', 'archived'}:
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=fragment.content_id,
+            base_commit=fragment.accepted_commit, base_blob=fragment.source_blob,
+            kind=None, path=None, title=None,
+            markdown="<tekdocs://key/steps.content>\n" if invalid == 'cycle' else None,
+            metadata_patch={"properties": {"lifecycle": "archived"}} if invalid == 'archived' else {},
+        )
+    else:
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None,
+            operation="update", content_id=document.content_id,
+            base_commit=document.accepted_commit, base_blob=document.source_blob,
+            kind=None, path=None, title=None,
+            markdown=("<tekdocs://key/absent.name>\n" if invalid == 'missing'
+                      else "Inline <tekdocs://key/steps.content>\n"), metadata_patch={},
+        )
+    before = RepositoryPublicationEvidence.objects.count()
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'unresolved-key-media')):
+        with pytest.raises(RepositoryPublicationEvidenceError):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=document.content_id,
+                audience='msp_internal', actor=installation.owner,
+            )
+    assert RepositoryPublicationEvidence.objects.count() == before
+
+
+def test_native_key_configuration_enforces_workspace_roles_and_client_audience(authoring_context, tmp_path):
+    from apps.core.models import EntityVisibility, RepositoryPublicationEvidence
+    from apps.core.repository_publication_evidence import (
+        RepositoryPublicationEvidenceError,
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, _msp_repository = authoring_context
+    clients = [create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name=name,
+        legal_name=name, website="", classifications=["client"],
+    ) for name in ('Native selected client', 'Native forbidden client')]
+    selected, sibling = clients
+    selected_workspace = Workspace.objects.get(tenant=installation.tenant, organization=selected)
+    repository = repository_storage.ensure_workspace_repository(selected_workspace).repository
+    own_site = _native_key_site(installation, selected, 'Native selected site')
+    other_site = _native_key_site(installation, sibling, 'Native forbidden site')
+    document = _create(installation, repository)
+    fragment = _native_key_fragment(installation, repository, '<tekdocs://key/site.name>\n')
+    document = _save_native_keys(
+        installation, repository, document,
+        {'site': str(own_site.entity_id), 'steps': str(fragment.content_id)},
+        '<tekdocs://key/steps.content>\n',
+    )
+    args = {'organization_entity_id': selected.entity_id, 'content_id': document.content_id}
+    url = reverse('organization-content-authoring-keys', kwargs=args)
+    author_url = reverse('organization-content-authoring', args=[selected.entity_id])
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(url, {'q': 'Native forbidden', 'target_id': str(other_site.entity_id)})
+    assert response.status_code == 200
+    assert str(other_site.entity_id) not in json.dumps(response.json())
+    assert 'Native forbidden site' not in json.dumps(response.json())
+    before = read_authored_content(repository=repository, content_id=document.content_id)
+    with pytest.raises(ContentAuthoringError, match='Key target is unavailable'):
+        _save_native_keys(installation, repository, document, {'site': str(other_site.entity_id)})
+    assert read_authored_content(repository=repository, content_id=document.content_id) == before
+    denied_scope = reverse(
+        'organization-content-authoring-keys', kwargs={**args, 'organization_entity_id': sibling.entity_id},
+    )
+    assert browser.get(denied_scope).status_code == 404
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'client-native-keys')):
+        count = RepositoryPublicationEvidence.objects.count()
+        with pytest.raises(RepositoryPublicationEvidenceError):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=document.content_id,
+                audience='client_visible', actor=installation.owner,
+            )
+        assert RepositoryPublicationEvidence.objects.count() == count
+        Entity.objects.filter(pk=own_site.entity_id).update(visibility=EntityVisibility.CLIENT_VISIBLE)
+        published = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience='client_visible', actor=installation.owner,
+        )
+        assert verify_repository_publication_evidence(published)['valid']
+        assert 'Native selected site' in published.manifest['key_snapshot']['markdown']
+    viewer = User.objects.create_user(
+        email=f'native-key-viewer-{uuid.uuid4()}@example.invalid', display_name='Key viewer',
+    )
+    TenantMembership.objects.create(tenant=installation.tenant, user=viewer, role=BuiltInRole.READ_ONLY)
+    TOTP.activate(viewer, generate_totp_secret())
+    from apps.accounts.access_control import assign_organization_staff
+
+    assign_organization_staff(
+        actor=installation.owner, organization_entity_id=selected.entity_id, member_user_id=viewer.id,
+    )
+    browser.force_login(viewer)
+    viewed = browser.get(url)
+    assert viewed.status_code == 200, viewed.content
+    assert viewed.json()['read_only'] is True
+    assert browser.post(author_url, data={}, content_type='application/json').status_code == 403
+    portal = User.objects.create_user(
+        email=f'native-key-client-{uuid.uuid4()}@example.invalid', display_name='Key client',
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=portal, role=BuiltInRole.CLIENT_USER, organization=selected,
+    )
+    browser.force_login(portal)
+    assert browser.get(url).status_code == 403
+    assert browser.post(author_url, data={}, content_type='application/json').status_code == 403
+    foreign = Tenant.objects.create(name='Native foreign tenant', slug=f'native-foreign-{uuid.uuid4()}')
+    outsider = User.objects.create_user(
+        email=f'native-key-outsider-{uuid.uuid4()}@example.invalid', display_name='Foreign key reader',
+    )
+    TenantMembership.objects.create(tenant=foreign, user=outsider, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(outsider, generate_totp_secret())
+    browser.force_login(outsider)
+    assert browser.get(url).status_code in {403, 404}
+
+
+def test_native_key_evidence_database_refuses_a_different_binding_map(authoring_context, tmp_path):
+    from copy import deepcopy
+
+    from apps.core.models import RepositoryPublicationEvidence
+    from apps.core.repository_publication_evidence import retain_repository_publication_evidence
+
+    installation, repository = authoring_context
+    document, _fragment, _site = _native_key_document(installation, repository)
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'guarded-native-keys')):
+        original = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience='msp_internal', actor=installation.owner,
+        )
+        values = {field.attname: getattr(original, field.attname) for field in original._meta.concrete_fields}
+        values['id'] = uuid.uuid4()
+        manifest = deepcopy(original.manifest)
+        manifest['evidence_id'] = str(values['id'])
+        manifest['key_bindings']['site'] = str(uuid.uuid4())
+        values['manifest'] = manifest
+        with pytest.raises(DatabaseError, match='native key evidence source mismatch'), transaction.atomic():
+            RepositoryPublicationEvidence.objects.create(**values)
 
 
 def test_git_only_primary_file_versions_are_retained_and_compare_and_swap(authoring_context, tmp_path):
@@ -1506,3 +1858,249 @@ def test_repository_source_snapshot_follows_template_and_copy_provenance(authori
         assert archive.read(historical[str(template_id)]["path"]) == original_template
         assert archive.read(historical[str(nested_id)]["path"]) == original_nested
         assert f"pinned/{first.object_id}/fragments/unrelated.md" not in archive.namelist()
+
+
+def test_native_key_uuid_spelling_is_canonical_without_rewriting_source(authoring_context, tmp_path):
+    from apps.core.repository_publication_evidence import (
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    site = _native_key_site(installation)
+    document = _create(installation, repository)
+    saved = _save_native_keys(
+        installation, repository, document, {'site': str(site.entity_id).upper()}, '<tekdocs://key/site.name>\n',
+    )
+    assert str(site.entity_id).upper() in saved.source
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'uuid-keys')):
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience='msp_internal', actor=installation.owner,
+        )
+        assert verify_repository_publication_evidence(evidence)['valid']
+        assert evidence.manifest['key_bindings'] == {'site': str(site.entity_id)}
+        assert evidence.manifest['key_source']['source'] == saved.source
+
+
+@pytest.mark.parametrize('foreign_file', [False, True])
+def test_native_content_key_files_require_the_destination_owner_and_retain_exact_bytes(
+    authoring_context, tmp_path, foreign_file,
+):
+    from apps.core.repository_publication_evidence import (
+        RepositoryPublicationEvidenceError,
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    document = _create(installation, repository)
+    owner = _create(installation, repository, title='Other native file owner') if foreign_file else document
+    browser = Client()
+    browser.force_login(installation.owner)
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'content-key-files')):
+        upload = browser.post(
+            reverse('msp-content-authoring-attachment-create', args=[owner.content_id]),
+            {'file': SimpleUploadedFile('nested.txt', b'Exact native content-key bytes\n')},
+        )
+        assert upload.status_code == 201, upload.content
+        attachment = DocumentAttachment.objects.get(entity_id=upload.json()['id'])
+        fragment = _native_key_fragment(
+            installation, repository, f'[Nested file](tekdocs://attachment/{attachment.entity_id})\n',
+        )
+        document = read_authored_content(repository=repository, content_id=document.content_id)
+        document = _save_native_keys(
+            installation, repository, document, {'steps': str(fragment.content_id)}, '<tekdocs://key/steps.content>\n',
+        )
+        if foreign_file:
+            with pytest.raises(RepositoryPublicationEvidenceError):
+                retain_repository_publication_evidence(
+                    repository_id=repository.id, content_id=document.content_id,
+                    audience='msp_internal', actor=installation.owner,
+                )
+            return
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=document.content_id,
+            audience='msp_internal', actor=installation.owner,
+        )
+        retained = evidence.attachments.get(source_attachment=attachment)
+        with retained.file.open('rb') as stream:
+            assert stream.read() == b'Exact native content-key bytes\n'
+        with attachment.file.open('wb') as stream:
+            stream.write(b'Later damaged live bytes\n')
+        assert verify_repository_publication_evidence(evidence)['valid']
+        with retained.file.open('rb') as stream:
+            assert stream.read() == b'Exact native content-key bytes\n'
+
+
+@pytest.mark.parametrize('unavailable', ['archived', 'missing_binding', 'stale_index'])
+def test_native_field_keys_refuse_unavailable_publication_inputs(authoring_context, tmp_path, unavailable):
+    from apps.core.content_publication_sources import ContentPublicationSourceError
+    from apps.core.repository_publication_evidence import (
+        RepositoryPublicationEvidenceError,
+        retain_repository_publication_evidence,
+    )
+
+    installation, repository = authoring_context
+    site = _native_key_site(installation)
+    document = _create(installation, repository)
+    document = _save_native_keys(
+        installation, repository, document, {'site': str(site.entity_id)}, '<tekdocs://key/site.name>\n',
+    )
+    if unavailable == 'archived':
+        Entity.objects.filter(pk=site.entity_id).update(archived_at=timezone.now())
+    elif unavailable == 'missing_binding':
+        document = _save_native_keys(installation, repository, document, {})
+    else:
+        repository.indexed_commit = None
+        repository.save(update_fields=['indexed_commit', 'updated_at'])
+    browser = Client()
+    browser.force_login(installation.owner)
+    if unavailable == 'stale_index':
+        assert browser.get(reverse('msp-content-authoring-keys', args=[document.content_id])).status_code == 409
+    else:
+        report = browser.get(reverse('msp-content-authoring-keys', args=[document.content_id]))
+        assert report.status_code == 200
+        assert report.json()['report'][0]['state'] == 'unresolvable'
+        if unavailable == 'archived':
+            assert not report.json()['bound_targets']
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'unavailable-field')):
+        expected_error = (
+            ContentPublicationSourceError if unavailable == 'stale_index' else RepositoryPublicationEvidenceError
+        )
+        with pytest.raises(expected_error):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=document.content_id,
+                audience='msp_internal', actor=installation.owner,
+            )
+
+
+def _native_legacy_key_shadow(authoring_context, state):
+    from apps.core.document_authority_handoff import transition_document_authority
+    from apps.core.document_migration_import import apply_document_import, prepare_document_import
+    from apps.core.models import EntityVisibility
+    from apps.core.workspaces import resolve_organization_workspace
+
+    installation, _msp_repository = authoring_context
+    organization = create_organization(
+        tenant=installation.tenant, actor_id=installation.owner.id, name='Native legacy-key client',
+        legal_name='', website='', classifications=['client'],
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=organization)
+    repository = repository_storage.ensure_workspace_repository(workspace).repository
+    root = _create(installation, repository, title='Native legacy-key consumer')
+    source = create_document(
+        tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+        title='Legacy private key source', markdown='Staff-private legacy procedure.\n',
+    )
+    block = source.placements.get().block
+    assert block.id != block.entity_id
+    Entity.objects.filter(pk=block.entity_id).update(visibility=EntityVisibility.MSP_PRIVATE)
+    plan = prepare_document_import(workspace=workspace, document_id=source.id)
+    result = apply_document_import(
+        workspace=workspace, document_id=source.id, expected_base=plan.base_commit,
+        plan_sha256=plan.plan_sha256, actor_id=installation.owner.id,
+    )
+    assert result.status == 'imported'
+    if state in {'promoted', 'rolled_back'}:
+        reader = resolve_organization_workspace(installation.owner, entity_id=organization.entity_id)
+        transition_document_authority(
+            workspace=workspace, document_id=source.id, actor_id=installation.owner.id,
+            target='repository', reader_workspace=reader,
+        )
+        if state == 'rolled_back':
+            transition_document_authority(
+                workspace=workspace, document_id=source.id, actor_id=installation.owner.id,
+                target='legacy', reader_workspace=reader,
+            )
+    if state == 'archived':
+        Block.objects.filter(pk=block.id).update(archived_at=timezone.now())
+    return installation, organization, repository, source, block, root
+
+
+def _external_native_legacy_key_binding(repository, root, target):
+    raw = (
+        f'---\nschema: tekdocs.content/v1\nid: {root.content_id}\nkind: document\n'
+        f'title: Native legacy-key consumer\nkey_bindings:\n  private: {target}\n---\n'
+        '<tekdocs://key/private.content>\n'
+    )
+    repository.refresh_from_db()
+    repository_service.commit_repository_files(
+        repository_id=repository.id, expected_base=repository.accepted_commit.object_id,
+        changes={root.path: raw.encode()}, message='Synthetic external legacy-key binding',
+    )
+    index_repository_content(repository_id=repository.id)
+
+
+@pytest.mark.parametrize('state', ['copied', 'promoted', 'rolled_back', 'archived'])
+@pytest.mark.parametrize('identity', ['fragment', 'entity'])
+def test_native_publication_cannot_bypass_legacy_block_policy(authoring_context, tmp_path, state, identity):
+    from apps.core.repository_publication_evidence import (
+        RepositoryPublicationEvidenceError,
+        retain_repository_publication_evidence,
+    )
+
+    installation, _organization, repository, _source, block, root = _native_legacy_key_shadow(authoring_context, state)
+    target = block.id if identity == 'fragment' else block.entity_id
+    # Model externally accepted Git input as well as normal protected authoring.
+    _external_native_legacy_key_binding(repository, root, target)
+    browser = Client()
+    browser.force_login(installation.owner)
+    detail = browser.get(reverse(
+        'organization-content-document-detail', args=[_organization.entity_id, root.content_id],
+    ))
+    assert detail.status_code == 200, detail.content
+    assert 'Staff-private legacy procedure.' not in detail.json()['sanitized_html']
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'legacy-key-policy')):
+        with pytest.raises(RepositoryPublicationEvidenceError, match='repository.key.unavailable'):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=root.content_id,
+                audience='client_visible', actor=installation.owner,
+            )
+
+
+@pytest.mark.parametrize('state', ['copied', 'promoted', 'rolled_back', 'archived'])
+def test_native_key_discovery_and_authoring_refuse_legacy_block_identities(authoring_context, state):
+    installation, organization, repository, _source, block, root = _native_legacy_key_shadow(authoring_context, state)
+    browser = Client()
+    browser.force_login(installation.owner)
+    url = reverse('organization-content-authoring-keys', args=[organization.entity_id, root.content_id])
+    response = browser.get(url, {'target_id': [str(block.id), str(block.entity_id)]})
+    assert response.status_code == 200, response.content
+    assert not {str(block.id), str(block.entity_id)} & {
+        row['id'] for row in response.json()['targets'] + response.json()['bound_targets']
+    }
+    before = read_authored_content(repository=repository, content_id=root.content_id)
+    for target in (block.id, block.entity_id):
+        with pytest.raises(ContentAuthoringError, match='Key target is unavailable'):
+            _save_native_keys(installation, repository, root, {'private': str(target)})
+        assert read_authored_content(repository=repository, content_id=root.content_id) == before
+
+
+def test_native_key_database_guard_rejects_a_legacy_fragment_disguised_as_native(
+    authoring_context, tmp_path, monkeypatch,
+):
+    from apps.core import repository_content_keys, repository_key_context
+    from apps.core.models import RepositoryPublicationEvidence
+    from apps.core.repository_publication_evidence import retain_repository_publication_evidence
+
+    installation, _organization, repository, _source, block, root = _native_legacy_key_shadow(
+        authoring_context, 'copied',
+    )
+    _external_native_legacy_key_binding(repository, root, block.id)
+
+    def unrestricted_fragments(selected):
+        return ContentNode.objects.filter(repository=selected, kind='fragment')
+
+    # Simulate a writer missing the Python identity adapter. PostgreSQL must still
+    # refuse a legacy Block masquerading as a native fragment in signed evidence.
+    monkeypatch.setattr(repository_key_context, 'native_fragment_nodes', unrestricted_fragments)
+    monkeypatch.setattr(repository_content_keys, 'native_fragment_nodes', unrestricted_fragments)
+    count = RepositoryPublicationEvidence.objects.count()
+    with override_settings(MEDIA_ROOT=str(tmp_path / 'native-key-sql-boundary')):
+        with pytest.raises(DatabaseError, match='native key evidence binding scope mismatch'):
+            retain_repository_publication_evidence(
+                repository_id=repository.id, content_id=root.content_id,
+                audience='client_visible', actor=installation.owner,
+            )
+    assert RepositoryPublicationEvidence.objects.count() == count

@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
@@ -9,13 +10,13 @@ import { rehearseRepositoryContent } from './repository-live-journey'
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { source_msp?: boolean; organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
 type ClientPublicationState = { organization_id: string; document_id: string; content_id: string; original_id: string; original_pdf_filename: string; original_pdf_sha256: string; review_on: string; companion_publication_id: string; sessions: { approver: string; client: string }; files: { filename: string; sha256: string }[] }
-type State = { native_approval_password: string; cross_workspace: AddressedState; repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { native_sites: { staff: { id: string; title: string }; client: { id: string; title: string } }; native_approval_password: string; cross_workspace: AddressedState; repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
 const additionalDiagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>[]>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('new primary-file documents') ? 'native_primary_files' : info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
+  const scenario = info.title.startsWith('new keyed documents') ? 'native_keys' : info.title.startsWith('new primary-file documents') ? 'native_primary_files' : info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -134,11 +135,12 @@ test('native documents appear in the library and reopen through the repository e
   await rehearseRepositoryContent(page, state.template.organization_id)
 })
 
-async function nativePublicationDocument(page: Page, title: string, organizationId?: string) {
+async function nativePublicationDocument(page: Page, title: string, organizationId?: string, kind: 'document' | 'fragment' = 'document') {
   const scope = organizationId ? `/workspaces/organizations/${organizationId}` : ''
   await page.goto(`${scope}/documentation`)
   await page.getByRole('button', { name: 'Repository content', exact: true }).click()
   await page.getByRole('button', { name: 'New Markdown file' }).click()
+  await page.getByLabel('Content type').selectOption(kind)
   await page.getByLabel('Title', { exact: true }).fill(title)
   await page.getByLabel('Markdown body').fill('Native publication original.\n')
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
@@ -237,6 +239,71 @@ async function downloadNativePrimary(page: Page, filename: string, version: numb
   } finally { await file.delete() }
 }
 
+async function configureNativeKeys(page: Page, fragment: { id: string; title: string }, site: { id: string; title: string }) {
+  await page.getByRole('button', { name: 'Keys and references', exact: true }).click()
+  const keys = page.getByRole('region', { name: 'Keys and references', exact: true })
+  await keys.getByLabel('Binding name', { exact: true }).focus()
+  await page.keyboard.press('Tab')
+  await expect(keys.getByLabel('Find a record or reusable fragment')).toBeFocused()
+  for (const [name, target] of [['site', site], ['steps', fragment]] as const) {
+    await keys.getByLabel('Find a record or reusable fragment').fill(target.title)
+    await expect(keys.getByRole('button', { name: 'Bind key to ' + target.title, exact: true })).toBeVisible()
+    await keys.getByLabel('Binding name', { exact: true }).fill(name)
+    await keys.getByRole('button', { name: 'Bind key to ' + target.title, exact: true }).click()
+    await expect(keys.getByLabel('Binding name', { exact: true })).toHaveValue('')
+    await expect(keys.getByLabel('Insert key for ' + name, { exact: true })).toBeEnabled()
+    await keys.getByLabel('Insert key for ' + name, { exact: true }).selectOption(name === 'site' ? 'name' : 'content')
+  }
+  await keys.getByLabel('Find a record or reusable fragment').fill(site.title)
+  await expect(keys.getByRole('button', { name: 'Insert reference to ' + site.title, exact: true })).toBeEnabled()
+  await keys.getByRole('button', { name: 'Insert reference to ' + site.title, exact: true }).click()
+  const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  expect((await saved).status()).toBe(200)
+  await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+}
+
+test('new keyed documents freeze field values, fragment text and entity references independently of later edits', async ({ page }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  const fragment = await nativePublicationDocument(page, 'Native browser reusable steps', undefined, 'fragment')
+  const native = await nativePublicationDocument(page, 'Native keyed browser guide')
+  await configureNativeKeys(page, { ...fragment, title: 'Native browser reusable steps' }, state.native_sites.staff)
+  const detail = await page.request.get('/api/v1/workspaces/msp/content-graph/documents/' + native.id)
+  expect(detail.status()).toBe(200)
+  expect((await detail.json() as { sanitized_html: string }).sanitized_html).toContain(state.native_sites.staff.title)
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
+  const original = await retainNativeSnapshot(page)
+  const evidenceUrl = '/api/v1/workspaces/msp/repository-publication-evidence/' + original.id
+  const frozen = await page.request.get(evidenceUrl)
+  expect(frozen.status()).toBe(200)
+  const body = await frozen.json() as { verified: boolean }
+  expect(body.verified).toBe(true)
+  const rendered = await page.request.get(evidenceUrl + '/review/html')
+  expect(rendered.status()).toBe(200)
+  const originalHtml = await rendered.text()
+  expect(originalHtml).toContain(state.native_sites.staff.title)
+  expect(originalHtml).not.toContain('tekdocs://key/')
+  await nativeDecision(page, 'Publish snapshot')
+  const pdf = await nativeRetainedPdf(page)
+  await page.goto(fragment.path)
+  await page.getByLabel('Markdown body').fill('Native browser later fragment.\n')
+  const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  expect((await saved).status()).toBe(200)
+  const later = await page.request.get('/api/v1/workspaces/msp/content-graph/documents/' + native.id)
+  expect((await later.json() as { sanitized_html: string }).sanitized_html).toContain('Native browser later fragment.')
+  expect(await (await page.request.get(evidenceUrl)).json()).toEqual(body)
+  expect(await (await page.request.get(evidenceUrl + '/review/html')).text()).toBe(originalHtml)
+  await page.goto(native.path)
+  await page.getByRole('button', { name: 'Load publication history' }).click()
+  await page.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native keyed browser guide/ }).click()
+  expect(await nativeRetainedPdf(page)).toBe(pdf)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.locator('.app-body')).toHaveCSS('margin-left', '0px')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+})
+
 test('new staff documents publish, correct and withdraw while retaining their original PDFs', async ({ page }) => {
   const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
   await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
@@ -284,7 +351,9 @@ test('new client documents require independent approval and revoke portal access
     const reviewer = await approver.newPage()
     const clientPage = await portal.newPage()
     additionalDiagnostics.set(page, [reviewer, clientPage].map(selected => attachPublicationDiagnostics(selected, { scenario: 'native_publications' })))
+    const fragment = await nativePublicationDocument(page, 'Native client reusable steps', organizationId, 'fragment')
     const native = await nativePublicationDocument(page, 'Native client browser guide', organizationId)
+    await configureNativeKeys(page, { ...fragment, title: 'Native client reusable steps' }, state.native_sites.client)
     const evidenceRoot = `/api/v1/workspaces/organizations/${organizationId}/repository-publication-evidence`
     const selectLatest = async (actor: Page) => {
       await actor.goto(native.path)
@@ -326,6 +395,9 @@ test('new client documents require independent approval and revoke portal access
       await nativeDecision(reviewer, 'Authorize client access', false, state.native_approval_password)
       const clientRecord = await portal.request.get(`/api/v1/portal/repository-publications/${status.publication_id}`)
       expect(clientRecord.status()).toBe(200)
+      const portalBody = await clientRecord.json() as { rendered_html: string }
+      expect(JSON.stringify(portalBody)).not.toContain('key_source')
+      if (!iteration) expect(portalBody.rendered_html).toContain(state.native_sites.client.title)
       const retainedFiles = await clientRecord.json() as { primary_file: { selected_source_id: string; versions: { id: string; source_id: string; version_number: number }[] } }
       expect(retainedFiles.primary_file.selected_source_id).toBe(primary.id)
       expect(retainedFiles.primary_file.versions).toHaveLength(iteration + 1)
@@ -358,6 +430,7 @@ test('new client documents require independent approval and revoke portal access
     await page.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).last().click()
     expect(await nativeRetainedPdf(page)).toBe(originalPdf)
     expect((await portal.request.get(`${evidenceRoot}`)).status()).toBe(403)
+    expect((await portal.request.get('/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id + '/keys')).status()).toBe(403)
     expect((await portal.request.get('/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id + '/primary-file')).status()).toBe(403)
   } finally { await approver.close(); await portal.close() }
 })

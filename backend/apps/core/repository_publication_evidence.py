@@ -1,9 +1,8 @@
-"""Signed, retained Git-source evidence for a future repository STATIC publisher.
+"""Signed retained Git-source inputs for staff and approved STATIC workflows.
 
-This internal record is not a distributable publication: staff may review its
-retained PDF and files, but no route approves or exposes them to portals. Its
-signature binds the exact source proof and composed Markdown without live Git
-verification.
+The signature binds exact source proof, composed Markdown and frozen dependencies
+without live Git verification. Distribution remains a separate publication and
+approval/delivery decision; retaining evidence alone grants no portal access.
 """
 
 from __future__ import annotations
@@ -55,6 +54,8 @@ from .publications import (
     publication_trusted_key_fingerprints,
 )
 from .rendering import attachment_ids_in_markdown, entity_ids_in_markdown
+from .repository_key_context import canonical_key_bindings
+from .repository_key_evidence import NATIVE_KEY_EVIDENCE_FORMAT, verify_native_key_evidence
 from .repository_primary_publication import (
     RepositoryPrimaryPublicationError,
     prepare_repository_primary_publication,
@@ -197,8 +198,16 @@ def _retain_pinned_evidence(
             or variant.get("digest") != source["composition_digest"]
         ):
             raise RepositoryPublicationEvidenceError("Indexed repository composition differs from its Git source")
-        attachment_ids = attachment_ids_in_markdown(markdown)
         key_targets = key_targets_in_markdown(markdown)
+        key_snapshot = _frozen_key_snapshot(
+            repository=repository, node=node, document=document,
+            markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
+        )
+        native_keys = document is None and bool(
+            key_targets or node.frontmatter.get("key_bindings") or entity_ids_in_markdown(markdown)
+        )
+        dependency_markdown = key_snapshot["markdown"] if native_keys and key_snapshot else markdown
+        attachment_ids = attachment_ids_in_markdown(dependency_markdown)
         if len(attachment_ids) > MAX_RETAINED_ATTACHMENTS:
             raise RepositoryPublicationEvidenceError(
                 "Repository publication preflight blocked: repository.attachment.limit"
@@ -206,10 +215,6 @@ def _retain_pinned_evidence(
         retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
         primary_retained: list[tuple[DocumentAttachment, bytes, uuid.UUID]] = []
         source_ids_by_attachment_id: dict[uuid.UUID, uuid.UUID] = {}
-        if document is None and key_targets:
-            raise RepositoryPublicationEvidenceError(
-                "Repository publication preflight blocked: repository.key.unavailable"
-            )
         if attachment_ids:
             owner_filter = Q(document__isnull=True)
             if document is not None:
@@ -272,15 +277,12 @@ def _retain_pinned_evidence(
             primary_retained = [
                 (version.source, version.content, uuid.uuid4()) for version in primary_snapshot.versions
             ]
-        key_snapshot = _frozen_key_snapshot(
-            repository=repository, node=node, document=document,
-            markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
-        )
+
         entity_cards = _frozen_entity_cards(
-            repository=repository, markdown=markdown, audience=audience, actor=actor, member=member
+            repository=repository, markdown=dependency_markdown, audience=audience, actor=actor, member=member
         )
         preflight = repository_publication_preflight(
-            markdown=markdown,
+            markdown=dependency_markdown,
             audience=audience,
             topic_type=node.topic_type,
             frozen_attachment_ids=set(source_ids_by_attachment_id.values()),
@@ -297,7 +299,8 @@ def _retain_pinned_evidence(
         if source_commit is None:  # pragma: no cover - guarded above
             raise RepositoryPublicationEvidenceError("Repository accepted commit is unavailable")
         manifest: dict[str, Any] = {
-            "format": PRIMARY_EVIDENCE_FORMAT if primary_snapshot is not None else EVIDENCE_FORMAT,
+            "format": (NATIVE_KEY_EVIDENCE_FORMAT if native_keys
+                       else PRIMARY_EVIDENCE_FORMAT if primary_snapshot is not None else EVIDENCE_FORMAT),
             "evidence_id": str(evidence_id),
             "workspace_id": str(repository.workspace_id),
             "repository_id": str(repository.id),
@@ -323,6 +326,12 @@ def _retain_pinned_evidence(
             ],
             "entity_cards": entity_cards,
         }
+        if native_keys:
+            from .content_authoring import read_authored_content
+
+            authored = read_authored_content(repository=repository, content_id=content_id)
+            manifest["key_bindings"] = canonical_key_bindings(node.frontmatter.get("key_bindings", {}))
+            manifest["key_source"] = {"source": authored.source, "path": authored.path, "blob": authored.source_blob}
         if primary_snapshot is not None:
             manifest["primary_file"] = {
                 "selected_source_id": str(primary_snapshot.selected_entity_id),
@@ -405,9 +414,9 @@ def _primary_evidence_valid(
     """Prove the signed chain against independently retained artifact bytes."""
 
     manifest = evidence.manifest
-    if manifest.get("format") == EVIDENCE_FORMAT:
-        return "primary_file" not in manifest
-    if manifest.get("format") != PRIMARY_EVIDENCE_FORMAT:
+    if manifest.get("format") in {EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT} and "primary_file" not in manifest:
+        return True
+    if manifest.get("format") not in {PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT}:
         return False
     primary = manifest.get("primary_file")
     if not isinstance(primary, dict) or set(primary) != {"selected_source_id", "versions"}:
@@ -490,7 +499,7 @@ def verify_repository_publication_evidence(
     source = manifest.get("source") if isinstance(manifest, dict) else None
     identity_valid = isinstance(source, dict) and all(
         (
-            manifest.get("format") in {EVIDENCE_FORMAT, PRIMARY_EVIDENCE_FORMAT},
+            manifest.get("format") in {EVIDENCE_FORMAT, PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT},
             manifest.get("evidence_id") == str(evidence.id),
             manifest.get("workspace_id") == str(evidence.workspace_id),
             manifest.get("repository_id") == str(evidence.repository_id),
@@ -509,12 +518,18 @@ def verify_repository_publication_evidence(
             source.get("markdown_sha256") == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
         )
     )
+    native_keys = isinstance(manifest, dict) and manifest.get("format") == NATIVE_KEY_EVIDENCE_FORMAT
+    native_key_valid = verify_native_key_evidence(evidence.canonical_markdown, manifest) if native_keys else True
+    frozen_snapshot = manifest.get("key_snapshot") if isinstance(manifest, dict) else None
+    dependency_markdown = (frozen_snapshot["markdown"]
+                           if native_keys and native_key_valid and isinstance(frozen_snapshot, dict)
+                           else evidence.canonical_markdown)
     preflight = manifest.get("preflight") if isinstance(manifest, dict) else None
     preflight_attested = isinstance(preflight, dict) and all(
         (
             preflight.get("format") == PREFLIGHT_FORMAT,
             preflight.get("audience") == evidence.audience,
-            preflight.get("markdown_sha256") == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
+            preflight.get("markdown_sha256") == hashlib.sha256(dependency_markdown.encode("utf-8")).hexdigest(),
             preflight.get("blockers") == [],
         )
     )
@@ -545,7 +560,7 @@ def verify_repository_publication_evidence(
                     len(attachment_targets) == len(descriptors)
                     and len(entity_targets) == len(cards_for_preflight)
                     and preflight == repository_publication_preflight(
-                        markdown=evidence.canonical_markdown,
+                        markdown=dependency_markdown,
                         audience=evidence.audience,
                         topic_type=topic_type,
                         frozen_attachment_ids=frozen_attachments,
@@ -553,7 +568,7 @@ def verify_repository_publication_evidence(
                         frozen_key_targets=set(key_targets) if manifest.get("key_snapshot") is not None else None,
                     )
                 )
-    requested_entities = entity_ids_in_markdown(evidence.canonical_markdown)
+    requested_entities = entity_ids_in_markdown(dependency_markdown)
     cards = manifest.get("entity_cards") if isinstance(manifest, dict) else None
     entity_cards_valid = (
         not requested_entities
@@ -573,7 +588,8 @@ def verify_repository_publication_evidence(
     key_snapshot = manifest.get("key_snapshot") if isinstance(manifest, dict) else None
     key_snapshot_valid = (
         not key_targets_in_markdown(evidence.canonical_markdown)
-        if key_snapshot is None else verify_frozen_field_keys(evidence.canonical_markdown, key_snapshot)
+        if key_snapshot is None else (native_key_valid if native_keys
+                                    else verify_frozen_field_keys(evidence.canonical_markdown, key_snapshot))
     )
     rendered_snapshot = manifest.get("rendered_snapshot") if isinstance(manifest, dict) else None
     rendered_snapshot_valid = (
@@ -615,7 +631,7 @@ def verify_repository_publication_evidence(
         if not isinstance(descriptors, list) or len(descriptors) > MAX_RETAINED_ATTACHMENTS:
             attachments_valid = False
         else:
-            requested_attachments = {str(item) for item in attachment_ids_in_markdown(evidence.canonical_markdown)}
+            requested_attachments = {str(item) for item in attachment_ids_in_markdown(dependency_markdown)}
             descriptor_sources = [item.get("source_id") for item in descriptors if isinstance(item, dict)]
             if (
                 len(descriptor_sources) != len(descriptors)
@@ -708,6 +724,7 @@ def verify_repository_publication_evidence(
         and primary_file_valid
         and entity_cards_valid
         and key_snapshot_valid
+        and native_key_valid
         and rendered_snapshot_valid
         and pdf_snapshot_valid
         and (topic_type is None or preflight is None or dependency_closure_attested)

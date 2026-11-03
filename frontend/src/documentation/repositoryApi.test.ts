@@ -459,3 +459,35 @@ it('refuses denied, mislabeled, or wrong-publication retained responses', async 
   await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest, 'org-1')).rejects.toThrow('could not be downloaded')
   await expect(browserRepositoryClient.exportStatic('evidence-1', 'html', digest)).rejects.toThrow('could not be downloaded')
 })
+
+const keyState = {
+  source_blob: 'a'.repeat(40), accepted_commit: 'b'.repeat(40), read_only: false,
+  key_bindings: { site: primary.id }, targets: [{ id: primary.id, title: 'Synthetic site', kind: 'entity', entity_type: 'site', fields: ['name'] }],
+  bound_targets: [], has_more: false, report: [{ expression: 'site.name', state: 'resolved', label: 'Site', reason: null }], report_has_more: false,
+}
+
+it.each([undefined, 'org/1'])('reads only the scoped key configuration and reauthorizes pending targets %s', async organizationId => {
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(keyState)))
+  vi.stubGlobal('fetch', fetch)
+  const controller = new AbortController()
+  expect(await browserRepositoryClient.keys('doc/1', organizationId, 'site & name', [primary.id], controller.signal)).toEqual(keyState)
+  const scope = organizationId ? '/api/v1/workspaces/organizations/org%2F1/content-graph' : '/api/v1/workspaces/msp/content-graph'
+  expect(fetch).toHaveBeenCalledWith(scope + '/authoring/doc%2F1/keys?q=site+%26+name&target_id=' + primary.id, {
+    credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal,
+  })
+})
+
+it.each([
+  { ...keyState, source_blob: 'bad' }, { ...keyState, read_only: 'false' },
+  { ...keyState, key_bindings: { Bad: primary.id } }, { ...keyState, key_bindings: { site: 'not-a-uuid' } },
+  { ...keyState, targets: [{ ...keyState.targets[0], kind: 'secret' }] },
+  { ...keyState, report: [{ ...keyState.report[0], state: 'unknown' }] },
+])('refuses malformed key configuration', async result => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(result))))
+  await expect(browserRepositoryClient.keys('doc')).rejects.toThrow()
+})
+
+it.each([403, 404, 409])('refuses denied, hidden or stale key state %s', async status => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status })))
+  await expect(browserRepositoryClient.keys('doc')).rejects.toThrow()
+})

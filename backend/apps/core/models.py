@@ -5178,6 +5178,7 @@ class RepositoryPublicationEvidence(models.Model):
             or self.manifest.get("format") not in {
                 "tekdocs-repository-publication-evidence/v1",
                 "tekdocs-repository-publication-evidence/v2",
+                "tekdocs-repository-publication-evidence/v3",
             }
             or self.manifest.get("evidence_id") != str(self.id)
             or self.manifest.get("workspace_id") != str(self.workspace_id)

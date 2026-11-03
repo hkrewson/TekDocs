@@ -9646,6 +9646,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/keys:
+    get:
+      operationId: content_authoring_msp_keys
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: target_id
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 64
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryKeyState'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Saved source/index unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/content-graph/authoring/{content_id}/primary-file:
     get:
       operationId: content_authoring_msp_primary_file_versions
@@ -20117,6 +20171,66 @@ paths:
                 format: uuid
         '400':
           description: Retained file is missing or has changed
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/keys:
+    get:
+      operationId: content_authoring_organization_keys
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: target_id
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 64
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryKeyState'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Saved source/index unavailable
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -51958,6 +52072,92 @@ components:
       required:
       - audience
       - content_id
+    RepositoryKeyReportRow:
+      type: object
+      properties:
+        expression:
+          type: string
+        state:
+          type: string
+        label:
+          type: string
+        reason:
+          type: string
+          nullable: true
+      required:
+      - expression
+      - label
+      - reason
+      - state
+    RepositoryKeyState:
+      type: object
+      properties:
+        source_blob:
+          type: string
+        accepted_commit:
+          type: string
+        read_only:
+          type: boolean
+        key_bindings:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyTarget'
+        bound_targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyTarget'
+        has_more:
+          type: boolean
+        report:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyReportRow'
+        report_has_more:
+          type: boolean
+      required:
+      - accepted_commit
+      - bound_targets
+      - has_more
+      - key_bindings
+      - read_only
+      - report
+      - report_has_more
+      - source_blob
+      - targets
+    RepositoryKeyTarget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          enum:
+          - entity
+          - fragment
+          type: string
+          description: |-
+            * `entity` - entity
+            * `fragment` - fragment
+          x-spec-enum-id: 475a2145e3e79cfc
+        entity_type:
+          type: string
+        fields:
+          type: array
+          items:
+            type: string
+      required:
+      - entity_type
+      - fields
+      - id
+      - kind
+      - title
     RepositoryPackage:
       type: object
       properties:

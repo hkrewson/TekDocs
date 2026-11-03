@@ -2416,3 +2416,16 @@ Remote Git replication, pull-request authoring and external repository authority
 blocker. The work must review all caller-settable RLS context and transition
 flags under the actual runtime role, then establish and test a stronger
 least-privilege database boundary before claiming resistance to hostile SQL.
+
+## Native keys and entity references (bounded development slice)
+
+New Git-only documents can stage field/content bindings and entity references in
+the protected draft without legacy Document/Block records. Publication evidence
+v3 freezes field values, exact fragment source proof and entity cards; earlier
+signed output, PDFs and file versions remain immutable. See
+[acceptance and validation](../planning/git-native-keys.md). Local tests, all 14 browser/server journeys and both source reviews pass;
+exact-source hosted validation follows the authorized push. Legacy-backed
+fragment identities cannot bypass permissions through native keys.
+Template enrollment and monitored-source configuration remain next, followed by
+clean-start combined acceptance. The six legacy migration gaps remain deferred;
+no existing-data migration or production deployment is included.

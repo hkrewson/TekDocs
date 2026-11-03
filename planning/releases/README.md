@@ -13,6 +13,20 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Native field/content keys and entity references
+
+The [bounded native-keys slice](../git-native-keys.md) connects new Git-only
+binding configuration and entity insertion to protected authoring. Evidence v3
+freezes exact field values, fragment source proof and entity cards while retaining
+older signed contracts. Migration 0220 adds validators and refuses populated
+rollback without rewriting existing records. Local validation passes 202 authoring cases,
+868 frontend cases, populated rollback/custody and all 14 browser/server journeys
+without retries. Both source reviews are clear; the legacy-fragment permission
+bypass is reproduced and fixed at discovery, authoring, runtime and SQL boundaries; exact-source hosted recovery and upgrade
+remain required after the authorized direct-main push. This is 0.9.18 development,
+not a release or deployment. No existing data is changed. Template and monitored
+configuration remain later slices; the six legacy migration gaps stay deferred.
+
 ## Native primary-file version controls after publication
 
 The [bounded primary-file slice](../git-native-primary-files.md) connects the

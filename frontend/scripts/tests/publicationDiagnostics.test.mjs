@@ -228,3 +228,20 @@ test('skipped runs stay silent and failure reporting is emitted only once', () =
   assert.deepEqual(JSON.parse(lines[0]).events.map(event => event.event), ['dialog', 'page_error'])
   failed.dispose()
 })
+
+
+test('native key reads never retain searches or pending target identities', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_keys', write: line => lines.push(line) })
+  const request = { url: () => 'http://localhost/api/v1/workspaces/msp/content-graph/authoring/private-document/keys?q=private-search&target_id=private-target', method: () => 'GET',
+    headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('Body must not be read') } }
+  page.emit('request', request)
+  page.emit('response', { request: () => request, status: () => 409 })
+  page.emit('requestfinished', request)
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_keys')
+  assert.equal(report.events.find(event => event.event === 'response').phase, 'native_keys_read')
+  for (const value of ['localhost', 'private-', 'target_id', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})

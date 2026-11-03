@@ -2838,6 +2838,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}/keys": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_msp_keys"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}/primary-file": {
         readonly parameters: {
             readonly query?: never;
@@ -5557,6 +5573,22 @@ export interface paths {
         readonly put?: never;
         readonly post?: never;
         readonly delete: operations["content_authoring_organization_attachment_archive"];
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/keys": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["content_authoring_organization_keys"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
         readonly options?: never;
         readonly head?: never;
         readonly patch?: never;
@@ -16221,6 +16253,38 @@ export interface components {
             readonly audience: "msp_internal" | "client_visible";
             readonly expected_commit?: string;
         };
+        readonly RepositoryKeyReportRow: {
+            readonly expression: string;
+            readonly state: string;
+            readonly label: string;
+            readonly reason: string | null;
+        };
+        readonly RepositoryKeyState: {
+            readonly source_blob: string;
+            readonly accepted_commit: string;
+            readonly read_only: boolean;
+            readonly key_bindings: {
+                readonly [key: string]: string;
+            };
+            readonly targets: readonly components["schemas"]["RepositoryKeyTarget"][];
+            readonly bound_targets: readonly components["schemas"]["RepositoryKeyTarget"][];
+            readonly has_more: boolean;
+            readonly report: readonly components["schemas"]["RepositoryKeyReportRow"][];
+            readonly report_has_more: boolean;
+        };
+        readonly RepositoryKeyTarget: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            /**
+             * @description * `entity` - entity
+             *     * `fragment` - fragment
+             * @enum {string}
+             */
+            readonly kind: "entity" | "fragment";
+            readonly entity_type: string;
+            readonly fields: readonly string[];
+        };
         readonly RepositoryPackage: {
             /** Format: uuid */
             readonly id: string;
@@ -24923,6 +24987,43 @@ export interface operations {
             };
         };
     };
+    readonly content_authoring_msp_keys: {
+        readonly parameters: {
+            readonly query?: {
+                readonly q?: string;
+                readonly target_id?: readonly string[];
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryKeyState"];
+                };
+            };
+            /** @description Saved source/index unavailable */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     readonly content_authoring_msp_primary_file_versions: {
         readonly parameters: {
             readonly query?: {
@@ -32232,6 +32333,44 @@ export interface operations {
             };
             /** @description Retained file is missing or has changed */
             readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    readonly content_authoring_organization_keys: {
+        readonly parameters: {
+            readonly query?: {
+                readonly q?: string;
+                readonly target_id?: readonly string[];
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryKeyState"];
+                };
+            };
+            /** @description Saved source/index unavailable */
+            readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
                     readonly "X-Request-ID"?: string;

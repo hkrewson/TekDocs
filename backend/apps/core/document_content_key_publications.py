@@ -21,7 +21,9 @@ from .document_keys import MAXIMUM_KEYS_PER_DOCUMENT, key_targets_in_markdown, k
 CONTENT_KEY_GIT_STATIC_FORMAT = "tekdocs-static-publication/v10"
 
 
-def verify_frozen_content_keys(markdown: str, snapshot: Any) -> bool:
+def verify_frozen_content_keys(
+    markdown: str, snapshot: Any, *, allow_native_fragments: bool = False,
+) -> bool:
     """Require an exact, bounded reconstruction using every retained resolution."""
     try:
         if not isinstance(snapshot, dict) or set(snapshot) != {"markdown", "sha256", "records"}:
@@ -57,7 +59,9 @@ def verify_frozen_content_keys(markdown: str, snapshot: Any) -> bool:
                 chain = (*ancestry, entity)
                 proof = record["git_source"]
                 if (
-                    record["kind"] != "content" or record["source_entity_type"] != "document_block"
+                    record["kind"] != "content" or record["source_entity_type"] not in (
+                        {"document_block", "repository_fragment"} if allow_native_fragments else {"document_block"}
+                    )
                     or entity in ancestry or record["dependency_chain"] != list(chain)
                     or record["source_revision_id"] is not None or record["source_revision_number"] is not None
                     or set(proof) != {
@@ -85,7 +89,12 @@ def verify_frozen_content_keys(markdown: str, snapshot: Any) -> bool:
                 if (
                     digest.hexdigest() != proof["blob"] or parsed.kind != "fragment"
                     or str(parsed.content_id) != proof["content_id"]
-                    or proof["path"] != f"fragments/{parsed.content_id}.md"
+                    or (proof["path"] != f"fragments/{parsed.content_id}.md" and not (
+                        allow_native_fragments and record["source_entity_type"] == "repository_fragment"
+                        and proof["path"].startswith("fragments/") and proof["path"].endswith(".md")
+                        and not any(part in {"", ".", ".."} for part in proof["path"].split("/"))
+                        and "\\" not in proof["path"]
+                    ))
                     or record["value"] != parsed.markdown
                     or record["source_fingerprint"] != hashlib.sha256(parsed.markdown.encode()).hexdigest()
                 ):

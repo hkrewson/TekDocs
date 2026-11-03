@@ -24,6 +24,38 @@ function primaryFile(value: unknown): DocumentPrimaryFile {
   return row as DocumentPrimaryFile
 }
 
+export type RepositoryKeyTarget = {
+  id: string; title: string; kind: 'entity' | 'fragment'; entity_type: string; fields: string[]
+}
+export type RepositoryKeyState = {
+  source_blob: string; accepted_commit: string; read_only: boolean; key_bindings: Record<string, string>
+  targets: RepositoryKeyTarget[]; bound_targets: RepositoryKeyTarget[]; has_more: boolean
+  report: { expression: string; state: 'resolved' | 'withheld' | 'unresolvable'; label: string; reason: string | null }[]
+  report_has_more: boolean
+}
+
+function validKeyState(result: RepositoryKeyState): boolean {
+  const uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i
+  const object = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/
+  if (!result || !object.test(result.source_blob) || !object.test(result.accepted_commit)
+    || typeof result.read_only !== 'boolean' || typeof result.has_more !== 'boolean'
+    || typeof result.report_has_more !== 'boolean' || !result.key_bindings || typeof result.key_bindings !== 'object'
+    || Array.isArray(result.key_bindings) || Object.keys(result.key_bindings).length > 64
+    || !Object.entries(result.key_bindings).every(([name, id]) => /^[a-z][a-z0-9_]{0,39}$/.test(name) && typeof id === 'string' && uuid.test(id))
+    || !Array.isArray(result.targets) || result.targets.length > 50
+    || !Array.isArray(result.bound_targets) || result.bound_targets.length > 128
+    || !Array.isArray(result.report) || result.report.length > 200) return false
+  for (const targets of [result.targets, result.bound_targets]) {
+    if (new Set(targets.map(target => target?.id)).size !== targets.length || !targets.every(target => target
+      && typeof target.id === 'string' && uuid.test(target.id) && typeof target.title === 'string' && target.title.length <= 240
+      && ['entity', 'fragment'].includes(target.kind) && typeof target.entity_type === 'string' && target.entity_type.length <= 64
+      && Array.isArray(target.fields) && target.fields.length <= 100 && target.fields.every(field => typeof field === 'string' && /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){0,2}$/.test(field))
+      && (target.kind !== 'fragment' || (target.entity_type === 'repository_fragment' && target.fields.length === 1 && target.fields[0] === 'content')))) return false
+  }
+  return result.report.every(row => row && typeof row.expression === 'string' && typeof row.label === 'string'
+    && ['resolved', 'withheld', 'unresolvable'].includes(row.state) && (row.reason === null || typeof row.reason === 'string'))
+}
+
 export type RepositorySummary = {
   id: string
   title: string
@@ -186,6 +218,16 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 export const browserRepositoryClient = {
+  async keys(contentId: string, organizationId?: string, query = '', targetIds: string[] = [], signal?: AbortSignal): Promise<RepositoryKeyState> {
+    const parameters = new URLSearchParams({ q: query })
+    targetIds.forEach(id => parameters.append('target_id', id))
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/keys?' + parameters.toString(), {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    const result = await parse<RepositoryKeyState>(response)
+    if (!validKeyState(result)) throw new Error('Invalid key configuration response')
+    return result
+  },
   async primaryFiles(contentId: string, organizationId?: string, page = 1, signal?: AbortSignal): Promise<RepositoryPrimaryFilePage> {
     const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/primary-file?page=' + page, {
       credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,

@@ -276,7 +276,23 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         seed_cross_workspace_fixture(installation.owner)
         cross_workspace_legacy = prepare_cross_workspace_fixture(installation.owner)
+        from apps.core.models import Entity, EntityVisibility, Organization
+        from apps.core.sites import create_site
+
+        native_sites = {}
+        for key, organization in (("staff", None), ("client", Organization.objects.get(
+            entity_id=client_publication_browser_state(installation.owner)["organization_id"],
+        ))):
+            site = create_site(
+                tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+                name=f"Native browser {key} location", code="NKB", address_line_1="", address_line_2="",
+                city="", region="", postal_code="", country_code="", timezone="UTC", phone="",
+            )
+            if organization is not None:
+                Entity.objects.filter(pk=site.entity_id).update(visibility=EntityVisibility.CLIENT_VISIBLE)
+            native_sites[key] = {"id": str(site.entity_id), "title": site.entity.display_name}
         prepared_state = {
+            "native_sites": native_sites,
             "cross_workspace": cross_workspace_browser_state(installation.owner),
             "repeated": repeated_browser_state(installation.owner),
             "client_publication": client_publication_browser_state(installation.owner),
@@ -384,6 +400,21 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 assert [repository_static_state(item) for item in native_publications] == ["superseded", "withdrawn"]
                 assert all(verify_repository_static_publication(item) for item in native_publications)
                 assert not any(repository_static_delivery_ready(item) for item in native_publications)
+
+        keyed_node = ContentNode.objects.get(title="Native keyed browser guide")
+        keyed_fragment = ContentNode.objects.get(title="Native browser reusable steps")
+        assert not Document.objects.filter(pk=keyed_node.content_id).exists()
+        from apps.core.models import Block
+
+        assert not Block.objects.filter(pk=keyed_fragment.content_id).exists()
+        keyed_snapshot = RepositoryPublicationEvidence.objects.get(content_id=keyed_node.content_id)
+        assert keyed_snapshot.manifest["format"] == "tekdocs-repository-publication-evidence/v3"
+        assert verify_repository_publication_evidence(keyed_snapshot)["valid"]
+        assert {row["kind"] for row in keyed_snapshot.manifest["key_snapshot"]["records"]} == {"field", "content"}
+        assert "Native publication original." in keyed_snapshot.manifest["key_snapshot"]["markdown"]
+        assert "Native browser later fragment." not in keyed_snapshot.manifest["key_snapshot"]["markdown"]
+        assert "Native browser later fragment." in keyed_fragment.markdown
+        assert len(keyed_snapshot.manifest["entity_cards"]) == 1
 
         primary_node = ContentNode.objects.get(title="Native primary-file browser guide")
         assert not Document.objects.filter(pk=primary_node.content_id).exists()

@@ -455,6 +455,7 @@ from apps.core.reminder_views import (
     OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
+from apps.core.repository_key_views import MSPRepositoryKeysView, OrganizationRepositoryKeysView
 from apps.core.repository_portal_views import (
     ClientPortalRepositoryPublicationAttachmentView,
     ClientPortalRepositoryPublicationDetailView,
@@ -630,6 +631,10 @@ urlpatterns = [
         name="msp-content-authoring-attachment-archive",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/keys",
+        MSPRepositoryKeysView.as_view(), name="msp-content-authoring-keys",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/primary-file",
         MSPContentAuthoringPrimaryFileView.as_view(),
         name="msp-content-authoring-primary-file",
@@ -778,6 +783,10 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/attachments/<uuid:attachment_entity_id>",
         OrganizationContentAuthoringAttachmentDetailView.as_view(),
         name="organization-content-authoring-attachment-archive",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/keys",
+        OrganizationRepositoryKeysView.as_view(), name="organization-content-authoring-keys",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/primary-file",

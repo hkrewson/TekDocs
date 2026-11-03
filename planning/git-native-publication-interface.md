@@ -115,3 +115,41 @@ Full-repository Docker Ruff, mypy across 302 files and migration checks pass;
 OpenAPI regeneration matches the tracked schema (zero errors, four existing
 warnings). Both review axes report zero findings on this formatting-only delta.
 Exact-source hosted runtime, upgrade and recovery must confirm the follow-up.
+
+Initial hosted Build 41583571943 completed with all twenty PostgreSQL groups
+passed and 89% combined coverage. Its live publication job stopped before browser
+execution because readiness exceeded the unchanged 240-second controller budget;
+the sanitized server report named the failure marker assertion at line 326.
+The cause of that startup delay remains unresolved. An unchanged final-source
+local replay became ready in 91.36 seconds, then passed all twelve browser cases
+without retries and server custody/retained-byte/authority verification. No
+readiness limit, selector, timeout or preservation assertion was weakened.
+Initial Extended 41583578573 passed its browser matrix, performance, DAST and
+independent recovery; recovery logs explicitly confirmed native staff lineage,
+signatures and PDFs restored exactly. Its still-running upgrade job was cancelled
+as superseded so final-source Extended could proceed, not recorded as a pass.
+
+Build 41584099808 on formatting-corrected source `b8da6a49` passed source,
+frontend, policy and nineteen PostgreSQL groups. Core-a-3 stopped before test
+execution because the upstream Go proxy returned an HTTP/2 INTERNAL_ERROR while
+fetching Mailpit's pinned SQLite dependency; no application fix is attributed to
+retrying that transport failure. Its first live-workspace attempt failed at the
+shared repository attachment assertion before publication acceptance: initial
+repository listing and scanned upload were independently pending, so the broad
+single-status query found both loading messages.
+
+The exact multiple-status failure was reproduced locally with controlled pending
+listing and upload promises before changing the journey. A positive component
+regression verifies concurrent states, the unsaved attachment link while listing
+remains pending, and the original single-status expectation after listing settles.
+The shared browser journey now waits for the existing list-ready control and
+verifies the exact attachment POST returns 201 before the original status/link
+checks. It retains selectors, timeouts, retries and all saved/unsaved assertions.
+This is test synchronization, not an upload performance improvement.
+
+Final Docker frontend lint, 818 tests, coverage, types and production bundle
+budgets passed. The complete twelve-journey browser/server gate then passed in
+four minutes with zero retries, retained-byte/authority verification and artifact
+hygiene. Both review axes reported zero findings on the final two-file delta.
+The isolated full live-workspace stack remains hosted-only under the single-project
+local rule; the shared repository helper ran through the existing-project gate.

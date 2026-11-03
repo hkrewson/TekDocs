@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
@@ -191,6 +191,37 @@ it('does not offer archive for a saved link or when the unsaved draft references
   await user.type(screen.getByLabelText('Markdown body'), ` tekdocs://attachment/${unused.id}`)
   expect(screen.getByRole('button', { name: 'Archive unused.txt' })).toBeDisabled()
   expect(client.archiveAttachment).not.toHaveBeenCalled()
+})
+
+it('keeps a pending repository listing independent from an attachment upload', async () => {
+  const user = userEvent.setup()
+  let finishListing!: (value: Awaited<ReturnType<RepositoryClient['list']>>) => void
+  let finishUpload!: (value: Awaited<ReturnType<RepositoryClient['uploadAttachment']>>) => void
+  const listing = new Promise<Awaited<ReturnType<RepositoryClient['list']>>>(resolve => { finishListing = resolve })
+  const upload = new Promise<Awaited<ReturnType<RepositoryClient['uploadAttachment']>>>(resolve => { finishUpload = resolve })
+  const list = vi.fn().mockReturnValue(listing)
+  const uploadAttachment = vi.fn().mockReturnValue(upload)
+  const { save } = setup({ list, uploadAttachment }, 'org-1', initial.content_id)
+  await screen.findByLabelText('Markdown body')
+  await waitFor(() => expect(list).toHaveBeenCalled())
+  await user.upload(screen.getByLabelText('Attach file to saved document'), new File(['steps'], 'steps.txt', { type: 'text/plain' }))
+  expect(screen.getAllByRole('status').map(item => item.textContent)).toEqual([
+    'Loading repository content…', 'Scanning and attaching file…',
+  ])
+  await act(async () => {
+    finishUpload({ id: '11111111-1111-4111-8111-111111111111', filename: 'steps.txt', size: 5, scan_status: 'clean' })
+    await upload
+  })
+  expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n[steps.txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n')
+  expect(screen.getAllByRole('status').map(item => item.textContent)).toEqual([
+    'steps.txt was attached. Save to Git to keep its link in the document.', 'Loading repository content…',
+  ])
+  await act(async () => {
+    finishListing({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false })
+    await listing
+  })
+  expect(screen.getByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(save).not.toHaveBeenCalled()
 })
 
 it('uploads to a saved indexed document and leaves its private-file link as an unsaved Markdown draft', async () => {

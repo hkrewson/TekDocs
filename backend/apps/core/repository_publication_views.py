@@ -12,10 +12,16 @@ from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.accounts.policy import PermissionKey, require_permission, require_recent_interactive_authentication
+from apps.accounts.policy import (
+    PermissionKey,
+    context_has_permission,
+    require_permission,
+    require_recent_interactive_authentication,
+)
 
 from .content_publication_sources import ContentPublicationSourceError
 from .document_views import _msp_workspace, _organization_workspace
@@ -34,6 +40,12 @@ from .models import (
     workspace_for_owner,
 )
 from .publications import MAX_RETAINED_ATTACHMENT_BYTES
+from .repository_internal_publications import (
+    InternalPublicationError,
+    active_internal_publication,
+    internal_publication_state,
+    record_internal_publication,
+)
 from .repository_package_authorization import (
     RepositoryPackageAuthorizationError,
     decide_repository_package,
@@ -75,6 +87,7 @@ from .workspaces import ResolvedWorkspace
 class RepositoryEvidenceWriteSerializer(serializers.Serializer):
     content_id = serializers.UUIDField()
     audience = serializers.ChoiceField(choices=PublicationAudience.choices)
+    expected_commit = serializers.RegexField(r"^(?:[a-f0-9]{40}|[a-f0-9]{64})$", required=False)
 
 
 class RepositoryEvidenceSummarySerializer(serializers.Serializer):
@@ -225,6 +238,137 @@ class RepositoryStaticDeliverySerializer(serializers.Serializer):
     permits_distribution = serializers.BooleanField()
 
 
+class RepositoryWorkflowSerializer(serializers.Serializer):
+    evidence_id = serializers.UUIDField()
+    source_commit = serializers.CharField()
+    audience = serializers.CharField()
+    verified = serializers.BooleanField()
+    stage = serializers.CharField()
+    state = serializers.CharField()
+    actions = serializers.ListField(child=serializers.CharField())
+    active_publication_id = serializers.UUIDField(allow_null=True)
+    publication_id = serializers.UUIDField(allow_null=True)
+    content_digest = serializers.CharField()
+    delivery_effective = serializers.BooleanField()
+    events = RepositoryStaticControlEventSerializer(many=True)
+
+
+def _workflow_data(workspace: ResolvedWorkspace, evidence: RepositoryPublicationEvidence) -> dict[str, object]:
+    actor = workspace.member.user
+    publisher = context_has_permission(
+        workspace.member, PermissionKey.DOCUMENTS_PUBLISH, organization=workspace.organization
+    )
+    approver = context_has_permission(
+        workspace.member, PermissionKey.DOCUMENTS_APPROVE, organization=workspace.organization
+    )
+    verified = bool(verify_repository_publication_evidence(evidence)["valid"])
+    data: dict[str, object] = dict(
+        evidence_id=evidence.id, source_commit=evidence.source_commit.object_id,
+        audience=evidence.audience,
+        verified=verified,
+        stage="review",
+        state="recorded",
+        actions=[],
+        active_publication_id=None,
+        publication_id=None,
+        content_digest=evidence.content_digest,
+        delivery_effective=False,
+        events=[],
+    )
+    if evidence.audience == PublicationAudience.MSP_INTERNAL:
+        state = internal_publication_state(evidence)
+        internal_active = active_internal_publication(evidence)
+        data.update(
+            stage="internal",
+            state=state,
+            publication_id=evidence.id if state != "recorded" else None,
+            active_publication_id=internal_active.id if internal_active else None,
+            events=[
+                {
+                    "id": e.id,
+                    "action": e.action,
+                    "supersedes_id": e.supersedes_id,
+                    "reason": e.reason,
+                    "actor_id": e.actor_id,
+                    "occurred_at": e.occurred_at,
+                }
+                for e in evidence.internal_events.all()
+            ],
+        )
+        if state == "recorded" and publisher and verified:
+            data["actions"] = ["release_internal"]
+        elif state == "released" and approver:
+            data["actions"] = ["withdraw_internal"]
+        return data
+    decision = RepositoryEvidenceReviewDecision.objects.filter(evidence=evidence).first()
+    if decision is None:
+        data["actions"] = (
+            ["accept_review", "reject_review"] if verified and approver and evidence.signed_by_id != actor.id else []
+        )
+        return data
+    if decision.outcome != RepositoryEvidenceReviewDecision.Outcome.ACCEPTED_FOR_PACKAGING:
+        data["state"] = "rejected"
+        return data
+    data["stage"] = "package"
+    package = RepositoryPublicationPackage.objects.filter(decision=decision).first()
+    if package is None:
+        data["actions"] = ["create_package"] if publisher and verified else []
+        return data
+    verified = verified and verify_repository_publication_package(package)
+    data.update(verified=verified, stage="authorization")
+    authorization = RepositoryPackageAuthorization.objects.filter(package=package).first()
+    if authorization is None:
+        data["actions"] = (
+            ["authorize_package", "reject_package"]
+            if verified and approver and package.created_by_id != actor.id
+            else []
+        )
+        return data
+    if authorization.outcome != RepositoryPackageAuthorization.Outcome.AUTHORIZED_FOR_PUBLICATION:
+        data["state"] = "rejected"
+        return data
+    data["stage"] = "publication"
+    publication = RepositoryStaticPublication.objects.filter(authorization=authorization).first()
+    if publication is None:
+        data["actions"] = ["create_static"] if verified and publisher else []
+        return data
+    state = repository_static_state(publication)
+    active = (
+        RepositoryStaticPublication.objects.filter(
+            workspace=evidence.workspace,
+            authorization__package__decision__evidence__content_id=evidence.content_id,
+            authorization__package__decision__evidence__audience=evidence.audience,
+            control_events__action="released",
+        )
+        .exclude(control_events__action="withdrawn")
+        .exclude(supersession_event__isnull=False)
+        .first()
+    )
+    verified = verified and verify_repository_static_publication(publication)
+    data.update(
+        verified=verified,
+        stage="release",
+        state=state,
+        publication_id=publication.id,
+        content_digest=publication.content_digest,
+        active_publication_id=active.id if active else None,
+        events=_static_control_data(publication)["events"] if approver else [],
+    )
+    if state == "recorded":
+        data["actions"] = ["release_client"] if verified and approver and publication.created_by_id != actor.id else []
+    elif state == "released":
+        data["actions"] = ["withdraw_client"] if approver else []
+        data["delivery_effective"] = repository_static_delivery_ready(publication)
+        if (
+            verified
+            and approver
+            and publication.created_by_id != actor.id
+            and not RepositoryStaticDeliveryAuthorization.objects.filter(publication=publication).exists()
+        ):
+            data["actions"] = [*cast(list[str], data["actions"]), "authorize_delivery"]
+    return data
+
+
 def _repository(workspace: ResolvedWorkspace) -> WorkspaceRepository:
     if workspace.member.surface == "client_portal":
         raise PermissionDenied("Repository publication evidence is unavailable to this audience")
@@ -280,6 +424,7 @@ def _collection(request, workspace: ResolvedWorkspace) -> Response:  # type: ign
             content_id=serializer.validated_data["content_id"],
             audience=serializer.validated_data["audience"],
             actor=request.user,
+            expected_commit=serializer.validated_data.get("expected_commit"),
         )
     except (ContentPublicationSourceError, RepositoryPublicationEvidenceError, RepositoryServiceError) as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
@@ -773,6 +918,63 @@ def _static_delivery(request, workspace: ResolvedWorkspace, evidence_id: UUID) -
     except RepositoryStaticDeliveryError as exc:
         return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
     return Response(_static_delivery_data(authorization), status=status.HTTP_201_CREATED)
+
+
+def _workflow_workspace(request: Request, organization_entity_id: UUID | None = None) -> ResolvedWorkspace:
+    if organization_entity_id is None:
+        return _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW)
+    return _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+
+
+class RepositoryPublicationWorkflowView(APIView):
+    @extend_schema(responses={200: RepositoryWorkflowSerializer})
+    def get(self, request, evidence_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workflow_workspace(request, organization_entity_id)
+        return Response(RepositoryWorkflowSerializer(_workflow_data(workspace, _evidence(workspace, evidence_id))).data)
+
+
+class RepositoryInternalPublicationView(APIView):
+    @extend_schema(responses={200: RepositoryWorkflowSerializer})
+    def get(self, request, evidence_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workflow_workspace(request, organization_entity_id)
+        evidence = _evidence(workspace, evidence_id)
+        if evidence.audience != PublicationAudience.MSP_INTERNAL:
+            return Response({"detail": "Staff-only evidence is required"}, status=409)
+        return Response(RepositoryWorkflowSerializer(_workflow_data(workspace, evidence)).data)
+
+    @extend_schema(request=RepositoryStaticControlWriteSerializer, responses={201: RepositoryWorkflowSerializer})
+    def post(self, request, evidence_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workflow_workspace(request, organization_entity_id)
+        evidence = _evidence(workspace, evidence_id)
+        serializer = RepositoryStaticControlWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            record_internal_publication(evidence=evidence, actor=request.user, **serializer.validated_data)
+        except (InternalPublicationError, IntegrityError):
+            return Response(
+                {"detail": "Publication changed or could not be verified. Refresh and review the decision."}, status=409
+            )
+        return Response(RepositoryWorkflowSerializer(_workflow_data(workspace, evidence)).data, status=201)
+
+
+class RepositoryInternalPublicationPDFView(APIView):
+    @extend_schema(responses={(200, "application/pdf"): bytes, 409: OpenApiResponse(description="Integrity conflict")})
+    def get(self, request, evidence_id, organization_entity_id=None):  # type: ignore[no-untyped-def]
+        workspace = _workflow_workspace(request, organization_entity_id)
+        evidence = _evidence(workspace, evidence_id)
+        if (
+            evidence.audience != PublicationAudience.MSP_INTERNAL
+            or not evidence.internal_events.filter(action="released").exists()
+        ):
+            return Response({"detail": "No staff publication exists"}, status=404)
+        if not verify_repository_publication_evidence(evidence)["valid"]:
+            return Response({"detail": "Retained publication failed verification"}, status=409)
+        response = _review_pdf(request, workspace, evidence_id)
+        if response.status_code == 200:
+            response["Content-Disposition"] = 'attachment; filename="repository-internal-publication.pdf"'
+            response["X-TekDocs-Export-Class"] = "immutable_internal_publication"
+            response["X-TekDocs-Publication-Digest"] = evidence.content_digest
+        return response
 
 
 class MSPRepositoryEvidenceCollectionView(APIView):

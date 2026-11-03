@@ -3,7 +3,7 @@ import type { Page, Request, Response } from '@playwright/test'
 type Options = { scenario?: string; now?: () => number; write?: (line: string) => void }
 type Entry = { phase: string; at: number }
 type Event = { event: string; phase: string; ms: number; status?: number; elapsed_ms?: number }
-const scenarios = new Set(['client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
+const scenarios = new Set(['native_publications', 'client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
 const milestones = new Set(['template', 'pdf_download', 'monitored', 'keyed'])
 const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload'] as const
 
@@ -11,8 +11,25 @@ function requestPhase(request: Request) {
   let url: URL
   try { url = new URL(request.url()) } catch { return null }
   const path = url.pathname
-  if (!path.startsWith('/api/v1/')) return null
   const method = request.method()
+  if (path === '/_allauth/browser/v1/auth/reauthenticate' && method === 'POST') return 'native_reauthentication'
+  if (!path.startsWith('/api/v1/')) return null
+  if (path.startsWith('/api/v1/portal/repository-publications')) return 'portal_read'
+  const native = path.match(/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/repository-publication-evidence(.*)$/)
+  if (native) {
+    if (!native[1]) return method === 'POST' ? 'native_snapshot' : 'native_history'
+    if (path.endsWith('/pdf')) return 'download_pdf'
+    if (path.endsWith('/workflow')) return 'native_workflow'
+    if (method === 'POST') {
+      if (path.endsWith('/delivery-authorization')) return 'native_delivery'
+      if (path.endsWith('/authorization')) return 'native_authorization'
+      if (path.endsWith('/decision')) return 'native_review'
+      if (path.endsWith('/package')) return 'native_package'
+      if (path.endsWith('/static-publication')) return 'native_static'
+      if (path.endsWith('/control') || path.endsWith('/internal-publication')) return 'native_control'
+    }
+    return 'native_history'
+  }
   if (path.endsWith('/from-template') && method === 'POST') return 'template_create'
   if (path.includes('/template-rollouts')) return 'template_rollout'
   if (path.includes('/observations/') && path.endsWith('/apply')) return 'source_apply'

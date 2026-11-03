@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
 import { RepositoryContentPanel } from './RepositoryContentPanel'
-import { RepositoryConflictError, type RepositoryClient, type RepositorySource } from './repositoryApi'
+import { RepositoryConflictError, RepositoryRecentAuthenticationRequiredError, type RepositoryClient, type RepositorySource } from './repositoryApi'
 
 const commit = 'a'.repeat(40)
 const blob = 'b'.repeat(40)
@@ -13,6 +13,114 @@ const initial: RepositorySource = {
   markdown: 'First revision.\n', source: '---\ntitle: Guide\n---\nFirst revision.\n',
   source_blob: blob, accepted_commit: commit, indexed_commit: commit,
 }
+
+it('offers publication controls for a saved native client document', async () => {
+  const user = userEvent.setup()
+  setup({}, 'org-1', 'content-1')
+  expect(await screen.findByLabelText('Markdown body')).toHaveValue('First revision.\n')
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
+  expect(await screen.findByRole('form', { name: 'Publish document' })).toBeInTheDocument()
+})
+
+it('retains the reviewed Git revision and leaves a denied snapshot retryable', async () => {
+  const user = userEvent.setup()
+  const createEvidence = vi.fn().mockRejectedValueOnce(new Error('Source changed')).mockResolvedValue({
+    id: 'evidence-new', content_id: initial.content_id, audience: 'client_visible', title: 'Frozen guide', source_commit: commit, signed_at: '2026-11-02T12:00:00Z',
+  })
+  setup({ createEvidence }, 'org-1', initial.content_id)
+  await user.click(await screen.findByRole('button', { name: 'Publish document' }))
+  await user.selectOptions(screen.getByLabelText('Publication audience'), 'client_visible')
+  await user.click(screen.getByRole('button', { name: 'Retain snapshot' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be retained')
+  expect(screen.getByLabelText('Publication audience')).toHaveValue('client_visible')
+  expect(screen.getByLabelText('Markdown body')).toHaveValue(initial.markdown)
+  await user.click(screen.getByRole('button', { name: 'Retain snapshot' }))
+  await waitFor(() => expect(createEvidence).toHaveBeenCalledTimes(2))
+  expect(createEvidence).toHaveBeenLastCalledWith(initial.content_id, 'client_visible', commit, 'org-1', expect.any(AbortSignal))
+})
+
+it('blocks new snapshots while Markdown changes are unsaved', async () => {
+  const user = userEvent.setup()
+  const { client } = setup({}, undefined, initial.content_id)
+  await user.type(await screen.findByLabelText('Markdown body'), ' Unsaved')
+  expect(screen.getByRole('button', { name: 'Publish document' })).toBeDisabled()
+  expect(client.createEvidence).not.toHaveBeenCalled()
+})
+
+it.each(['identity', 'revision'])('rejects a workflow response for a different publication %s', async mismatch => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: initial.content_id, audience: 'client_visible', title: 'Frozen guide', source_commit: commit, signed_at: '2026-11-02T12:00:00Z' }
+  setup({
+    listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, count: 1, page_size: 25, has_more: false }),
+    publicationWorkflow: vi.fn().mockResolvedValue({ evidence_id: mismatch === 'identity' ? 'other-evidence' : 'evidence-1', source_commit: mismatch === 'revision' ? 'f'.repeat(40) : commit, audience: 'client_visible', verified: true, stage: 'release', state: 'released', actions: [], active_publication_id: 'static-1', publication_id: 'static-1', content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }),
+  }, 'org-1', initial.content_id)
+  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Publication controls are unavailable')
+  expect(screen.queryByRole('button', { name: 'Download retained PDF' })).not.toBeInTheDocument()
+})
+
+it('confirms recent authentication without automatically retrying client delivery', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: initial.content_id, audience: 'client_visible', title: 'Frozen guide', source_commit: commit, signed_at: '2026-11-02T12:00:00Z' }
+  const publicationAction = vi.fn().mockRejectedValueOnce(new RepositoryRecentAuthenticationRequiredError()).mockResolvedValue(undefined)
+  const reauthenticate = vi.fn().mockResolvedValue(undefined)
+  setup({
+    listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, count: 1, page_size: 25, has_more: false }),
+    publicationWorkflow: vi.fn().mockResolvedValue({ evidence_id: 'evidence-1', source_commit: commit, audience: 'client_visible', verified: true, stage: 'release', state: 'released', actions: ['authorize_delivery'], active_publication_id: 'publication-1', publication_id: 'publication-1', content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }),
+    publicationAction, reauthenticate,
+  }, 'org-1', initial.content_id)
+  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
+  await user.click(await screen.findByRole('button', { name: 'Authorize client access' }))
+  await user.type(screen.getByLabelText('Decision reason'), 'Reviewed delivery')
+  await user.click(screen.getByRole('button', { name: 'Confirm decision' }))
+  await user.type(await screen.findByLabelText('Current password'), 'synthetic-test-password')
+  await user.click(screen.getByRole('button', { name: 'Confirm password' }))
+  await waitFor(() => expect(screen.queryByLabelText('Current password')).not.toBeInTheDocument())
+  expect(reauthenticate).toHaveBeenCalledWith('synthetic-test-password')
+  expect(publicationAction).toHaveBeenCalledTimes(1)
+  expect(screen.getByLabelText('Decision reason')).toHaveValue('Reviewed delivery')
+  await user.click(screen.getByRole('button', { name: 'Confirm decision' }))
+  await waitFor(() => expect(publicationAction).toHaveBeenCalledTimes(2))
+})
+
+it('preserves a denied decision reason and requires explicit correction confirmation', async () => {
+  const user = userEvent.setup()
+  const evidence = { id: 'evidence-1', content_id: initial.content_id, audience: 'msp_internal', title: 'Frozen guide', source_commit: commit, signed_at: '2026-11-02T12:00:00Z' }
+  const publicationAction = vi.fn().mockRejectedValueOnce(new Error('Denied')).mockResolvedValue(undefined)
+  const status = { evidence_id: 'evidence-1', source_commit: commit, audience: 'msp_internal', verified: true, stage: 'internal', state: 'recorded', actions: ['release_internal'], active_publication_id: 'previous-evidence', publication_id: null, content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }
+  const publicationWorkflow = vi.fn().mockResolvedValueOnce(status).mockResolvedValue({ ...status, active_publication_id: 'changed-predecessor' })
+  const { onClose } = setup({
+    listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, count: 1, page_size: 25, has_more: false }),
+    publicationWorkflow,
+    publicationAction,
+  }, undefined, initial.content_id)
+  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
+  await user.click(await screen.findByRole('button', { name: 'Publish snapshot' }))
+  await user.type(screen.getByLabelText('Decision reason'), 'Reviewed correction')
+  expect(screen.getByRole('button', { name: 'Confirm decision' })).toBeDisabled()
+  await user.click(screen.getByLabelText('Replace the current publication as a correction'))
+  await user.click(screen.getByRole('button', { name: 'Confirm decision' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Your reason was preserved')
+  expect(screen.getByLabelText('Decision reason')).toHaveValue('Reviewed correction')
+  expect(screen.getByRole('button', { name: /Frozen guide/ })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Refresh publication' }))
+  await waitFor(() => expect(publicationWorkflow).toHaveBeenCalledTimes(2))
+  expect(await screen.findByLabelText('Replace the current publication as a correction')).not.toBeChecked()
+  expect(screen.getByLabelText('Decision reason')).toHaveValue('Reviewed correction')
+  expect(screen.getByRole('button', { name: 'Confirm decision' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  expect(onClose).not.toHaveBeenCalled()
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(onClose).not.toHaveBeenCalled()
+  expect(screen.getByLabelText('Decision reason')).toHaveValue('Reviewed correction')
+  await user.click(screen.getByLabelText('Replace the current publication as a correction'))
+  await user.click(screen.getByRole('button', { name: 'Confirm decision' }))
+  await waitFor(() => expect(publicationAction).toHaveBeenCalledTimes(2))
+  expect(publicationAction).toHaveBeenLastCalledWith('evidence-1', 'release_internal', 'Reviewed correction', 'changed-predecessor', undefined, expect.any(AbortSignal))
+})
 
 function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string, initialContentId?: string) {
   const save = vi.fn().mockResolvedValue({ ...initial, markdown: 'Changed revision.\n', accepted_commit: 'c'.repeat(40), indexed_commit: 'c'.repeat(40) })
@@ -28,6 +136,11 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     listAttachments: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     archiveAttachment: vi.fn().mockResolvedValue(undefined),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
+    createEvidence: vi.fn(),
+    reauthenticate: vi.fn().mockResolvedValue(undefined),
+    publicationWorkflow: vi.fn().mockImplementation((id: string) => Promise.resolve({ evidence_id: id, source_commit: commit, audience: 'msp_internal', verified: true, stage: 'internal', state: 'recorded', actions: ['release_internal'], active_publication_id: null, publication_id: null, content_digest: 'd'.repeat(64), delivery_effective: false, events: [] })),
+    publicationAction: vi.fn().mockResolvedValue(undefined),
+    internalPublicationPdf: vi.fn(),
     staticPublication: vi.fn().mockResolvedValue(null),
     reviewPdf: vi.fn().mockResolvedValue({ content: new Blob(['%PDF-review']), name: 'repository-evidence-snapshot.pdf' }),
     exportStatic: vi.fn().mockResolvedValue({ content: new Blob(['retained']), name: 'repository-static-publication.pdf' }),
@@ -284,6 +397,7 @@ it('downloads a verified retained file after approval and keeps denial retryable
     setup({
       listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, page_size: 25, count: 1, has_more: false }),
       staticPublication: vi.fn().mockResolvedValue({ id: 'static-1', source_commit: commit, content_digest: 'd'.repeat(64), verified: true, permits_distribution: false }),
+      publicationWorkflow: vi.fn().mockResolvedValue({ evidence_id: 'evidence-1', source_commit: commit, audience: 'client_visible', verified: true, stage: 'release', state: 'released', actions: [], active_publication_id: 'static-1', publication_id: 'static-1', content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }),
       exportStatic,
     }, 'org-1')
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
@@ -292,10 +406,11 @@ it('downloads a verified retained file after approval and keeps denial retryable
     await user.click(screen.getByRole('button', { name: 'Load publication history' }))
     await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
     const download = await screen.findByRole('button', { name: 'Download retained PDF' })
+    expect(screen.getAllByRole('button', { name: 'Download retained PDF' })).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Download retained Markdown' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Download retained HTML' })).toBeInTheDocument()
     await user.click(download)
-    expect(await screen.findByRole('alert')).toHaveTextContent('retained file could not be downloaded')
+    expect(await screen.findByRole('alert')).toHaveTextContent('retained PDF could not be verified or downloaded')
     expect(click).not.toHaveBeenCalled()
     await user.click(download)
     await waitFor(() => expect(click).toHaveBeenCalledOnce())

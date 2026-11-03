@@ -24,6 +24,35 @@ def route(
 
 
 AUTHENTICATED_ROUTE_PERMISSIONS = (
+    route(
+        "msp-repository-publication-evidence-workflow", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+    ),
+    route(
+        "msp-repository-publication-evidence-internal-publication", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_PUBLISH, PermissionKey.DOCUMENTS_APPROVE),
+    ),
+    route(
+        "msp-repository-publication-evidence-internal-publication-pdf", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+    ),
+    route(
+        "organization-repository-publication-evidence-workflow", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-internal-publication", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_PUBLISH, PermissionKey.DOCUMENTS_APPROVE),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-internal-publication-pdf", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
     route("system-diagnostics", ("GET",), PermissionKey.SYSTEM_DIAGNOSTICS_VIEW),

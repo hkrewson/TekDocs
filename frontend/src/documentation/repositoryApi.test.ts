@@ -1,7 +1,47 @@
 import { afterEach, it, expect, vi } from 'vitest'
-import { browserRepositoryClient } from './repositoryApi'
+import { browserRepositoryClient, RepositoryRecentAuthenticationRequiredError } from './repositoryApi'
 
 afterEach(() => vi.unstubAllGlobals())
+
+it('distinguishes recent-authentication denial from other permission failures', async () => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code: 'recent_authentication_required' } }), { status: 403 })))
+  await expect(browserRepositoryClient.publicationAction('evidence-1', 'authorize_delivery', 'Reviewed', null, 'org-1')).rejects.toBeInstanceOf(RepositoryRecentAuthenticationRequiredError)
+})
+
+it.each([undefined, 'org/1'])('retains only the exact reviewed revision in workspace %s', async organizationId => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'evidence-1' }), { status: 201 }))
+  vi.stubGlobal('fetch', fetch)
+  await browserRepositoryClient.createEvidence('doc/1', 'msp_internal', 'a'.repeat(40), organizationId)
+  const [url, request] = fetch.mock.calls[0] as [string, RequestInit]
+  expect(url).toContain(organizationId ? '/organizations/org%2F1/' : '/workspaces/msp/')
+  expect(JSON.parse(request.body as string)).toEqual({ content_id: 'doc/1', audience: 'msp_internal', expected_commit: 'a'.repeat(40) })
+  expect(new Headers(request.headers).get('X-CSRFToken')).toBe('repository-csrf')
+})
+
+it.each([
+  ['accept_review', '/decision', { outcome: 'accepted_for_packaging', reason: 'Reviewed' }],
+  ['reject_review', '/decision', { outcome: 'rejected', reason: 'Reviewed' }],
+  ['create_package', '/package', {}],
+  ['authorize_package', '/package/authorization', { outcome: 'authorized_for_publication', reason: 'Reviewed' }],
+  ['reject_package', '/package/authorization', { outcome: 'rejected', reason: 'Reviewed' }],
+  ['create_static', '/package/static-publication', {}],
+  ['release_client', '/package/static-publication/control', { action: 'released', reason: 'Reviewed', supersedes_id: 'previous' }],
+  ['withdraw_client', '/package/static-publication/control', { action: 'withdrawn', reason: 'Reviewed' }],
+  ['authorize_delivery', '/package/static-publication/delivery-authorization', { reason: 'Reviewed' }],
+  ['release_internal', '/internal-publication', { action: 'released', reason: 'Reviewed', supersedes_id: 'previous' }],
+  ['withdraw_internal', '/internal-publication', { action: 'withdrawn', reason: 'Reviewed' }],
+] as const)('sends %s through its guarded native endpoint', async (action, suffix, body) => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  const fetch = vi.fn().mockResolvedValue(new Response('{}', { status: 201 }))
+  vi.stubGlobal('fetch', fetch)
+  await browserRepositoryClient.publicationAction('evidence/1', action, 'Reviewed', 'previous', 'org/1')
+  const [url, request] = fetch.mock.calls[0] as [string, RequestInit]
+  expect(url).toBe(`/api/v1/workspaces/organizations/org%2F1/repository-publication-evidence/evidence%2F1${suffix}`)
+  expect(request.method).toBe('POST')
+  expect(JSON.parse(request.body as string)).toEqual(body)
+})
 
 it.each([undefined, 'org/1'])('uploads a scanned file to the exact saved document in workspace %s', async (organizationId) => {
   Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })

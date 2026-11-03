@@ -13,6 +13,21 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Native staff and client publication controls after discovery/export
+
+The [native publication slice](../git-native-publication-interface.md) connects
+new Git-only documents to retained snapshots, publishing, corrections, withdrawal,
+history and PDF downloads. Staff decisions use guarded append-only records;
+client delivery retains independent approval and exact-client authorization.
+Version remains 0.9.18 development. Local Docker validation passed the adapted
+170-case authoring gate, targeted scope/schema/concurrency checks, all 817 frontend
+tests and all twelve real browser journeys without retries, with server custody
+verification. Standards and Spec reviews each reported zero findings. Migration
+0219 remains unapplied to retained development data; no deployment occurred.
+Exact-source hosted Build, CodeQL, supported upgrade and independent encrypted
+recovery must pass after push. Primary-file controls and configuration are later
+bounded workflow slices; the six automatic-migration gaps remain deferred.
+
 ## Cross-Workspace reuse and remaining-gap audit after 0.9.18
 
 The maintainer authorized the [remaining migration audit](../migrations/remaining-migration-audit.md),

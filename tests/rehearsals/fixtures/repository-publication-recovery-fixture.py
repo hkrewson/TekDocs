@@ -471,6 +471,12 @@ elif mode == "verify":
     )
     for number, digest in enumerate(native_hashes, start=1):
         assert digest == os.environ[f"TEKDOCS_RECOVERY_NATIVE_PRIMARY_VERSION_{number}_SHA256"]
+    from apps.core.tests.native_internal_publication_fixture import native_internal_publication_fingerprint
+    with transaction.atomic():
+        bind_local_rls_scope(DataScope.tenant(tenant), organization_mode=OrganizationRLSMode.MSP_ONLY,
+                             actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER)
+        assert native_internal_publication_fingerprint(owner) == os.environ["TEKDOCS_RECOVERY_INTERNAL_PUBLICATION_SHA256"]
+    print("Native staff publication lineage, signatures and PDFs restored exactly")
     print("Signed legacy PDF and released v1/v2 repository publications restored with legacy and Git-only primary history")
 elif mode == "corrupt":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])

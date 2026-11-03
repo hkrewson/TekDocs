@@ -58,6 +58,7 @@ from apps.core.models import (
     OutboxEvent,
     RepositoryEvidenceAttachment,
     RepositoryEvidenceReviewDecision,
+    RepositoryInternalPublicationEvent,
     RepositoryPackageAuthorization,
     RepositoryPublicationEvidence,
     RepositoryPublicationPackage,
@@ -143,6 +144,330 @@ def composition_repository(tmp_path):
         repository = repository_storage.ensure_workspace_repository(workspace).repository
         repository.refresh_from_db()
         yield installation, workspace, repository
+
+
+@pytest.mark.parametrize("organization_owned", (False, True))
+def test_native_internal_publication_has_no_legacy_document(
+    composition_repository, tmp_path, settings, organization_owned, django_runtime_role
+):
+    installation, _workspace, repository = composition_repository
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    organization = None
+    if organization_owned:
+        organization = create_organization(
+            tenant=installation.tenant,
+            actor_id=installation.owner.id,
+            name="Native staff client",
+            legal_name="",
+            website="",
+            classifications=["client"],
+        )
+        repository = repository_storage.ensure_workspace_repository(
+            Workspace.objects.get(organization=organization)
+        ).repository
+    content_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "docs/native-internal.md": _content(
+                content_id=content_id, title="Native internal", body="Staff procedure.\n"
+            )
+        },
+        message="Create native internal publication source",
+    )
+    index_repository_content(repository_id=repository.id)
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    collection = (
+        f"/api/v1/workspaces/organizations/{organization.entity_id}/repository-publication-evidence"
+        if organization
+        else "/api/v1/workspaces/msp/repository-publication-evidence"
+    )
+    created = browser.post(
+        collection,
+        data=json.dumps({"content_id": str(content_id), "audience": "msp_internal"}),
+        content_type="application/json",
+    )
+    assert created.status_code == 201
+    before_count = RepositoryPublicationEvidence.objects.count()
+    stale = browser.post(
+        collection,
+        data=json.dumps({"content_id": str(content_id), "audience": "msp_internal", "expected_commit": "0" * 40}),
+        content_type="application/json",
+    )
+    assert stale.status_code == 409
+    assert RepositoryPublicationEvidence.objects.count() == before_count
+    endpoint = f"{collection}/{created.json()['id']}/internal-publication"
+    published = browser.post(
+        endpoint,
+        data=json.dumps({"action": "released", "reason": "Reviewed staff procedure"}),
+        content_type="application/json",
+    )
+    assert published.status_code == 201, published.content
+    assert published.json()["state"] == "released"
+    assert not Document.objects.filter(pk=content_id).exists()
+    evidence = RepositoryPublicationEvidence.objects.get(pk=created.json()["id"])
+    pdf_url = f"{endpoint}/pdf"
+    original_pdf = browser.get(pdf_url)
+    assert original_pdf.status_code == 200 and original_pdf.content.startswith(b"%PDF-")
+    assert original_pdf["X-TekDocs-Publication-Digest"] == evidence.content_digest
+    assert (
+        browser.post(
+            endpoint, data=json.dumps({"action": "released", "reason": "Duplicate"}), content_type="application/json"
+        ).status_code
+        == 409
+    )
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "docs/native-internal.md": _content(
+                content_id=content_id, title="Native internal", body="Corrected staff procedure.\n"
+            )
+        },
+        message="Correct native staff procedure",
+    )
+    index_repository_content(repository_id=repository.id)
+    second = browser.post(
+        collection,
+        data=json.dumps({"content_id": str(content_id), "audience": "msp_internal"}),
+        content_type="application/json",
+    ).json()
+    correction = f"{collection}/{second['id']}/internal-publication"
+    assert (
+        browser.post(
+            correction,
+            data=json.dumps({"action": "released", "reason": "Missing lineage"}),
+            content_type="application/json",
+        ).status_code
+        == 409
+    )
+    assert (
+        browser.post(
+            correction,
+            data=json.dumps({"action": "released", "reason": "Correction", "supersedes_id": created.json()["id"]}),
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+    assert browser.get(endpoint).json()["state"] == "superseded"
+    assert (
+        browser.post(
+            correction,
+            data=json.dumps({"action": "withdrawn", "reason": "Retain history"}),
+            content_type="application/json",
+        ).status_code
+        == 201
+    )
+    assert browser.get(endpoint).json()["state"] == "superseded"
+    assert browser.get(pdf_url).content == original_pdf.content
+    assert browser.get(f"{correction}/pdf").status_code == 200
+    with pytest.raises(DatabaseError, match="append-only"), transaction.atomic():
+        RepositoryInternalPublicationEvent.objects.filter(evidence=evidence).update(reason="Rewrite")
+    with pytest.raises(DatabaseError, match="only current internal"), transaction.atomic():
+        RepositoryInternalPublicationEvent.objects.create(
+            tenant=installation.tenant,
+            workspace=evidence.workspace,
+            organization=organization,
+            evidence=evidence,
+            actor=installation.owner,
+            action="withdrawn",
+            reason="Bypass service",
+        )
+    with evidence.pdf_file.storage.open(evidence.pdf_file.name, "wb") as stream:
+        stream.write(b"Damaged synthetic PDF")
+    assert browser.get(pdf_url).status_code == 409
+    with evidence.pdf_file.storage.open(evidence.pdf_file.name, "wb") as stream:
+        stream.write(original_pdf.content)
+    assert browser.get(pdf_url).content == original_pdf.content
+    foreign_tenant = Tenant.objects.create(name="Foreign publication test", slug=f"foreign-{uuid.uuid4()}")
+    foreign = User.objects.create_user(email=f"foreign-{uuid.uuid4()}@example.invalid", display_name="Foreign")
+    TenantMembership.objects.create(tenant=foreign_tenant, user=foreign, role=BuiltInRole.ADMINISTRATOR)
+    browser.force_login(foreign)
+    assert browser.get(f"{collection}/{evidence.id}/workflow").status_code in {403, 404}
+    assert browser.get(pdf_url).status_code in {403, 404}
+    assert browser.post(
+        endpoint, data=json.dumps({"action": "withdrawn", "reason": "Foreign"}), content_type="application/json"
+    ).status_code in {403, 404}
+
+    readonly = User.objects.create_user(
+        email=f"readonly-{uuid.uuid4()}@example.invalid", display_name="Publication reader"
+    )
+    membership = TenantMembership.objects.create(tenant=installation.tenant, user=readonly, role=BuiltInRole.READ_ONLY)
+    if organization:
+        OrganizationAccessAssignment.objects.create(
+            tenant=installation.tenant, organization=organization, membership=membership, created_by=installation.owner
+        )
+    browser.force_login(readonly)
+    assert browser.get(f"{collection}/{evidence.id}/workflow").json()["actions"] == []
+    assert browser.get(pdf_url).status_code == 200
+    assert (
+        browser.post(
+            endpoint,
+            data=json.dumps({"action": "withdrawn", "reason": "Reader denied"}),
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
+    scope = DataScope.owner(installation.tenant, organization)
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            scope, organization_mode=OrganizationRLSMode.ORGANIZATION if organization else OrganizationRLSMode.MSP_ONLY
+        )
+        assert RepositoryInternalPublicationEvent.objects.filter(evidence=evidence).count() == 1
+    with django_runtime_role(), transaction.atomic():
+        bind_local_rls_scope(
+            DataScope(tenant_id=foreign_tenant.id, workspace_id=evidence.workspace_id),
+            organization_mode=OrganizationRLSMode.MSP_ONLY,
+        )
+        assert not RepositoryInternalPublicationEvent.objects.exists()
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Sibling staff publication client",
+        legal_name="",
+        website="",
+        classifications=["client"],
+    )
+    repository_storage.ensure_workspace_repository(Workspace.objects.get(organization=sibling))
+    browser.force_login(installation.owner)
+    sibling_root = f"/api/v1/workspaces/organizations/{sibling.entity_id}/repository-publication-evidence/{evidence.id}"
+    for suffix in ("workflow", "internal-publication", "internal-publication/pdf"):
+        assert browser.get(f"{sibling_root}/{suffix}").status_code == 404
+    assert (
+        browser.post(
+            f"{sibling_root}/internal-publication",
+            data=json.dumps({"action": "released", "reason": "Wrong client"}),
+            content_type="application/json",
+        ).status_code
+        == 404
+    )
+    portal = User.objects.create_user(
+        email=f"staff-portal-{uuid.uuid4()}@example.invalid", display_name="Portal reader"
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant, organization=organization or sibling, user=portal, role=BuiltInRole.CLIENT_USER
+    )
+    browser.force_login(portal)
+    assert browser.get(f"{collection}/{evidence.id}/workflow").status_code == 403
+    assert browser.get(pdf_url).status_code == 403
+    assert (
+        browser.post(
+            endpoint,
+            data=json.dumps({"action": "released", "reason": "Portal denied"}),
+            content_type="application/json",
+        ).status_code
+        == 403
+    )
+
+    with pytest.raises(DatabaseError, match="Retained staff publications prevent schema rollback"):
+        call_command("migrate", "core", "0218", verbosity=0)
+    call_command("migrate", "core", verbosity=0)
+    assert RepositoryInternalPublicationEvent.objects.filter(evidence=evidence).count() == 1
+
+
+def test_native_internal_publication_empty_schema_rollback_and_recovery():
+    try:
+        call_command("migrate", "core", "0218", verbosity=0)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT to_regclass('core_repositoryinternalpublicationevent')")
+            assert cursor.fetchone()[0] is None
+        call_command("migrate", "core", verbosity=0)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE oid='core_repositoryinternalpublicationevent'::regclass"
+            )
+            assert cursor.fetchone() == (True, True)
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger "
+                "WHERE tgrelid='core_repositoryinternalpublicationevent'::regclass AND NOT tgisinternal"
+            )
+            assert cursor.fetchone()[0] == 2
+    finally:
+        call_command("migrate", "core", verbosity=0)
+
+
+def test_native_staff_recovery_fingerprint_survives_later_repository_writes(composition_repository, tmp_path, settings):
+    from apps.core.tests.native_internal_publication_fixture import (
+        create_native_internal_publication_fixture,
+        native_internal_publication_fingerprint,
+    )
+
+    installation, _workspace, repository = composition_repository
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    expected = create_native_internal_publication_fixture(installation.owner)
+    other_id = uuid.uuid4()
+    repository_service.commit_repository_files(
+        repository_id=repository.id,
+        expected_base=_accepted(repository),
+        changes={
+            "docs/later-independent.md": _content(content_id=other_id, title="Later", body="Later source change.\n")
+        },
+        message="Advance repository after staff publication",
+    )
+    index_repository_content(repository_id=repository.id)
+    assert native_internal_publication_fingerprint(installation.owner) == expected
+
+
+def test_native_staff_corrections_do_not_fork_under_concurrent_publishers(composition_repository, tmp_path, settings):
+    from threading import Barrier
+
+    from django.db import close_old_connections
+
+    from apps.core.repository_internal_publications import InternalPublicationError, record_internal_publication
+    from apps.core.tests.native_internal_publication_fixture import (
+        CONTENT_ID,
+        create_native_internal_publication_fixture,
+    )
+
+    installation, _workspace, repository = composition_repository
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    create_native_internal_publication_fixture(installation.owner)
+    candidates = [
+        retain_repository_publication_evidence(
+            repository_id=repository.id,
+            content_id=CONTENT_ID,
+            audience="msp_internal",
+            actor=installation.owner,
+        )
+        for _ in range(3)
+    ]
+    record_internal_publication(
+        evidence=candidates[0], actor=installation.owner, action="released", reason="Current edition"
+    )
+    barrier = Barrier(2)
+
+    def release(candidate):
+        close_old_connections()
+        try:
+            barrier.wait(timeout=10)
+            record_internal_publication(
+                evidence=candidate,
+                actor=installation.owner,
+                action="released",
+                reason="Concurrent correction",
+                supersedes_id=candidates[0].id,
+            )
+            return "released"
+        except InternalPublicationError:
+            return "conflict"
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assert sorted(pool.map(release, candidates[1:])) == ["conflict", "released"]
+    assert RepositoryInternalPublicationEvent.objects.filter(supersedes=candidates[0]).count() == 1
 
 
 def _accepted(repository) -> str | None:  # type: ignore[no-untyped-def]
@@ -834,6 +1159,11 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     )
     assert created.status_code == 201
     evidence_id = created.json()["id"]
+    workflow_url = reverse(
+        "organization-repository-publication-evidence-workflow", args=[organization.entity_id, evidence_id]
+    )
+    assert browser.get(workflow_url).json()["stage"] == "review"
+    assert browser.get(workflow_url).json()["actions"] == []
     if source_id_kind == "native":
         assert attachment.document_id is None
         assert not Document.objects.filter(pk=content_id).exists()
@@ -866,6 +1196,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     accepted = browser.post(url, data=payload, content_type="application/json")
     assert accepted.status_code == 201
     assert accepted.json()["permits_distribution"] is False
+    assert browser.get(workflow_url).json()["actions"] == ["create_package"]
     package_url = reverse(
         "organization-repository-publication-evidence-package", args=[organization.entity_id, evidence_id]
     )
@@ -873,6 +1204,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     packaged = browser.post(package_url)
     assert packaged.status_code == 201, packaged.content
     assert packaged.json()["verified"] is True
+    assert browser.get(workflow_url).json()["stage"] == "authorization"
+    assert browser.get(workflow_url).json()["actions"] == []
     assert packaged.json()["permits_distribution"] is False
     package = RepositoryPublicationPackage.objects.get(pk=packaged.json()["id"])
     assert (
@@ -934,6 +1267,7 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     Authenticator.objects.create(user=authorizer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()})
     authorized = browser.post(authorization_url, data=authorization_payload, content_type="application/json")
     assert authorized.status_code == 201, authorized.content
+    assert browser.get(workflow_url).json()["actions"] == ["create_static"]
     assert authorized.json()["permits_distribution"] is False
     assert authorized.json()["package_id"] == str(package.id)
     assert browser.get(authorization_url).json()["outcome"] == "authorized_for_publication"
@@ -951,6 +1285,8 @@ def test_repository_evidence_decision_is_separate_from_distribution(
     recorded = browser.post(static_url)
     assert recorded.status_code == 201, recorded.content
     assert recorded.json()["verified"] is True
+    assert browser.get(workflow_url).json()["state"] == "recorded"
+    assert browser.get(workflow_url).json()["actions"] == []
     assert recorded.json()["permits_distribution"] is False
     publication = RepositoryStaticPublication.objects.get(pk=recorded.json()["id"])
     evidence_record = RepositoryPublicationEvidence.objects.get(pk=evidence_id)

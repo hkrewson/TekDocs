@@ -3,6 +3,28 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import { attachPublicationDiagnostics } from '../../e2e/publicationDiagnostics.ts'
 
+test('native workflow and password-confirmation diagnostics never read or retain request values', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_publications', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['POST', '/api/v1/workspaces/msp/repository-publication-evidence'],
+    ['GET', '/api/v1/workspaces/organizations/private-org/repository-publication-evidence/private-evidence/workflow'],
+    ['POST', '/api/v1/workspaces/organizations/private-org/repository-publication-evidence/private-evidence/package/static-publication/delivery-authorization'],
+    ['POST', '/_allauth/browser/v1/auth/reauthenticate'],
+  ]) {
+    const request = { url: () => `http://localhost${path}?private-query=private-value`, method: () => method, headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('Password must not be read') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 403 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_publications')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['native_snapshot', 'native_workflow', 'native_delivery', 'native_reauthentication'])
+  assert.ok(!lines[0].includes('private-') && !lines[0].includes('localhost'))
+  diagnostic.dispose()
+})
+
 test('a pending Git document read is visible without retaining document or query values', () => {
   const page = new EventEmitter(), lines = []
   let time = 0

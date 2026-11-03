@@ -94,7 +94,8 @@ def evidence_payload(*, manifest: dict[str, Any], markdown: str) -> bytes:
 
 
 def retain_repository_publication_evidence(
-    *, repository_id: uuid.UUID, content_id: uuid.UUID, audience: str, actor: User
+    *, repository_id: uuid.UUID, content_id: uuid.UUID, audience: str, actor: User,
+    expected_commit: str | None = None,
 ) -> RepositoryPublicationEvidence:
     """Sign and insert one exact source snapshot under the accepted-head lock."""
 
@@ -116,6 +117,7 @@ def retain_repository_publication_evidence(
             actor=actor,
             member=member,
             stored_files=stored_files,
+            expected_commit=expected_commit,
         )
     except Exception:
         for storage, name in stored_files:
@@ -130,11 +132,19 @@ def _retain_pinned_evidence(
     actor: User,
     member: InstallationMemberContext,
     stored_files: list[tuple[Any, str]],
+    expected_commit: str | None,
 ) -> RepositoryPublicationEvidence:
     with pinned_git_document_dependencies(
         repository_id=repository.id, content_id=content_id, audience=audience
     ) as source:
         repository.refresh_from_db(fields=("accepted_commit", "indexed_commit"))
+        accepted = repository.accepted_commit
+        if expected_commit is not None and (
+            accepted is None or accepted.object_id != expected_commit
+        ):
+            raise RepositoryPublicationEvidenceError(
+                "The saved source changed. Reopen and review it before publishing."
+            )
         if repository.accepted_commit_id is None or repository.accepted_commit_id != repository.indexed_commit_id:
             raise RepositoryPublicationEvidenceError("Repository source changed before retention")
         node = ContentNode.objects.filter(

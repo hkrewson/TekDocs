@@ -1,4 +1,4 @@
-import { browserCsrfToken } from '../auth/api'
+import { browserAuthClient, browserCsrfToken } from '../auth/api'
 import { translate } from '../i18n/localization'
 
 export type RepositorySummary = {
@@ -78,6 +78,23 @@ export type RepositoryStaticPublication = {
 
 export type RepositoryStaticFormat = 'md' | 'html' | 'pdf'
 
+export type RepositoryPublicationAction = 'accept_review' | 'reject_review' | 'create_package' | 'authorize_package' | 'reject_package' | 'create_static' | 'release_client' | 'withdraw_client' | 'authorize_delivery' | 'release_internal' | 'withdraw_internal'
+
+export type RepositoryWorkflow = {
+  evidence_id: string
+  source_commit: string
+  audience: string
+  verified: boolean
+  stage: string
+  state: string
+  actions: RepositoryPublicationAction[]
+  active_publication_id: string | null
+  publication_id: string | null
+  content_digest: string
+  delivery_effective: boolean
+  events: { id: string; action: string; supersedes_id: string | null; reason: string; actor_id: string; occurred_at: string }[]
+}
+
 export type RepositoryMutation = {
   operation: 'create' | 'update' | 'move'
   content_id: string
@@ -106,6 +123,8 @@ export class RepositoryConflictError extends Error {
   }
 }
 
+export class RepositoryRecentAuthenticationRequiredError extends Error {}
+
 function path(organizationId?: string) {
   return organizationId
     ? `/api/v1/workspaces/organizations/${encodeURIComponent(organizationId)}/content-graph`
@@ -132,11 +151,64 @@ async function parse<T>(response: Response): Promise<T> {
   if (response.ok) return response.json() as Promise<T>
   if (response.status === 409) throw new RepositoryConflictError(await response.json() as RepositoryConflict)
   let detail: unknown
-  try { detail = (await response.json() as { detail?: unknown }).detail } catch { /* An upstream error may be HTML. */ }
+  try {
+    const body = await response.json() as { detail?: unknown; error?: { code?: unknown } }
+    if (response.status === 403 && body.error?.code === 'recent_authentication_required') throw new RepositoryRecentAuthenticationRequiredError()
+    detail = body.detail
+  } catch (error) {
+    if (error instanceof RepositoryRecentAuthenticationRequiredError) throw error
+    /* An upstream error may be HTML. */
+  }
   throw new Error(typeof detail === 'string' && detail.length < 300 ? detail : translate('repository.requestFailed', { status: response.status }))
 }
 
 export const browserRepositoryClient = {
+  reauthenticate: (password: string) => browserAuthClient.reauthenticate(password),
+  async createEvidence(contentId: string, audience: string, expectedCommit: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryEvidence>(await fetch(evidencePath(organizationId), {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify({ content_id: contentId, audience, expected_commit: expectedCommit }),
+    }))
+  },
+  async publicationWorkflow(evidenceId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryWorkflow>(await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/workflow`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
+  },
+  async publicationAction(evidenceId: string, action: RepositoryPublicationAction, reason: string, supersedesId: string | null, organizationId?: string, signal?: AbortSignal) {
+    const actions: Record<RepositoryPublicationAction, { suffix: string; body: Record<string, unknown> }> = {
+      accept_review: { suffix: '/decision', body: { outcome: 'accepted_for_packaging', reason } },
+      reject_review: { suffix: '/decision', body: { outcome: 'rejected', reason } },
+      create_package: { suffix: '/package', body: {} },
+      authorize_package: { suffix: '/package/authorization', body: { outcome: 'authorized_for_publication', reason } },
+      reject_package: { suffix: '/package/authorization', body: { outcome: 'rejected', reason } },
+      create_static: { suffix: '/package/static-publication', body: {} },
+      release_client: { suffix: '/package/static-publication/control', body: { action: 'released', reason, supersedes_id: supersedesId } },
+      withdraw_client: { suffix: '/package/static-publication/control', body: { action: 'withdrawn', reason } },
+      authorize_delivery: { suffix: '/package/static-publication/delivery-authorization', body: { reason } },
+      release_internal: { suffix: '/internal-publication', body: { action: 'released', reason, supersedes_id: supersedesId } },
+      withdraw_internal: { suffix: '/internal-publication', body: { action: 'withdrawn', reason } },
+    }
+    const operation = actions[action]
+    await parse<unknown>(await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}${operation.suffix}`, {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(operation.body),
+    }))
+  },
+  async internalPublicationPdf(evidenceId: string, expectedDigest: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/internal-publication/pdf`, { credentials: 'same-origin', signal })
+    if (!response.ok || !/^[a-f0-9]{64}$/.test(expectedDigest)
+      || response.headers.get('X-TekDocs-Publication-Digest') !== expectedDigest
+      || response.headers.get('X-TekDocs-Export-Class') !== 'immutable_internal_publication'
+      || response.headers.get('Content-Type') !== 'application/pdf'
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-internal-publication.pdf"'
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') throw new Error(translate('repository.lifecycle.downloadFailed'))
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength > 8 * 1024 * 1024 || new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error(translate('repository.lifecycle.downloadFailed'))
+    return { content: new Blob([bytes], { type: 'application/pdf' }), name: 'repository-internal-publication.pdf' }
+  },
   async list(organizationId?: string, q = '', signal?: AbortSignal) {
     const query = new URLSearchParams({ page_size: '100' })
     if (q) query.set('q', q)

@@ -359,7 +359,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadDocx() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{docxExporting ? translate('repository.docxPreparing') : translate('repository.docxDownload')}</button>}
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
-        {source?.kind === 'document' && source.accepted_commit && <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} />}
+        {source?.kind === 'document' && source.accepted_commit && <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy} />}
       </section>
     </div>
   </section>

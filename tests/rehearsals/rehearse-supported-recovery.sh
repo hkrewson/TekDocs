@@ -153,6 +153,14 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
   -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
 sed -n '/Cross-Workspace isolation, pins, signed publications, files, PDFs and rollback verified/p' "$cross_workspace_recovery_log"
+# Create native staff decisions before source-snapshot baselines: authoring this
+# fixture advances the MSP repository; retained evidence itself is head-independent.
+internal_publication_log="$work_directory/internal-publication.log"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_NATIVE_INTERNAL_FIXTURE_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/native_internal_publication_fixture.py" > "$internal_publication_log"
+internal_publication_sha=$(sed -n 's/^INTERNAL_PUBLICATION_SHA256=//p' "$internal_publication_log")
+printf '%s\n' "$internal_publication_sha" | grep -Eq '^[0-9a-f]{64}$'
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -448,6 +456,7 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=verify \
+  -e TEKDOCS_RECOVERY_INTERNAL_PUBLICATION_SHA256="$internal_publication_sha" \
   -e TEKDOCS_RECOVERY_PUBLICATION_ID="$publication_id" \
   -e TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256="$publication_html_sha" \
   -e TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256="$publication_pdf_sha" \

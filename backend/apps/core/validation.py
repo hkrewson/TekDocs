@@ -32,6 +32,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_documentauthority"
         else "Append-only signed repository source evidence; exact-workspace RLS and source-identity guard."
         if table == "core_repositorypublicationevidence"
+        else "Append-only staff publication decisions over signed evidence; exact-workspace RLS and lineage guards."
+        if table == "core_repositoryinternalpublicationevent"
         else "Append-only exact-evidence internal review decision; exact-workspace RLS and scope guard."
         if table == "core_repositoryevidencereviewdecision"
         else "Append-only accepted-evidence handoff; exact-workspace RLS and decision-scope guard."

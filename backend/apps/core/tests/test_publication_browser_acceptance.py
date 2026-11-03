@@ -253,7 +253,9 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             seed_client_publication_fixture,
         )
 
-        seed_client_publication_fixture(installation.owner)
+        # Set the generated password before both the custody baseline and sessions.
+        approval_password = f"{secrets.token_urlsafe(24)}Aa7!"
+        seed_client_publication_fixture(installation.owner, approver_password=approval_password)
         client_publication_legacy = prepare_client_publication_fixture(installation.owner)
         from apps.core.tests.repeated_block_fixture import (
             browser_state as repeated_browser_state,
@@ -302,6 +304,8 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 )
             ],
         }
+        # A generated password stays in private IPC; the browser reauthenticates.
+        prepared_state["native_approval_password"] = approval_password
         # The live server opens its own connections through the constrained role.
         # Fixture metadata is collected beforehand, outside the request RLS scope.
         served_roles = set()
@@ -324,6 +328,35 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 server.stop()
                 connection_created.disconnect(record_http_connection)
         assert served_roles == {RUNTIME_ROLE}
+
+        from apps.core.models import ContentNode, Document, RepositoryPublicationEvidence, RepositoryStaticPublication
+        from apps.core.repository_internal_publications import internal_publication_state
+        from apps.core.repository_publication_evidence import verify_repository_publication_evidence
+        from apps.core.repository_static_controls import repository_static_state
+        from apps.core.repository_static_delivery import repository_static_delivery_ready
+        from apps.core.repository_static_publications import verify_repository_static_publication
+
+        for title, internal in (("Native staff browser guide", True), ("Native client browser guide", False)):
+            node = ContentNode.objects.get(title=title)
+            assert not Document.objects.filter(pk=node.content_id).exists()
+            native_snapshots = list(RepositoryPublicationEvidence.objects.filter(
+                workspace_id=node.workspace_id, content_id=node.content_id,
+            ).order_by("signed_at"))
+            assert len(native_snapshots) == 2
+            assert all(verify_repository_publication_evidence(item)["valid"] for item in native_snapshots)
+            assert "original" in native_snapshots[0].canonical_markdown
+            assert "corrected" in native_snapshots[1].canonical_markdown
+            if internal:
+                assert [internal_publication_state(item) for item in native_snapshots] == ["superseded", "withdrawn"]
+                assert all(item.internal_events.filter(action="released").exists() for item in native_snapshots)
+            else:
+                native_publications = list(RepositoryStaticPublication.objects.filter(
+                    authorization__package__decision__evidence__in=native_snapshots,
+                ).order_by("created_at"))
+                assert len(native_publications) == 2
+                assert [repository_static_state(item) for item in native_publications] == ["superseded", "withdrawn"]
+                assert all(verify_repository_static_publication(item) for item in native_publications)
+                assert not any(repository_static_delivery_ready(item) for item in native_publications)
 
         original.refresh_from_db()
         assert (original.manifest, original.signature, original.content_digest) == retained

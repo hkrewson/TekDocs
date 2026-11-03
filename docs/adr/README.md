@@ -11,3 +11,4 @@ transition review.
 | [0117](0117-addressed-git-publication-custody.md) | Addressed Git publication custody | accepted | 2026-10-31 |
 | [0116](0116-enrolled-template-library-git-custody.md) | Enrolled template library Git custody | proposed | 2026-10-30 |
 | [0122](0122-repeated-shared-block-occurrence-custody.md) | Repeated shared-block occurrence custody | accepted | 2026-11-01 |
+| [0124](0124-native-publication-workflow.md) | Native publication workflow and staff decisions | accepted; local runtime verified, hosted pending | 2026-11-02 |

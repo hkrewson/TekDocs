@@ -15840,6 +15840,114 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/internal-publication:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/internal-publication/pdf:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_pdf_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_msp_review
@@ -15997,6 +16105,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/workflow:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_workflow_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/service-rates:
     get:
       operationId: workspaces_msp_service_rates_list
@@ -33487,6 +33623,132 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/internal-publication
+  : get:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/internal-publication/pdf
+  : get:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_pdf_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package:
     get:
       operationId: repository_evidence_organization_package_retrieve
@@ -34197,6 +34459,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/workflow:
+    get:
+      operationId: workspaces_organizations_repository_publication_evidence_workflow_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/search:
     get:
       operationId: workspace_search_organization
@@ -51632,6 +51928,9 @@ components:
             * `msp_internal` - MSP internal
             * `client_visible` - Client visible
           x-spec-enum-id: 489f26fd4031dd3a
+        expected_commit:
+          type: string
+          pattern: ^(?:[a-f0-9]{40}|[a-f0-9]{64})$
       required:
       - audience
       - content_id
@@ -51951,6 +52250,55 @@ components:
       - package_id
       - permits_distribution
       - source_commit
+      - verified
+    RepositoryWorkflow:
+      type: object
+      properties:
+        evidence_id:
+          type: string
+          format: uuid
+        source_commit:
+          type: string
+        audience:
+          type: string
+        verified:
+          type: boolean
+        stage:
+          type: string
+        state:
+          type: string
+        actions:
+          type: array
+          items:
+            type: string
+        active_publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        content_digest:
+          type: string
+        delivery_effective:
+          type: boolean
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryStaticControlEvent'
+      required:
+      - actions
+      - active_publication_id
+      - audience
+      - content_digest
+      - delivery_effective
+      - events
+      - evidence_id
+      - publication_id
+      - source_commit
+      - stage
+      - state
       - verified
     ReuseAudience:
       type: object

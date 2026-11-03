@@ -462,9 +462,6 @@ from apps.core.repository_portal_views import (
     ClientPortalRepositoryPublicationPDFView,
 )
 from apps.core.repository_publication_views import (
-    RepositoryPublicationWorkflowView,
-    RepositoryInternalPublicationView,
-    RepositoryInternalPublicationPDFView,
     MSPRepositoryEvidenceCollectionView,
     MSPRepositoryEvidenceDetailView,
     MSPRepositoryEvidenceReviewAttachmentView,
@@ -486,6 +483,9 @@ from apps.core.repository_publication_views import (
     OrganizationRepositoryStaticMarkdownExportView,
     OrganizationRepositoryStaticPDFExportView,
     OrganizationRepositoryStaticPublicationView,
+    RepositoryInternalPublicationPDFView,
+    RepositoryInternalPublicationView,
+    RepositoryPublicationWorkflowView,
 )
 from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
 from apps.core.site_views import (
@@ -541,12 +541,39 @@ urlpatterns = [
     path("_allauth/", include("allauth.headless.urls")),
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/workspaces/msp/content-graph", MSPContentGraphView.as_view(), name="msp-content-graph"),
-    path("api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/workflow", RepositoryPublicationWorkflowView.as_view(), name="msp-repository-publication-evidence-workflow"),
-    path("api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication", RepositoryInternalPublicationView.as_view(), name="msp-repository-publication-evidence-internal-publication"),
-    path("api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf", RepositoryInternalPublicationPDFView.as_view(), name="msp-repository-publication-evidence-internal-publication-pdf"),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/workflow", RepositoryPublicationWorkflowView.as_view(), name="organization-repository-publication-evidence-workflow"),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/internal-publication", RepositoryInternalPublicationView.as_view(), name="organization-repository-publication-evidence-internal-publication"),
-    path("api/v1/workspaces/organizations/<uuid:organization_entity_id>/repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf", RepositoryInternalPublicationPDFView.as_view(), name="organization-repository-publication-evidence-internal-publication-pdf"),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/workflow",
+        RepositoryPublicationWorkflowView.as_view(),
+        name="msp-repository-publication-evidence-workflow",
+    ),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication",
+        RepositoryInternalPublicationView.as_view(),
+        name="msp-repository-publication-evidence-internal-publication",
+    ),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf",
+        RepositoryInternalPublicationPDFView.as_view(),
+        name="msp-repository-publication-evidence-internal-publication-pdf",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/workflow",
+        RepositoryPublicationWorkflowView.as_view(),
+        name="organization-repository-publication-evidence-workflow",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/internal-publication",
+        RepositoryInternalPublicationView.as_view(),
+        name="organization-repository-publication-evidence-internal-publication",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf",
+        RepositoryInternalPublicationPDFView.as_view(),
+        name="organization-repository-publication-evidence-internal-publication-pdf",
+    ),
     path(
         "api/v1/workspaces/msp/repository-publication-evidence",
         MSPRepositoryEvidenceCollectionView.as_view(),

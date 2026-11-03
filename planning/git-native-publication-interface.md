@@ -102,3 +102,16 @@ No production access, deployment, document copying, retained-data mutation or
 release/tag publication occurred. A read-only check confirmed migration 0219
 has not been applied to the retained development database. Wiki changes remain
 a local draft. Pre-existing planning edits remain outside the implementation.
+
+## Hosted delivery follow-up
+
+Initial source `20907c7f1b75f7c89e3bf2c56fd88681a84d8ae4` was pushed directly to
+main. Build 41583571943 reproduced seven Ruff findings in the route file: one
+import-order violation and six overlong new declarations. The earlier focused
+local lint had omitted this file. Full Docker Ruff reproduced the same failure.
+The correction sorts imports and wraps declarations without changing routes,
+views, names or order; normalized Python syntax trees confirm this equivalence.
+Full-repository Docker Ruff, mypy across 302 files and migration checks pass;
+OpenAPI regeneration matches the tracked schema (zero errors, four existing
+warnings). Both review axes report zero findings on this formatting-only delta.
+Exact-source hosted runtime, upgrade and recovery must confirm the follow-up.

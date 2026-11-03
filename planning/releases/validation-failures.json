@@ -1351,6 +1351,26 @@
       "next_action": "Preserve the unsuccessful attempts and their original timing uncertainty. Validate corrected-source CI after the complete local selection, privacy, browser/server, lint and type gates. Existing content assertions, configured test budgets, retry count and production permission/data behavior remain unchanged. Network completion now precedes the five-second DOM check, so this is functional synchronization, not an unchanged five-second end-to-end latency allowance.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41551455933",
+      "job": "Live browser-to-PostgreSQL journey (125642915846)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Fresh Docker test test_legacy_library_works_with_a_new_unindexed_empty_repository reproduced 409 instead of 200 before the correction (65.91s). Original CI timed out at live-workspace.spec.ts:428 while opening the supplier publication; backend document-search returned 409.",
+      "cause": "The native discovery guard treated an initialized, empty Git repository awaiting its first index as unavailable native content, blocking a valid legacy-only Workspace library.",
+      "next_action": "The same follow-up commit proves accepted Git has no Markdown before allowing legacy discovery. Nine API cases pass, including MSP/organization blank repositories and rejection of the first unindexed native document. Validate the corrected source in hosted live-workspace and all required gates; preserve this failed run.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41551481488",
+      "job": "Browser (webkit) (125639887388)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Original CI: document-operations.spec.ts:110 timed out awaiting Keep editing after history.back(). The unchanged exact case passed five serial and twenty four-worker Docker replays, zero retries; surrounding eight-case suite passed three times (24 cases, 29.2s).",
+      "cause": "unknown; no causal link to the backend discovery changes was established, and the unchanged failure has not reproduced locally.",
+      "next_action": "Retain the failure and original timing uncertainty. Run unchanged WebKit assertions and budgets on the corrected source; investigate recurrence rather than increasing waits or claiming an application fix from a passing retry.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

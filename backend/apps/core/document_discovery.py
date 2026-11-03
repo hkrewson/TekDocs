@@ -5,7 +5,11 @@ from typing import Any
 
 from .content_read import RepositoryContentNotIndexed
 from .models import ContentNode, Document, WorkspaceRepository, workspace_for_owner
-from .repository_service import RepositoryServiceError, read_accepted_repository_file_dates
+from .repository_service import (
+    RepositoryServiceError,
+    read_accepted_repository_file_dates,
+    read_accepted_repository_markdown_files,
+)
 from .workspaces import ResolvedWorkspace
 
 
@@ -18,6 +22,18 @@ def native_document_summaries(workspace: ResolvedWorkspace, values: dict[str, An
     if repository is None:
         return []
     if repository.accepted_commit_id != repository.indexed_commit_id:
+        # A fresh repository contains only manifests until its first content
+        # write. Prove that from accepted Git, rather than trusting an empty index.
+        if not ContentNode.objects.filter(repository=repository).exists():
+            try:
+                _commit, files = read_accepted_repository_markdown_files(
+                    repository_id=repository.id, max_files=1, max_bytes=1024 * 1024,
+                    record_reconciliation=False,
+                )
+                if not files:
+                    return []
+            except RepositoryServiceError:
+                pass
         raise RepositoryContentNotIndexed()
     # Include archived rows here: a retained shadow copy must not resurrect them.
     legacy_ids = Document.objects.filter(tenant=workspace.member.tenant, entity__workspace=owner).values("id")

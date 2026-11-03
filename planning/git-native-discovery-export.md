@@ -96,3 +96,29 @@ recovery rehearsals that provision additional environments remain hosted under
 the repository's single-project rule. Previous HEAD's green CI is historical
 and does not validate this changed runtime. Wiki edits are prepared locally,
 not publicly published. No new risk waiver is requested or inferred.
+
+## Hosted CI follow-up after `0a7c69dc`
+
+Build 41551455933 failed live-workspace job 125642915846 at the supplier
+publication list. The original backend log shows ordinary document search
+returning 409. A fresh Docker public-API regression reproduced 409 instead of
+200 for valid legacy-only Workspaces whose initialized repository contains only
+manifests and has no index yet. The discovery guard was too broad.
+
+The correction does not trust an empty index: a bounded, read-only accepted-Git
+inventory must prove there are no Markdown files before legacy discovery can
+proceed. Reconciliation recording is disabled. Missing/unreadable custody,
+resource limits, stale content and the first unindexed native document remain
+blocked. All nine focused discovery cases passed (71.64 seconds); the full
+adapted authoring aggregate also passed, as did 158 tooling cases (three optional
+skips), lint, types and both review axes. No schema, API shape, authority or retained data
+changes are needed.
+
+Extended 41551481488 separately failed WebKit job 125639887388 at
+`document-operations.spec.ts:110`, waiting for Keep editing after browser Back.
+Five serial and twenty concurrent unchanged replays passed locally with zero
+retries; the surrounding eight-case operations suite also passed three times
+(24 cases, 29.2 seconds). The original cause remains unknown. A failure-only, value-minimized history/dialog snapshot is retained if the
+case recurs, without route identifiers, review text or response bodies. No
+frontend assertion, timeout or retry setting is changed to conceal the failure. The failure ledger retains
+both hosted failures. Corrected-source CI remains required.

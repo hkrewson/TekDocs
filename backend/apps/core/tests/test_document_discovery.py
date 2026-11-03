@@ -193,3 +193,51 @@ def test_native_modified_order_ignores_unrelated_repository_changes(discovery_co
     assert [(row["content_id"], row["updated_at"]) for row in after["results"]] == [
         (row["content_id"], row["updated_at"]) for row in before["results"]
     ]
+
+
+@pytest.mark.parametrize("organization_scope", [False, True])
+def test_legacy_library_works_with_a_new_unindexed_empty_repository(discovery_context, organization_scope):
+    from apps.core import repository_storage
+    from apps.core.models import Workspace
+    from apps.core.organizations import create_organization
+
+    installation, repository = discovery_context
+    organization = None
+    if organization_scope:
+        organization = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id, name="Fresh supplier",
+            legal_name="Fresh supplier", website="", classifications=["vendor"],
+        )
+        repository = repository_storage.ensure_workspace_repository(
+            Workspace.objects.get(organization=organization)
+        ).repository
+    old = create_document(
+        tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+        title="Supplier installation guide", markdown="Retained supplier instructions.\n",
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    repository.refresh_from_db()
+    assert repository.accepted_commit_id != repository.indexed_commit_id
+    scope = {"organization_entity_id": organization.entity_id} if organization else {}
+    for route in ("document-search", "document-list-create"):
+        response = browser.get(reverse(("organization-" if organization else "msp-") + route, kwargs=scope))
+        assert response.status_code == 200, response.content
+        assert [row["id"] for row in response.json()["results"]] == [str(old.entity_id)]
+
+
+def test_unindexed_first_git_document_is_not_mistaken_for_an_empty_repository(discovery_context):
+    from apps.core import repository_service
+    from apps.core.tests.test_content_read import _content
+
+    installation, repository = discovery_context
+    repository.refresh_from_db()
+    repository_service.commit_repository_files(
+        repository_id=repository.id, expected_base=repository.accepted_commit.object_id,
+        changes={"docs/unindexed.md": _content(content_id=uuid.uuid4(), title="Pending native", body="Pending text\n")},
+        message="Prepare unindexed synthetic content",
+    )
+    browser = Client()
+    browser.force_login(installation.owner)
+    for route in ("msp-document-search", "msp-document-list-create"):
+        assert browser.get(reverse(route)).status_code == 409

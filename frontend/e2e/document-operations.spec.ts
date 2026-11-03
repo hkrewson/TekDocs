@@ -96,6 +96,28 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   })
 }
 
+// Retain only structural state if the intermittent Back failure recurs in CI.
+// Never log route identifiers, review text, history state or response bodies.
+test.afterEach(async ({ page }, info) => {
+  if (info.title !== 'browser Back protects an unfinished review request'
+    || info.status === info.expectedStatus || page.isClosed()) return
+  try {
+    const state = await page.evaluate(() => {
+      const parameters = new URL(location.href).searchParams
+      return {
+        documentRoute: parameters.has('document'),
+        operationsRoute: parameters.get('document_view') === 'operations',
+        historyLength: history.length,
+        reviewPanel: document.querySelector('.document-operations') !== null,
+        navigationDialog: document.querySelector('.unsaved-changes-dialog[open]') !== null,
+      }
+    })
+    console.info(`Review Back failure state: ${JSON.stringify(state)}`)
+  } catch {
+    console.info('Review Back failure state unavailable.')
+  }
+})
+
 test('browser Back protects an unfinished review request', async ({ page, baseURL }) => {
   const { allowChoices } = await setup(page, baseURL!)
   await page.goto(`/workspaces/organizations/${organizationId}/documentation`)

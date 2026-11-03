@@ -101,3 +101,21 @@ or test failure. Local scans, static checks and runtime tests use the existing
 services; the first source-scan wrapper invoked its ephemeral scanner container
 before its implementation was inspected. Subsequent scans were adapted to the
 existing migrate service; no additional data volume or database was created.
+
+## Hosted validation at the pushed source
+
+Direct-main commit `75cd045d62257e9a48d12dd3624192a8fffce599` is pushed.
+[Build 41736862074](https://github.com/hkrewson/TekDocs/actions/runs/41736862074),
+[CodeQL 41736881583](https://github.com/hkrewson/TekDocs/actions/runs/41736881583)
+and [Extended 41736884897](https://github.com/hkrewson/TekDocs/actions/runs/41736884897)
+record the initial source. Build's core-c group reproduced two native key-read
+routes missing from the permission inventory; its completeness assertion was
+unchanged. The exact Docker reproduction failed, then passed after registering
+the two GET/DOCUMENTS_VIEW contracts and their shared-test URL arguments. Both
+new route-denial cases and the complete constrained-runtime authorization matrix
+pass on a fresh synthetic database (four selected cases total). Ruff, mypy and
+full-source secret scanning pass, and both corrective source reviews are clear.
+No runtime permission handler or browser behavior changed. Corrective-source
+hosted validation remains required; the first failure is retained in the ledger. Local synthetic databases were removed; retained records,
+production, release tags and version remain unchanged. This post-push evidence
+note is local until results are final.

@@ -1403,6 +1403,16 @@
       "next_action": "Final Docker owner/authoring/file-migration replay passed all 62 cases, exact plain conflict-message assertions passed, Ruff/mypy passed and both reviews are clear. Push the bounded correction directly to main and require exact-source Build, CodeQL, supported upgrades and independent encrypted restore. Preserve the failed first run; no test assertion or deadline was weakened.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41736862074",
+      "job": "PostgreSQL shard (core-c)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing Docker migrate service: pytest apps/core/tests/test_permission_idor_matrix.py::test_route_permission_inventory_covers_every_api_route_and_has_stable_unique_contracts -q reproduces the two missing key-read routes.",
+      "cause": "The native key routes were implemented and individually tested but omitted from AUTHENTICATED_ROUTE_PERMISSIONS and the shared matrix route-argument map.",
+      "next_action": "Corrected inventory, both route-denial cases and the complete constrained-runtime authorization matrix pass locally on a fresh synthetic database. Both source reviews and static/secret checks pass. Validate corrective source in hosted Build, CodeQL and Extended workflows.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

@@ -141,3 +141,47 @@ once in the split. All 11 planning/coverage checks and shell syntax pass; both
 review axes are clear. No deadline, test assertion, retry policy, coverage
 requirement, job or service was added or weakened. Hosted completion remains the
 proof of capacity; no local parallel environment was created.
+
+## Runtime headroom correction after `ddc7d4dd`
+
+The allocation restoration alone was insufficient: Build 41556077294 cancelled
+`core-a-2` job 125655990105 again at 30 minutes, with 144/298 cases reported.
+Do not read the earlier restoration as a verified capacity closure. The sparse
+progress log does not identify one causal slow test. The same source passed all
+five browser configurations, CodeQL, performance, DAST, independent encrypted
+recovery and the complete live application/publication journey; its remaining
+Build failure is the database-group budget.
+
+The third-group selector regression failed before implementation. The former
+second branch is now divided into disjoint 10/9-module groups `core-a-2` and
+`core-a-3`; `core-a-1` and its discovery tests stay unchanged. The independent
+baseline fixture still proves the exact original family union. CI adds one
+matrix entry and refuses combined coverage without all three outputs. The
+80% aggregate requirement, per-test assertions/retries and 30-minute job deadline
+remain unchanged. Existing module progress and duration diagnostics are retained
+with increased verbosity. All twelve plan/coverage checks and both review axes
+pass; full local selections and exact-source hosted completion establish runtime
+headroom, not module counts alone. No application code, service configuration,
+production system, retained data or local parallel environment changes are made
+by this CI-only correction.
+
+Full local execution of the new selectors, sequentially in the existing migrate
+service with generated test databases and coverage, passed:
+
+- `core-a-2`: 194 passed, two existing renderer-runtime skips, 393.64 seconds.
+- `core-a-3`: 101 passed, one existing live-harness skip, 500.38 seconds.
+- All 298 selected cases are retained across the disjoint groups.
+- All 160 tooling cases passed (three optional tooling skips), as did POSIX shell
+  syntax checks and both review axes. No full local matrix/parallel stack was
+  provisioned. Hosted startup and execution still need to confirm headroom under
+  the unchanged 30-minute job limit.
+
+For application source `ddc7d4dd`, Extended validation 41556114578 and CodeQL
+41556111917 both completed successfully on attempt 1. Upgrade and independent
+recovery are green; backup receipt artifact 13196975710 was checked for exact
+source/status/category, immutable identifier `41556114578:1:supported-recovery`,
+and ZIP SHA-256 `94cc39769b1fa7b11571315d46db15bad65b3839fb00df54206b538a26d4206d`.
+WebKit artifact 13195373116 reports all 415 cases passed with zero retries,
+including the unchanged Back assertion. Its original failure cause remains
+unknown. The following correction changes only CI selection/coverage collection
+and diagnostics; the application code remains unchanged.

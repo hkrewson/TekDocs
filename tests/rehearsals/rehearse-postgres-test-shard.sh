@@ -57,9 +57,9 @@ case "$shard" in
     set -- $core_files "$matrix_file" -k \
       "not test_every_authenticated_route_denies_anonymous_and_non_member and not test_every_cataloged_mutation_method_denies_read_only_members and not test_identifier_routes_reject_malformed_uuid_paths_without_entering_a_view and not test_every_unsafe_route_rejects_a_session_without_csrf and not test_every_cataloged_privileged_mutation_method_requires_mfa"
     ;;
-  core-a|core-a-1|core-a-2|core-b|core-c)
+  core-a|core-a-1|core-a-2|core-a-3|core-b|core-c)
     case "$shard" in
-      core-a|core-a-1|core-a-2) partition=1 ;;
+      core-a|core-a-1|core-a-2|core-a-3) partition=1 ;;
       core-b) partition=2 ;;
       core-c) partition=0 ;;
     esac
@@ -78,8 +78,15 @@ case "$shard" in
     # Keep the original aggregate selector available, but divide its complete
     # modules between two CI jobs so each retains headroom under the same limit.
     case "$shard" in
-      core-a-1|core-a-2)
-        case "$shard" in core-a-1) subpartition=1 ;; core-a-2) subpartition=0 ;; esac
+      core-a-1|core-a-2|core-a-3)
+        case "$shard" in core-a-1) subpartition=1 ;; core-a-2|core-a-3) subpartition=0 ;; esac
+        core_files=$(printf '%s\n' "$core_files" | awk -v partition="$subpartition" 'NR % 2 == partition')
+        ;;
+    esac
+    # The slower former second half needs its own two complete, disjoint groups.
+    case "$shard" in
+      core-a-2|core-a-3)
+        case "$shard" in core-a-2) subpartition=1 ;; core-a-3) subpartition=0 ;; esac
         core_files=$(printf '%s\n' "$core_files" | awk -v partition="$subpartition" 'NR % 2 == partition')
         ;;
     esac
@@ -170,7 +177,7 @@ PARTITION
       apps/core/tests/test_webhooks.py::test_inbound_signature_replay_tampering_and_expiration
     ;;
   *)
-    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-a-1|core-a-2|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|monitored-migration|client-publication-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
+    echo "Usage: $0 {route-access|route-methods|route-session|accounts|core|core-a|core-a-1|core-a-2|core-a-3|core-b|core-c|key-entity-migration|content-key-migration|diagram-migration|monitored-migration|client-publication-migration|template-migration|template-migration-a|template-migration-b|template-migration-c|migration-foundation|migration-isolation|migration-guards|runtime}" >&2
     exit 2
     ;;
 esac
@@ -209,7 +216,7 @@ else
   shard_compose run --rm \
     -v "$coverage_directory:/coverage" \
     -e "COVERAGE_FILE=/coverage/coverage.$shard" \
-    migrate pytest "$@" --cov --cov-report= --cov-fail-under=0 --durations=25
+    migrate pytest "$@" -v --cov --cov-report= --cov-fail-under=0 --durations=25
   test -s "$coverage_file"
   echo "PostgreSQL test shard $shard wrote $coverage_file"
 fi

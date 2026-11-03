@@ -1381,6 +1381,16 @@
       "next_action": "Restore the independently captured validated 64bb580 allocation and append discovery only to core-a/core-a-1. All 11 plan/coverage checks and shell syntax pass. Keep the deadline, coverage requirement and failed attempt; exact-source hosted completion must confirm capacity.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41556077294",
+      "job": "PostgreSQL shard (core-a-2) (125655990105)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The restored 298-case allocation was cancelled again at 30 minutes, after 144 cases of progress. New public selector test_slow_core_a_branch_is_split_without_omitting_modules failed before adding the third group. Full selections passed sequentially with coverage in the existing Docker project: 194 passed/2 existing skips in 393.64s and 101 passed/1 existing skip in 500.38s.",
+      "cause": "Restoring the validated allocation did not provide sufficient runtime headroom for the slower branch. The sparse progress output does not identify one causal slow test; the earlier allocation-only correction was insufficient.",
+      "next_action": "Divide only the former second branch into disjoint core-a-2/core-a-3 groups; require every coverage output at the unchanged 80% aggregate threshold and unchanged 30-minute deadline. Keep complete union/disjointness and baseline-family tests. Added verbose module progress retains better evidence if capacity fails again. Both full groups, 160 tooling cases and both review axes passed locally. Exact-source hosted CI must confirm startup/execution headroom.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

@@ -27,7 +27,6 @@ from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import document_migration_import, repository_storage
 from apps.core.content_index import index_repository_content
 from apps.core.document_attachments import (
-    copy_attachment_content,
     create_document_attachment,
     replace_primary_document_file,
 )
@@ -329,7 +328,15 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 connection_created.disconnect(record_http_connection)
         assert served_roles == {RUNTIME_ROLE}
 
-        from apps.core.models import ContentNode, Document, RepositoryPublicationEvidence, RepositoryStaticPublication
+        from apps.core.document_attachments import copy_attachment_content
+        from apps.core.models import (
+            ContentNode,
+            Document,
+            DocumentAttachment,
+            DocumentAttachmentPurpose,
+            RepositoryPublicationEvidence,
+            RepositoryStaticPublication,
+        )
         from apps.core.repository_internal_publications import internal_publication_state
         from apps.core.repository_publication_evidence import verify_repository_publication_evidence
         from apps.core.repository_static_controls import repository_static_state
@@ -344,6 +351,26 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             ).order_by("signed_at"))
             assert len(native_snapshots) == 2
             assert all(verify_repository_publication_evidence(item)["valid"] for item in native_snapshots)
+            primary_versions = list(DocumentAttachment.objects.filter(
+                owner_workspace_id=node.workspace_id, owner_content_id=node.content_id,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, document__isnull=True,
+            ).order_by("version_number"))
+            expected_versions = (
+                [
+                    b"Staff primary version one.\n", b"Staff primary version two.\n",
+                    b"Staff primary after publication.\n",
+                ]
+                if internal else [b"Client primary version 1.\n", b"Client primary version 2.\n"]
+            )
+            for index, (version, expected_bytes) in enumerate(zip(primary_versions, expected_versions, strict=True)):
+                assert copy_attachment_content(version) == expected_bytes
+                assert version.version_number == index + 1
+                assert version.replaces_id == (primary_versions[index - 1].id if index else None)
+            for index, snapshot in enumerate(native_snapshots):
+                assert snapshot.manifest["primary_file"]["selected_source_id"] == str(primary_versions[index].entity_id)
+                assert [row["source_id"] for row in snapshot.manifest["primary_file"]["versions"]] == [
+                    str(version.entity_id) for version in primary_versions[:index + 1]
+                ]
             assert "original" in native_snapshots[0].canonical_markdown
             assert "corrected" in native_snapshots[1].canonical_markdown
             if internal:
@@ -357,6 +384,20 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 assert [repository_static_state(item) for item in native_publications] == ["superseded", "withdrawn"]
                 assert all(verify_repository_static_publication(item) for item in native_publications)
                 assert not any(repository_static_delivery_ready(item) for item in native_publications)
+
+        primary_node = ContentNode.objects.get(title="Native primary-file browser guide")
+        assert not Document.objects.filter(pk=primary_node.content_id).exists()
+        assert not RepositoryPublicationEvidence.objects.filter(content_id=primary_node.content_id).exists()
+        primary_versions = list(DocumentAttachment.objects.filter(
+            owner_workspace_id=primary_node.workspace_id, owner_content_id=primary_node.content_id,
+            document__isnull=True, purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert [version.version_number for version in primary_versions] == [1, 2, 3]
+        assert [copy_attachment_content(version) for version in primary_versions] == [
+            b"Primary browser original.\n", b"Primary browser concurrent replacement.\n",
+            b"Primary browser reviewed retry.\n",
+        ]
+        assert primary_node.markdown == "Native publication original.\n"
 
         original.refresh_from_db()
         assert (original.manifest, original.signature, original.content_digest) == retained

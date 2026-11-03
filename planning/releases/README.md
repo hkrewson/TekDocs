@@ -13,6 +13,26 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Native primary-file version controls after publication
+
+The [bounded primary-file slice](../git-native-primary-files.md) connects the
+repository editor to existing scanned intake, immutable version history,
+compare-and-swap replacement and private retained downloads. Selected files and
+Markdown drafts survive errors and protected navigation; refresh requires
+explicit confirmation of a changed replacement target. File updates do not
+rewrite signed publications or their independently retained files/PDFs.
+The pre-existing history adapter also now shows the exact promoted legacy-owner
+chain; repository read/append refuse legacy-authoritative shadows. This is a
+bounded compatibility correction, not a migration or existing-data rewrite.
+Local frontend validation passed 849 tests, coverage, lint, types and bundles;
+privacy diagnostics passed ten cases. Both review axes are clear after the
+reproduced compatibility correction. The final combined authoring gate passed
+196 cases; all thirteen clean browser journeys passed without retries, followed
+by retained-byte/authority verification and artifact hygiene. Exact-source hosted
+Build, CodeQL, upgrade and independent encrypted restore remain required before
+closeout. Version remains 0.9.18 development. No deployment,
+release/tag publication or existing-data change is authorized by this slice.
+
 ## Native staff and client publication controls after discovery/export
 
 The [native publication slice](../git-native-publication-interface.md) connects

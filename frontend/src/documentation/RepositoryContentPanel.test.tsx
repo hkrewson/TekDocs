@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import { NavigationGuardProvider } from '../navigation/NavigationGuardProvider'
+import type { DocumentPrimaryFile } from './api'
 import { RepositoryContentPanel } from './RepositoryContentPanel'
 import { RepositoryConflictError, RepositoryRecentAuthenticationRequiredError, type RepositoryClient, type RepositorySource } from './repositoryApi'
 
@@ -13,6 +14,54 @@ const initial: RepositorySource = {
   markdown: 'First revision.\n', source: '---\ntitle: Guide\n---\nFirst revision.\n',
   source_blob: blob, accepted_commit: commit, indexed_commit: commit,
 }
+
+it('offers primary-file version controls for a saved Git-only document', async () => {
+  setup({}, 'org-1', initial.content_id)
+  expect(await screen.findByRole('button', { name: 'Primary file versions' })).toBeVisible()
+})
+
+it('protects a primary-file selection and Markdown draft through navigation and scanned intake', async () => {
+  const user = userEvent.setup()
+  const version: DocumentPrimaryFile = {
+    id: '11111111-1111-4111-8111-111111111111', filename: 'primary.txt', media_type: 'text/plain', size: 5,
+    checksum: 'a'.repeat(64), scan_status: 'clean', scan_engine: 'synthetic',
+    scanned_at: '2026-11-03T12:00:00Z', created_at: '2026-11-03T12:00:00Z',
+    version_number: 1, replaces_id: null, is_current: true,
+  }
+  let finish!: (value: DocumentPrimaryFile) => void
+  const pending = new Promise<DocumentPrimaryFile>(resolve => { finish = resolve })
+  const appendPrimaryFile = vi.fn().mockReturnValue(pending)
+  const empty = { results: [], count: 0, page: 1, page_size: 25, has_more: false }
+  const primaryFiles = vi.fn().mockResolvedValueOnce(empty).mockResolvedValue({ ...empty, results: [version], count: 1 })
+  const { onClose, save } = setup({ primaryFiles, appendPrimaryFile }, 'org-1', initial.content_id)
+  const body = await screen.findByLabelText('Markdown body')
+  await user.type(body, ' Unsaved notes')
+  await user.click(screen.getByRole('button', { name: 'Primary file versions' }))
+  await screen.findByText('No primary file yet.')
+  await user.upload(screen.getByLabelText('Choose primary file'), new File(['first'], 'primary.txt'))
+  expect(screen.getByRole('button', { name: 'Publish document' })).toBeDisabled()
+  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
+  expect(onClose).not.toHaveBeenCalled()
+  expect(screen.getByText('Selected: primary.txt')).toBeVisible()
+  expect(body).toHaveValue('First revision.\n Unsaved notes')
+  await user.click(screen.getByRole('button', { name: 'Upload primary file' }))
+  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  expect(await screen.findByRole('button', { name: 'Discard changes' })).toBeDisabled()
+  await act(async () => { finish(version); await pending })
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Discard changes' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: 'Keep editing' }))
+  expect(await screen.findByRole('button', { name: 'Download primary.txt, version 1' })).toBeVisible()
+  expect(body).toHaveValue('First revision.\n Unsaved notes')
+  expect(save).not.toHaveBeenCalled()
+  expect(onClose).not.toHaveBeenCalled()
+})
+
+it('does not offer primary-file controls for a reusable fragment', async () => {
+  setup({ source: vi.fn().mockResolvedValue({ ...initial, kind: 'fragment' }) }, undefined, initial.content_id)
+  await screen.findByLabelText('Markdown body')
+  expect(screen.queryByRole('button', { name: 'Primary file versions' })).not.toBeInTheDocument()
+})
 
 it('offers publication controls for a saved native client document', async () => {
   const user = userEvent.setup()
@@ -136,6 +185,10 @@ function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: strin
     listAttachments: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
     archiveAttachment: vi.fn().mockResolvedValue(undefined),
     listEvidence: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
+    primaryFiles: vi.fn().mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false }),
+    appendPrimaryFile: vi.fn(),
+    primaryFileDownloadUrl: vi.fn().mockImplementation((id: string, fileId: string) => '/files/' + id + '/' + fileId),
+    downloadPrimaryFile: vi.fn(),
     createEvidence: vi.fn(),
     reauthenticate: vi.fn().mockResolvedValue(undefined),
     publicationWorkflow: vi.fn().mockImplementation((id: string) => Promise.resolve({ evidence_id: id, source_commit: commit, audience: 'msp_internal', verified: true, stage: 'internal', state: 'recorded', actions: ['release_internal'], active_publication_id: null, publication_id: null, content_digest: 'd'.repeat(64), delivery_effective: false, events: [] })),

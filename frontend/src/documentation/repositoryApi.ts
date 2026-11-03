@@ -1,5 +1,28 @@
 import { browserAuthClient, browserCsrfToken } from '../auth/api'
 import { translate } from '../i18n/localization'
+import type { DocumentPrimaryFile } from './api'
+
+export type RepositoryPrimaryFilePage = { results: DocumentPrimaryFile[]; count: number; page: number; page_size: number; has_more: boolean }
+
+export class RepositoryPrimaryFileConflictError extends Error {}
+
+function primaryFile(value: unknown): DocumentPrimaryFile {
+  if (!value || typeof value !== 'object') throw new Error('Invalid primary-file response')
+  const row = value as Record<string, unknown>
+  const uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i
+  if (typeof row.id !== 'string' || !uuid.test(row.id)
+    || typeof row.filename !== 'string' || !row.filename || row.filename.length > 255
+    || typeof row.size !== 'number' || !Number.isSafeInteger(row.size) || row.size < 0
+    || typeof row.version_number !== 'number' || !Number.isSafeInteger(row.version_number) || row.version_number < 1
+    || (row.replaces_id !== null && (typeof row.replaces_id !== 'string' || !uuid.test(row.replaces_id)))
+    || ((row.version_number === 1) !== (row.replaces_id === null)) || row.replaces_id === row.id
+    || typeof row.is_current !== 'boolean' || row.scan_status !== 'clean'
+    || typeof row.checksum !== 'string' || !/^[a-f0-9]{64}$/.test(row.checksum)
+    || !['media_type', 'scan_engine', 'scanned_at', 'created_at'].every(key => typeof row[key] === 'string' && row[key])) {
+    throw new Error('Invalid primary-file response')
+  }
+  return row as DocumentPrimaryFile
+}
 
 export type RepositorySummary = {
   id: string
@@ -163,6 +186,44 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 export const browserRepositoryClient = {
+  async primaryFiles(contentId: string, organizationId?: string, page = 1, signal?: AbortSignal): Promise<RepositoryPrimaryFilePage> {
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/primary-file?page=' + page, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    const result = await parse<RepositoryPrimaryFilePage>(response)
+    if (!Array.isArray(result.results) || result.page !== page || result.page_size !== 25
+      || !Number.isSafeInteger(result.count) || result.count < 0 || typeof result.has_more !== 'boolean') throw new Error('Invalid primary-file history')
+    const results = result.results.map(primaryFile)
+    if (results.length !== Math.min(25, Math.max(0, result.count - (page - 1) * 25))
+      || result.has_more !== (page * 25 < result.count)
+      || results.some((row, index) => row.version_number !== result.count - (page - 1) * 25 - index
+        || row.is_current !== (page === 1 && index === 0))) throw new Error('Invalid primary-file history')
+    return { ...result, results }
+  },
+  async appendPrimaryFile(contentId: string, file: File, expectedCurrentId: string | null, organizationId?: string, signal?: AbortSignal): Promise<DocumentPrimaryFile> {
+    const form = new FormData()
+    form.set('file', file)
+    if (expectedCurrentId !== null) form.set('expected_current_id', expectedCurrentId)
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/primary-file', {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { Accept: 'application/json', 'X-CSRFToken': await token() }, body: form,
+    })
+    if (response.status === 409) throw new RepositoryPrimaryFileConflictError('Current primary file changed')
+    return primaryFile(await parse<unknown>(response))
+  },
+  primaryFileDownloadUrl(contentId: string, fileId: string, organizationId?: string) {
+    return path(organizationId) + '/documents/' + encodeURIComponent(contentId) + '/attachments/' + encodeURIComponent(fileId) + '/download'
+  },
+  async downloadPrimaryFile(contentId: string, version: DocumentPrimaryFile, organizationId?: string, signal?: AbortSignal): Promise<{ content: Blob; name: string }> {
+    const response = await fetch(browserRepositoryClient.primaryFileDownloadUrl(contentId, version.id, organizationId), { credentials: 'same-origin', signal })
+    if (response.status !== 200 || response.headers.get('Content-Type') !== 'application/octet-stream'
+      || !response.headers.get('Content-Disposition')?.startsWith('attachment;')
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') throw new Error(translate('repository.primary.downloadFailed'))
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength !== version.size) throw new Error(translate('repository.primary.downloadFailed'))
+    return { content: new Blob([bytes], { type: 'application/octet-stream' }), name: version.filename }
+  },
   reauthenticate: (password: string) => browserAuthClient.reauthenticate(password),
   async createEvidence(contentId: string, audience: string, expectedCommit: string, organizationId?: string, signal?: AbortSignal) {
     return parse<RepositoryEvidence>(await fetch(evidencePath(organizationId), {

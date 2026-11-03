@@ -417,6 +417,48 @@ def test_native_staff_recovery_fingerprint_survives_later_repository_writes(comp
     assert native_internal_publication_fingerprint(installation.owner) == expected
 
 
+def test_native_primary_recovery_checks_live_versions_without_rewriting_signed_copies(
+    composition_repository, tmp_path, settings
+):
+    from rest_framework.exceptions import ValidationError as APIValidationError
+
+    from apps.core.document_attachments import copy_attachment_content
+    from apps.core.models import DocumentAttachment
+    from apps.core.tests.native_internal_publication_fixture import (
+        CONTENT_ID,
+        create_native_internal_publication_fixture,
+        native_internal_publication_fingerprint,
+    )
+
+    installation, _workspace, _repository = composition_repository
+    settings.MEDIA_ROOT = str(tmp_path / "media")
+    Authenticator.objects.create(
+        user=installation.owner, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()}
+    )
+    expected = create_native_internal_publication_fixture(installation.owner)
+    snapshots = list(RepositoryPublicationEvidence.objects.filter(content_id=CONTENT_ID).order_by("signed_at"))
+    signed = []
+    for item in snapshots:
+        with item.pdf_file.open("rb") as stream:
+            signed.append((item.manifest, item.signature, item.content_digest, stream.read()))
+    first = DocumentAttachment.objects.get(owner_content_id=CONTENT_ID, version_number=1)
+    original = copy_attachment_content(first)
+    try:
+        with first.file.open("wb") as stream:
+            stream.write(b"Synthetic changed primary bytes.\n")
+        with pytest.raises(APIValidationError):
+            native_internal_publication_fingerprint(installation.owner)
+        assert all(verify_repository_publication_evidence(item)["valid"] for item in snapshots)
+        for item, retained in zip(snapshots, signed, strict=True):
+            item.refresh_from_db()
+            with item.pdf_file.open("rb") as stream:
+                assert (item.manifest, item.signature, item.content_digest, stream.read()) == retained
+    finally:
+        with first.file.open("wb") as stream:
+            stream.write(original)
+    assert native_internal_publication_fingerprint(installation.owner) == expected
+
+
 def test_native_staff_corrections_do_not_fork_under_concurrent_publishers(composition_repository, tmp_path, settings):
     from threading import Barrier
 

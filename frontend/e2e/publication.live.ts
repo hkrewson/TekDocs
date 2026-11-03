@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import type { DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
+import type { DocumentPrimaryFile, DocumentPublicationDetail, RepositoryDocumentRead } from '../src/documentation/api'
 import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
 import { rehearseRepositoryContent } from './repository-live-journey'
 
@@ -15,7 +15,7 @@ const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnos
 const additionalDiagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>[]>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
+  const scenario = info.title.startsWith('new primary-file documents') ? 'native_primary_files' : info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -198,11 +198,51 @@ async function nativeRetainedPdf(page: Page) {
   } finally { await download.delete() }
 }
 
+async function nativePrimaryPanel(page: Page) {
+  const panel = page.getByRole('region', { name: 'Primary file versions', exact: true })
+  const loaded = page.waitForResponse(response => response.url().endsWith('/primary-file?page=1') && response.request().method() === 'GET')
+  if (await panel.count()) await panel.getByRole('button', { name: 'Refresh file versions' }).click()
+  else await page.getByRole('button', { name: 'Primary file versions', exact: true }).click()
+  expect((await loaded).status()).toBe(200)
+  await expect(panel.getByLabel('Choose primary file')).toBeEnabled()
+  return panel
+}
+
+async function appendNativePrimary(page: Page, filename: string, content: string, previous = 0) {
+  const panel = await nativePrimaryPanel(page)
+  await panel.getByLabel('Choose primary file').setInputFiles({ name: filename, mimeType: 'text/plain', buffer: Buffer.from(content) })
+  if (previous) {
+    await expect(panel.getByRole('button', { name: 'Replace primary file', exact: true })).toBeDisabled()
+    await panel.getByLabel('Replace version ' + previous + '; keep all earlier versions').check()
+  }
+  const uploaded = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/primary-file') && response.request().method() === 'POST')
+  await panel.getByRole('button', { name: previous ? 'Replace primary file' : 'Upload primary file', exact: true }).click()
+  const response = await uploaded
+  expect(response.status()).toBe(201)
+  const version = await response.json() as DocumentPrimaryFile
+  expect(version.version_number).toBe(previous + 1)
+  await expect(panel.getByRole('button', { name: 'Download ' + filename + ', version ' + version.version_number })).toBeEnabled()
+  await expect(panel.getByRole('button', { name: 'Refresh file versions' })).toBeEnabled()
+  return version
+}
+
+async function downloadNativePrimary(page: Page, filename: string, version: number, expected: string) {
+  const downloaded = page.waitForEvent('download')
+  await page.getByRole('region', { name: 'Primary file versions', exact: true }).getByRole('button', { name: 'Download ' + filename + ', version ' + version }).click()
+  const file = await downloaded
+  try {
+    expect(await file.failure()).toBeNull()
+    expect(file.suggestedFilename()).toBe(filename)
+    expect((await readFile(await file.path())).toString()).toBe(expected)
+  } finally { await file.delete() }
+}
+
 test('new staff documents publish, correct and withdraw while retaining their original PDFs', async ({ page }) => {
   const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
   await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
   await page.setViewportSize({ width: 390, height: 844 })
   const native = await nativePublicationDocument(page, 'Native staff browser guide')
+  await appendNativePrimary(page, 'staff-primary-v1.txt', 'Staff primary version one.\n')
   const first = await retainNativeSnapshot(page)
   await nativeDecision(page, 'Publish snapshot')
   const originalPdf = await nativeRetainedPdf(page)
@@ -211,6 +251,7 @@ test('new staff documents publish, correct and withdraw while retaining their or
   await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
   expect((await save).status()).toBe(200)
   await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+  await appendNativePrimary(page, 'staff-primary-v2.txt', 'Staff primary version two.\n', 1)
   const second = await retainNativeSnapshot(page)
   expect(second.id).not.toBe(first.id)
   await nativeDecision(page, 'Publish snapshot', true)
@@ -218,6 +259,10 @@ test('new staff documents publish, correct and withdraw while retaining their or
   const publishing = page.getByRole('region', { name: 'Publishing', exact: true })
   await expect(publishing.getByRole('status')).toHaveText('Withdrawn')
   expect(await nativeRetainedPdf(page)).not.toBe(originalPdf)
+  await appendNativePrimary(page, 'staff-primary-v3.txt', 'Staff primary after publication.\n', 2)
+  await downloadNativePrimary(page, 'staff-primary-v1.txt', 1, 'Staff primary version one.\n')
+  await downloadNativePrimary(page, 'staff-primary-v2.txt', 2, 'Staff primary version two.\n')
+  await downloadNativePrimary(page, 'staff-primary-v3.txt', 3, 'Staff primary after publication.\n')
   await page.goto(native.path)
   await page.getByRole('button', { name: 'Load publication history' }).click()
   const history = page.getByRole('region', { name: 'Repository publication history', exact: true })
@@ -248,6 +293,7 @@ test('new client documents require independent approval and revoke portal access
     }
     let originalPublication = ''
     let originalPdf = ''
+    let originalPrimaryUrl = ''
     for (let iteration = 0; iteration < 2; iteration++) {
       if (iteration) {
         await page.getByLabel('Markdown body').fill('Native client publication corrected.\n')
@@ -255,6 +301,12 @@ test('new client documents require independent approval and revoke portal access
         await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
         expect((await saved).status()).toBe(200)
         await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+      }
+      const primary = await appendNativePrimary(page, 'client-primary-v' + (iteration + 1) + '.txt', 'Client primary version ' + (iteration + 1) + '.\n', iteration)
+      if (iteration) {
+        const retainedOriginal = await portal.request.get(originalPrimaryUrl)
+        expect(retainedOriginal.status()).toBe(200)
+        expect((await retainedOriginal.body()).toString()).toBe('Client primary version 1.\n')
       }
       const evidence = await retainNativeSnapshot(page, true)
       await expect(page.getByRole('region', { name: 'Publishing', exact: true }).getByRole('button', { name: 'Accept snapshot', exact: true })).toHaveCount(0)
@@ -274,6 +326,16 @@ test('new client documents require independent approval and revoke portal access
       await nativeDecision(reviewer, 'Authorize client access', false, state.native_approval_password)
       const clientRecord = await portal.request.get(`/api/v1/portal/repository-publications/${status.publication_id}`)
       expect(clientRecord.status()).toBe(200)
+      const retainedFiles = await clientRecord.json() as { primary_file: { selected_source_id: string; versions: { id: string; source_id: string; version_number: number }[] } }
+      expect(retainedFiles.primary_file.selected_source_id).toBe(primary.id)
+      expect(retainedFiles.primary_file.versions).toHaveLength(iteration + 1)
+      for (const retained of retainedFiles.primary_file.versions) {
+        const url = '/api/v1/portal/repository-publications/' + status.publication_id + '/attachments/' + retained.id
+        const downloaded = await portal.request.get(url)
+        expect(downloaded.status()).toBe(200)
+        expect((await downloaded.body()).toString()).toBe('Client primary version ' + retained.version_number + '.\n')
+        if (!iteration) originalPrimaryUrl = url
+      }
       await clientPage.goto(`/portal?section=publications&publication=${status.publication_id}`)
       await expect(clientPage.getByText('Native client browser guide', { exact: true }).first()).toBeVisible()
       await expect(clientPage.locator('article')).toContainText(iteration ? 'Native client publication corrected.' : 'Native publication original.')
@@ -285,8 +347,10 @@ test('new client documents require independent approval and revoke portal access
         originalPdf = createHash('sha256').update(await pdf.body()).digest('hex')
       } else {
         expect((await portal.request.get(`/api/v1/portal/repository-publications/${originalPublication}`)).status()).toBe(404)
+        expect((await portal.request.get(originalPrimaryUrl)).status()).toBe(404)
         await nativeDecision(reviewer, 'Withdraw publication')
         expect((await portal.request.get(`/api/v1/portal/repository-publications/${status.publication_id}`)).status()).toBe(404)
+        for (const retained of retainedFiles.primary_file.versions) expect((await portal.request.get('/api/v1/portal/repository-publications/' + status.publication_id + '/attachments/' + retained.id)).status()).toBe(404)
       }
     }
     await page.goto(native.path)
@@ -294,7 +358,69 @@ test('new client documents require independent approval and revoke portal access
     await page.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).last().click()
     expect(await nativeRetainedPdf(page)).toBe(originalPdf)
     expect((await portal.request.get(`${evidenceRoot}`)).status()).toBe(403)
+    expect((await portal.request.get('/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id + '/primary-file')).status()).toBe(403)
   } finally { await approver.close(); await portal.close() }
+})
+
+test('new primary-file documents retain every version and require review after concurrent replacement', async ({ page, browser }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  const organizationId = state.client_publication.organization_id
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  const native = await nativePublicationDocument(page, 'Native primary-file browser guide', organizationId)
+  const first = await appendNativePrimary(page, 'primary-v1.txt', 'Primary browser original.\n')
+  const other = await page.context().newPage()
+  const portal = await browser.newContext({ baseURL: 'http://localhost:8080' })
+  try {
+    additionalDiagnostics.set(page, [attachPublicationDiagnostics(other, { scenario: 'native_primary_files' })])
+    await other.goto(native.path)
+    await expect(other.getByLabel('Markdown body')).toHaveValue('Native publication original.\n')
+    const files = await nativePrimaryPanel(other)
+    await other.getByLabel('Markdown body').fill('Unsaved primary-file draft.\n')
+    await files.getByLabel('Choose primary file').setInputFiles({ name: 'primary-v3.txt', mimeType: 'text/plain', buffer: Buffer.from('Primary browser reviewed retry.\n') })
+    await files.getByLabel('Replace version 1; keep all earlier versions').check()
+    await appendNativePrimary(page, 'primary-v2.txt', 'Primary browser concurrent replacement.\n', 1)
+    const conflict = other.waitForResponse(response => new URL(response.url()).pathname.endsWith('/primary-file') && response.request().method() === 'POST')
+    await files.getByRole('button', { name: 'Replace primary file', exact: true }).click()
+    expect((await conflict).status()).toBe(409)
+    await expect(files.getByRole('alert')).toContainText('Your selected file is kept here')
+    await expect(files.getByText('Selected: primary-v3.txt', { exact: true })).toBeVisible()
+    await expect(files.getByRole('button', { name: 'Replace primary file', exact: true })).toBeDisabled()
+    await nativePrimaryPanel(other)
+    const confirmation = files.getByLabel('Replace version 2; keep all earlier versions')
+    await expect(confirmation).not.toBeChecked()
+    await confirmation.focus(); await confirmation.press('Space')
+    await expect(confirmation).toBeChecked()
+    const replaced = other.waitForResponse(response => new URL(response.url()).pathname.endsWith('/primary-file') && response.request().method() === 'POST')
+    await files.getByRole('button', { name: 'Replace primary file', exact: true }).click()
+    expect((await replaced).status()).toBe(201)
+    await expect(files.getByRole('button', { name: 'Download primary-v3.txt, version 3' })).toBeEnabled()
+    await downloadNativePrimary(other, 'primary-v1.txt', 1, 'Primary browser original.\n')
+    await downloadNativePrimary(other, 'primary-v2.txt', 2, 'Primary browser concurrent replacement.\n')
+    await downloadNativePrimary(other, 'primary-v3.txt', 3, 'Primary browser reviewed retry.\n')
+    await expect(other.getByLabel('Markdown body')).toHaveValue('Unsaved primary-file draft.\n')
+    await other.getByRole('button', { name: 'Back to documentation' }).click()
+    await other.getByRole('button', { name: 'Keep editing', exact: true }).click()
+    const endpoint = '/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id
+    const stored = await page.request.get(endpoint)
+    expect(stored.status()).toBe(200)
+    expect((await stored.json() as { markdown: string }).markdown).toBe('Native publication original.\n')
+    expect((await page.request.get('/api/v1/workspaces/msp/content-graph/authoring/' + native.id + '/primary-file')).status()).toBe(404)
+    const downloadPath = '/api/v1/workspaces/organizations/' + organizationId + '/content-graph/documents/' + native.id + '/attachments/' + first.id + '/download'
+    expect((await page.request.get(downloadPath.replace('/organizations/' + organizationId, '/msp'))).status()).toBe(404)
+    await portal.addCookies([{ name: state.session_name, value: state.client_publication.sessions.client, url: 'http://localhost:8080' }])
+    expect((await portal.request.get(endpoint + '/primary-file')).status()).toBe(403)
+    expect((await portal.request.get(downloadPath)).status()).toBe(403)
+    await page.goto(native.path)
+    expect(new URL(page.url()).searchParams.get('repository') === native.id).toBe(true)
+    await expect(page.getByLabel('Markdown body')).toHaveValue('Native publication original.\n')
+    await page.reload()
+    await nativePrimaryPanel(page)
+    await expect(page.getByRole('button', { name: /^Download primary-v/ })).toHaveCount(3)
+    await page.setViewportSize({ width: 390, height: 844 })
+    // Match the existing repository journey: measure after the sidebar settles.
+    await expect(page.locator('.app-body')).toHaveCSS('margin-left', '0px')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
+  } finally { await other.close(); await portal.close() }
 })
 
 test('migrated signed history survives real publishing, correction, withdrawal and PDF downloads', async ({ page, browser }) => {

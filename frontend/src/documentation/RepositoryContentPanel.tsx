@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
+import { RepositoryPrimaryFiles } from './RepositoryPrimaryFiles'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -48,6 +49,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
+  const [primaryEditing, setPrimaryEditing] = useState(false)
   const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
@@ -359,7 +361,10 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadDocx() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{docxExporting ? translate('repository.docxPreparing') : translate('repository.docxDownload')}</button>}
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
-        {source?.kind === 'document' && source.accepted_commit && <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy} />}
+        {source?.kind === 'document' && source.accepted_commit && <>
+          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy} onEditingChange={setPrimaryEditing} />
+          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing} />
+        </>}
       </section>
     </div>
   </section>

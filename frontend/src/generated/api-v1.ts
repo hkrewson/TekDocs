@@ -24946,6 +24946,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["RepositoryPrimaryFilePage"];
                 };
             };
+            /** @description Repository file authority or index is unavailable */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly content_authoring_msp_primary_file_append: {
@@ -24973,7 +24984,7 @@ export interface operations {
                     readonly "application/json": components["schemas"]["DocumentPrimaryFile"];
                 };
             };
-            /** @description Current version changed */
+            /** @description Source authority or current version changed */
             readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */
@@ -32256,6 +32267,17 @@ export interface operations {
                     readonly "application/json": components["schemas"]["RepositoryPrimaryFilePage"];
                 };
             };
+            /** @description Repository file authority or index is unavailable */
+            readonly 409: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
         };
     };
     readonly content_authoring_organization_primary_file_append: {
@@ -32284,7 +32306,7 @@ export interface operations {
                     readonly "application/json": components["schemas"]["DocumentPrimaryFile"];
                 };
             };
-            /** @description Current version changed */
+            /** @description Source authority or current version changed */
             readonly 409: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */

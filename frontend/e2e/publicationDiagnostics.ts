@@ -3,7 +3,7 @@ import type { Page, Request, Response } from '@playwright/test'
 type Options = { scenario?: string; now?: () => number; write?: (line: string) => void }
 type Entry = { phase: string; at: number }
 type Event = { event: string; phase: string; ms: number; status?: number; elapsed_ms?: number }
-const scenarios = new Set(['native_publications', 'client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
+const scenarios = new Set(['native_primary_files', 'native_publications', 'client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
 const milestones = new Set(['template', 'pdf_download', 'monitored', 'keyed'])
 const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload'] as const
 
@@ -30,6 +30,8 @@ function requestPhase(request: Request) {
     }
     return 'native_history'
   }
+  if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/authoring\/[^/]+\/primary-file$/.test(path)) return method === 'POST' ? 'primary_file_write' : 'primary_file_read'
+  if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/documents\/[^/]+\/attachments\/[^/]+\/download$/.test(path)) return 'managed_file_download'
   if (path.endsWith('/from-template') && method === 'POST') return 'template_create'
   if (path.includes('/template-rollouts')) return 'template_rollout'
   if (path.includes('/observations/') && path.endsWith('/apply')) return 'source_apply'

@@ -11,6 +11,7 @@ from django.urls import reverse
 from apps.core.document_attachments import create_document_attachment, replace_primary_document_file
 from apps.core.document_authority_handoff import transition_document_authority
 from apps.core.document_migration_import import apply_document_import, prepare_document_import
+from apps.core.models import DocumentAttachment
 from apps.core.publications import publish_document, read_publication_artifact, verify_retained_publication_custody
 from apps.core.workspaces import resolve_msp_workspace
 
@@ -171,6 +172,22 @@ def test_file_backed_signed_document_migrates_and_rolls_back_with_all_versions(p
             )
             == "transitioned"
         )
+        primary_history = browser.get(reverse("msp-content-authoring-primary-file", args=[document.id]))
+        if target == "repository":
+            assert primary_history.status_code == 200
+            assert primary_history.json()["count"] == 2
+            assert [row["id"] for row in primary_history.json()["results"]] == [
+                str(second.entity_id), str(first.entity_id)
+            ]
+            assert [row["is_current"] for row in primary_history.json()["results"]] == [True, False]
+        else:
+            assert primary_history.status_code == 409
+            blocked = browser.post(reverse("msp-content-authoring-primary-file", args=[document.id]), {
+                "file": SimpleUploadedFile("shadow.txt", b"Unreviewed shadow version\n"),
+                "expected_current_id": str(second.entity_id),
+            })
+            assert blocked.status_code == 409
+            assert DocumentAttachment.objects.filter(document=document, purpose="primary_file").count() == 2
         for item, content in (
             (first, b"Original primary file.\n"),
             (second, b"Revised primary file.\n"),
@@ -187,6 +204,17 @@ def test_file_backed_signed_document_migrates_and_rolls_back_with_all_versions(p
             response = browser.get(reverse(route, kwargs={**kwargs, "attachment_entity_id": item.entity_id}))
             assert response.status_code == 200
             assert b"".join(response.streaming_content) == content
+    appended = browser.post(reverse("msp-content-authoring-primary-file", args=[document.id]), {
+        "file": SimpleUploadedFile("guide-v3.txt", b"Native appended primary file.\n"),
+        "expected_current_id": str(second.entity_id),
+    })
+    assert appended.status_code == 201, appended.content
+    assert appended.json()["replaces_id"] == str(second.entity_id)
+    third = DocumentAttachment.objects.get(entity_id=appended.json()["id"])
+    primary_history = browser.get(reverse("msp-content-authoring-primary-file", args=[document.id]))
+    assert [row["id"] for row in primary_history.json()["results"]] == [
+        str(third.entity_id), str(second.entity_id), str(first.entity_id)
+    ]
     newer = publish_document(
         workspace=reader,
         document=document,
@@ -202,6 +230,7 @@ def test_file_backed_signed_document_migrates_and_rolls_back_with_all_versions(p
         first.entity_id: b"Original primary file.\n",
         second.entity_id: b"Revised primary file.\n",
         attachment.entity_id: b"Retained checklist.\n",
+        third.entity_id: b"Native appended primary file.\n",
     }
     assert {
         item.source_attachment.entity_id: read_publication_artifact(item)
@@ -220,6 +249,11 @@ def test_file_backed_signed_document_migrates_and_rolls_back_with_all_versions(p
             )
             == "transitioned"
         )
+        route = "msp-document-attachment-download" if target == "legacy" else "msp-content-document-attachment-download"
+        owner = {"document_entity_id": document.entity_id} if target == "legacy" else {"content_id": document.id}
+        retained_third = browser.get(reverse(route, kwargs={**owner, "attachment_entity_id": third.entity_id}))
+        assert retained_third.status_code == 200
+        assert b"".join(retained_third.streaming_content) == b"Native appended primary file.\n"
     for item, expected in zip((first, second, attachment), snapshots, strict=True):
         item.refresh_from_db()
         assert (item.pk, item.file.name, item.checksum, item.document_id) == expected

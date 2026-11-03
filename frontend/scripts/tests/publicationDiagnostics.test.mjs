@@ -25,6 +25,28 @@ test('native workflow and password-confirmation diagnostics never read or retain
   diagnostic.dispose()
 })
 
+test('primary-file diagnostics distinguish intake and download without reading file values', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_primary_files', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['GET', '/api/v1/workspaces/organizations/private-org/content-graph/authoring/private-document/primary-file'],
+    ['POST', '/api/v1/workspaces/msp/content-graph/authoring/private-document/primary-file'],
+    ['GET', '/api/v1/workspaces/organizations/private-org/content-graph/documents/private-document/attachments/private-file/download'],
+  ]) {
+    const request = { url: () => 'http://localhost' + path + '?filename=private-value', method: () => method,
+      headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('File bytes must not be read') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 409 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_primary_files')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['primary_file_read', 'primary_file_write', 'managed_file_download'])
+  for (const value of ['localhost', 'private-', 'filename', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
 test('a pending Git document read is visible without retaining document or query values', () => {
   const page = new EventEmitter(), lines = []
   let time = 0

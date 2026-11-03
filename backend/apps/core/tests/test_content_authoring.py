@@ -120,6 +120,13 @@ def test_git_only_primary_file_versions_are_retained_and_compare_and_swap(author
         assert second.status_code == 201, second.content
         assert second.json()["version_number"] == 2
         assert second.json()["replaces_id"] == first_id
+        with override_settings(TEKDOCS_ATTACHMENT_SCANNER="apps.core.tests.test_attachment_security.RejectingScanner"):
+            rejected = browser.post(primary_url, {
+                "file": SimpleUploadedFile("rejected.txt", b"Scanner must reject this version\n"),
+                "expected_current_id": second.json()["id"],
+            })
+        assert rejected.status_code == 400
+        assert DocumentAttachment.objects.filter(owner_content_id=document.content_id).count() == 2
         history = browser.get(primary_url)
         assert history.status_code == 200, history.content
         assert [row["version_number"] for row in history.json()["results"]] == [2, 1]

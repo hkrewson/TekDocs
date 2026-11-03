@@ -5,13 +5,21 @@ import json
 import os
 import uuid
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 
 from apps.accounts.models import User
 from apps.accounts.policy import require_installation_member
 from apps.core.content_authoring import author_content
 from apps.core.content_index import index_repository_content
-from apps.core.models import Document, RepositoryPublicationEvidence, Workspace
+from apps.core.document_attachments import append_repository_primary_document_file, copy_attachment_content
+from apps.core.models import (
+    Document,
+    DocumentAttachment,
+    DocumentAttachmentPurpose,
+    RepositoryPublicationEvidence,
+    Workspace,
+)
 from apps.core.repository_internal_publications import internal_publication_state, record_internal_publication
 from apps.core.repository_publication_evidence import (
     retain_repository_publication_evidence,
@@ -22,6 +30,11 @@ from apps.core.rls import OrganizationRLSMode, RLSPrincipalMode, bind_local_rls_
 from apps.core.scoping import DataScope
 
 CONTENT_ID = uuid.uuid5(uuid.NAMESPACE_DNS, "tekdocs.recovery.fixture.native.internal.publication")
+PRIMARY_CONTENT = (
+    b"Native recovery primary file, original.\n",
+    b"Native recovery primary file, replacement.\n",
+    b"Native recovery primary file, after publication.\n",
+)
 
 
 def native_internal_publication_fingerprint(owner: User) -> str:
@@ -35,9 +48,30 @@ def native_internal_publication_fingerprint(owner: User) -> str:
     )
     assert len(snapshots) == 2 and not Document.objects.filter(tenant=tenant, pk=CONTENT_ID).exists()
     assert [internal_publication_state(item) for item in snapshots] == ["superseded", "withdrawn"]
+    versions = list(DocumentAttachment.objects.filter(
+        tenant=tenant, owner_content_id=CONTENT_ID, document__isnull=True,
+        purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+    ).order_by("version_number"))
+    assert len(versions) == len(PRIMARY_CONTENT)
+    files = []
+    for index, version in enumerate(versions):
+        content = copy_attachment_content(version)
+        assert content == PRIMARY_CONTENT[index]
+        assert version.version_number == index + 1
+        assert version.replaces_id == (versions[index - 1].id if index else None)
+        files.append({
+            "id": str(version.entity_id), "owner": str(version.owner_content_id),
+            "workspace": str(version.owner_workspace_id), "version": version.version_number,
+            "replaces": str(version.replaces_id), "file": version.file.name,
+            "checksum": version.checksum, "bytes_sha256": hashlib.sha256(content).hexdigest(),
+        })
     records = []
-    for snapshot in snapshots:
+    for index, snapshot in enumerate(snapshots):
         assert verify_repository_publication_evidence(snapshot)["valid"]
+        assert snapshot.manifest["primary_file"]["selected_source_id"] == str(versions[index].entity_id)
+        assert [row["source_id"] for row in snapshot.manifest["primary_file"]["versions"]] == [
+            str(version.entity_id) for version in versions[:index + 1]
+        ]
         with snapshot.pdf_file.open("rb") as stream:
             pdf = stream.read()
         records.append(
@@ -60,7 +94,8 @@ def native_internal_publication_fingerprint(owner: User) -> str:
                 ],
             }
         )
-    return hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()
+    payload = json.dumps({"publications": records, "primary_files": files}, sort_keys=True).encode()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def create_native_internal_publication_fixture(owner: User) -> str:
@@ -70,7 +105,8 @@ def create_native_internal_publication_fixture(owner: User) -> str:
     index_repository_content(repository_id=repository.id)
     source = None
     previous = None
-    for body in ("Staff recovery original.\n", "Staff recovery corrected.\n"):
+    primary = None
+    for index, body in enumerate(("Staff recovery original.\n", "Staff recovery corrected.\n")):
         repository.refresh_from_db()
         accepted = repository.accepted_commit
         source = author_content(
@@ -86,6 +122,11 @@ def create_native_internal_publication_fixture(owner: User) -> str:
             title="Native staff publication recovery" if source is None else None,
             markdown=body,
             metadata_patch={},
+        )
+        primary = append_repository_primary_document_file(
+            repository=repository, content_id=CONTENT_ID, actor_id=owner.id,
+            upload=SimpleUploadedFile(f"native-recovery-v{index + 1}.txt", PRIMARY_CONTENT[index]),
+            expected_current_entity_id=primary.entity_id if primary else None,
         )
         evidence = retain_repository_publication_evidence(
             repository_id=repository.id,
@@ -105,6 +146,12 @@ def create_native_internal_publication_fixture(owner: User) -> str:
     assert previous is not None
     record_internal_publication(
         evidence=previous, actor=owner, action="withdrawn", reason="Retain withdrawn staff history"
+    )
+    assert primary is not None
+    append_repository_primary_document_file(
+        repository=repository, content_id=CONTENT_ID, actor_id=owner.id,
+        upload=SimpleUploadedFile("native-recovery-v3.txt", PRIMARY_CONTENT[2]),
+        expected_current_entity_id=primary.entity_id,
     )
     return native_internal_publication_fingerprint(owner)
 

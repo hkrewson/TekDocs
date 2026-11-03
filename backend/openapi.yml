@@ -9681,6 +9681,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Repository file authority or index is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
     post:
       operationId: content_authoring_msp_primary_file_append
       parameters:
@@ -9715,7 +9727,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Current version changed
+          description: Source authority or current version changed
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -20156,6 +20168,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Repository file authority or index is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
     post:
       operationId: content_authoring_organization_primary_file_append
       parameters:
@@ -20196,7 +20220,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Current version changed
+          description: Source authority or current version changed
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.

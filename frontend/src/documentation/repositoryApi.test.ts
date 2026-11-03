@@ -1,7 +1,98 @@
 import { afterEach, it, expect, vi } from 'vitest'
-import { browserRepositoryClient, RepositoryRecentAuthenticationRequiredError } from './repositoryApi'
+import { browserRepositoryClient, RepositoryPrimaryFileConflictError, RepositoryRecentAuthenticationRequiredError } from './repositoryApi'
 
 afterEach(() => vi.unstubAllGlobals())
+
+const primary = {
+  id: '11111111-1111-4111-8111-111111111111', filename: 'primary.txt', size: 5, media_type: 'text/plain',
+  checksum: 'a'.repeat(64), scan_status: 'clean' as const, scan_engine: 'synthetic',
+  scanned_at: '2026-11-03T12:00:00Z', created_at: '2026-11-03T12:00:00Z',
+  version_number: 1, replaces_id: null, is_current: true,
+}
+
+it.each([undefined, 'org/1'])('reads and downloads primary-file history in exact workspace %s', async organizationId => {
+  const page = { results: [primary], count: 1, page: 1, page_size: 25, has_more: false }
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(page)))
+  vi.stubGlobal('fetch', fetch)
+  const controller = new AbortController()
+  expect(await browserRepositoryClient.primaryFiles('doc/1', organizationId, 1, controller.signal)).toEqual(page)
+  const scope = organizationId ? '/api/v1/workspaces/organizations/org%2F1/content-graph' : '/api/v1/workspaces/msp/content-graph'
+  expect(fetch).toHaveBeenCalledWith(scope + '/authoring/doc%2F1/primary-file?page=1', {
+    credentials: 'same-origin', headers: { Accept: 'application/json' }, signal: controller.signal,
+  })
+  expect(browserRepositoryClient.primaryFileDownloadUrl('doc/1', 'file/1', organizationId)).toBe(scope + '/documents/doc%2F1/attachments/file%2F1/download')
+})
+
+it.each([null, '22222222-2222-4222-8222-222222222222'])('compares primary-file intake against reviewed predecessor %s', async expectedCurrentId => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  const result = { ...primary, version_number: expectedCurrentId ? 2 : 1, replaces_id: expectedCurrentId }
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 201 }))
+  vi.stubGlobal('fetch', fetch)
+  const file = new File(['first'], 'primary.txt')
+  const controller = new AbortController()
+  expect(await browserRepositoryClient.appendPrimaryFile('doc/1', file, expectedCurrentId, 'org/1', controller.signal)).toEqual(result)
+  const [url, request] = fetch.mock.calls[0] as [string, RequestInit]
+  expect(url).toBe('/api/v1/workspaces/organizations/org%2F1/content-graph/authoring/doc%2F1/primary-file')
+  expect(request).toMatchObject({ method: 'POST', credentials: 'same-origin', signal: controller.signal })
+  expect(new Headers(request.headers).get('X-CSRFToken')).toBe('repository-csrf')
+  expect(new Headers(request.headers).has('Content-Type')).toBe(false)
+  expect((request.body as FormData).get('file')).toBe(file)
+  expect((request.body as FormData).get('expected_current_id')).toBe(expectedCurrentId)
+})
+
+it('keeps primary-version conflicts distinct from permission denial', async () => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response('{}', { status: 409 })).mockResolvedValueOnce(new Response('{}', { status: 403 })))
+  const file = new File(['first'], 'primary.txt')
+  await expect(browserRepositoryClient.appendPrimaryFile('doc', file, null)).rejects.toBeInstanceOf(RepositoryPrimaryFileConflictError)
+  await expect(browserRepositoryClient.appendPrimaryFile('doc', file, null)).rejects.not.toBeInstanceOf(RepositoryPrimaryFileConflictError)
+})
+
+it('downloads private complete primary-file bytes through the exact scoped route', async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response('first', { headers: {
+    'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="primary.txt"',
+    'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+  } }))
+  vi.stubGlobal('fetch', fetch)
+  const controller = new AbortController()
+  const result = await browserRepositoryClient.downloadPrimaryFile('doc/1', primary, 'org/1', controller.signal)
+  expect(result.name).toBe(primary.filename)
+  expect(result.content.size).toBe(5)
+  expect(fetch).toHaveBeenCalledWith('/api/v1/workspaces/organizations/org%2F1/content-graph/documents/doc%2F1/attachments/' + primary.id + '/download', { credentials: 'same-origin', signal: controller.signal })
+})
+
+it.each([
+  [403, 'first', 'application/octet-stream'],
+  [206, 'first', 'application/octet-stream'],
+  [200, 'shorter than expected', 'application/octet-stream'],
+  [200, 'first', 'text/html'],
+] as const)('refuses denied, partial or unexpected primary downloads', async (status, body, mediaType) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status, headers: {
+    'Content-Type': mediaType, 'Content-Disposition': 'attachment; filename="primary.txt"',
+    'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+  } })))
+  await expect(browserRepositoryClient.downloadPrimaryFile('doc', primary)).rejects.toThrow('could not be downloaded')
+})
+
+it.each([
+  { ...primary, scan_status: 'pending' },
+  { ...primary, checksum: 'wrong' },
+  { ...primary, version_number: 2 },
+  { ...primary, replaces_id: primary.id },
+])('refuses an unverified or inconsistent primary-file response', async result => {
+  Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(result), { status: 201 })))
+  await expect(browserRepositoryClient.appendPrimaryFile('doc', new File(['first'], 'primary.txt'), null)).rejects.toThrow('Invalid primary-file response')
+})
+
+it.each([
+  { results: [primary], count: 2, page: 1, page_size: 25, has_more: false },
+  { results: [{ ...primary, is_current: false }], count: 1, page: 1, page_size: 25, has_more: false },
+  { results: [primary], count: 1, page: 2, page_size: 25, has_more: false },
+])('refuses incomplete or misidentified primary history pages', async page => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(page))))
+  await expect(browserRepositoryClient.primaryFiles('doc')).rejects.toThrow('Invalid primary-file history')
+})
 
 it('distinguishes recent-authentication denial from other permission failures', async () => {
   Object.defineProperty(document, 'cookie', { configurable: true, value: 'csrftoken=repository-csrf' })

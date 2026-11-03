@@ -65,6 +65,7 @@ case "$shard" in
     esac
     core_files=$(find "$repository_root/backend/apps/core/tests" -name 'test_*.py' -type f \
       ! -name 'test_migration_stabilization.py' \
+      ! -name 'test_document_discovery.py' \
       ! -name 'test_permission_idor_matrix.py' \
       ! -name 'test_key_entity_publication_migration.py' \
       ! -name 'test_content_key_publication_migration.py' \
@@ -80,6 +81,13 @@ case "$shard" in
       core-a-1|core-a-2)
         case "$shard" in core-a-1) subpartition=1 ;; core-a-2) subpartition=0 ;; esac
         core_files=$(printf '%s\n' "$core_files" | awk -v partition="$subpartition" 'NR % 2 == partition')
+        ;;
+    esac
+    # Keep the validated allocation stable: inserting one filename into the
+    # round-robin inventory otherwise redistributes every later legacy module.
+    case "$shard" in
+      core-a|core-a-1)
+        core_files=$(printf '%s\n%s\n' "$core_files" 'apps/core/tests/test_document_discovery.py')
         ;;
     esac
     # shellcheck disable=SC2086

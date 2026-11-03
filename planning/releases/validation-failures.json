@@ -1371,6 +1371,16 @@
       "next_action": "Retain the failure and original timing uncertainty. Run unchanged WebKit assertions and budgets on the corrected source; investigate recurrence rather than increasing waits or claiming an application fix from a passing retry.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41551455933",
+      "job": "PostgreSQL shard (core-a-2) (125640023353)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The allocation-preservation planning regression failed for all four core groups before correction. Docker pytest collection measured 393 cases in the failed allocation versus 298 in the restored allocation, both 19 modules; no test database was provisioned for collection.",
+      "cause": "The new discovery test filename shifted the alphabetical round-robin assignments for existing modules. The enlarged core-a-2 workload was cancelled at the unchanged 30-minute job deadline after reporting 144 cases of progress.",
+      "next_action": "Restore the independently captured validated 64bb580 allocation and append discovery only to core-a/core-a-1. All 11 plan/coverage checks and shell syntax pass. Keep the deadline, coverage requirement and failed attempt; exact-source hosted completion must confirm capacity.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

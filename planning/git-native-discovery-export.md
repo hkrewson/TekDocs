@@ -122,3 +122,22 @@ retries; the surrounding eight-case operations suite also passed three times
 case recurs, without route identifiers, review text or response bodies. No
 frontend assertion, timeout or retry setting is changed to conceal the failure. The failure ledger retains
 both hosted failures. Corrected-source CI remains required.
+
+## CI allocation correction
+
+The initial Build also cancelled `core-a-2` job 125640023353 at its unchanged
+30-minute deadline. Inserting the new discovery filename changed alphabetical
+round-robin assignments for existing modules. A public selector regression
+failed for all four groups before correction. Docker collection measured 393
+cases in the failed allocation versus 298 in the restored allocation (19 modules
+each), independently confirming the workload change rather than guessing from
+the timeout. Collection did not provision a database or execute the tests.
+
+The allocation fixture is captured from previously validated immutable source
+`64bb580`, not generated from the modified selector. The new discovery module
+is excluded before round-robin partitioning and appended to `core-a`/`core-a-1`
+afterward. Existing modules keep their validated allocations; discovery executes
+once in the split. All 11 planning/coverage checks and shell syntax pass; both
+review axes are clear. No deadline, test assertion, retry policy, coverage
+requirement, job or service was added or weakened. Hosted completion remains the
+proof of capacity; no local parallel environment was created.

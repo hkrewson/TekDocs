@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import subprocess
 import tempfile
@@ -44,6 +45,17 @@ class PostgresShardPlanTests(unittest.TestCase):
         self.assertEqual(sorted(first + second), sorted(original))
         self.assertEqual(len(first + second), len(set(first + second)))
         self.assertLessEqual(abs(len(first) - len(second)), 1)
+
+    def test_new_discovery_tests_do_not_redistribute_validated_core_modules(self) -> None:
+        baseline = json.loads((ROOT / "scripts/tests/fixtures/postgres-core-baseline.json").read_text())
+        existing = {name for values in baseline["groups"].values() for name in values}
+        with plan_environment() as environment:
+            for group, expected in baseline["groups"].items():
+                with self.subTest(group=group):
+                    result = subprocess.run([str(RUNNER), group], cwd=ROOT, check=True,
+                                            capture_output=True, text=True, env=environment)
+                    actual = [line for line in result.stdout.splitlines() if line in existing]
+                    self.assertEqual(actual, expected)
 
     def test_combined_coverage_requires_both_split_core_a_results(self) -> None:
         with tempfile.TemporaryDirectory() as directory, plan_environment() as environment:

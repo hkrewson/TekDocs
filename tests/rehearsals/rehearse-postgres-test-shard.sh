@@ -71,6 +71,7 @@ case "$shard" in
       ! -name 'test_content_key_publication_migration.py' \
       ! -name 'test_diagram_publication_migration.py' \
       ! -name 'test_monitored_source_migration.py' \
+      ! -name 'test_native_monitored_sources.py' \
       ! -name 'test_client_published_migration.py' -print | sort | \
       awk -v partition="$partition" \
         'NR % 3 == partition && $0 !~ /\/test_template_enrollment_migration\.py$/' | \
@@ -133,7 +134,9 @@ PARTITION
     set -- apps/core/tests/test_client_published_migration.py
     ;;
   monitored-migration)
-    set -- apps/core/tests/test_monitored_source_migration.py
+    set -- \
+      apps/core/tests/test_monitored_source_migration.py \
+      apps/core/tests/test_native_monitored_sources.py
     ;;
   diagram-migration)
     set -- apps/core/tests/test_diagram_publication_migration.py

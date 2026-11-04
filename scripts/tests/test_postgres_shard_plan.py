@@ -240,6 +240,22 @@ class PostgresShardPlanTests(unittest.TestCase):
         )
         self.assertIn("--ds=tekdocs.settings.test", result.stdout.splitlines())
 
+    def test_monitored_sources_have_a_required_dedicated_partition(self) -> None:
+        with plan_environment() as environment:
+            result = subprocess.run(
+                [str(RUNNER), "monitored-migration"], cwd=ROOT,
+                capture_output=True, text=True, env=environment,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            [line for line in result.stdout.splitlines() if line.endswith(".py")],
+            [
+                "apps/core/tests/test_monitored_source_migration.py",
+                "apps/core/tests/test_native_monitored_sources.py",
+            ],
+        )
+        self.assertIn("--ds=tekdocs.settings.test", result.stdout.splitlines())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -287,6 +287,19 @@ def _retain_pinned_evidence(
         entity_cards = _frozen_entity_cards(
             repository=repository, markdown=dependency_markdown, audience=audience, actor=actor, member=member
         )
+        from .document_source_models import DocumentRemoteSource
+
+        monitored = DocumentRemoteSource.objects.filter(
+            repository=repository, content_id=content_id, archived_at__isnull=True,
+        ).first()
+        if monitored is not None:
+            unapplied = monitored.observations.filter(state="changed")
+            if monitored.last_applied_observation_id is not None:
+                unapplied = unapplied.exclude(id=monitored.last_applied_observation_id)
+            if unapplied.exists():
+                raise RepositoryPublicationEvidenceError(
+                    "Repository publication preflight blocked: remote.observation.unapplied"
+                )
         preflight = repository_publication_preflight(
             markdown=dependency_markdown,
             audience=audience,

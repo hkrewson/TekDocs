@@ -13,7 +13,7 @@ from apps.core.models import InstallationState
 
 
 @pytest.fixture
-def owner_client(db):
+def owner_client(transactional_db):
     InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
     installation = bootstrap_owner(
         tenant_name="API Contract MSP",

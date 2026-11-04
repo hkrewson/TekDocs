@@ -101,6 +101,9 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "msp-content-authoring-keys": ("content_id",),
         "msp-content-authoring-template": ("content_id",),
         "msp-content-authoring-primary-file": ("content_id",),
+        "msp-content-authoring-remote-source": ("content_id",),
+        "msp-content-authoring-remote-observations": ("content_id",),
+        "msp-content-authoring-remote-observation-apply": ("content_id", "observation_id"),
         "msp-content-authoring-attachment-create": ("content_id",),
         "msp-content-authoring-attachment-archive": ("content_id", "attachment_entity_id"),
         "msp-content-document-attachment-download": ("content_id", "attachment_entity_id"),
@@ -477,6 +480,11 @@ def _kwargs_for(route_name: str) -> dict[str, object]:
         "organization-content-templates": ("organization_entity_id",),
         "organization-content-template-enrollments": ("organization_entity_id",),
         "organization-content-authoring-primary-file": ("organization_entity_id", "content_id"),
+        "organization-content-authoring-remote-source": ("organization_entity_id", "content_id"),
+        "organization-content-authoring-remote-observations": ("organization_entity_id", "content_id"),
+        "organization-content-authoring-remote-observation-apply": (
+            "organization_entity_id", "content_id", "observation_id",
+        ),
         "organization-content-authoring-attachment-create": ("organization_entity_id", "content_id"),
         "organization-content-authoring-attachment-archive": (
             "organization_entity_id", "content_id", "attachment_entity_id"

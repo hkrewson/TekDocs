@@ -118,6 +118,15 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "msp-content-authoring-primary-file", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route(
+        "msp-content-authoring-remote-source", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route(
+        "msp-content-authoring-remote-observations", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route("msp-content-authoring-remote-observation-apply", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-content-authoring-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-authoring-keys", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1503,6 +1512,18 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     ),
     route(
         "organization-content-authoring-primary-file", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-remote-source", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-remote-observations", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-remote-observation-apply", ("POST",),
         mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
     ),
     route("organization-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),

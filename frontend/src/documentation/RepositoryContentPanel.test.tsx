@@ -116,6 +116,24 @@ it('offers primary-file version controls for a saved Git-only document', async (
   expect(await screen.findByRole('button', { name: 'Primary file versions' })).toBeVisible()
 })
 
+it('configures a Web source for a saved Git-only document', async () => {
+  const user = userEvent.setup()
+  const saved = { id: 'source-1', url: 'https://example.invalid/guide.md', source_kind: 'markdown' as const,
+    enabled: true, check_interval_minutes: 180, next_check_at: '2026-11-04T00:00:00Z',
+    last_checked_at: null, last_applied_observation_id: null }
+  const saveRemoteSource = vi.fn().mockResolvedValue(saved)
+  setup({ saveRemoteSource }, 'org-1', initial.content_id)
+  await user.click(await screen.findByRole('button', { name: 'Web source' }))
+  await user.type(await screen.findByLabelText('Public document URL'), saved.url)
+  await user.selectOptions(screen.getByLabelText('Source format'), 'markdown')
+  await user.clear(screen.getByLabelText('Check every (minutes)'))
+  await user.type(screen.getByLabelText('Check every (minutes)'), '180')
+  await user.click(screen.getByRole('button', { name: 'Save source' }))
+  await waitFor(() => expect(saveRemoteSource).toHaveBeenCalledWith(initial.content_id, {
+    url: saved.url, source_kind: 'markdown', enabled: true, check_interval_minutes: 180,
+  }, 'org-1'))
+})
+
 it('protects a primary-file selection and Markdown draft through navigation and scanned intake', async () => {
   const user = userEvent.setup()
   const version: DocumentPrimaryFile = {
@@ -270,6 +288,11 @@ it('preserves a denied decision reason and requires explicit correction confirma
 function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string, initialContentId?: string) {
   const save = vi.fn().mockResolvedValue({ ...initial, markdown: 'Changed revision.\n', accepted_commit: 'c'.repeat(40), indexed_commit: 'c'.repeat(40) })
   const client = {
+    remoteSource: vi.fn().mockResolvedValue(undefined),
+    saveRemoteSource: vi.fn(),
+    remoteObservations: vi.fn().mockResolvedValue({ results: [], count: 0 }),
+    checkRemoteSource: vi.fn(),
+    applyRemoteObservation: vi.fn(),
     template: vi.fn().mockResolvedValue({ role: 'none', read_only: true }),
     templateAction: vi.fn(), templates: vi.fn(), enrollTemplate: vi.fn(),
     list: vi.fn().mockResolvedValue({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false }),

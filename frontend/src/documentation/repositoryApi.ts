@@ -1,6 +1,6 @@
 import { browserAuthClient, browserCsrfToken } from '../auth/api'
 import { translate } from '../i18n/localization'
-import type { DocumentPrimaryFile } from './api'
+import type { DocumentPrimaryFile, DocumentRemoteObservation, DocumentRemoteSource } from './api'
 
 export type RepositoryPrimaryFilePage = { results: DocumentPrimaryFile[]; count: number; page: number; page_size: number; has_more: boolean }
 
@@ -234,6 +234,37 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 export const browserRepositoryClient = {
+  async remoteSource(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source', {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    if (response.status === 204) return undefined
+    return parse<DocumentRemoteSource>(response)
+  },
+  async saveRemoteSource(contentId: string, input: Pick<DocumentRemoteSource, 'url' | 'source_kind' | 'enabled' | 'check_interval_minutes'>, organizationId?: string) {
+    return parse<DocumentRemoteSource>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source', {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify(input),
+    }))
+  },
+  async remoteObservations(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<{ results: DocumentRemoteObservation[]; count: number }>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations', {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
+  },
+  async checkRemoteSource(contentId: string, organizationId?: string) {
+    return parse<DocumentRemoteObservation>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations', {
+      method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRFToken': await token() },
+    }))
+  },
+  async applyRemoteObservation(contentId: string, observationId: string, fingerprint: string, organizationId?: string) {
+    return parse<DocumentRemoteObservation>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations/' + encodeURIComponent(observationId) + '/apply', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify({ review_fingerprint: fingerprint }),
+    }))
+  },
   async template(contentId: string, organizationId?: string, signal?: AbortSignal) {
     return parse<RepositoryTemplateState>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/template', { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
   },

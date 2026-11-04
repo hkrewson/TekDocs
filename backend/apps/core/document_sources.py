@@ -187,16 +187,23 @@ def apply_remote_observation(
         else:
             if review_fingerprint is not None:
                 raise PlacementConflict("Document authority changed after review. Close and reopen Web source.")
+            if source.document_id is None:
+                raise PlacementConflict("The monitored document is unavailable.")
             _apply_legacy_observation(source=source, observation=observation, actor_id=actor_id)
 
 
 def _apply_legacy_observation(
     *, source: DocumentRemoteSource, observation: DocumentRemoteObservation, actor_id: UUID,
 ) -> None:
+    if source.document_id is None:
+        raise PlacementConflict("The monitored document is unavailable.")
+    document = source.document
+    if document is None:
+        raise PlacementConflict("The monitored document is unavailable.")
     observation = source.observations.get(pk=observation.id)
     if observation.source_id != source.id or observation.state == "failed" or not observation.canonical_markdown:
         raise PlacementConflict("Only a successful retained source observation can be applied.")
-    placement = primary_placement(source.document)
+    placement = primary_placement(document)
     if placement.block.current_revision_id is None:
         raise PlacementConflict("The document block does not have a current revision.")
     update_shared_block(
@@ -211,6 +218,6 @@ def _apply_legacy_observation(
         tenant=source.tenant,
         actor_id=actor_id,
         action="document.remote_source_applied",
-        entity_id=source.document.entity_id,
+        entity_id=document.entity_id,
         metadata={"observation_id": str(observation.id)},
     )

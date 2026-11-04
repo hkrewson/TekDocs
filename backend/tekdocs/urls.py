@@ -165,9 +165,15 @@ from apps.core.document_source_views import (
     MSPDocumentRemoteObservationApplyView,
     MSPDocumentRemoteObservationView,
     MSPDocumentRemoteSourceView,
+    MSPNativeRemoteObservationApplyView,
+    MSPNativeRemoteObservationView,
+    MSPNativeRemoteSourceView,
     OrganizationDocumentRemoteObservationApplyView,
     OrganizationDocumentRemoteObservationView,
     OrganizationDocumentRemoteSourceView,
+    OrganizationNativeRemoteObservationApplyView,
+    OrganizationNativeRemoteObservationView,
+    OrganizationNativeRemoteSourceView,
 )
 from apps.core.document_views import (
     DocumentTopicSchemaView,
@@ -659,6 +665,18 @@ urlpatterns = [
         name="msp-content-authoring-primary-file",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source",
+        MSPNativeRemoteSourceView.as_view(), name="msp-content-authoring-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source/observations",
+        MSPNativeRemoteObservationView.as_view(), name="msp-content-authoring-remote-observations",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source/observations/<uuid:observation_id>/apply",
+        MSPNativeRemoteObservationApplyView.as_view(), name="msp-content-authoring-remote-observation-apply",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/resolve-path",
         MSPContentPathResolveView.as_view(),
         name="msp-content-resolve-path",
@@ -811,6 +829,19 @@ urlpatterns = [
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/primary-file",
         OrganizationContentAuthoringPrimaryFileView.as_view(),
         name="organization-content-authoring-primary-file",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source",
+        OrganizationNativeRemoteSourceView.as_view(), name="organization-content-authoring-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source/observations",
+        OrganizationNativeRemoteObservationView.as_view(), name="organization-content-authoring-remote-observations",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source/observations/<uuid:observation_id>/apply",
+        OrganizationNativeRemoteObservationApplyView.as_view(),
+        name="organization-content-authoring-remote-observation-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/resolve-path",

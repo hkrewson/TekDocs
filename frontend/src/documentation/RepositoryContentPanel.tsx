@@ -5,6 +5,7 @@ import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
 import { RepositoryPrimaryFiles } from './RepositoryPrimaryFiles'
 import { RepositoryKeys } from './RepositoryKeys'
 import { RepositoryTemplates } from './RepositoryTemplates'
+import { RepositoryRemoteSource } from './RepositoryRemoteSource'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -55,6 +56,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   const [primaryEditing, setPrimaryEditing] = useState(false)
   const [keysEditing, setKeysEditing] = useState(false)
   const [templateEditing, setTemplateEditing] = useState(false)
+  const [remoteSourceEditing, setRemoteSourceEditing] = useState(false)
   const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
@@ -91,7 +93,11 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
 
   const canDownloadSaved = source?.kind === 'document' && !!source.accepted_commit
     && source.accepted_commit === source.indexed_commit
-  const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null && !templateEditing)
+  const attempt = useUnsavedChanges(
+    dirty || remoteSourceEditing, busy,
+    () => { setDraft(null); setSource(null); setConflict(null) },
+    draft !== null && !templateEditing && !remoteSourceEditing,
+  )
 
   useEffect(() => { headingRef.current?.focus() }, [])
   useEffect(() => { sourceRef.current = source }, [source])
@@ -388,7 +394,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
         {canDownloadSaved && <p className="form-message">{translate('repository.pdfNotice')}</p>}
         {canDownloadSaved && <p className="form-message">{translate('repository.docxNotice')}</p>}
         <div className="form-actions">
-          <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || templateEditing || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
+          <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || templateEditing || remoteSourceEditing || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
           {source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</button>}
@@ -396,10 +402,11 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
         {source?.kind === 'document' && source.accepted_commit && <>
-          <RepositoryTemplates key={'template:' + (organizationId ?? 'msp') + ':' + source.content_id} source={source} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing} onEditingChange={setTemplateEditing} onSaved={saved => { setSource(saved); setDraft(draftFromSource(saved)); setConflict(null); setReload(value => value + 1) }} />
-          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy || templateEditing} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
-          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy && !templateEditing} onEditingChange={setPrimaryEditing} />
-          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing && !templateEditing} />
+          <RepositoryTemplates key={'template:' + (organizationId ?? 'msp') + ':' + source.content_id} source={source} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || remoteSourceEditing} onEditingChange={setTemplateEditing} onSaved={saved => { setSource(saved); setDraft(draftFromSource(saved)); setConflict(null); setReload(value => value + 1) }} />
+          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy || templateEditing || remoteSourceEditing} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
+          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy && !templateEditing && !remoteSourceEditing} onEditingChange={setPrimaryEditing} />
+          <RepositoryRemoteSource key={'remote:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || templateEditing} onEditingChange={setRemoteSourceEditing} />
+          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing && !templateEditing && !remoteSourceEditing} />
         </>}
       </section>
     </div>

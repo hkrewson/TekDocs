@@ -37,6 +37,7 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayM
   await page.route(`**/api/v1/workspaces/organizations/${organization}`, r => r.fulfill({ json: {
     kind: 'organization', id: organization, name: 'Example client', classifications: ['client'], capabilities: ['documentation'], organization: null,
   } }))
+  await page.route(url => url.pathname === `/api/v1/workspaces/organizations/${organization}/content-graph/templates`, route => route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false } }))
   await page.route('**/api/v1/documents/topic-schemas', r => r.fulfill({ json: { topics: [] } }))
   await page.route(`**/api/v1/workspaces/organizations/${organization}/content-graph/documents/${content}`, r => r.fulfill({ json: {
     id: content, kind: 'document', title: 'Client enrollment guide', indexed_commit: 'b'.repeat(40),

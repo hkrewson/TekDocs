@@ -177,6 +177,7 @@ async function mockWorkspaceApplication(page: Page) {
     if (url.pathname.endsWith('/sites')) return route.fulfill({ json: { results: [site], page: 1, page_size: 25, count: 1, has_more: false } })
     if (url.pathname.endsWith('/documents/search')) return route.fulfill({ json: { results: [], count: 0, collections: [], tags: [], health: [] } })
     if (url.pathname.endsWith('/documents/operations/choices')) return route.fulfill({ json: [] })
+    if ([clientWorkspace.id, secondClientWorkspace.id, supplierWorkspace.id].some(id => url.pathname === `/api/v1/workspaces/organizations/${id}/content-graph/templates`)) return route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false } })
     if (url.pathname.endsWith('/documents/template-library')) return route.fulfill({ json: { results: [], count: 0 } })
     if (url.pathname.endsWith('/documents')) return route.fulfill({ json: { results: [], count: 0 } })
     if (url.pathname.endsWith('/assets')) return route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true, can_view_relationships: true, can_create_relationships: true, can_archive_relationships: true } })

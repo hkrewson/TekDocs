@@ -62,3 +62,10 @@ regression verifies denial before assignment, permitted reads afterward and
 continued write denial. Safe reader diagnostics and cleanup preserve the original
 failure without recording account/session payloads. Source re-review is clear;
 Docker collection also verifies the corrected assignment-helper import.
+
+The four post-push browser catalog stubs were reviewed separately along both axes.
+They match exact synthetic client paths and return valid empty pages, preserving
+legacy denial responses/assertions without intercepting other clients or routes.
+No findings. The production-preview replay passes all 99 affected cases with no
+retries; the development-only StrictMode fixture discrepancy is recorded without
+changing that unrelated test or product behavior.

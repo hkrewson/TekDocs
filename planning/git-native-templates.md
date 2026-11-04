@@ -157,3 +157,20 @@ also confirmed there. No new local Compose project, service or data volume is us
 
 Unrelated pre-existing planning edits and ignored machine-specific instructions
 are excluded from the slice commit. The Wiki change remains a local draft.
+
+## Post-push browser fixture correction
+
+After implementation commit `7761899f`, the older mocked library journey was
+reproduced failing at 320px: its new native-catalog request was unhandled, adding
+an unrelated error beside the expected legacy denial. Four explicit, exact-client
+empty-catalog responses correct the fixture contract. Product code, expected
+legacy denials, selectors, assertions and retry/time limits are unchanged.
+Both source-review axes are clear. Production-preview validation in the existing
+frontend container passes all 99 affected cases across Chromium, Firefox and
+WebKit, with zero retries; lint, types, build and bundle limits pass.
+
+The first local sweep used the development server and passed 97/99. Its two
+workspace-retry failures were reproduced as StrictMode issuing two initial reads
+against a fixture that fails only the first request. No unrelated fixture or
+product fix was made: both cases pass unchanged using the production build that
+matches hosted browser validation. Hosted checks must confirm the final source.

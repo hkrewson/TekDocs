@@ -3,7 +3,7 @@
 import re
 from typing import Any
 
-from .content_read import RepositoryContentNotIndexed
+from .content_read import RepositoryContentNotIndexed, repository_for_reader
 from .models import ContentNode, Document, WorkspaceRepository, workspace_for_owner
 from .repository_service import (
     RepositoryServiceError,
@@ -21,6 +21,9 @@ def native_document_summaries(workspace: ResolvedWorkspace, values: dict[str, An
     repository = WorkspaceRepository.objects.select_related("accepted_commit").filter(workspace=owner).first()
     if repository is None:
         return []
+    # Discovery is a content read: a source revocation must take effect even if
+    # the user searches before opening a document or the repository browser.
+    repository = repository_for_reader(workspace)
     if repository.accepted_commit_id != repository.indexed_commit_id:
         # A fresh repository contains only manifests until its first content
         # write. Prove that from accepted Git, rather than trusting an empty index.
@@ -64,7 +67,7 @@ def native_document_summaries(workspace: ResolvedWorkspace, values: dict[str, An
         taxonomy_tags = [str(tag) for group in node.taxonomy_keys.values() if isinstance(group, list) for tag in group]
         composition = node.composition_variants.get("msp_internal", {})
         markdown = composition.get("markdown", node.markdown) if isinstance(composition, dict) else node.markdown
-        is_template = properties.get("is_template") is True
+        is_template = properties.get("template", properties.get("is_template")) is True
         if (
             (values["category"] and values["category"] != category)
             or (values["collection"] and values["collection"].casefold() != collection.casefold())

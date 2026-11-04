@@ -22,6 +22,7 @@ from django.db import connection
 from django.db.backends.signals import connection_created
 from django.test import Client, override_settings
 
+from apps.accounts.access_control import assign_organization_staff
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import document_migration_import, repository_storage
@@ -210,6 +211,14 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.template_browser_fixture import prepare_template_browser_fixture
 
         template_fixture = prepare_template_browser_fixture(installation.owner)
+        from apps.core.tests.native_template_browser_fixture import prepare_native_template_browser_fixture
+
+        native_template_fixture = prepare_native_template_browser_fixture(installation.owner)
+        assign_organization_staff(
+            actor=installation.owner,
+            organization_entity_id=uuid.UUID(native_template_fixture["organization_id"]),
+            member_user_id=viewer.id,
+        )
         from apps.core.tests.key_entity_fixture import promote_addressed_fixture, seed_addressed_fixture
 
         addressed_fixture = seed_addressed_fixture(installation.owner)
@@ -292,6 +301,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 Entity.objects.filter(pk=site.entity_id).update(visibility=EntityVisibility.CLIENT_VISIBLE)
             native_sites[key] = {"id": str(site.entity_id), "title": site.entity.display_name}
         prepared_state = {
+            "native_templates": native_template_fixture,
             "native_sites": native_sites,
             "cross_workspace": cross_workspace_browser_state(installation.owner),
             "repeated": repeated_browser_state(installation.owner),
@@ -478,6 +488,9 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.template_browser_fixture import verify_template_browser_fixture
 
         verify_template_browser_fixture(template_fixture, installation.owner)
+        from apps.core.tests.native_template_browser_fixture import verify_native_template_browser_fixture
+
+        verify_native_template_browser_fixture(native_template_fixture, installation.owner)
         from apps.core.tests.key_entity_fixture import verify_addressed_browser_fixture
 
         verify_addressed_browser_fixture(addressed_fixture, installation.owner)

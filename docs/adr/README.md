@@ -14,3 +14,4 @@ transition review.
 | [0124](0124-native-publication-workflow.md) | Native publication workflow and staff decisions | accepted; local runtime verified, hosted pending | 2026-11-02 |
 | [0125](0125-native-primary-file-controls.md) | Primary-file controls for Git-native documents | accepted scope; runtime validation pending | 2026-11-03 |
 | [0126](0126-native-key-configuration-and-evidence.md) | Native key configuration and frozen evidence | accepted scope; local validation complete | 2026-11-03 |
+| [0127](0127-native-template-enrollment.md) | Native template enrollment and retained source proof | accepted scope; validation in progress | 2026-11-03 |

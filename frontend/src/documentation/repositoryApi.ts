@@ -56,6 +56,22 @@ function validKeyState(result: RepositoryKeyState): boolean {
     && ['resolved', 'withheld', 'unresolvable'].includes(row.state) && (row.reason === null || typeof row.reason === 'string'))
 }
 
+export type RepositoryTemplateMode = 'copy' | 'live' | 'pinned'
+export type RepositoryTemplateSection = { id: string; title: string; markdown: string }
+export type RepositoryTemplateState = {
+  role: 'source' | 'enrolled' | 'none'; read_only: boolean
+  source?: { enabled: boolean; library_visible: boolean; fragments: RepositoryTemplateSection[]; selected_fragment_ids: string[] }
+  enrollment?: { source_title: string; applied_revision_id: string; available_revision_id: string; expected_base: string; expected_blob: string; can_apply: boolean; changes: (RepositoryTemplateSection & { mode: RepositoryTemplateMode; current_markdown?: string; state: 'unchanged' | 'updated' | 'added' | 'removed' | 'conflict' })[] }
+}
+export type RepositoryTemplateDefinition = { id: string; title: string; definition_sha256: string; sections: RepositoryTemplateSection[] }
+export type RepositoryTemplatePage = { results: RepositoryTemplateDefinition[]; count: number; page: number; page_size: number; has_more: boolean }
+export type RepositoryTemplateAction = { base_commit: string | null; base_blob: string } & (
+  { action: 'configure'; enabled: boolean; library_visible: boolean; fragment_ids: string[] }
+  | ({ expected_applied_revision_id: string; expected_available_revision_id: string } & (
+    { action: 'apply'; rules: Record<string, RepositoryTemplateMode | 'keep'> } | { action: 'detach'; section_id: string }
+  ))
+)
+
 export type RepositorySummary = {
   id: string
   title: string
@@ -218,6 +234,18 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 export const browserRepositoryClient = {
+  async template(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryTemplateState>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/template', { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async templateAction(contentId: string, action: RepositoryTemplateAction, organizationId?: string) {
+    return parse<RepositorySource>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/template', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(action) }))
+  },
+  async templates(organizationId: string, query = '', page = 1, signal?: AbortSignal) {
+    return parse<RepositoryTemplatePage>(await fetch(path(organizationId) + '/templates?' + new URLSearchParams({ q: query, page: String(page) }).toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async enrollTemplate(organizationId: string, input: { source_content_id: string; definition_sha256: string; title: string; rules: Record<string, RepositoryTemplateMode> }) {
+    return parse<RepositorySource>(await fetch(path(organizationId) + '/template-enrollments', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(input) }))
+  },
   async keys(contentId: string, organizationId?: string, query = '', targetIds: string[] = [], signal?: AbortSignal): Promise<RepositoryKeyState> {
     const parameters = new URLSearchParams({ q: query })
     targetIds.forEach(id => parameters.append('target_id', id))

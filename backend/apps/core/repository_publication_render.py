@@ -8,6 +8,7 @@ from typing import Any
 from .document_key_freeze import verify_frozen_field_keys
 from .rendering import RenderedAttachment, RenderedEntityMention, render_markdown, render_pdf
 from .repository_key_evidence import NATIVE_KEY_EVIDENCE_FORMAT, verify_native_key_evidence
+from .repository_template_evidence import NATIVE_TEMPLATE_EVIDENCE_FORMAT
 
 RENDERED_SNAPSHOT_FORMAT = "tekdocs-repository-rendered-snapshot/v1"
 MAX_RENDERED_HTML_BYTES = 4 * 1024 * 1024
@@ -17,7 +18,7 @@ MAX_RENDERED_PDF_BYTES = 8 * 1024 * 1024
 
 def frozen_repository_markdown(*, markdown: str, manifest: dict[str, Any]) -> str:
     key_snapshot = manifest.get("key_snapshot")
-    if manifest.get("format") == NATIVE_KEY_EVIDENCE_FORMAT:
+    if manifest.get("format") in {NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT}:
         if not verify_native_key_evidence(markdown, manifest):
             raise ValueError("Native key snapshot is unavailable")
         return key_snapshot["markdown"] if key_snapshot is not None else markdown
@@ -36,7 +37,7 @@ def retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any]) -> tuple[d
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Repository document title is unavailable")
     frozen_markdown = frozen_repository_markdown(markdown=markdown, manifest=manifest)
-    if manifest.get("format") == NATIVE_KEY_EVIDENCE_FORMAT:
+    if manifest.get("format") in {NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT}:
         mentions, attachments = _render_context(manifest)
         content = render_pdf(frozen_markdown, title=title, entity_mentions=mentions, attachments=attachments)
     else:

@@ -3,9 +3,9 @@ import type { Page, Request, Response } from '@playwright/test'
 type Options = { scenario?: string; now?: () => number; write?: (line: string) => void }
 type Entry = { phase: string; at: number }
 type Event = { event: string; phase: string; ms: number; status?: number; elapsed_ms?: number }
-const scenarios = new Set(['native_keys', 'native_primary_files', 'native_publications', 'client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
+const scenarios = new Set(['native_templates', 'native_keys', 'native_primary_files', 'native_publications', 'client_publications', 'templates', 'history_templates', 'field_keys', 'content_keys', 'diagrams', 'monitored_sources'])
 const milestones = new Set(['template', 'pdf_download', 'monitored', 'keyed'])
-const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload'] as const
+const visibleControls = ['navigationPrompt', 'createTemplate', 'useTemplate', 'pdfDownload', 'repositoryEditor', 'repositorySourceFailure', 'repositoryEmpty', 'nativeLibrary', 'applicationError'] as const
 
 function requestPhase(request: Request) {
   let url: URL
@@ -13,6 +13,8 @@ function requestPhase(request: Request) {
   const path = url.pathname
   const method = request.method()
   if (path === '/_allauth/browser/v1/auth/reauthenticate' && method === 'POST') return 'native_reauthentication'
+  if (path === '/_allauth/browser/v1/auth/session' && method === 'GET') return 'auth_session'
+  if (path === '/api/v1/auth/context' && method === 'GET') return 'auth_context'
   if (!path.startsWith('/api/v1/')) return null
   if (path.startsWith('/api/v1/portal/repository-publications')) return 'portal_read'
   const native = path.match(/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/repository-publication-evidence(.*)$/)
@@ -33,10 +35,13 @@ function requestPhase(request: Request) {
   if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/authoring\/[^/]+\/primary-file$/.test(path)) return method === 'POST' ? 'primary_file_write' : 'primary_file_read'
   if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/documents\/[^/]+\/attachments\/[^/]+\/download$/.test(path)) return 'managed_file_download'
   if (/^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/authoring\/[^/]+\/keys$/.test(path)) return 'native_keys_read'
+  if (path.endsWith('/template-enrollments')) return 'native_template_enroll'
+  if (/\/content-graph\/authoring\/[^/]+\/template$/.test(path)) return method === 'POST' ? 'native_template_write' : 'native_template_read'
   if (path.endsWith('/from-template') && method === 'POST') return 'template_create'
   if (path.includes('/template-rollouts')) return 'template_rollout'
   if (path.includes('/observations/') && path.endsWith('/apply')) return 'source_apply'
   if (path.endsWith('/remote-source') && method === 'PUT') return 'source_settings'
+  if (method === 'GET' && /^\/api\/v1\/workspaces\/(?:msp|organizations\/[^/]+)\/content-graph\/authoring\/[^/]+$/.test(path)) return 'native_source_read'
   if (path.endsWith('/content-graph/authoring')) return 'git_write'
   if (/^\/api\/v1\/workspaces\/organizations\/[^/]+$/.test(path)) return 'workspace_read'
   if (path.startsWith('/api/v1/portal/documents')) return 'portal_read'

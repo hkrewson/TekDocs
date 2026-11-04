@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
 import { RepositoryPrimaryFiles } from './RepositoryPrimaryFiles'
 import { RepositoryKeys } from './RepositoryKeys'
+import { RepositoryTemplates } from './RepositoryTemplates'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -29,6 +30,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   client?: RepositoryClient
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const markdownId = useId()
   const [listing, setListing] = useState<RepositoryListing | null>(null)
   const [query, setQuery] = useState('')
   const [reload, setReload] = useState(0)
@@ -52,6 +54,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   const [conflict, setConflict] = useState<RepositoryConflict | null>(null)
   const [primaryEditing, setPrimaryEditing] = useState(false)
   const [keysEditing, setKeysEditing] = useState(false)
+  const [templateEditing, setTemplateEditing] = useState(false)
   const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
@@ -88,7 +91,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
 
   const canDownloadSaved = source?.kind === 'document' && !!source.accepted_commit
     && source.accepted_commit === source.indexed_commit
-  const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null)
+  const attempt = useUnsavedChanges(dirty, busy, () => { setDraft(null); setSource(null); setConflict(null) }, draft !== null && !templateEditing)
 
   useEffect(() => { headingRef.current?.focus() }, [])
   useEffect(() => { sourceRef.current = source }, [source])
@@ -365,11 +368,11 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
       </section>
       <section aria-label={translate('repository.editor')}>
         {!draft && <p className="empty-state">{translate('repository.choose')}</p>}
-        {draft && <><div className="repository-editor-fields">
+        {draft && <><fieldset className="repository-editor-fields" disabled={templateEditing}>
           {!source && <label>{translate('repository.kind')}<select value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as Draft['kind'] })}><option value="document">{translate('repository.document')}</option><option value="fragment">{translate('repository.fragment')}</option></select></label>}
           <label>{translate('repository.title')}<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
           <label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label>
-          <label>{translate('repository.markdown')}<textarea rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} /></label>
+          <label htmlFor={markdownId}>{translate('repository.markdown')}</label><textarea id={markdownId} rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} />
           {source?.kind === 'document' && <><label>{translate('repository.attachFile')}<input type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadAttachment(file) }} /></label><p className="field-hint">{translate('repository.attachmentNotice')}</p>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}
             {canDownloadSaved && <section aria-label={translate('repository.attachmentFiles')}><h2>{translate('repository.attachmentFiles')}</h2>{attachmentError && <p role="alert">{attachmentError}</p>}
               {attachments.length === 0 && !attachmentError && <p>{translate('repository.attachmentEmpty')}</p>}
@@ -378,14 +381,14 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
             </section>}
           </>}
           <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
-        </div>
+        </fieldset>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
         {source?.accepted_commit && <p className="form-message">{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</p>}
         {canDownloadSaved && <p className="form-message">{translate('repository.htmlNotice')}</p>}
         {canDownloadSaved && <p className="form-message">{translate('repository.pdfNotice')}</p>}
         {canDownloadSaved && <p className="form-message">{translate('repository.docxNotice')}</p>}
         <div className="form-actions">
-          <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
+          <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || templateEditing || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
           {source?.accepted_commit && <button type="button" className="secondary-button" onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>}
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button>}
           {canDownloadSaved && <button type="button" className="secondary-button" onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</button>}
@@ -393,9 +396,10 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
         {source?.kind === 'document' && source.accepted_commit && <>
-          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
-          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy} onEditingChange={setPrimaryEditing} />
-          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing} />
+          <RepositoryTemplates key={'template:' + (organizationId ?? 'msp') + ':' + source.content_id} source={source} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing} onEditingChange={setTemplateEditing} onSaved={saved => { setSource(saved); setDraft(draftFromSource(saved)); setConflict(null); setReload(value => value + 1) }} />
+          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy || templateEditing} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
+          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy && !templateEditing} onEditingChange={setPrimaryEditing} />
+          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing && !templateEditing} />
         </>}
       </section>
     </div>

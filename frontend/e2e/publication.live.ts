@@ -1,3 +1,4 @@
+import { rehearseNativeTemplates, type NativeTemplateFixture } from './native-template-live-journey'
 import AxeBuilder from '@axe-core/playwright'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -10,13 +11,13 @@ import { rehearseRepositoryContent } from './repository-live-journey'
 type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { source_msp?: boolean; organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
 type ClientPublicationState = { organization_id: string; document_id: string; content_id: string; original_id: string; original_pdf_filename: string; original_pdf_sha256: string; review_on: string; companion_publication_id: string; sessions: { approver: string; client: string }; files: { filename: string; sha256: string }[] }
-type State = { native_sites: { staff: { id: string; title: string }; client: { id: string; title: string } }; native_approval_password: string; cross_workspace: AddressedState; repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
+type State = { native_templates: NativeTemplateFixture; native_sites: { staff: { id: string; title: string }; client: { id: string; title: string } }; native_approval_password: string; cross_workspace: AddressedState; repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
 const stateDirectory = process.env.TEKDOCS_PUBLICATION_ACCEPTANCE_DIRECTORY!
 const diagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>>()
 const additionalDiagnostics = new WeakMap<Page, ReturnType<typeof attachPublicationDiagnostics>[]>()
 
 test.beforeEach(({ page }, info) => {
-  const scenario = info.title.startsWith('new keyed documents') ? 'native_keys' : info.title.startsWith('new primary-file documents') ? 'native_primary_files' : info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
+  const scenario = info.title.startsWith('new template documents') ? 'native_templates' : info.title.startsWith('new keyed documents') ? 'native_keys' : info.title.startsWith('new primary-file documents') ? 'native_primary_files' : info.title.startsWith('new staff documents') || info.title.startsWith('new client documents') ? 'native_publications' : info.title.startsWith('client publications') ? 'client_publications' : info.title.startsWith('template sources') ? 'templates' : (info.title.startsWith('migrated signed') || info.title.startsWith('repeated shared') || info.title.startsWith('cross-Workspace')) ? 'history_templates'
     : info.title.startsWith('field keys') ? 'field_keys'
       : info.title.startsWith('nested content') ? 'content_keys'
         : info.title.startsWith('diagram revisions') ? 'diagrams'
@@ -31,13 +32,18 @@ test.afterEach(async ({ page }, info) => {
     const visible: Record<string, unknown> = {}
     if (info.status !== 'passed' && info.status !== 'skipped' && !page.isClosed()) {
       try {
-        const [prompts, creates, templates, pdfs] = await Promise.all([
+        const [prompts, creates, templates, pdfs, repositoryEditor, repositorySourceFailure, repositoryEmpty, nativeLibrary, applicationError] = await Promise.all([
           page.locator('dialog.unsaved-changes-dialog[open]').count(),
           page.getByRole('button', { name: 'Create document', exact: true }).count(),
           page.getByRole('button', { name: 'Use template', exact: true }).count(),
           page.getByRole('link', { name: 'Download PDF', exact: true }).or(page.getByRole('button', { name: 'Download retained PDF', exact: true })).count(),
+          page.getByRole('region', { name: 'Markdown editor', exact: true }).count(),
+          page.getByText('The selected source could not be opened.', { exact: true }).count(),
+          page.getByText('Choose a file or create a new one.', { exact: true }).count(),
+          page.getByRole('region', { name: 'Git-backed templates', exact: true }).count(),
+          page.getByRole('heading', { name: 'This page could not open', exact: true }).count(),
         ])
-        Object.assign(visible, { navigationPrompt: prompts > 0, createTemplate: creates > 0, useTemplate: templates > 0, pdfDownload: pdfs > 0 })
+        Object.assign(visible, { navigationPrompt: prompts > 0, createTemplate: creates > 0, useTemplate: templates > 0, pdfDownload: pdfs > 0, repositoryEditor: repositoryEditor > 0, repositorySourceFailure: repositorySourceFailure > 0, repositoryEmpty: repositoryEmpty > 0, nativeLibrary: nativeLibrary > 0, applicationError: applicationError > 0 })
       } catch {
         // A timed-out navigation may already have destroyed the page. Retain
         // request timings without replacing the original failure with a probe error.
@@ -951,4 +957,49 @@ test('cross-Workspace reuse retains distinct pins, live updates, file versions a
   expect(publication.canonical_markdown).not.toContain('Private MSP child')
   expect(publication.canonical_markdown).not.toContain('Current live library edition.')
   await correctAndWithdraw(page, publication, 'tekdocs-static-publication/v13')
+})
+
+
+test('new template documents preserve copy live and pinned sections through reviewed updates and detach', async ({ page, browser }) => {
+  const state = JSON.parse(await readFile(`${stateDirectory}/ready.json`, 'utf8')) as State
+  await page.context().addCookies([{ name: state.session_name, value: state.sessions.owner, url: 'http://localhost:8080' }])
+  const document = await rehearseNativeTemplates(page, state.native_templates, state.template.organization_id)
+  const viewer = await browser.newContext()
+  let failed = false
+  let primaryError: unknown
+  try {
+    await viewer.addCookies([{ name: state.session_name, value: state.sessions.viewer, url: 'http://localhost:8080' }])
+    const reader = await viewer.newPage()
+    additionalDiagnostics.set(page, [attachPublicationDiagnostics(reader, { scenario: 'native_templates' })])
+    const boundary = (path: string) => {
+      const pending = reader.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === path)
+      // Later boundaries may never run after an earlier denial; teardown still owns their listeners.
+      void pending.catch(() => undefined)
+      return pending
+    }
+    const session = boundary('/_allauth/browser/v1/auth/session')
+    const auth = boundary('/api/v1/auth/context')
+    const workspacePath = '/api/v1/workspaces/organizations/' + state.native_templates.organization_id
+    const workspace = boundary(workspacePath)
+    const source = boundary(workspacePath + '/content-graph/authoring/' + document.id)
+    await reader.goto(document.path)
+    expect((await session).status()).toBe(200)
+    const authenticated = await auth
+    expect(authenticated.status()).toBe(200)
+    expect((await authenticated.json() as { role: string }).role).toBe('read_only')
+    expect((await workspace).status()).toBe(200)
+    expect((await source).status()).toBe(200)
+    const settings = reader.getByRole('button', { name: 'Template settings and updates', exact: true })
+    await expect(settings).toBeVisible()
+    await expect(settings).toBeEnabled()
+    const review = boundary(workspacePath + '/content-graph/authoring/' + document.id + '/template')
+    await settings.click()
+    const reviewed = await review
+    expect(reviewed.status()).toBe(200)
+    expect((await reviewed.json() as { read_only: boolean }).read_only).toBe(true)
+    await expect(reader.getByText('Template changes are not permitted for this document.', { exact: true })).toBeVisible()
+    await expect(reader.getByRole('button', { name: 'Apply reviewed update', exact: true })).toBeDisabled()
+  } catch (error) { failed = true; primaryError = error }
+  try { await viewer.close() } catch (error) { if (!failed) throw error }
+  if (failed) throw primaryError
 })

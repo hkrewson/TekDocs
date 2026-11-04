@@ -17,9 +17,9 @@ d0ca059c1273ead353dba83789f5d56329d9ab4e:planning/responsive-layouts/progress.md
 
 # Reviewed source-scan matches: static route metadata, browser preference key,
 # and validation prose. Exact /src path + line fingerprints; no directory exclusions.
-/src/backend/apps/core/permission_inventory.py:generic-api-key:1132
-/src/backend/apps/core/permission_inventory.py:generic-api-key:1519
-/src/backend/apps/core/permission_inventory.py:generic-api-key:1522
-/src/backend/apps/core/permission_inventory.py:generic-api-key:1525
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1136
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1532
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1535
+/src/backend/apps/core/permission_inventory.py:generic-api-key:1538
 /src/frontend/src/App.tsx:generic-api-key:189
 /src/planning/responsive-layouts/progress.md:generic-api-key:957

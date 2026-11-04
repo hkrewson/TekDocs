@@ -270,6 +270,8 @@ it('preserves a denied decision reason and requires explicit correction confirma
 function setup(overrides: Partial<RepositoryClient> = {}, organizationId?: string, initialContentId?: string) {
   const save = vi.fn().mockResolvedValue({ ...initial, markdown: 'Changed revision.\n', accepted_commit: 'c'.repeat(40), indexed_commit: 'c'.repeat(40) })
   const client = {
+    template: vi.fn().mockResolvedValue({ role: 'none', read_only: true }),
+    templateAction: vi.fn(), templates: vi.fn(), enrollTemplate: vi.fn(),
     list: vi.fn().mockResolvedValue({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false }),
     source: vi.fn().mockResolvedValue(initial),
     exportSources: vi.fn().mockResolvedValue({ content: new Blob(['snapshot']), name: 'tekdocs-repository-aaaaaaaaaaaa.zip' }),
@@ -970,4 +972,27 @@ it('retires a native binding in the same protected Git draft without removing it
   await screen.findByRole('alert')
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ metadata_patch: { key_bindings: {} } }), undefined)
   expect(body).toHaveValue('First revision.\n <tekdocs://key/site.name>')
+})
+
+it('keeps the saved document open when discarding an unfinished template declaration', async () => {
+  const user = userEvent.setup()
+  setup({ template: vi.fn().mockResolvedValue({ role: 'source', read_only: false, source: { enabled: false, library_visible: false, fragments: [], selected_fragment_ids: [] } }) }, undefined, 'content-1')
+  await user.click(await screen.findByRole('button', { name: 'Template settings and updates' }))
+  await user.click(await screen.findByLabelText('Use as a template'))
+  expect(screen.getByLabelText('Markdown body')).toBeDisabled()
+  const region = screen.getByRole('region', { name: 'Template settings and updates' })
+  const { within } = await import('@testing-library/react')
+  await user.click(within(region).getByRole('button', { name: 'Close' }))
+  await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
+  expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n')
+  expect(screen.getByLabelText('Markdown body')).toBeEnabled()
+})
+
+it('keeps the Markdown label separate from preloaded text for exact browser lookup', async () => {
+  setup({}, undefined, 'content-1')
+  const editor = await screen.findByLabelText<HTMLTextAreaElement>('Markdown body')
+  expect(editor).toHaveValue('First revision.\n')
+  expect(editor.labels).toHaveLength(1)
+  expect(editor.labels?.[0]).toHaveAttribute('for', editor.id)
+  expect(editor.labels?.[0]?.textContent).toBe('Markdown body')
 })

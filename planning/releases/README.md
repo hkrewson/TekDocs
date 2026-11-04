@@ -13,6 +13,19 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Native template enrollment for new documents
+
+The [bounded native-template slice](../git-native-templates.md) connects saved MSP
+Git sources to new client documents with independent copies, live/pinned sections,
+reviewed updates and detach. Evidence v4 retains selected source proof without
+changing older signed formats. Local combined Docker validation passes 796 cases;
+883 frontend cases with coverage, types, contracts and source review pass. All 15
+real browser/server journeys pass without retries. Exact-source hosted upgrade,
+independent encrypted recovery and security checks follow the authorized push.
+This is 0.9.18 development, with no deployment or existing-data transition.
+See [development notes](native-template-enrollment-notes.md) and
+[source review](native-template-source-review.md).
+
 ## Native field/content keys and entity references
 
 The [bounded native-keys slice](../git-native-keys.md) connects new Git-only

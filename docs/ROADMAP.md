@@ -2426,6 +2426,17 @@ signed output, PDFs and file versions remain immutable. See
 [acceptance and validation](../planning/git-native-keys.md). Local tests, all 14 browser/server journeys and both source reviews pass;
 exact-source hosted validation follows the authorized push. Legacy-backed
 fragment identities cannot bypass permissions through native keys.
-Template enrollment and monitored-source configuration remain next, followed by
+Native template enrollment is implemented; monitored-source configuration remains next, followed by
 clean-start combined acceptance. The six legacy migration gaps remain deferred;
 no existing-data migration or production deployment is included.
+
+## Native template enrollment (bounded development slice)
+
+[Native template enrollment](../planning/git-native-templates.md) connects saved
+MSP Git sources to new client documents through the existing Templates interface.
+It covers independent introductions/copies, live and pinned sections, exact-version
+update review, detach, Workspace isolation and retained publication proof.
+Local validation passes 796 combined backend cases, 883 frontend cases and all 15
+browser/server journeys; source reviews are clear. Exact-source hosted upgrade and
+independent encrypted restore follow the authorized push. The change does not
+migrate existing documents or alter the published 0.9.18 checkpoint.

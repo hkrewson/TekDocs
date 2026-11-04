@@ -102,8 +102,410 @@ from apps.core.repository_static_publications import (
 from apps.core.rls import OrganizationRLSMode, bind_local_rls_scope
 from apps.core.scoping import DataScope
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
+from apps.core.tests.test_content_authoring import authoring_context as _authoring_context
+from apps.core.tests.test_template_enrollment_migration import native_enrollment_context as _native_enrollment_context
 
 pytestmark = pytest.mark.django_db(transaction=True)
+authoring_context = _authoring_context
+native_enrollment_context = _native_enrollment_context
+
+
+def test_native_template_browser_fixture_uses_managed_workspace_identity(authoring_context):
+    from apps.core.tests.native_template_browser_fixture import prepare_native_template_browser_fixture
+
+    installation, repository = authoring_context
+    fixture = prepare_native_template_browser_fixture(installation.owner)
+    assert set(fixture['fragments']) == {'copy', 'live', 'pinned'}
+    assert ContentNode.objects.filter(
+        repository=repository, content_id=fixture['source_id'], kind='document',
+    ).exists()
+
+
+@pytest.mark.parametrize('surface', ['graph', 'list', 'search'])
+def test_native_template_discovery_rechecks_revocation_before_any_detail_read(native_enrollment_context, surface):
+    from apps.core.content_authoring import read_authored_content
+
+    _installation, source_repository, repository, organization, source, fragments, root, browser, prefix = (
+        native_enrollment_context
+    )
+    source = read_authored_content(repository=source_repository, content_id=source.content_id)
+    revoked = browser.post(f'/api/v1/workspaces/msp/content-graph/authoring/{source.content_id}/template', data={
+        'action': 'configure', 'base_commit': source.accepted_commit, 'base_blob': source.source_blob,
+        'enabled': False, 'library_visible': False, 'fragment_ids': [str(item.content_id) for item in fragments],
+    }, content_type='application/json')
+    assert revoked.status_code == 200, revoked.content
+    # No destination read has refreshed this deliberately stale projection yet.
+    cached = ContentNode.objects.get(repository=repository, content_id=root.content_id)
+    assert 'live original.' in cached.composition_variants['msp_internal']['markdown']
+    url = prefix if surface == 'graph' else f'/api/v1/workspaces/organizations/{organization.entity_id}/documents'
+    response = browser.get(url, {'q': 'live original'} if surface == 'search' else {})
+    assert response.status_code == 200, response.content
+    assert b'live original.' not in response.content
+    if surface == 'search':
+        assert not any(str(item['id']) == str(root.content_id) for item in response.json()['results'])
+    cached = ContentNode.objects.get(repository=repository, content_id=root.content_id)
+    assert cached.composition_variants['msp_internal'].get('unavailable') is True
+
+
+def test_native_template_source_is_discoverable_with_template_filter(native_enrollment_context):
+    _installation, _source_repository, _repository, _organization, source, _fragments, _root, browser, _prefix = (
+        native_enrollment_context
+    )
+    response = browser.get('/api/v1/documents', {'template': 'templates'})
+    assert response.status_code == 200, response.content
+    assert any(item['id'] == str(source.content_id) and item['is_template'] for item in response.json()['results'])
+
+
+def test_native_template_evidence_verifies_without_current_source(native_enrollment_context, monkeypatch):
+    from apps.core import native_templates
+
+    installation, _source_repository, repository, _organization, _source, _fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id, content_id=root.content_id, audience="msp_internal", actor=installation.owner,
+    )
+    assert evidence.manifest["format"] == "tekdocs-repository-publication-evidence/v4"
+    original_manifest = json.dumps(evidence.manifest, sort_keys=True)
+    with evidence.pdf_file.open("rb") as stream:
+        original_pdf = stream.read()
+
+    def unavailable(*_args, **_kwargs):
+        raise AssertionError("Retained verification must not resolve a current template or Git source")
+
+    monkeypatch.setattr(native_templates, "_template", unavailable)
+    monkeypatch.setattr(native_templates, "read_native_template_fragment", unavailable)
+    monkeypatch.setattr(repository_service, "read_repository_markdown_files_at_commit", unavailable)
+    monkeypatch.setattr(content_publication_sources, "read_repository_markdown_files_at_commit", unavailable)
+    monkeypatch.setattr(content_publication_sources, "read_accepted_repository_markdown_files", unavailable)
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    assert json.dumps(evidence.manifest, sort_keys=True) == original_manifest
+    with evidence.pdf_file.open("rb") as stream:
+        assert stream.read() == original_pdf
+
+
+@pytest.mark.parametrize("tamper", ["selected_source", "revision", "sibling_enrollment"])
+def test_native_template_evidence_sql_rejects_forged_selection(native_enrollment_context, tamper):
+    from apps.core.content_authoring import read_authored_content
+    from apps.core.content_publication_sources import freeze_git_document_dependencies
+    from apps.core.models import RepositoryTemplate, repository_evidence_pdf_upload_to
+    from apps.core.native_templates import enroll_native_template
+
+    installation, source_repository, repository, _organization, source, fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    template = RepositoryTemplate.objects.select_related("latest_revision").get(
+        repository=source_repository, content_id=source.content_id,
+    )
+    sibling = enroll_native_template(
+        repository=repository, actor_id=installation.owner.id, request_id=None,
+        source_content_id=source.content_id, definition_sha256=template.latest_revision.checksum,
+        title="Independent sibling enrollment", rules={str(row.content_id): "copy" for row in fragments},
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id, content_id=root.content_id, audience="msp_internal", actor=installation.owner,
+    )
+    forged = RepositoryPublicationEvidence.objects.get(pk=evidence.id)
+    forged.pk = uuid.uuid4()
+    forged.manifest["evidence_id"] = str(forged.pk)
+    forged.pdf_file.name = repository_evidence_pdf_upload_to(forged, "snapshot.pdf")
+    foreign = next(item for item in forged.manifest["source"]["sources"] if "library_workspace" in item)
+    if tamper == "selected_source":
+        foreign["selected_source"] += "Forged source text.\n"
+        foreign["source_sha256"] = hashlib.sha256(foreign["selected_source"].encode()).hexdigest()
+    elif tamper == "revision":
+        foreign["template_revision"] = str(uuid.uuid4())
+    else:
+        # Both roots and enrollments exist in the same client repository. The sibling
+        # has only copies, so it cannot borrow the first root's foreign-section grant.
+        sibling = read_authored_content(repository=repository, content_id=sibling.content_id)
+        sibling_proof = freeze_git_document_dependencies(
+            repository_id=repository.id, content_id=sibling.content_id, audience="msp_internal",
+        )
+        forged.content_id = sibling.content_id
+        forged.manifest["content_id"] = str(sibling.content_id)
+        forged.manifest["source"]["content_id"] = str(sibling.content_id)
+        forged.manifest["key_source"] = {
+            "path": sibling.path, "blob": sibling.source_blob, "source": sibling.source,
+        }
+        forged.manifest["source"]["sources"][0] = sibling_proof["sources"][0]
+    with pytest.raises(DatabaseError, match="native template evidence source mismatch"), transaction.atomic():
+        RepositoryPublicationEvidence.objects.bulk_create([forged])
+    assert RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+    assert not RepositoryPublicationEvidence.objects.filter(pk=forged.pk).exists()
+
+
+def test_native_template_evidence_blocks_schema_rollback(native_enrollment_context):
+    installation, _source_repository, repository, _organization, _source, _fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id, content_id=root.content_id, audience="msp_internal", actor=installation.owner,
+    )
+    try:
+        with pytest.raises(DatabaseError, match="Retained native template evidence prevents schema rollback"):
+            call_command("migrate", "core", "0221", verbosity=0)
+        assert RepositoryPublicationEvidence.objects.filter(pk=evidence.id).exists()
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                           "WHERE oid='core_repositorypublicationevidence'::regclass")
+            assert cursor.fetchone() == (True, True)
+    finally:
+        call_command("migrate", "core", verbosity=0)
+
+
+def test_native_template_evidence_empty_schema_rollback_and_recovery():
+    from django.db.migrations.recorder import MigrationRecorder
+
+    try:
+        call_command("migrate", "core", "0221", verbosity=0)
+        assert not MigrationRecorder.Migration.objects.filter(app="core", name="0222_native_template_evidence").exists()
+        call_command("migrate", "core", verbosity=0)
+        assert MigrationRecorder.Migration.objects.filter(app="core", name="0222_native_template_evidence").exists()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                           "WHERE oid='core_repositorypublicationevidence'::regclass")
+            assert cursor.fetchone() == (True, True)
+    finally:
+        call_command("migrate", "core", verbosity=0)
+
+
+def test_native_template_enrollment_blocks_schema_rollback_without_publications(native_enrollment_context):
+    from apps.core.models import RepositoryTemplateEnrollment
+
+    _installation, _source_repository, repository, _organization, _source, _fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    try:
+        with pytest.raises(DatabaseError, match="Retained native template enrollments prevent schema rollback"):
+            call_command("migrate", "core", "0220", verbosity=0)
+        assert RepositoryTemplateEnrollment.objects.filter(repository=repository, content_id=root.content_id).exists()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                           "WHERE relname IN ('core_repositorytemplate', 'core_repositorytemplaterevision', "
+                           "'core_repositorytemplateenrollment') ORDER BY relname")
+            assert cursor.fetchall() == [(True, True)] * 3
+    finally:
+        call_command("migrate", "core", verbosity=0)
+
+
+def test_native_template_empty_schema_can_downgrade_and_recover():
+    from django.db.migrations.executor import MigrationExecutor
+
+    head = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([('core', '0220_native_key_evidence')])
+        assert 'core_repositorytemplate' not in connection.introspection.table_names()
+        MigrationExecutor(connection).migrate(head)
+        assert 'core_repositorytemplate' in connection.introspection.table_names()
+    finally:
+        MigrationExecutor(connection).migrate(head)
+
+
+@pytest.mark.parametrize("with_primary", [False, True])
+def test_native_template_client_delivery_retains_frozen_html_pdf_and_isolation(
+    native_enrollment_context, tmp_path, with_primary,
+):
+    from apps.core.content_authoring import author_content, read_authored_content
+
+    installation, source_repository, repository, organization, _source, fragments, root, browser, _prefix = (
+        native_enrollment_context
+    )
+    with override_settings(MEDIA_ROOT=str(tmp_path / "media")):
+        root = author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None, operation="update",
+            content_id=root.content_id, base_commit=root.accepted_commit, base_blob=root.source_blob,
+            kind=None, path=None, title=None, markdown=None,
+            metadata_patch={"properties": {"audience": "client_visible"}},
+        )
+        if with_primary:
+            append_repository_primary_document_file(
+                repository=repository, content_id=root.content_id, actor_id=installation.owner.id,
+                upload=SimpleUploadedFile("template-client-source.txt", b"Retained native template primary.\n"),
+                expected_current_entity_id=None,
+            )
+        evidence = retain_repository_publication_evidence(
+            repository_id=repository.id, content_id=root.content_id,
+            audience="client_visible", actor=installation.owner,
+        )
+        assert evidence.manifest["format"] == "tekdocs-repository-publication-evidence/v4"
+        retained_html = evidence.manifest["rendered_snapshot"]["html"]
+        with evidence.pdf_file.open("rb") as stream:
+            retained_pdf = stream.read()
+        reviewer = User.objects.create_user(
+            email=f"native-template-reviewer-{uuid.uuid4()}@example.invalid", display_name="Native template reviewer",
+        )
+        membership = TenantMembership.objects.create(
+            tenant=installation.tenant, user=reviewer, role=BuiltInRole.ADMINISTRATOR,
+        )
+        OrganizationAccessAssignment.objects.create(
+            tenant=installation.tenant, organization=organization, membership=membership, created_by=installation.owner,
+        )
+        Authenticator.objects.create(
+            user=reviewer, type=Authenticator.Type.TOTP, data={"secret": generate_totp_secret()},
+        )
+        browser.force_login(reviewer)
+        reviewed = browser.post(
+            reverse("organization-repository-publication-evidence-decision",
+                    args=[organization.entity_id, evidence.id]),
+            data={"outcome": "accepted_for_packaging", "reason": "Independent native template review"},
+            content_type="application/json",
+        )
+        assert reviewed.status_code == 201, reviewed.content
+        decision = RepositoryEvidenceReviewDecision.objects.get(evidence=evidence)
+        package = create_repository_publication_package(decision_id=decision.id, actor=installation.owner)
+        assert package.manifest["format"] == f"tekdocs-repository-publication-package/v{2 if with_primary else 1}"
+        assert verify_repository_publication_package(package)
+        authorization = decide_repository_package(
+            package_id=package.id, outcome=RepositoryPackageAuthorization.Outcome.AUTHORIZED_FOR_PUBLICATION,
+            reason="Independent native template package authorization", actor=reviewer,
+        )
+        publication = create_repository_static_publication(authorization_id=authorization.id, actor=installation.owner)
+        assert publication.manifest["format"] == f"tekdocs-repository-static-publication/v{2 if with_primary else 1}"
+        assert verify_repository_static_publication(publication)
+        controls = reverse(
+            "organization-repository-publication-evidence-static-control", args=[organization.entity_id, evidence.id],
+        )
+        delivery = reverse(
+            "organization-repository-publication-evidence-static-delivery", args=[organization.entity_id, evidence.id],
+        )
+        released = browser.post(
+            controls, data={"action": "released", "reason": "Reviewed native client release"},
+            content_type="application/json",
+        )
+        assert released.status_code == 201, released.content
+        _recent_session(browser)
+        delivered = browser.post(
+            delivery, data={"reason": "Reviewed native client delivery"}, content_type="application/json",
+        )
+        assert delivered.status_code == 201, delivered.content
+        client = User.objects.create_user(
+            email=f"native-template-client-{uuid.uuid4()}@example.invalid", display_name="Native template client",
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=client, organization=organization, role=BuiltInRole.CLIENT_USER,
+        )
+        detail_url = reverse("client-portal-repository-publication-detail", args=[publication.id])
+        pdf_url = reverse("client-portal-repository-publication-pdf", args=[publication.id])
+        list_url = reverse("client-portal-repository-publication-list")
+
+        def assert_frozen_delivery():
+            browser.force_login(client)
+            detail = browser.get(detail_url)
+            assert detail.status_code == 200, detail.content
+            assert detail.json()["rendered_html"] == retained_html
+            assert browser.get(pdf_url).content == retained_pdf
+            assert [row["id"] for row in browser.get(list_url).json()["results"]] == [str(publication.id)]
+
+        assert_frozen_delivery()
+        for fragment in fragments:
+            current = read_authored_content(repository=source_repository, content_id=fragment.content_id)
+            author_content(
+                repository=source_repository, actor_id=installation.owner.id, request_id=None, operation="update",
+                content_id=current.content_id, base_commit=current.accepted_commit, base_blob=current.source_blob,
+                kind=None, path=None, title=None, markdown="Source changed after client publication.\n",
+                metadata_patch={},
+            )
+        current = read_authored_content(repository=repository, content_id=root.content_id)
+        author_content(
+            repository=repository, actor_id=installation.owner.id, request_id=None, operation="update",
+            content_id=current.content_id, base_commit=current.accepted_commit, base_blob=current.source_blob,
+            kind=None, path=None, title=None, markdown="Client changed after publication.\n", metadata_patch={},
+        )
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        assert verify_repository_publication_package(package) and verify_repository_static_publication(publication)
+        assert_frozen_delivery()
+        sibling = create_organization(
+            tenant=installation.tenant, actor_id=installation.owner.id,
+            name="Native template unrelated client", legal_name="", website="", classifications=["client"],
+        )
+        outsider = User.objects.create_user(
+            email=f"native-template-outsider-{uuid.uuid4()}@example.invalid", display_name="Unrelated client",
+        )
+        TenantMembership.objects.create(
+            tenant=installation.tenant, user=outsider, organization=sibling, role=BuiltInRole.CLIENT_USER,
+        )
+        browser.force_login(outsider)
+        assert browser.get(detail_url).status_code == 404 and browser.get(pdf_url).status_code == 404
+        assert browser.get(list_url).json()["results"] == []
+        browser.force_login(reviewer)
+        withdrawn = browser.post(
+            controls, data={"action": "withdrawn", "reason": "Withdraw client template edition"},
+            content_type="application/json",
+        )
+        assert withdrawn.status_code == 201, withdrawn.content
+        browser.force_login(client)
+        assert browser.get(detail_url).status_code == 404 and browser.get(pdf_url).status_code == 404
+        assert browser.get(list_url).json()["results"] == []
+        assert verify_repository_publication_evidence(evidence)["valid"]
+        with evidence.pdf_file.open("rb") as stream:
+            assert stream.read() == retained_pdf
+
+
+def _native_template_proof(mode='pinned'):
+    from apps.core.content_publication_sources import _source_record
+    from apps.core.publications import canonical_json
+
+    root_id, section_id, destination_id, workspace_id, repository_id, revision_id = (uuid.uuid4() for _ in range(6))
+    commit = 'a' * 40
+    section_source = _content(content_id=section_id, title='Native section', kind='fragment', body='Retained leaf.\n')
+    template_source = _content(content_id=root_id, title='Native source', body='Independent introduction.\n')
+    section = parse_content(section_source)
+    definition = {
+        'format': 'tekdocs.native-template/v1', 'content_id': str(root_id), 'workspace_id': str(workspace_id),
+        'repository_id': str(repository_id), 'commit': commit, 'title': 'Native source',
+        'root': {'id': str(root_id), 'path': 'docs/source.md', 'source': template_source.decode(),
+                 'body_sha256': hashlib.sha256(parse_content(template_source).markdown.encode()).hexdigest()},
+        'sections': [{'id': str(section_id), 'title': 'Native section', 'path': 'fragments/leaf.md',
+                      'source': section_source.decode(),
+                      'body_sha256': hashlib.sha256(section.markdown.encode()).hexdigest()}],
+    }
+    record = _source_record(content_id=section_id, commit=commit,
+                            source=('fragments/leaf.md', section_source, section), object_format='sha1',
+                            audience='shared', mode=mode, ordinal_path=[0])
+    record.update(library_workspace=str(workspace_id), repository_id=str(repository_id), object_format='sha1',
+                  accepted_commit=commit, template_revision=str(revision_id), enrollment_revision=str(revision_id),
+                  template_checksum=hashlib.sha256(canonical_json(definition)).hexdigest(),
+                  template_manifest=definition, native_template=True, body_only=True,
+                  selected_source=section_source.decode())
+    destination = _content(
+        content_id=destination_id, title='Client document', body='Client-owned introduction.\n',
+        metadata=('includes:\n' + _include(content_id=section_id, mode=mode, audience='shared',
+                                           commit=commit if mode == 'pinned' else '')
+                  + f'    library_workspace: {workspace_id}\n    library_revision: {revision_id}\n'),
+    )
+    return {'source': {'format': 'tekdocs.git-dependencies/v4', 'sources': [record],
+                       'workspace_id': str(uuid.uuid4()), 'repository_id': str(uuid.uuid4())},
+            'key_source': {'source': destination.decode()}}
+
+
+@pytest.mark.parametrize('mode', ['live', 'pinned'])
+def test_native_template_signed_proof_verifies_retained_selection_without_live_reads(mode):
+    from apps.core.repository_template_evidence import verify_native_template_evidence
+
+    manifest = _native_template_proof(mode)
+    assert verify_native_template_evidence(manifest)
+    # Unrelated later source commits do not change the immutable definition.
+    if mode == 'live':
+        manifest['source']['sources'][0].update(commit='b' * 40, accepted_commit='b' * 40)
+        assert verify_native_template_evidence(manifest)
+
+
+@pytest.mark.parametrize('field,value', [
+    ('selected_source', 'untrusted replacement'), ('source_sha256', '0' * 64), ('blob', '0' * 40),
+    ('content_digest', '0' * 64), ('template_checksum', '0' * 64), ('template_revision', 'not-a-uuid'),
+    ('enrollment_revision', str(uuid.UUID(int=1))), ('mode', 'copy'), ('body_only', False),
+    ('native_template', False), ('path', 'fragments/other.md'), ('ordinal_path', [1]),
+    ('library_workspace', str(uuid.UUID(int=2))), ('repository_id', str(uuid.UUID(int=3))),
+    ('commit', 'c' * 40),
+])
+def test_native_template_signed_proof_rejects_tampered_selection(field, value):
+    from apps.core.repository_template_evidence import verify_native_template_evidence
+
+    manifest = _native_template_proof()
+    manifest['source']['sources'][0][field] = value
+    assert not verify_native_template_evidence(manifest)
 
 
 def _recent_session(browser):

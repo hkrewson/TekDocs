@@ -2870,6 +2870,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/msp/content-graph/authoring/{content_id}/template": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_msp_content_graph_authoring_template_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_msp_content_graph_authoring_template_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/msp/content-graph/authoring/export": {
         readonly parameters: {
             readonly query?: never;
@@ -5610,6 +5626,22 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/template": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_content_graph_authoring_template_retrieve"];
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_content_graph_authoring_template_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export": {
         readonly parameters: {
             readonly query?: never;
@@ -5747,6 +5779,38 @@ export interface paths {
             readonly cookie?: never;
         };
         readonly get: operations["content_entity_organization_retrieve"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/template-enrollments": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["workspaces_organizations_content_graph_template_enrollments_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
+    readonly "/api/v1/workspaces/organizations/{organization_entity_id}/content-graph/templates": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get: operations["workspaces_organizations_content_graph_templates_retrieve"];
         readonly put?: never;
         readonly post?: never;
         readonly delete?: never;
@@ -13831,6 +13895,110 @@ export interface components {
             readonly specifications: unknown;
             /** @default  */
             readonly notes: string;
+        };
+        readonly NativeTemplateChange: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly markdown: string;
+            /**
+             * @description * `copy` - copy
+             *     * `live` - live
+             *     * `pinned` - pinned
+             * @enum {string}
+             */
+            readonly mode: "copy" | "live" | "pinned";
+            /**
+             * @description * `unchanged` - unchanged
+             *     * `updated` - updated
+             *     * `added` - added
+             *     * `removed` - removed
+             *     * `conflict` - conflict
+             * @enum {string}
+             */
+            readonly state: "unchanged" | "updated" | "added" | "removed" | "conflict";
+            readonly current_markdown?: string;
+        };
+        readonly NativeTemplateEnrollment: {
+            /** Format: uuid */
+            readonly source_content_id: string;
+            readonly definition_sha256: string;
+            readonly title: string;
+            readonly rules: {
+                readonly [key: string]: "copy" | "live" | "pinned";
+            };
+        };
+        readonly NativeTemplateLibraryItem: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly definition_sha256: string;
+            readonly sections: readonly components["schemas"]["NativeTemplateSection"][];
+        };
+        readonly NativeTemplateLibraryPage: {
+            readonly results: readonly components["schemas"]["NativeTemplateLibraryItem"][];
+            readonly count: number;
+            readonly page: number;
+            readonly page_size: number;
+            readonly has_more: boolean;
+        };
+        readonly NativeTemplateMutation: {
+            /**
+             * @description * `configure` - configure
+             *     * `apply` - apply
+             *     * `detach` - detach
+             * @enum {string}
+             */
+            readonly action: "configure" | "apply" | "detach";
+            readonly base_commit: string;
+            readonly base_blob: string;
+            readonly enabled?: boolean;
+            readonly library_visible?: boolean;
+            readonly fragment_ids?: readonly string[];
+            /** Format: uuid */
+            readonly expected_applied_revision_id?: string;
+            /** Format: uuid */
+            readonly expected_available_revision_id?: string;
+            readonly rules?: {
+                readonly [key: string]: "copy" | "live" | "pinned" | "keep";
+            };
+            /** Format: uuid */
+            readonly section_id?: string;
+        };
+        readonly NativeTemplateReview: {
+            readonly source_title: string;
+            /** Format: uuid */
+            readonly applied_revision_id: string;
+            /** Format: uuid */
+            readonly available_revision_id: string;
+            readonly expected_base: string;
+            readonly expected_blob: string;
+            readonly changes: readonly components["schemas"]["NativeTemplateChange"][];
+            readonly can_apply: boolean;
+        };
+        readonly NativeTemplateSection: {
+            /** Format: uuid */
+            readonly id: string;
+            readonly title: string;
+            readonly markdown: string;
+        };
+        readonly NativeTemplateSource: {
+            readonly enabled: boolean;
+            readonly library_visible: boolean;
+            readonly fragments: readonly components["schemas"]["NativeTemplateSection"][];
+            readonly selected_fragment_ids: readonly string[];
+        };
+        readonly NativeTemplateStatus: {
+            /**
+             * @description * `source` - source
+             *     * `enrolled` - enrolled
+             *     * `none` - none
+             * @enum {string}
+             */
+            readonly role: "source" | "enrolled" | "none";
+            readonly read_only: boolean;
+            readonly source?: components["schemas"]["NativeTemplateSource"];
+            readonly enrollment?: components["schemas"]["NativeTemplateReview"];
         };
         readonly NetBoxAdoption: {
             /** Format: uuid */
@@ -25098,6 +25266,58 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_msp_content_graph_authoring_template_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NativeTemplateStatus"];
+                };
+            };
+        };
+    };
+    readonly workspaces_msp_content_graph_authoring_template_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NativeTemplateMutation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NativeTemplateMutation"];
+                readonly "multipart/form-data": components["schemas"]["NativeTemplateMutation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
     readonly content_authoring_msp_export: {
         readonly parameters: {
             readonly query?: {
@@ -32458,6 +32678,60 @@ export interface operations {
             };
         };
     };
+    readonly workspaces_organizations_content_graph_authoring_template_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NativeTemplateStatus"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_content_graph_authoring_template_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly content_id: string;
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NativeTemplateMutation"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NativeTemplateMutation"];
+                readonly "multipart/form-data": components["schemas"]["NativeTemplateMutation"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
     readonly content_authoring_organization_export: {
         readonly parameters: {
             readonly query?: {
@@ -32764,6 +33038,58 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["EntityContent"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_content_graph_template_enrollments_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["NativeTemplateEnrollment"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["NativeTemplateEnrollment"];
+                readonly "multipart/form-data": components["schemas"]["NativeTemplateEnrollment"];
+            };
+        };
+        readonly responses: {
+            readonly 201: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ContentAuthoringSource"];
+                };
+            };
+        };
+    };
+    readonly workspaces_organizations_content_graph_templates_retrieve: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly organization_entity_id: string;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["NativeTemplateLibraryPage"];
                 };
             };
         };

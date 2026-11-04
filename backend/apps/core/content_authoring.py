@@ -280,6 +280,13 @@ def author_content(
     if operation not in {"create", "update", "move"}:
         raise ContentAuthoringError("Authoring operation is unsupported")
     _validate_patch(metadata_patch)
+    from .native_templates import _native_operation, native_enrollment
+    if (
+        {'includes', 'derived_from', 'template_sources'} & metadata_patch.keys()
+        and not _native_operation.get() and native_enrollment(repository, content_id)
+    ):
+        raise ContentAuthoringError('Enrolled template sections must be changed through reviewed template updates')
+
     owner = {
         "id": content_id,
         "tenant_id": repository.tenant_id,
@@ -408,6 +415,8 @@ def author_content(
             candidate.pop(changed_path, None)
         else:
             candidate[changed_path] = changed_source
+    from .native_templates import validate_native_template_snapshot
+    validate_native_template_snapshot(repository, candidate)
     validate_candidate_snapshot(repository=repository, files=tuple(sorted(candidate.items())))
     if "key_bindings" in metadata_patch:
         from apps.accounts.models import User

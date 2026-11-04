@@ -90,6 +90,8 @@ def document_detail(
         for entity_id, item in visible.items()
     }
     composition = node.composition_variants.get(audience)
+    if isinstance(composition, dict) and composition.get('unavailable'):
+        raise RepositoryContentNotIndexed('Template source is unavailable; review this document’s template updates.')
     markdown = str(composition.get("markdown", "")) if isinstance(composition, dict) else node.markdown
     legacy_document = (
         Document.objects.filter(

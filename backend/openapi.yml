@@ -9792,6 +9792,73 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/template:
+    get:
+      operationId: workspaces_msp_content_graph_authoring_template_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateStatus'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_content_graph_authoring_template_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
@@ -20345,6 +20412,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/template:
+    get:
+      operationId: workspaces_organizations_content_graph_authoring_template_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateStatus'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_content_graph_authoring_template_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export:
     get:
       operationId: content_authoring_organization_export
@@ -20800,6 +20946,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EntityContent'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/template-enrollments:
+    post:
+      operationId: workspaces_organizations_content_graph_template_enrollments_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/templates:
+    get:
+      operationId: workspaces_organizations_content_graph_templates_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateLibraryPage'
           description: ''
           headers:
             X-Request-ID:
@@ -46550,6 +46764,265 @@ components:
       - name
       - specification_version_id
       - specifications
+    NativeTemplateChange:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        markdown:
+          type: string
+        mode:
+          enum:
+          - copy
+          - live
+          - pinned
+          type: string
+          description: |-
+            * `copy` - copy
+            * `live` - live
+            * `pinned` - pinned
+          x-spec-enum-id: e159dafe529a6480
+        state:
+          enum:
+          - unchanged
+          - updated
+          - added
+          - removed
+          - conflict
+          type: string
+          description: |-
+            * `unchanged` - unchanged
+            * `updated` - updated
+            * `added` - added
+            * `removed` - removed
+            * `conflict` - conflict
+          x-spec-enum-id: af2b8de9f85d4aa0
+        current_markdown:
+          type: string
+      required:
+      - id
+      - markdown
+      - mode
+      - state
+      - title
+    NativeTemplateEnrollment:
+      type: object
+      properties:
+        source_content_id:
+          type: string
+          format: uuid
+        definition_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        title:
+          type: string
+          maxLength: 240
+        rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+            x-spec-enum-id: e159dafe529a6480
+      required:
+      - definition_sha256
+      - rules
+      - source_content_id
+      - title
+    NativeTemplateLibraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        definition_sha256:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateSection'
+      required:
+      - definition_sha256
+      - id
+      - sections
+      - title
+    NativeTemplateLibraryPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateLibraryItem'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    NativeTemplateMutation:
+      type: object
+      properties:
+        action:
+          enum:
+          - configure
+          - apply
+          - detach
+          type: string
+          description: |-
+            * `configure` - configure
+            * `apply` - apply
+            * `detach` - detach
+          x-spec-enum-id: 18059ba311880d71
+        base_commit:
+          type: string
+          maxLength: 64
+        base_blob:
+          type: string
+          maxLength: 64
+        enabled:
+          type: boolean
+        library_visible:
+          type: boolean
+        fragment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 128
+        expected_applied_revision_id:
+          type: string
+          format: uuid
+        expected_available_revision_id:
+          type: string
+          format: uuid
+        rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            - keep
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+              * `keep` - keep
+            x-spec-enum-id: 1dfef6801517786d
+        section_id:
+          type: string
+          format: uuid
+      required:
+      - action
+      - base_blob
+      - base_commit
+    NativeTemplateReview:
+      type: object
+      properties:
+        source_title:
+          type: string
+        applied_revision_id:
+          type: string
+          format: uuid
+        available_revision_id:
+          type: string
+          format: uuid
+        expected_base:
+          type: string
+        expected_blob:
+          type: string
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateChange'
+        can_apply:
+          type: boolean
+      required:
+      - applied_revision_id
+      - available_revision_id
+      - can_apply
+      - changes
+      - expected_base
+      - expected_blob
+      - source_title
+    NativeTemplateSection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        markdown:
+          type: string
+      required:
+      - id
+      - markdown
+      - title
+    NativeTemplateSource:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        library_visible:
+          type: boolean
+        fragments:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateSection'
+        selected_fragment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - enabled
+      - fragments
+      - library_visible
+      - selected_fragment_ids
+    NativeTemplateStatus:
+      type: object
+      properties:
+        role:
+          enum:
+          - source
+          - enrolled
+          - none
+          type: string
+          description: |-
+            * `source` - source
+            * `enrolled` - enrolled
+            * `none` - none
+          x-spec-enum-id: c29f2127d758b5c4
+        read_only:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/NativeTemplateSource'
+        enrollment:
+          $ref: '#/components/schemas/NativeTemplateReview'
+      required:
+      - read_only
+      - role
     NetBoxAdoption:
       type: object
       properties:

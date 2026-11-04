@@ -138,6 +138,8 @@ def freeze_git_document_dependencies(
         ):
             raise ContentPublicationSourceError("Indexed repository metadata differs from its accepted source")
         variant = variants[content_id][audience]
+        if variant.get('unavailable'):
+            raise ContentPublicationSourceError('Native template source is unavailable')
         if node.composition_variants != variants[content_id]:
             raise ContentPublicationSourceError("Indexed repository composition differs from its accepted source")
 
@@ -200,7 +202,8 @@ def freeze_git_document_dependencies(
     except RepositoryServiceError as exc:
         raise ContentPublicationSourceError("Repository source objects are unavailable") from exc
     return {
-        "format": ("tekdocs.git-dependencies/v3" if any(s.get("library_source") for s in evidence)
+        "format": ("tekdocs.git-dependencies/v4" if any(s.get("native_template") for s in evidence)
+                   else "tekdocs.git-dependencies/v3" if any(s.get("library_source") for s in evidence)
                    else "tekdocs.git-dependencies/v2" if any(s.get("library_workspace") for s in evidence)
                    else "tekdocs.git-dependencies/v1"),
         "repository_id": str(repository.id),
@@ -275,6 +278,16 @@ def _publication_repository_ids(*, repository_id: uuid.UUID, content_id: uuid.UU
         organization=repository.workspace.organization, pk__in=parents | owners | {content_id},
     ).order_by("id")
     identities = {repository_id}
+    from django.db.models import F, Q
+
+    from .models import RepositoryTemplateEnrollment
+    identities.update(RepositoryTemplateEnrollment.objects.filter(
+        tenant_id=repository.tenant_id, repository=repository, workspace_id=repository.workspace_id,
+        organization=repository.workspace.organization, content_id=content_id,
+        source_template__enabled=True, source_template__library_visible=True,
+        source_template__repository__accepted_commit_id=F("source_template__repository__indexed_commit_id"),
+    ).filter(Q(placement_map__contains=[{'mode': 'live'}]) | Q(placement_map__contains=[{'mode': 'pinned'}]))
+     .values_list('source_template__repository_id', flat=True))
     for document in documents:
         from .shared_library_scope import ordinary_library_placements
 
@@ -315,12 +328,33 @@ def _library_source_record(*, repository: WorkspaceRepository, document_id: uuid
     source_repository = WorkspaceRepository.objects.select_related("accepted_commit").get(
         tenant_id=repository.tenant_id, workspace_id=workspace_id,
     )
+    if source_repository.accepted_commit is None:
+        raise ContentPublicationSourceError('Template library repository is unavailable')
     selected_include = ParsedInclude(
         target_content_id=uuid.UUID(include["id"]), mode=include["mode"], audience=include["audience"],
         pinned_object_id=include["commit"] if include["mode"] == "pinned" else "",
         ordinal=include["ordinal_path"][-1], library_workspace_id=workspace_id, library_revision_id=revision_id,
         library_source_id=ordinary_source,
     )
+    from .native_templates import read_native_template_fragment
+    native = read_native_template_fragment(repository=repository, content_id=document_id, include=selected_include)
+    if native is not None:
+        selected, revision = native
+        parsed = parse_content(selected.source)
+        if selected.object_id != include['commit'] or parsed.content_digest != include['digest']:
+            raise ContentPublicationSourceError('Native template source changed during publication')
+        record = _source_record(content_id=parsed.content_id, commit=selected.object_id,
+            source=(selected.source_path, selected.source, parsed),
+            object_format=source_repository.accepted_commit.object_format,
+            audience=include['audience'], mode=include['mode'], ordinal_path=include['ordinal_path'])
+        record.update(
+            native_template=True, library_workspace=str(workspace_id), repository_id=str(source_repository.id),
+            object_format=source_repository.accepted_commit.object_format,
+            accepted_commit=source_repository.accepted_commit.object_id, template_revision=str(revision.id),
+            enrollment_revision=str(revision_id), template_checksum=revision.checksum,
+            template_manifest=revision.manifest,
+            selected_source=selected.source.decode(), body_only=True)
+        return record
     with transaction.atomic():
         selected = read_library_fragment(
             tenant_id=repository.tenant_id,

@@ -340,6 +340,7 @@ from apps.core.invoice_views import (
     ServiceRateDetailView,
     ServiceRateListCreateView,
 )
+from apps.core.native_template_views import NativeTemplateEnrollmentsView, NativeTemplateLibraryView, NativeTemplateView
 from apps.core.netbox_reconciliation_views import (
     NetBoxReconciliationPreviewView,
     NetBoxReferenceChoicePageView,
@@ -532,6 +533,24 @@ from apps.core.workspace_views import (
 )
 
 urlpatterns = [
+    path(
+        'api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/template',
+        NativeTemplateView.as_view(), name='msp-content-authoring-template',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/'
+        'authoring/<uuid:content_id>/template',
+        NativeTemplateView.as_view(), name='organization-content-authoring-template',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/templates',
+        NativeTemplateLibraryView.as_view(), name='organization-content-templates',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/template-enrollments',
+        NativeTemplateEnrollmentsView.as_view(), name='organization-content-template-enrollments',
+    ),
+
     path(
         "api/v1/webhooks/inbound/<uuid:endpoint_id>",
         InboundWebhookView.as_view(),

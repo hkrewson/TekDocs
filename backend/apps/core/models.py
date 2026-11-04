@@ -35,6 +35,9 @@ from .document_source_models import DocumentSourceKind as DocumentSourceKind
 from .document_template_models import DocumentTemplateEnrollment as DocumentTemplateEnrollment
 from .document_template_models import DocumentTemplateRevision as DocumentTemplateRevision
 from .model_support import TimestampedModel
+from .native_template_models import RepositoryTemplate as RepositoryTemplate
+from .native_template_models import RepositoryTemplateEnrollment as RepositoryTemplateEnrollment
+from .native_template_models import RepositoryTemplateRevision as RepositoryTemplateRevision
 from .scoping import OrganizationScopedManager, TenantScopedManager
 
 WORKSPACE_UUID_NAMESPACE = uuid.UUID("6890dc87-8d91-4f76-a6eb-99dfd06904a5")
@@ -5179,6 +5182,7 @@ class RepositoryPublicationEvidence(models.Model):
                 "tekdocs-repository-publication-evidence/v1",
                 "tekdocs-repository-publication-evidence/v2",
                 "tekdocs-repository-publication-evidence/v3",
+                "tekdocs-repository-publication-evidence/v4",
             }
             or self.manifest.get("evidence_id") != str(self.id)
             or self.manifest.get("workspace_id") != str(self.workspace_id)
@@ -5189,7 +5193,11 @@ class RepositoryPublicationEvidence(models.Model):
             or self.manifest.get("signed_at")
             != self.signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
             or self.manifest.get("source_commit") != self.source_commit.object_id
-            or source.get("format") != "tekdocs.git-dependencies/v1"
+            or source.get("format") != (
+                "tekdocs.git-dependencies/v4"
+                if self.manifest.get("format") == "tekdocs-repository-publication-evidence/v4"
+                else "tekdocs.git-dependencies/v1"
+            )
             or source.get("repository_id") != str(self.repository_id)
             or source.get("workspace_id") != str(self.workspace_id)
             or source.get("content_id") != str(self.content_id)

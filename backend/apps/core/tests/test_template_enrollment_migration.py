@@ -17,9 +17,11 @@ from apps.core.models import Document, DocumentPublication, InstallationState, W
 from apps.core.organizations import create_organization
 from apps.core.publications import publish_document, read_publication_artifact, verify_retained_publication_custody
 from apps.core.repository_storage import ensure_workspace_repository
+from apps.core.tests.test_content_authoring import authoring_context as authoring_context_fixture
 from apps.core.workspaces import ResolvedWorkspace, resolve_organization_workspace
 
 pytestmark = pytest.mark.django_db(transaction=True)
+authoring_context = authoring_context_fixture
 
 
 @dataclass(frozen=True)
@@ -3070,3 +3072,582 @@ def test_source_template_publication_preserves_all_primary_file_versions(promote
             str(first.entity_id), str(second.entity_id),
         }
         assert verify_internal_git_publication(publication)
+
+
+def test_native_template_configuration_has_no_legacy_owner_requirement(authoring_context):
+    from django.test import Client
+
+    from apps.core.tests.test_content_authoring import _create
+
+    installation, repository = authoring_context
+    source = _create(installation, repository, title="Native source template")
+    browser = Client()
+    browser.force_login(installation.owner)
+    response = browser.get(f"/api/v1/workspaces/msp/content-graph/authoring/{source.content_id}/template")
+    assert response.status_code == 200, response.content
+    assert response.json()["role"] == "source"
+    assert not response.json()["source"]["enabled"]
+    assert not Document.objects.filter(pk=source.content_id).exists()
+
+
+def test_native_template_recovery_preserves_enrollment_and_signed_artifacts(authoring_context):
+    from apps.core.tests.native_template_recovery_fixture import (
+        create_native_template_recovery_fixture,
+        native_template_recovery_fingerprint,
+    )
+
+    installation, _repository = authoring_context
+    digest = create_native_template_recovery_fixture(installation.owner)
+    assert native_template_recovery_fingerprint(installation.owner) == digest
+
+
+@pytest.fixture
+def native_enrollment_context(authoring_context):
+    from django.test import Client
+
+    from apps.core.content_authoring import read_authored_content
+    from apps.core.tests.test_content_authoring import _create, _native_key_fragment
+
+    installation, repository = authoring_context
+    fragments = [
+        _native_key_fragment(installation, repository, f"{mode} original.\n") for mode in ("copy", "live", "pinned")
+    ]
+    source = _create(installation, repository, title="Native template")
+    browser = Client()
+    browser.force_login(installation.owner)
+    configure = browser.post(
+        f"/api/v1/workspaces/msp/content-graph/authoring/{source.content_id}/template",
+        data={
+            "action": "configure",
+            "base_commit": source.accepted_commit,
+            "base_blob": source.source_blob,
+            "enabled": True,
+            "library_visible": True,
+            "fragment_ids": [str(row.content_id) for row in fragments],
+        },
+        content_type="application/json",
+    )
+    assert configure.status_code == 200, configure.content
+    organization = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Native client",
+        legal_name="",
+        website="",
+        classifications=["client"],
+    )
+    workspace = Workspace.objects.get(tenant=installation.tenant, organization=organization)
+    client_repository = ensure_workspace_repository(workspace).repository
+    prefix = f"/api/v1/workspaces/organizations/{organization.entity_id}/content-graph"
+    library = browser.get(f"{prefix}/templates")
+    assert library.status_code == 200, library.content
+    selected = library.json()["results"][0]
+    enrolled = browser.post(
+        f"{prefix}/template-enrollments",
+        data={
+            "source_content_id": str(source.content_id),
+            "definition_sha256": selected["definition_sha256"],
+            "title": "Native enrolled guide",
+            "rules": {
+                str(row.content_id): mode for row, mode in zip(fragments, ("copy", "live", "pinned"), strict=True)
+            },
+        },
+        content_type="application/json",
+    )
+    assert enrolled.status_code == 201, enrolled.content
+    from uuid import UUID
+
+    content_id = UUID(enrolled.json()["content_id"])
+    root = read_authored_content(repository=client_repository, content_id=content_id)
+    return installation, repository, client_repository, organization, source, fragments, root, browser, prefix
+
+
+def test_native_template_enrollment_api_preserves_modes_and_rejects_tampering(native_enrollment_context):
+    from apps.core.content_authoring import ContentAuthoringError, author_content
+    from apps.core.content_profile import parse_content
+    from apps.core.models import Block, RepositoryTemplateEnrollment
+
+    installation, repository, client_repository, _org, source, fragments, root, browser, prefix = (
+        native_enrollment_context
+    )
+    assert not Document.objects.filter(pk__in=[source.content_id, root.content_id]).exists()
+    assert not Block.objects.filter(pk__in=[row.content_id for row in fragments]).exists()
+    parsed = parse_content(root.source.encode())
+    assert [row.mode for row in parsed.includes] == ["live", "live", "pinned"]
+    assert parsed.includes[0].library_workspace_id is None
+    assert parsed.includes[1].library_workspace_id == repository.workspace_id
+    state = browser.get(f"{prefix}/authoring/{root.content_id}/template")
+    assert state.status_code == 200, state.content
+    assert state.json()["role"] == "enrolled"
+    enrollment = RepositoryTemplateEnrollment.objects.get(repository=client_repository, content_id=root.content_id)
+    assert [row["mode"] for row in enrollment.placement_map] == ["copy", "live", "pinned"]
+    with pytest.raises(ContentAuthoringError, match="reviewed template"):
+        author_content(
+            repository=client_repository,
+            actor_id=installation.owner.id,
+            request_id=None,
+            operation="update",
+            content_id=root.content_id,
+            base_commit=root.accepted_commit,
+            base_blob=root.source_blob,
+            kind=None,
+            path=None,
+            title=None,
+            markdown=None,
+            metadata_patch={"includes": []},
+        )
+    review = state.json()["enrollment"]
+    before = root.accepted_commit
+    stale = browser.post(
+        f"{prefix}/authoring/{root.content_id}/template",
+        data={
+            "action": "apply",
+            "base_commit": before,
+            "base_blob": "0" * 40,
+            "expected_applied_revision_id": review["applied_revision_id"],
+            "expected_available_revision_id": review["available_revision_id"],
+            "rules": {str(row.content_id): "keep" for row in fragments},
+        },
+        content_type="application/json",
+    )
+    assert stale.status_code == 409
+    client_repository.refresh_from_db()
+    assert client_repository.accepted_commit.object_id == before
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "<tekdocs://key/foo.content>",
+        "<tekdocs://attachment/6e72d0f0-3639-4aba-9242-6766468ce514>",
+        "<tekdocs://entity/6e72d0f0-3639-4aba-9242-6766468ce514>",
+    ],
+)
+def test_native_template_text_rejects_unresolved_owned_references(body):
+    from uuid import uuid4
+
+    from apps.core.content_profile import parse_content
+    from apps.core.native_templates import NativeTemplateConflict, _independent_body, _new_source
+
+    parsed = parse_content(_new_source(uuid4(), "fragment", "Unsafe source", body))
+    with pytest.raises(NativeTemplateConflict, match="references"):
+        _independent_body(parsed)
+
+
+def test_native_template_permissions_and_workspace_isolation(native_enrollment_context):
+    from uuid import uuid4
+
+    from apps.accounts.access_control import assign_organization_staff
+    from apps.accounts.models import BuiltInRole, TenantMembership
+    from apps.core.models import Tenant
+
+    installation, _source_repo, _client_repo, organization, source, _fragments, root, browser, prefix = (
+        native_enrollment_context
+    )
+    url = f"{prefix}/authoring/{root.content_id}/template"
+    sibling = create_organization(
+        tenant=installation.tenant,
+        actor_id=installation.owner.id,
+        name="Sibling native client",
+        legal_name="",
+        website="",
+        classifications=["client"],
+    )
+    ensure_workspace_repository(Workspace.objects.get(tenant=installation.tenant, organization=sibling))
+    sibling_prefix = f"/api/v1/workspaces/organizations/{sibling.entity_id}/content-graph"
+    assert browser.get(f"{sibling_prefix}/authoring/{root.content_id}/template").status_code == 404
+    assert browser.get(f"{prefix}/authoring/{source.content_id}/template").status_code == 404
+    viewer = User.objects.create_user(
+        email=f"native-template-viewer-{uuid4()}@example.invalid", display_name="Template reader"
+    )
+    TenantMembership.objects.create(tenant=installation.tenant, user=viewer, role=BuiltInRole.READ_ONLY)
+    TOTP.activate(viewer, generate_totp_secret())
+    assign_organization_staff(
+        actor=installation.owner, organization_entity_id=organization.entity_id, member_user_id=viewer.id
+    )
+    browser.force_login(viewer)
+    viewed = browser.get(url)
+    assert viewed.status_code == 200, viewed.content
+    assert viewed.json()["read_only"] is True
+    assert browser.post(url, data={}, content_type="application/json").status_code == 403
+    assert browser.post(f"{prefix}/template-enrollments", data={}, content_type="application/json").status_code == 403
+    portal = User.objects.create_user(
+        email=f"native-template-portal-{uuid4()}@example.invalid", display_name="Template client"
+    )
+    TenantMembership.objects.create(
+        tenant=installation.tenant, user=portal, role=BuiltInRole.CLIENT_USER, organization=organization
+    )
+    browser.force_login(portal)
+    assert browser.get(url).status_code == 403
+    assert browser.get(f"{prefix}/templates").status_code == 403
+    foreign = Tenant.objects.create(name="Other template tenant", slug=f"native-template-{uuid4()}")
+    outsider = User.objects.create_user(
+        email=f"native-template-outsider-{uuid4()}@example.invalid", display_name="Other tenant"
+    )
+    TenantMembership.objects.create(tenant=foreign, user=outsider, role=BuiltInRole.ADMINISTRATOR)
+    TOTP.activate(outsider, generate_totp_secret())
+    browser.force_login(outsider)
+    assert browser.get(url).status_code in {403, 404}
+    assert browser.get(f"{prefix}/templates").status_code in {403, 404}
+
+
+def test_native_template_failed_detach_restores_git_and_enrollment(native_enrollment_context, monkeypatch):
+    from uuid import UUID
+
+    from apps.core import content_index
+    from apps.core.content_authoring import read_authored_content
+    from apps.core.models import RepositoryTemplateEnrollment
+    from apps.core.native_templates import detach_native_template, native_template_state
+
+    installation, _source_repo, repository, _organization, _source, fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    enrollment = RepositoryTemplateEnrollment.objects.get(repository=repository, content_id=root.content_id)
+    prior_map = deepcopy(enrollment.placement_map)
+    state = native_template_state(repository=repository, content_id=root.content_id)["enrollment"]
+
+    def fail_index(**_kwargs):
+        raise RuntimeError("Synthetic native index failure")
+
+    monkeypatch.setattr(content_index, "index_repository_content", fail_index)
+    with pytest.raises(RuntimeError, match="Synthetic native index failure"):
+        detach_native_template(
+            repository=repository,
+            actor_id=installation.owner.id,
+            request_id=None,
+            content_id=root.content_id,
+            base_commit=state["expected_base"],
+            base_blob=state["expected_blob"],
+            expected_applied_revision_id=UUID(state["applied_revision_id"]),
+            expected_available_revision_id=UUID(state["available_revision_id"]),
+            section_id=fragments[1].content_id,
+        )
+    enrollment.refresh_from_db()
+    after = read_authored_content(repository=repository, content_id=root.content_id)
+    assert enrollment.placement_map == prior_map
+    assert after.source == root.source and after.accepted_commit == root.accepted_commit
+
+
+def test_native_template_removed_reference_keep_and_source_revocation(native_enrollment_context):
+    from apps.core.content_authoring import read_authored_content
+    from apps.core.models import RepositoryTemplateEnrollment
+    from apps.core.native_templates import configure_native_template
+
+    installation, source_repo, repository, organization, source, fragments, root, browser, prefix = (
+        native_enrollment_context
+    )
+    current = read_authored_content(repository=source_repo, content_id=source.content_id)
+    configured = configure_native_template(
+        repository=source_repo,
+        actor_id=installation.owner.id,
+        request_id=None,
+        content_id=source.content_id,
+        base_commit=current.accepted_commit,
+        base_blob=current.source_blob,
+        enabled=True,
+        library_visible=True,
+        fragment_ids=[fragments[0].content_id, fragments[2].content_id],
+    )
+    url = f"{prefix}/authoring/{root.content_id}/template"
+    response = browser.get(url)
+    assert response.status_code == 200, response.content
+    state = response.json()["enrollment"]
+    assert next(row for row in state["changes"] if row["id"] == str(fragments[1].content_id))["state"] == "removed"
+    kept = browser.post(
+        url,
+        data={
+            "action": "apply",
+            "base_commit": state["expected_base"],
+            "base_blob": state["expected_blob"],
+            "expected_applied_revision_id": state["applied_revision_id"],
+            "expected_available_revision_id": state["available_revision_id"],
+            "rules": {str(fragment.content_id): "keep" for fragment in fragments},
+        },
+        content_type="application/json",
+    )
+    assert kept.status_code == 200, kept.content
+    enrollment = RepositoryTemplateEnrollment.objects.get(repository=repository, content_id=root.content_id)
+    assert enrollment.placement_map[1]["mode"] == "copy"
+    from uuid import UUID
+
+    copied = read_authored_content(repository=repository, content_id=UUID(enrollment.placement_map[1]["local_id"]))
+    assert copied.markdown == "live original.\n"
+    configure_native_template(
+        repository=source_repo,
+        actor_id=installation.owner.id,
+        request_id=None,
+        content_id=source.content_id,
+        base_commit=configured.accepted_commit,
+        base_blob=configured.source_blob,
+        enabled=False,
+        library_visible=False,
+        fragment_ids=[fragments[0].content_id, fragments[2].content_id],
+    )
+    assert browser.get(url).status_code == 409
+    assert browser.get(f"{prefix}/templates").json()["results"] == []
+    assert (
+        read_authored_content(repository=repository, content_id=UUID(enrollment.placement_map[1]["local_id"])).markdown
+        == copied.markdown
+    )
+
+
+@pytest.mark.parametrize("archive_target", ["root", "fragment"])
+def test_native_template_archive_removes_library_access(native_enrollment_context, archive_target):
+    from apps.core.content_authoring import author_content, read_authored_content
+    from apps.core.content_profile import parse_content
+
+    installation, repository, _client_repo, _org, root, fragments, client, browser, prefix = native_enrollment_context
+    target = root.content_id if archive_target == "root" else fragments[1].content_id
+    source = read_authored_content(repository=repository, content_id=target)
+    properties = dict(parse_content(source.source.encode()).properties)
+    properties["lifecycle"] = "archived"
+    author_content(
+        repository=repository,
+        actor_id=installation.owner.id,
+        request_id=None,
+        operation="update",
+        content_id=target,
+        base_commit=source.accepted_commit,
+        base_blob=source.source_blob,
+        kind=None,
+        path=None,
+        title=None,
+        markdown=None,
+        metadata_patch={"properties": properties},
+    )
+    library = browser.get(f"{prefix}/templates")
+    assert library.status_code == 200, library.content
+    assert library.json()["results"] == []
+    status = browser.get(f"{prefix}/authoring/{client.content_id}/template")
+    assert status.status_code == 409
+
+
+def test_native_template_revocation_isolates_independent_documents(native_enrollment_context, tmp_path, settings):
+    from uuid import UUID, uuid4
+
+    from apps.core.content_authoring import _replace_fields, _snapshot, read_authored_content
+    from apps.core.content_index import ContentIndexValidationError, validate_candidate_snapshot
+    from apps.core.content_profile import parse_content
+    from apps.core.models import ContentNode
+    from apps.core.native_templates import configure_native_template
+    from apps.core.repository_publication_evidence import (
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+
+    installation, source_repo, repository, _org, source, fragments, root, browser, prefix = native_enrollment_context
+    settings.MEDIA_ROOT = str(tmp_path / "native-revocation-media")
+    definition = browser.get(f"{prefix}/templates").json()["results"][0]
+    copied = browser.post(
+        f"{prefix}/template-enrollments",
+        data={
+            "source_content_id": str(source.content_id),
+            "definition_sha256": definition["definition_sha256"],
+            "title": "Independent native copies",
+            "rules": {str(row.content_id): "copy" for row in fragments},
+        },
+        content_type="application/json",
+    )
+    assert copied.status_code == 201, copied.content
+    copy_id = UUID(copied.json()["content_id"])
+    current = read_authored_content(repository=source_repo, content_id=source.content_id)
+    configure_native_template(
+        repository=source_repo,
+        actor_id=installation.owner.id,
+        request_id=None,
+        content_id=source.content_id,
+        base_commit=current.accepted_commit,
+        base_blob=current.source_blob,
+        enabled=False,
+        library_visible=False,
+        fragment_ids=[row.content_id for row in fragments],
+    )
+    denied = browser.get(f"{prefix}/documents/{root.content_id}")
+    assert denied.status_code == 409, denied.content
+    unavailable = ContentNode.objects.get(repository=repository, content_id=root.content_id)
+    assert all(
+        variant["markdown"] == "" and not variant["manifest"] for variant in unavailable.composition_variants.values()
+    )
+    usable = browser.get(f"{prefix}/documents/{copy_id}")
+    assert usable.status_code == 200, usable.content
+    assert "live original." in usable.json()["sanitized_html"]
+    exported = browser.get(f"{prefix}/documents/{copy_id}/export/html")
+    assert exported.status_code == 200, exported.content
+    assert browser.get(f"{prefix}/documents/{root.content_id}/export/html").status_code == 409
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id, content_id=copy_id, audience="msp_internal", actor=installation.owner
+    )
+    assert verify_repository_publication_evidence(evidence)["valid"]
+    # Availability does not exempt malformed or forged grants from candidate validation.
+    accepted, files = _snapshot(repository)
+    original = read_authored_content(repository=repository, content_id=root.content_id)
+    includes = list(parse_content(original.source.encode()).frontmatter["includes"])
+    includes.append({"id": str(uuid4()), "mode": "live", "audience": "shared"})
+    files[original.path] = _replace_fields(original.source.encode(), {"includes": includes}, None)
+    with pytest.raises(ContentIndexValidationError):
+        validate_candidate_snapshot(repository=repository, files=tuple(sorted(files.items())))
+    repository.refresh_from_db()
+    assert repository.accepted_commit.object_id == accepted
+
+
+def test_native_template_offline_source_keeps_independent_copy_first_read_and_publication(
+    native_enrollment_context, monkeypatch, tmp_path, settings
+):
+    from contextlib import contextmanager
+    from uuid import UUID
+
+    from apps.core import content_publication_sources, native_templates
+    from apps.core.models import ContentNode
+    from apps.core.repository_publication_evidence import (
+        retain_repository_publication_evidence,
+        verify_repository_publication_evidence,
+    )
+    from apps.core.repository_service import RepositoryFileNotFoundError, RepositoryServiceError
+
+    installation, source_repo, repository, _org, source, fragments, root, browser, prefix = native_enrollment_context
+    settings.MEDIA_ROOT = str(tmp_path / "native-offline-media")
+    definition = browser.get(f"{prefix}/templates").json()["results"][0]
+    copied = browser.post(
+        f"{prefix}/template-enrollments",
+        data={
+            "source_content_id": str(source.content_id),
+            "definition_sha256": definition["definition_sha256"],
+            "title": "Offline-independent guide",
+            "rules": {str(row.content_id): "copy" for row in fragments},
+        },
+        content_type="application/json",
+    )
+    assert copied.status_code == 201, copied.content
+    copy_id = UUID(copied.json()["content_id"])
+    original_read = native_templates.read_repository_markdown_files_at_commit
+
+    def unavailable_read(*, repository_id, object_id):
+        if repository_id == source_repo.id:
+            raise RepositoryFileNotFoundError("Synthetic offline source")
+        return original_read(repository_id=repository_id, object_id=object_id)
+
+    original_pin = content_publication_sources.pin_accepted_repository_for_publication
+
+    @contextmanager
+    def unavailable_pin(repository_id):
+        if repository_id == source_repo.id:
+            raise RepositoryServiceError("Synthetic offline source pin")
+        with original_pin(repository_id) as selected:
+            yield selected
+
+    monkeypatch.setattr(native_templates, "read_repository_markdown_files_at_commit", unavailable_read)
+    monkeypatch.setattr(content_publication_sources, "pin_accepted_repository_for_publication", unavailable_pin)
+    response = browser.get(f"{prefix}/documents/{copy_id}")
+    assert response.status_code == 200, response.content
+    assert "copy original." in response.json()["sanitized_html"]
+    assert browser.get(f"{prefix}/documents/{copy_id}/export/html").status_code == 200
+    assert browser.get(f"{prefix}/documents/{root.content_id}").status_code == 409
+    unavailable = ContentNode.objects.get(repository=repository, content_id=root.content_id)
+    assert unavailable.composition_variants["all"]["unavailable"] is True
+    assert unavailable.composition_variants["all"]["markdown"] == ""
+    evidence = retain_repository_publication_evidence(
+        repository_id=repository.id, content_id=copy_id, audience="msp_internal", actor=installation.owner
+    )
+    assert verify_repository_publication_evidence(evidence)["valid"]
+
+
+def test_native_template_runtime_enrollment_reopens_authored_source(native_enrollment_context, django_runtime_role):
+    installation, _source_repo, _repository, _org, source, fragments, _root, browser, prefix = native_enrollment_context
+    with django_runtime_role():
+        library = browser.get(f"{prefix}/templates")
+        assert library.status_code == 200, library.content
+        definition = library.json()["results"][0]
+        enrolled = browser.post(
+            f"{prefix}/template-enrollments",
+            data={
+                "source_content_id": str(source.content_id),
+                "definition_sha256": definition["definition_sha256"],
+                "title": "Runtime-role enrolled guide",
+                "rules": {
+                    str(row.content_id): mode for row, mode in zip(fragments, ("copy", "live", "pinned"), strict=True)
+                },
+            },
+            content_type="application/json",
+        )
+        assert enrolled.status_code == 201, enrolled.content
+        content_id = enrolled.json()["content_id"]
+        reopened = browser.get(f"{prefix}/authoring/{content_id}")
+        assert reopened.status_code == 200, reopened.content
+        assert reopened.json()["markdown"] == "Initial instructions.\n"
+        assert reopened.json()["content_id"] == content_id
+        detail = browser.get(f"{prefix}/documents/{content_id}")
+        assert detail.status_code == 200, detail.content
+        assert "live original." in detail.json()["sanitized_html"]
+        state = browser.get(f"{prefix}/authoring/{content_id}/template")
+        assert state.status_code == 200, state.content
+        assert state.json()["role"] == "enrolled"
+
+
+def test_native_template_runtime_viewer_requires_client_assignment(native_enrollment_context, django_runtime_role):
+    from uuid import uuid4
+
+    from apps.accounts.access_control import assign_organization_staff
+    from apps.accounts.models import BuiltInRole, TenantMembership
+    from apps.core.content_authoring import author_content, read_authored_content
+
+    installation, source_repo, _repository, organization, _source, fragments, root, browser, prefix = (
+        native_enrollment_context
+    )
+    control = f"{prefix}/authoring/{root.content_id}/template"
+    state = browser.get(control).json()["enrollment"]
+    detached = browser.post(
+        control,
+        data={
+            "action": "detach",
+            "section_id": str(fragments[1].content_id),
+            "base_commit": state["expected_base"],
+            "base_blob": state["expected_blob"],
+            "expected_applied_revision_id": state["applied_revision_id"],
+            "expected_available_revision_id": state["available_revision_id"],
+        },
+        content_type="application/json",
+    )
+    assert detached.status_code == 200, detached.content
+    source = read_authored_content(repository=source_repo, content_id=fragments[2].content_id)
+    author_content(
+        repository=source_repo,
+        actor_id=installation.owner.id,
+        request_id=None,
+        operation="update",
+        content_id=source.content_id,
+        base_commit=source.accepted_commit,
+        base_blob=source.source_blob,
+        kind=None,
+        path=None,
+        title=None,
+        markdown="New pinned candidate.\n",
+        metadata_patch={},
+    )
+    viewer = User.objects.create_user(
+        email=f"native-runtime-viewer-{uuid4()}@example.invalid", display_name="Native viewer"
+    )
+    TenantMembership.objects.create(tenant=installation.tenant, user=viewer, role=BuiltInRole.READ_ONLY)
+    TOTP.activate(viewer, generate_totp_secret())
+    browser.force_login(viewer)
+    urls = [
+        f"/api/v1/workspaces/organizations/{organization.entity_id}",
+        f"{prefix}/authoring/{root.content_id}",
+        control,
+    ]
+    with django_runtime_role():
+        for url in urls:
+            response = browser.get(url)
+            assert response.status_code in {403, 404}, response.content
+    assign_organization_staff(
+        actor=installation.owner, organization_entity_id=organization.entity_id, member_user_id=viewer.id
+    )
+    with django_runtime_role():
+        responses = [browser.get(url) for url in urls]
+        for response in responses:
+            assert response.status_code == 200, response.content
+        assert responses[1].json()["markdown"] == "Initial instructions.\n"
+        review = responses[2].json()
+        assert review["read_only"] is True
+        assert review["enrollment"]["can_apply"] is False
+        assert [row["mode"] for row in review["enrollment"]["changes"]] == ["copy", "copy", "pinned"]
+        assert browser.post(control, data={}, content_type="application/json").status_code == 403

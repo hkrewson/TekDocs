@@ -477,6 +477,9 @@ elif mode == "verify":
                              actor_user_id=owner.id, principal_mode=RLSPrincipalMode.USER)
         assert native_internal_publication_fingerprint(owner) == os.environ["TEKDOCS_RECOVERY_INTERNAL_PUBLICATION_SHA256"]
     print("Native staff lineage, frozen keys/entity references, signatures, PDFs and primary-file versions restored exactly")
+    from apps.core.tests.native_template_recovery_fixture import native_template_recovery_fingerprint
+    assert native_template_recovery_fingerprint(owner) == os.environ["TEKDOCS_RECOVERY_NATIVE_TEMPLATE_SHA256"]
+    print("Native copy/live/pinned enrollment, reviewed updates, detach, signed PDFs and file custody restored exactly")
     print("Signed legacy PDF and released v1/v2 repository publications restored with legacy and Git-only primary history")
 elif mode == "corrupt":
     publication_id = uuid.UUID(os.environ["TEKDOCS_RECOVERY_PUBLICATION_ID"])

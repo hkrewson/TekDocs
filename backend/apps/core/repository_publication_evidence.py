@@ -75,6 +75,11 @@ from .repository_publication_render import (
     verify_retained_pdf_snapshot,
     verify_retained_rendered_snapshot,
 )
+from .repository_template_evidence import (
+    NATIVE_TEMPLATE_DEPENDENCY_FORMAT,
+    NATIVE_TEMPLATE_EVIDENCE_FORMAT,
+    verify_native_template_evidence,
+)
 from .topic_schemas import SCHEMAS
 
 RepositoryPublicationEvidenceError = RepositoryPublicationDependencyError
@@ -203,8 +208,9 @@ def _retain_pinned_evidence(
             repository=repository, node=node, document=document,
             markdown=markdown, audience=audience, actor=actor, signed_at=signed_at_text,
         )
+        native_templates = document is None and source['format'] == NATIVE_TEMPLATE_DEPENDENCY_FORMAT
         native_keys = document is None and bool(
-            key_targets or node.frontmatter.get("key_bindings") or entity_ids_in_markdown(markdown)
+            native_templates or key_targets or node.frontmatter.get("key_bindings") or entity_ids_in_markdown(markdown)
         )
         dependency_markdown = key_snapshot["markdown"] if native_keys and key_snapshot else markdown
         attachment_ids = attachment_ids_in_markdown(dependency_markdown)
@@ -299,7 +305,8 @@ def _retain_pinned_evidence(
         if source_commit is None:  # pragma: no cover - guarded above
             raise RepositoryPublicationEvidenceError("Repository accepted commit is unavailable")
         manifest: dict[str, Any] = {
-            "format": (NATIVE_KEY_EVIDENCE_FORMAT if native_keys
+            "format": (NATIVE_TEMPLATE_EVIDENCE_FORMAT if native_templates
+                       else NATIVE_KEY_EVIDENCE_FORMAT if native_keys
                        else PRIMARY_EVIDENCE_FORMAT if primary_snapshot is not None else EVIDENCE_FORMAT),
             "evidence_id": str(evidence_id),
             "workspace_id": str(repository.workspace_id),
@@ -414,9 +421,13 @@ def _primary_evidence_valid(
     """Prove the signed chain against independently retained artifact bytes."""
 
     manifest = evidence.manifest
-    if manifest.get("format") in {EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT} and "primary_file" not in manifest:
+    if manifest.get("format") in {
+        EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT,
+    } and "primary_file" not in manifest:
         return True
-    if manifest.get("format") not in {PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT}:
+    if manifest.get("format") not in {
+        PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT,
+    }:
         return False
     primary = manifest.get("primary_file")
     if not isinstance(primary, dict) or set(primary) != {"selected_source_id", "versions"}:
@@ -499,7 +510,9 @@ def verify_repository_publication_evidence(
     source = manifest.get("source") if isinstance(manifest, dict) else None
     identity_valid = isinstance(source, dict) and all(
         (
-            manifest.get("format") in {EVIDENCE_FORMAT, PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT},
+            manifest.get("format") in {
+                EVIDENCE_FORMAT, PRIMARY_EVIDENCE_FORMAT, NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT,
+            },
             manifest.get("evidence_id") == str(evidence.id),
             manifest.get("workspace_id") == str(evidence.workspace_id),
             manifest.get("repository_id") == str(evidence.repository_id),
@@ -508,7 +521,9 @@ def verify_repository_publication_evidence(
             manifest.get("signed_by") == str(evidence.signed_by_id),
             manifest.get("signed_at")
             == evidence.signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z"),
-            source.get("format") == "tekdocs.git-dependencies/v1",
+            source.get("format") == (NATIVE_TEMPLATE_DEPENDENCY_FORMAT
+                                     if manifest.get('format') == NATIVE_TEMPLATE_EVIDENCE_FORMAT
+                                     else "tekdocs.git-dependencies/v1"),
             source.get("workspace_id") == str(evidence.workspace_id),
             source.get("repository_id") == str(evidence.repository_id),
             source.get("content_id") == str(evidence.content_id),
@@ -518,7 +533,11 @@ def verify_repository_publication_evidence(
             source.get("markdown_sha256") == hashlib.sha256(evidence.canonical_markdown.encode("utf-8")).hexdigest(),
         )
     )
-    native_keys = isinstance(manifest, dict) and manifest.get("format") == NATIVE_KEY_EVIDENCE_FORMAT
+    native_templates = isinstance(manifest, dict) and manifest.get('format') == NATIVE_TEMPLATE_EVIDENCE_FORMAT
+    identity_valid = identity_valid and (not native_templates or verify_native_template_evidence(manifest))
+    native_keys = isinstance(manifest, dict) and manifest.get("format") in {
+        NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT,
+    }
     native_key_valid = verify_native_key_evidence(evidence.canonical_markdown, manifest) if native_keys else True
     frozen_snapshot = manifest.get("key_snapshot") if isinstance(manifest, dict) else None
     dependency_markdown = (frozen_snapshot["markdown"]

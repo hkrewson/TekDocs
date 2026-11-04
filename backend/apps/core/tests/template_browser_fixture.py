@@ -108,6 +108,10 @@ def prepare_template_browser_fixture(owner) -> TemplateBrowserFixture:
             mode: str(document.entity_id)
             for mode, document in zip(("copy", "live", "pinned"), documents, strict=True)
         },
+        "content_ids": {
+            mode: str(document.id)
+            for mode, document in zip(("copy", "live", "pinned"), documents, strict=True)
+        },
         "pin_original_publication": str(publications[3].entity_id),
         "pin_original_pdf_sha256": hashlib.sha256(original[3][2]).hexdigest(),
         "files": [{"filename": item.original_filename, "sha256": item.checksum}

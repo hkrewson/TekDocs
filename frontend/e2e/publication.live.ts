@@ -1,3 +1,4 @@
+import { openRepositoryDocument } from './repository-document-navigation'
 import { rehearseNativeTemplates, type NativeTemplateFixture } from './native-template-live-journey'
 import AxeBuilder from '@axe-core/playwright'
 import { createHash } from 'node:crypto'
@@ -8,7 +9,8 @@ import type { DocumentPrimaryFile, DocumentPublicationDetail, RepositoryDocument
 import { attachPublicationDiagnostics } from './publicationDiagnostics.ts'
 import { rehearseRepositoryContent } from './repository-live-journey'
 
-type TemplateState = { organization_id: string; source_fragment_id: string; documents: { copy: string; live: string; pinned: string }; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
+type TemplateModeIds = { copy: string; live: string; pinned: string }
+type TemplateState = { organization_id: string; source_fragment_id: string; documents: TemplateModeIds; content_ids: TemplateModeIds; pin_original_publication: string; pin_original_pdf_sha256: string; files: { filename: string; sha256: string }[] }
 type AddressedState = { source_msp?: boolean; organization_id: string; document_id: string; content_id: string; fragment_id: string; original_id: string; original_pdf_sha256: string; edited_markdown: string; observation_id?: string; files: { filename: string; sha256: string }[] }
 type ClientPublicationState = { organization_id: string; document_id: string; content_id: string; original_id: string; original_pdf_filename: string; original_pdf_sha256: string; review_on: string; companion_publication_id: string; sessions: { approver: string; client: string }; files: { filename: string; sha256: string }[] }
 type State = { native_templates: NativeTemplateFixture; native_sites: { staff: { id: string; title: string }; client: { id: string; title: string } }; native_approval_password: string; cross_workspace: AddressedState; repeated: AddressedState; client_publication: ClientPublicationState; monitored: AddressedState; diagrams: AddressedState; addressed: AddressedState; content_keys: AddressedState; template: TemplateState; document_id: string; content_id: string; fragment_id: string; shared_live_fragment_id: string; shared_pin_fragment_id: string; original_id: string; original_pdf_sha256: string; session_name: string; sessions: { owner: string; viewer: string }; files: { filename: string; sha256: string }[] }
@@ -79,7 +81,7 @@ async function templateJourney(page: Page, state: State) {
   await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
   await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
   for (const mode of ['copy', 'live', 'pinned'] as const) {
-    await page.goto(`${path}?document=${fixture.documents[mode]}`)
+    await openRepositoryDocument(page, `${path}?document=${fixture.documents[mode]}`, `/api/v1/workspaces/organizations/${fixture.organization_id}/content-graph/documents/${fixture.content_ids[mode]}`)
     await expect(page.getByText(`Browser client ${mode} local introduction.`, { exact: true })).toBeVisible()
     await expect(page.getByText(mode === 'live' ? 'Browser template procedure updated.' : 'Browser template procedure original.', { exact: true })).toBeVisible()
   }

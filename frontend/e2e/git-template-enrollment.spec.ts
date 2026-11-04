@@ -1,3 +1,4 @@
+import { openRepositoryDocument } from './repository-document-navigation'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
@@ -8,7 +9,7 @@ const placement = crypto.randomUUID(), block = crypto.randomUUID()
 const endpoint = `/api/v1/workspaces/organizations/${organization}/documents`
 const location = `/workspaces/organizations/${organization}/documentation`
 
-async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayMs = 0, createDelayMs = 0) {
+async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayMs = 0, createDelayMs = 0, readDelays = { listing: 0, content: 0 }) {
   let created = false, applied = false, detached = false, sourceChanged = false, writes = 0, detaches = 0
   const record = () => ({
     id: document, content_id: content, title: 'Client enrollment guide', category: 'guide',
@@ -39,10 +40,13 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayM
   } }))
   await page.route(url => url.pathname === `/api/v1/workspaces/organizations/${organization}/content-graph/templates`, route => route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false } }))
   await page.route('**/api/v1/documents/topic-schemas', r => r.fulfill({ json: { topics: [] } }))
-  await page.route(`**/api/v1/workspaces/organizations/${organization}/content-graph/documents/${content}`, r => r.fulfill({ json: {
-    id: content, kind: 'document', title: 'Client enrollment guide', indexed_commit: 'b'.repeat(40),
-    sanitized_html: `<p>Local client introduction.</p><p>${applied ? 'Updated template procedure.' : 'Selected template procedure.'}</p>`, entity_context: [],
-  } }))
+  await page.route(`**/api/v1/workspaces/organizations/${organization}/content-graph/documents/${content}`, async r => {
+    if (readDelays.content) await new Promise(resolve => setTimeout(resolve, readDelays.content))
+    return r.fulfill({ json: {
+      id: content, kind: 'document', title: 'Client enrollment guide', indexed_commit: 'b'.repeat(40),
+      sanitized_html: `<p>Local client introduction.</p><p>${applied ? 'Updated template procedure.' : 'Selected template procedure.'}</p>`, entity_context: [],
+    } })
+  })
   await page.route(`**${endpoint}**`, async r => {
     const url = new URL(r.request().url())
     if (url.pathname.endsWith('/template-library')) return r.fulfill({ json: { results: [{
@@ -82,6 +86,7 @@ async function setup(page: Page, baseURL: string, applyDelayMs = 0, detachDelayM
       return r.fulfill({ json: record() })
     }
     if (url.pathname.endsWith(`/${document}`)) return r.fulfill({ json: record() })
+    if (url.pathname === `${endpoint}/search` && readDelays.listing) await new Promise(resolve => setTimeout(resolve, readDelays.listing))
     return r.fulfill({ json: { results: created ? [record()] : [], count: created ? 1 : 0, page: 1, page_size: 25, has_more: false } })
   })
   return { writes: () => writes, detaches: () => detaches }
@@ -129,3 +134,13 @@ for (const [width, applyDelayMs, detachDelayMs, createDelayMs] of [[320, 0, 0, 0
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
   })
 }
+
+
+test('opening a Git-backed enrollment separates injected read latency from the rendering assertion', async ({ page, baseURL }) => {
+  // Deliberately exceed the five-second rendering assertion with two sequential
+  // reads. This models response ordering, not the cause of hosted server latency.
+  await setup(page, baseURL!, 0, 0, 0, { listing: 4000, content: 1600 })
+  await openRepositoryDocument(page, `${location}?document=${document}`, `/api/v1/workspaces/organizations/${organization}/content-graph/documents/${content}`)
+  await expect(page.getByText('Local client introduction.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Selected template procedure.', { exact: true })).toBeVisible()
+})

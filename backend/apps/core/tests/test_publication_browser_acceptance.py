@@ -211,6 +211,16 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.template_browser_fixture import prepare_template_browser_fixture
 
         template_fixture = prepare_template_browser_fixture(installation.owner)
+        modes = ("copy", "live", "pinned")
+        assert template_fixture.browser["documents"] == {
+            mode: str(document.entity_id)
+            for mode, document in zip(modes, template_fixture.documents, strict=True)
+        }
+        assert template_fixture.browser["content_ids"] == {
+            mode: str(document.id)
+            for mode, document in zip(modes, template_fixture.documents, strict=True)
+        }
+        assert template_fixture.browser["documents"] != template_fixture.browser["content_ids"]
         from apps.core.tests.native_template_browser_fixture import prepare_native_template_browser_fixture
 
         native_template_fixture = prepare_native_template_browser_fixture(installation.owner)

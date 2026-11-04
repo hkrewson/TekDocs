@@ -5,9 +5,13 @@ import uuid
 from django.db import models
 
 from .model_support import TimestampedModel
+from .scoping import OrganizationScopedManager, TenantScopedManager
 
 
 class RepositoryTemplate(TimestampedModel):
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT)
     workspace = models.ForeignKey("core.Workspace", on_delete=models.PROTECT)
@@ -26,6 +30,9 @@ class RepositoryTemplate(TimestampedModel):
 
 
 class RepositoryTemplateRevision(TimestampedModel):
+    objects = models.Manager()
+    scoped = TenantScopedManager()
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT)
     template = models.ForeignKey(RepositoryTemplate, on_delete=models.PROTECT, related_name="revisions")
@@ -38,6 +45,9 @@ class RepositoryTemplateRevision(TimestampedModel):
 
 
 class RepositoryTemplateEnrollment(TimestampedModel):
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT)
     organization = models.ForeignKey("core.Organization", on_delete=models.PROTECT)

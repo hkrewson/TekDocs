@@ -1413,6 +1413,36 @@
       "next_action": "Corrected inventory, both route-denial cases and the complete constrained-runtime authorization matrix pass locally on a fresh synthetic database. Both source reviews and static/secret checks pass. Validate corrective source in hosted Build, CodeQL and Extended workflows.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "41767392831",
+      "job": "Browser (chromium/firefox/webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Docker production-preview replay of document-libraries at 320px reproduced an unhandled native catalog request and extra alert; corrected fixtures pass all 99 affected cross-browser cases without retries.",
+      "cause": "Four older mock fixtures omitted the newly required exact-client native template catalog response. Each hosted browser failed the same six library widths.",
+      "next_action": "Confirm corrected exact source in hosted Extended validation.",
+      "fix_commit": "fa9f4da64d5ccb3f61738c5cb24929bc5915d891",
+      "retest_run": null
+    },
+    {
+      "run_id": "41767369135",
+      "job": "PostgreSQL shard (diagram-migration)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Exact identity-proof case and complete 34-case module pass unchanged in existing Docker services. Forced actual-worker claim before ready chmod reproduces diagram.renderer.unavailable; deterministic test_renderer_can_claim_ready_before_producer_returns fails old code and passes readiness-last fix.",
+      "cause": "Reproduced producer/worker readiness race: worker can rename ready before producer chmod. This matches the hosted symptom; the hosted underlying OS error was not retained, so attribution remains inferred.",
+      "next_action": "Review and validate readiness-last fix, then confirm exact-source hosted diagram and recovery gates.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "41767369135",
+      "job": "PostgreSQL shard (core-a-1)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Existing every-tenant-model scoped-manager inventory test reproduced locally before the fix. Corrected entity/scoping modules pass 29 cases; 16 focused native-template cases pass with populated positive/negative scoped queries.",
+      "cause": "The three new native-template models omitted the standard fail-closed scoped managers. Existing service filtering and database guards remain unchanged.",
+      "next_action": "Confirm corrected exact source in hosted Build and Extended validation.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

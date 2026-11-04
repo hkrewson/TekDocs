@@ -3162,6 +3162,31 @@ def native_enrollment_context(authoring_context):
     return installation, repository, client_repository, organization, source, fragments, root, browser, prefix
 
 
+def test_native_template_scoped_queries_preserve_tenant_and_client_boundaries(native_enrollment_context):
+    from uuid import uuid4
+
+    from apps.core.models import RepositoryTemplate, RepositoryTemplateEnrollment, RepositoryTemplateRevision
+    from apps.core.scoping import DataScope
+
+    installation, source_repo, client_repo, organization, source, _fragments, root, _browser, _prefix = (
+        native_enrollment_context
+    )
+    scope = DataScope.organization(installation.tenant, organization)
+    assert RepositoryTemplate.scoped.for_tenant(installation.tenant).get().content_id == source.content_id
+    assert RepositoryTemplateRevision.scoped.for_tenant(installation.tenant).count() == 1
+    assert RepositoryTemplateEnrollment.scoped.for_scope(scope).get().content_id == root.content_id
+    assert not RepositoryTemplateEnrollment.scoped.for_scope(DataScope.tenant(installation.tenant)).exists()
+    sibling_scope = DataScope(
+        tenant_id=installation.tenant.id, workspace_id=client_repo.workspace_id, organization_id=uuid4(),
+    )
+    assert not RepositoryTemplateEnrollment.scoped.for_scope(sibling_scope).exists()
+    foreign_scope = DataScope(
+        tenant_id=uuid4(), workspace_id=source_repo.workspace_id, organization_id=organization.id,
+    )
+    for model in (RepositoryTemplate, RepositoryTemplateRevision, RepositoryTemplateEnrollment):
+        assert not model.scoped.for_scope(foreign_scope).exists()
+
+
 def test_native_template_enrollment_api_preserves_modes_and_rejects_tampering(native_enrollment_context):
     from apps.core.content_authoring import ContentAuthoringError, author_content
     from apps.core.content_profile import parse_content

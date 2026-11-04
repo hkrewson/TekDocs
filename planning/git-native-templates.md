@@ -174,3 +174,36 @@ workspace-retry failures were reproduced as StrictMode issuing two initial reads
 against a fixture that fails only the first request. No unrelated fixture or
 product fix was made: both cases pass unchanged using the production build that
 matches hosted browser validation. Hosted checks must confirm the final source.
+
+## Diagram readiness follow-up
+
+The earlier hosted diagram shard failed while preparing a retained publication:
+`diagram.renderer.unavailable` in the identity-proof case. The exact case and
+all 34 cases in its module pass unchanged locally. A deterministic reproduction
+with the actual Docker renderer exposes a producer/worker race: the worker renames
+`ready` to `processing` before the producer's subsequent chmod, which raises an
+OS error and produces the same unavailable result. Hosted logs do not retain the
+underlying OS error, so attribution of that particular failure remains inferred.
+
+The producer now finishes input permissions before creating `ready` atomically
+with its final restrictive permissions, and never accesses the marker afterward.
+The regression forces immediate claiming, fails before the fix and passes after
+it; it checks output, input permissions and cleanup. The real worker also passes
+the forced handoff after the fix. No renderer limits, publication assertions,
+retries or timeouts are weakened.
+
+The diagram follow-up passes 81 Docker diagram export/publication cases (including
+real renderer cases), 64 document cases, Ruff and strict typing. Renderer sandbox
+settings and empty job-directory cleanup are verified. This adapts
+`test-diagram-exports` to existing containers without migrating retained records.
+
+The hosted core-a-1 contract also found missing scoped managers on the three
+native template models. The exact inventory test reproduces the failure locally.
+The models now use the existing fail-closed tenant managers, with organization
+scoping for enrollments and unchanged service/default managers and database
+guards. The scope-required regression includes all three new models; a populated
+enrollment checks permitted reads and tenant/client exclusion. The authorization
+and scoping modules pass 29 cases; Django reports no schema drift.
+
+The focused native template follow-up passes all 16 cases; both scoped-manager
+reviews are clear, strict typing passes and no schema drift is detected.

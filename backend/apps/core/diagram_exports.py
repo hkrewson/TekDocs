@@ -475,9 +475,11 @@ def render_diagram_exports(markdown: str, *, required: bool = False) -> tuple[Di
             json.dumps({"count": len(sources)}, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
-        ready_path.write_bytes(b"")
-        for path in (*input_paths, request_path, ready_path):
+        for path in (*input_paths, request_path):
             path.chmod(0o600)
+        # The worker may rename ready immediately. Publish it only after inputs
+        # are complete, with its final permissions set at creation.
+        ready_path.touch(mode=0o600, exist_ok=False)
         deadline = time.monotonic() + diagram_render_wait_seconds(len(sources))
         result_path = job / "result.json"
         while time.monotonic() < deadline and not result_path.is_file():

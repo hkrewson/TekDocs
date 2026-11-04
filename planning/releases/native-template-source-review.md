@@ -69,3 +69,18 @@ legacy denial responses/assertions without intercepting other clients or routes.
 No findings. The production-preview replay passes all 99 affected cases with no
 retries; the development-only StrictMode fixture discrepancy is recorded without
 changing that unrelated test or product behavior.
+
+The diagram readiness follow-up received separate standards and correctness
+reviews with no findings. Input permissions now precede atomic readiness
+publication; no producer access follows worker handoff. A forced immediate-claim
+regression fails on the old code and passes on the fix, checking permissions,
+rendered output and cleanup. The actual Docker renderer confirms the same
+interleaving. Fail-closed validation and resource limits remain unchanged.
+
+The scoped-manager correction follows existing model conventions and adds no
+schema or authorization-policy change. Separate review checks the explicit
+tenant scope on source/revision records and organization scope on enrollments,
+plus required-scope and positive/negative query coverage.
+
+The focused native template follow-up passes all 16 cases; both scoped-manager
+reviews are clear, strict typing passes and no schema drift is detected.

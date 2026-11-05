@@ -1,5 +1,80 @@
 #!/usr/bin/env bash
 
+tekdocs_release_is_newer() {
+  local left=$1 right=$2
+  [[ "$left" =~ ^v([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$ ]] || return 2
+  local left_major=${BASH_REMATCH[1]} left_minor=${BASH_REMATCH[2]} left_patch=${BASH_REMATCH[3]}
+  [[ "$right" =~ ^v([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$ ]] || return 2
+  local right_major=${BASH_REMATCH[1]} right_minor=${BASH_REMATCH[2]} right_patch=${BASH_REMATCH[3]}
+  ((10#$left_major > 10#$right_major)) && return 0
+  ((10#$left_major < 10#$right_major)) && return 1
+  ((10#$left_minor > 10#$right_minor)) && return 0
+  ((10#$left_minor < 10#$right_minor)) && return 1
+  ((10#$left_patch > 10#$right_patch))
+}
+
+# Print stable releases that have both an application tag and companion receipt
+# tag. The application commit is peeled when a future annotated tag is used.
+tekdocs_discover_published_releases() {
+  local root=$1 references sha ref release existing index insert_at candidate commit fallback
+  local application_releases=() receipt_releases=() published_releases=() sorted_releases=()
+  references=$(git -C "$root" ls-remote --tags origin 'refs/tags/v*' 'refs/tags/receipts/v*') || return 1
+  while IFS=$'\t' read -r sha ref; do
+    [[ -n "$sha" && -n "$ref" ]] || continue
+    case "$ref" in
+      refs/tags/v*'^{}') continue ;;
+      refs/tags/v*) release=${ref#refs/tags/} ;;
+      refs/tags/receipts/v*) release=${ref#refs/tags/receipts/} ;;
+      *) continue ;;
+    esac
+    [[ "$release" =~ ^v[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$ ]] || continue
+    if [[ "$ref" == refs/tags/receipts/* ]]; then
+      receipt_releases+=("$release")
+    else
+      application_releases+=("$release")
+    fi
+  done <<< "$references"
+  for release in "${application_releases[@]}"; do
+    for existing in "${receipt_releases[@]}"; do
+      if [[ "$release" == "$existing" ]]; then
+        published_releases+=("$release")
+        break
+      fi
+    done
+  done
+  for release in "${published_releases[@]}"; do
+    insert_at=${#sorted_releases[@]}
+    for index in "${!sorted_releases[@]}"; do
+      if tekdocs_release_is_newer "$release" "${sorted_releases[$index]}"; then
+        insert_at=$index
+        break
+      fi
+    done
+    sorted_releases=("${sorted_releases[@]:0:$insert_at}" "$release" "${sorted_releases[@]:$insert_at}")
+  done
+  ((${#sorted_releases[@]} > 0)) || return 1
+  for candidate in "${sorted_releases[@]}"; do
+    commit=
+    fallback=
+    while IFS=$'\t' read -r sha ref; do
+      case "$ref" in
+        "refs/tags/$candidate^{}") commit=$sha; break ;;
+        "refs/tags/$candidate") fallback=$sha ;;
+      esac
+    done <<< "$references"
+    [[ -n "$commit" ]] || commit=$fallback
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\t%s\n' "$candidate" "$commit"
+  done
+}
+
+tekdocs_latest_published_release() {
+  local root=$1 catalog first
+  catalog=$(tekdocs_discover_published_releases "$root") || return 1
+  first=${catalog%%$'\n'*}
+  printf '%s\n' "${first%%$'\t'*}"
+}
+
 # Read reviewed release data as data, never as executable shell input.
 tekdocs_load_release_receipt() {
   local root=$1 release=$2 key value count=0

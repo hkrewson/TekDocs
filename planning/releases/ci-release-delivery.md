@@ -42,6 +42,19 @@ behavior, database schema or API contracts.
    evidence artifacts remain available for broader security review; green CI does
    not fabricate source-review findings or human risk acceptance.
 
+## Operator release catalog follow-up
+
+Application and receipt tags currently establish immutable identity, not a
+human-readable change summary. A future bounded delivery change should create an
+annotated application tag from reviewed repository-owned release metadata. Keep
+the annotation short and factual: one summary line, followed by an explicit
+`Breaking changes: none` or a concise operator action. CI must validate the text,
+derive it from the committed candidate packet rather than generated prose, and
+deliver the annotated application tag atomically with the existing receipt tag.
+The updater can then offer an optional detailed release list without trusting tag
+text for receipt, image, ancestry or migration decisions. Until that contract is
+implemented, release discovery shows version tags only.
+
 The Build workflow no longer triggers on tag pushes. GitHub also documents that
 pushes made with its workflow token do not recursively start workflows:
 [workflow triggering](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow).
@@ -59,10 +72,16 @@ names. Rules are never bypassed automatically.
 Install this updated tooling once. For future releases:
 
 ```bash
+scripts/update-production.sh --check
+scripts/update-production.sh --latest
 scripts/update-production.sh --release vMAJOR.MINOR.PATCH
 ```
 
-Use the actual published version. The updater prefers a historical checked-in
+`--check` is read-only. `--latest` selects the newest stable application tag only
+when the matching receipt tag also exists, then subjects that release to the same
+receipt and image verification as an explicit `--release`. Use the explicit form
+when an operator needs to pin or roll forward to a particular published version.
+The updater prefers a historical checked-in
 receipt when present. Otherwise it fetches the companion tag into `FETCH_HEAD`,
 checks the receipt schema, sole parent and sole changed path, and loads its four
 immutable images. This fetch changes neither branch nor working tree and needs

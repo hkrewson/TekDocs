@@ -9,18 +9,8 @@ source "$repository_root/scripts/lib/production-release.sh"
 invocation_directory=$PWD
 environment_file="$repository_root/.env"
 operator_config_file="$repository_root/.tekdocs-update.env"
-saved_backup_root=
-saved_recovery_key=
-if [[ -e "$operator_config_file" ]]; then
-  [[ -f "$operator_config_file" && -r "$operator_config_file" ]] || {
-    echo "TekDocs production update refused: operator configuration is not a readable file: $operator_config_file" >&2
-    exit 1
-  }
-  saved_backup_root=$(sed -n 's/^TEKDOCS_UPDATE_BACKUP_ROOT=//p' "$operator_config_file" | tail -n 1)
-  saved_recovery_key=$(sed -n 's/^TEKDOCS_UPDATE_RECOVERY_KEY_FILE=//p' "$operator_config_file" | tail -n 1)
-fi
-backup_root=${TEKDOCS_BACKUP_ROOT:-$saved_backup_root}
-recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-$saved_recovery_key}
+backup_root=${TEKDOCS_BACKUP_ROOT:-}
+recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-}
 secret_directory=
 use_traefik=true
 use_bootstrap_secret=false
@@ -28,50 +18,84 @@ skip_backup=false
 application_stopped=false
 release=
 release_directory=
+mode=
+update_controls=false
+argument_count=$#
+
+brief_usage() {
+  cat <<'EOF'
+TekDocs production updater
+
+Nothing was changed. Choose what you want to do:
+  scripts/update-production.sh --check          Show the installed and latest releases
+  scripts/update-production.sh --list-releases  Show published release tags
+  scripts/update-production.sh --latest         Install the latest published stable release
+  scripts/update-production.sh --release TAG    Install one published release, such as v0.9.18
+
+Run scripts/update-production.sh --help for requirements and all options.
+EOF
+}
 
 usage() {
   cat <<'EOF'
 Safely update a running TekDocs production installation.
 
-Normal update:
-  scripts/update-production.sh \
-    --backup-root DIRECTORY \
-    --recovery-key FILE
+Common commands:
+  scripts/update-production.sh --check
+      Show the tooling version, recorded deployed release and latest published release.
 
-  --backup-root is a parent directory for a new timestamped encrypted backup.
-  --recovery-key is an existing TekDocs recovery-key file kept separately from
-  both the backup directory and the deployment secret directory.
+  scripts/update-production.sh --list-releases
+      List stable application tags that have a companion CI receipt tag.
 
-Example:
-  scripts/update-production.sh \
+  scripts/update-production.sh --latest
+      Update to the latest published stable release after validating its receipt.
+
+  scripts/update-production.sh --release vMAJOR.MINOR.PATCH
+      Update to an explicitly selected published release.
+
+Update requirements:
+  A clean tooling checkout, a running production database and backend, Docker,
+  Git, curl, the production .env and secret directory, and either:
+
+  --backup-root DIRECTORY --recovery-key FILE
+      Create a timestamped encrypted backup before changing services. The key
+      must be retained separately from the backup and deployment secrets.
+
+  --skip-backup
+      Continue only after creating and verifying an external VM or volume snapshot.
+
+Examples:
+  scripts/update-production.sh --latest \
     --backup-root /path/to/tekdocs-backups \
     --recovery-key /separate/path/tekdocs-recovery.key
 
-If no recovery key exists, create one once and retain a separate copy:
+  scripts/update-production.sh --release v0.9.18
+
+Options:
+  --check                         Read-only update availability check
+  --list-releases                 Read-only published release list
+  --latest                        Select the newest published stable release
+  --release TAG                   Select an exact vMAJOR.MINOR.PATCH release
+  --upstream                      Advanced legacy branch update mode
+  --backup-root DIRECTORY         Parent directory for the new encrypted backup
+  --recovery-key FILE             Existing recovery-key file
+  --skip-backup                   Use an already verified external snapshot
+  --env-file FILE                 Production environment file
+  --secret-directory DIRECTORY    Production secret-files directory
+  --without-traefik               Exclude the Traefik overlay
+  --with-bootstrap-secret         Include the bootstrap-secret overlay
+  -h, --help                      Show this help
+
+Create a recovery key once, if needed:
   scripts/generate-recovery-key.sh /separate/path/tekdocs-recovery.key
-
-Update after creating a verified external VM or volume snapshot:
-  scripts/update-production.sh --skip-backup
-
-Select an approved published release (recommended):
-  scripts/update-production.sh --release vMAJOR.MINOR.PATCH
 
 Release mode retrieves the CI receipt (or uses a historical local receipt), checks the exact tag commit,
 image revisions and digests. It uses the release Compose files without changing
 the tooling checkout. Existing backup settings still apply.
-
-Optional arguments:
-    [--release vMAJOR.MINOR.PATCH] \
-    [--env-file FILE] \
-    [--secret-directory DIRECTORY] \
-    [--without-traefik] \
-    [--with-bootstrap-secret]
-
-Traefik is enabled by default. SMTP and OIDC overlays are detected from secret files.
-TEKDOCS_BACKUP_ROOT and TEKDOCS_RECOVERY_KEY_FILE may supply the two backup paths.
-The first complete backup configuration is saved in the ignored .tekdocs-update.env file.
-The update pulls the public GHCR images for the checked-out commit, verifies their
-embedded revision labels, deploys immutable digests, and records those digests in .env.
+The first complete backup configuration is saved in ignored .tekdocs-update.env.
+TEKDOCS_BACKUP_ROOT and TEKDOCS_RECOVERY_KEY_FILE may supply those paths.
+Calling the updater with backup options but no selector preserves legacy upstream
+mode with a deprecation warning; use --upstream explicitly instead.
 EOF
 }
 
@@ -87,21 +111,46 @@ argument_error() {
   exit 2
 }
 
+set_mode() {
+  local requested=$1
+  [[ -z "$mode" ]] || argument_error "$requested cannot be combined with the selected $mode mode"
+  mode=$requested
+}
+
 while (($#)); do
   case "$1" in
     --release)
       (($# >= 2)) || argument_error "--release requires a version tag"
       [[ -n "$2" ]] || argument_error "--release requires a version tag"
+      set_mode release
       release=$2
       shift 2
       ;;
+    --latest)
+      set_mode latest
+      shift
+      ;;
+    --list-releases)
+      set_mode list-releases
+      shift
+      ;;
+    --check)
+      set_mode check
+      shift
+      ;;
+    --upstream)
+      set_mode upstream
+      shift
+      ;;
     --backup-root)
       (($# >= 2)) || argument_error "--backup-root must be followed by a directory path"
+      update_controls=true
       backup_root=${2:-}
       shift 2
       ;;
     --recovery-key)
       (($# >= 2)) || argument_error "--recovery-key must be followed by a recovery-key file path"
+      update_controls=true
       recovery_key=${2:-}
       shift 2
       ;;
@@ -112,18 +161,22 @@ while (($#)); do
       ;;
     --secret-directory)
       (($# >= 2)) || argument_error "--secret-directory must be followed by a directory path"
+      update_controls=true
       secret_directory=${2:-}
       shift 2
       ;;
     --without-traefik)
+      update_controls=true
       use_traefik=false
       shift
       ;;
     --with-bootstrap-secret)
+      update_controls=true
       use_bootstrap_secret=true
       shift
       ;;
     --skip-backup)
+      update_controls=true
       skip_backup=true
       shift
       ;;
@@ -137,9 +190,86 @@ while (($#)); do
   esac
 done
 
-if [[ -n "$release" ]]; then
+if [[ -z "$mode" ]]; then
+  if ((argument_count == 0)); then
+    brief_usage
+    exit 0
+  fi
+  mode=upstream
+  echo "Warning: implicit upstream mode is deprecated; use --upstream explicitly." >&2
+fi
+
+if [[ "$mode" == list-releases || "$mode" == check ]]; then
+  [[ "$update_controls" == false ]] || argument_error "$mode is read-only and cannot be combined with update options"
+  catalog=$(tekdocs_discover_published_releases "$repository_root") || fail "published release tags could not be read from origin"
+  if [[ "$mode" == list-releases ]]; then
+    echo "Published TekDocs releases (newest first):"
+    while IFS=$'\t' read -r published_release _commit; do
+      printf '  %s\n' "$published_release"
+    done <<< "$catalog"
+    echo "Each tag has a companion CI receipt; the receipt is validated when selected."
+    exit 0
+  fi
+  latest_line=${catalog%%$'\n'*}
+  latest_release=${latest_line%%$'\t'*}
+  checkout_version=$(tr -d '[:space:]' < "$repository_root/VERSION")
+  deployed_commit=
+  if [[ "$environment_file" != /* ]]; then
+    environment_file="$invocation_directory/$environment_file"
+  fi
+  if [[ -f "$environment_file" ]]; then
+    deployed_commit=$(sed -n 's/^TEKDOCS_DEPLOYED_COMMIT=//p' "$environment_file" | head -n 1)
+  fi
+  deployed_release=
+  if [[ "$deployed_commit" =~ ^[0-9a-f]{40}$ ]]; then
+    while IFS=$'\t' read -r published_release published_commit; do
+      [[ "$published_commit" == "$deployed_commit" ]] || continue
+      deployed_release=$published_release
+      break
+    done <<< "$catalog"
+  fi
+  echo "TekDocs update check"
+  echo "  Tooling checkout version: v$checkout_version"
+  if [[ -n "$deployed_release" ]]; then
+    echo "  Recorded deployed release: $deployed_release"
+  elif [[ -n "$deployed_commit" ]]; then
+    echo "  Recorded deployed commit: ${deployed_commit:0:12} (not a listed release)"
+  else
+    echo "  Recorded deployed release: not available in $environment_file"
+  fi
+  echo "  Latest published release: $latest_release"
+  if [[ "$deployed_release" == "$latest_release" ]]; then
+    echo "  Status: up to date"
+  elif [[ -n "$deployed_release" ]]; then
+    echo "  Status: update available ($deployed_release -> $latest_release)"
+  else
+    echo "  Status: deployed release could not be compared"
+  fi
+  echo "Run scripts/update-production.sh --latest to select it."
+  exit 0
+fi
+
+if [[ "$mode" == latest ]]; then
+  release=$(tekdocs_latest_published_release "$repository_root") || fail "the latest published release could not be determined from origin"
+  echo "Selected latest published release: $release"
+fi
+
+if [[ "$mode" == release || "$mode" == latest ]]; then
   tekdocs_load_published_release "$repository_root" "$release" || argument_error "release has no valid reviewed image receipt: $release"
 fi
+
+saved_backup_root=
+saved_recovery_key=
+if [[ -e "$operator_config_file" ]]; then
+  [[ -f "$operator_config_file" && -r "$operator_config_file" ]] || {
+    echo "TekDocs production update refused: operator configuration is not a readable file: $operator_config_file" >&2
+    exit 1
+  }
+  saved_backup_root=$(sed -n 's/^TEKDOCS_UPDATE_BACKUP_ROOT=//p' "$operator_config_file" | tail -n 1)
+  saved_recovery_key=$(sed -n 's/^TEKDOCS_UPDATE_RECOVERY_KEY_FILE=//p' "$operator_config_file" | tail -n 1)
+fi
+[[ -n "$backup_root" ]] || backup_root=$saved_backup_root
+[[ -n "$recovery_key" ]] || recovery_key=$saved_recovery_key
 
 if [[ "$skip_backup" != true ]]; then
   if [[ -z "$backup_root" && -z "$recovery_key" ]]; then
@@ -252,10 +382,26 @@ previous_version=$(tr -d '[:space:]' < VERSION)
 backup_output=
 
 if [[ "$skip_backup" == true ]]; then
-  echo "Skipping TekDocs backup because --skip-backup was explicitly supplied."
+  backup_plan="verified external snapshot (--skip-backup)"
 else
   timestamp=$(date -u '+%Y%m%d-%H%M%S')
   backup_output="$backup_root/tekdocs-${previous_version}-${timestamp}"
+  backup_plan=$backup_output
+fi
+
+echo "TekDocs production update plan"
+echo "  Current tooling version: v$previous_version (${previous_commit:0:12})"
+if [[ -n "$release" ]]; then
+  echo "  Selected release: $release"
+else
+  echo "  Selected source: configured upstream branch (advanced mode)"
+fi
+echo "  Pre-update recovery: $backup_plan"
+echo "  Traefik overlay: $use_traefik"
+
+if [[ "$skip_backup" == true ]]; then
+  echo "Skipping TekDocs backup because --skip-backup was explicitly supplied."
+else
   "$repository_root/scripts/tekdocs-backup.sh" \
     --env-file "$environment_file" \
     --secret-directory "$secret_directory" \

@@ -10,6 +10,8 @@ from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey
 
+from .content_authoring import AuthoredContent, ContentAuthoringError, read_authored_content
+from .content_read import repository_for_reader
 from .document_source_models import DocumentRemoteSource
 from .document_source_serializers import (
     RemoteObservationApplySerializer,
@@ -21,6 +23,8 @@ from .document_source_serializers import (
 from .document_sources import apply_remote_observation, fetch_remote_document
 from .document_views import _document, _msp_workspace, _organization_workspace
 from .documents import PlacementConflict
+from .models import Document, WorkspaceRepository
+from .repository_service import RepositoryServiceError
 from .workspaces import ResolvedWorkspace
 
 
@@ -67,7 +71,10 @@ def _source_detail(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
 
 
 def _observations(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:
-    source = _source(workspace, document_entity_id)
+    return _source_observations(_source(workspace, document_entity_id), request)
+
+
+def _source_observations(source: DocumentRemoteSource, request: Request) -> Response:
     if request.method == "POST":
         observation = fetch_remote_document(source)
         from .document_source_git import source_uses_git
@@ -94,7 +101,10 @@ def _observations(workspace: ResolvedWorkspace, document_entity_id: UUID, reques
 
 
 def _apply(workspace: ResolvedWorkspace, document_entity_id: UUID, observation_id: UUID, request: Request) -> Response:
-    source = _source(workspace, document_entity_id)
+    return _source_apply(_source(workspace, document_entity_id), observation_id, request)
+
+
+def _source_apply(source: DocumentRemoteSource, observation_id: UUID, request: Request) -> Response:
     observation = get_object_or_404(source.observations.all(), id=observation_id)
     serializer = RemoteObservationApplySerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -106,6 +116,127 @@ def _apply(workspace: ResolvedWorkspace, document_entity_id: UUID, observation_i
     except PlacementConflict as exc:
         return Response({"code": "placement_conflict", "detail": str(exc)}, status=409)
     return Response(RemoteObservationSerializer(observation).data)
+
+
+def _native_owner(
+    workspace: ResolvedWorkspace, content_id: UUID, *, lock: bool = False,
+) -> tuple[WorkspaceRepository, AuthoredContent]:
+    try:
+        repository = repository_for_reader(workspace)
+        if lock:
+            repository = WorkspaceRepository.objects.select_for_update().get(pk=repository.pk)
+        authored = read_authored_content(repository=repository, content_id=content_id)
+    except (WorkspaceRepository.DoesNotExist, ContentAuthoringError, RepositoryServiceError, ValueError) as exc:
+        raise Http404 from exc
+    if authored.kind != "document" or Document.objects.filter(
+        pk=content_id,
+        tenant_id=workspace.member.tenant.id,
+        organization=workspace.organization,
+    ).exists():
+        raise Http404
+    return repository, authored
+
+
+def _native_source(workspace: ResolvedWorkspace, content_id: UUID) -> DocumentRemoteSource:
+    repository, _authored = _native_owner(workspace, content_id)
+    return get_object_or_404(
+        DocumentRemoteSource.objects.select_related("last_applied_observation", "repository"),
+        repository=repository, content_id=content_id, archived_at__isnull=True,
+    )
+
+
+@transaction.atomic
+def _native_source_detail(workspace: ResolvedWorkspace, content_id: UUID, request: Request) -> Response:
+    repository, _authored = _native_owner(workspace, content_id, lock=request.method != "GET")
+    if request.method == "GET":
+        try:
+            source = _native_source(workspace, content_id)
+        except Http404:
+            return Response(status=204)
+        return Response(RemoteSourceResultSerializer(source).data)
+    serializer = RemoteSourceWriteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    list(DocumentRemoteSource.objects.select_for_update().filter(repository=repository, content_id=content_id))
+    source, created = DocumentRemoteSource.objects.get_or_create(
+        repository=repository,
+        content_id=content_id,
+        defaults={
+            "tenant": workspace.member.tenant,
+            "organization": workspace.organization,
+            "created_by": request.user,
+            **serializer.validated_data,
+        },
+    )
+    if not created:
+        for field, value in serializer.validated_data.items():
+            setattr(source, field, value)
+        source.archived_at = None
+        source.save(update_fields=(*serializer.validated_data.keys(), "archived_at", "updated_at"))
+    return Response(RemoteSourceResultSerializer(source).data, status=201)
+
+
+class MSPNativeRemoteSourceView(APIView):
+    @extend_schema(responses={200: RemoteSourceResultSerializer, 204: None})
+    def get(self, request: Request, content_id: UUID) -> Response:
+        return _native_source_detail(_msp_workspace(request, PermissionKey.DOCUMENTS_VIEW), content_id, request)
+
+    @extend_schema(request=RemoteSourceWriteSerializer, responses={201: RemoteSourceResultSerializer})
+    def put(self, request: Request, content_id: UUID) -> Response:
+        return _native_source_detail(_msp_workspace(request, PermissionKey.DOCUMENTS_EDIT), content_id, request)
+
+
+class OrganizationNativeRemoteSourceView(APIView):
+    @extend_schema(responses={200: RemoteSourceResultSerializer, 204: None})
+    def get(self, request: Request, organization_entity_id: UUID, content_id: UUID) -> Response:
+        return _native_source_detail(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW), content_id, request,
+        )
+
+    @extend_schema(request=RemoteSourceWriteSerializer, responses={201: RemoteSourceResultSerializer})
+    def put(self, request: Request, organization_entity_id: UUID, content_id: UUID) -> Response:
+        return _native_source_detail(
+            _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT), content_id, request,
+        )
+
+
+class MSPNativeRemoteObservationView(APIView):
+    @extend_schema(responses={200: RemoteObservationListSerializer})
+    def get(self, request: Request, content_id: UUID) -> Response:
+        workspace = _msp_workspace(request, PermissionKey.DOCUMENTS_VIEW)
+        return _source_observations(_native_source(workspace, content_id), request)
+
+    @extend_schema(request=None, responses={201: RemoteObservationSerializer})
+    def post(self, request: Request, content_id: UUID) -> Response:
+        workspace = _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT)
+        return _source_observations(_native_source(workspace, content_id), request)
+
+
+class OrganizationNativeRemoteObservationView(APIView):
+    @extend_schema(responses={200: RemoteObservationListSerializer})
+    def get(self, request: Request, organization_entity_id: UUID, content_id: UUID) -> Response:
+        workspace = _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_VIEW)
+        return _source_observations(_native_source(workspace, content_id), request)
+
+    @extend_schema(request=None, responses={201: RemoteObservationSerializer})
+    def post(self, request: Request, organization_entity_id: UUID, content_id: UUID) -> Response:
+        workspace = _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT)
+        return _source_observations(_native_source(workspace, content_id), request)
+
+
+class MSPNativeRemoteObservationApplyView(APIView):
+    @extend_schema(request=RemoteObservationApplySerializer, responses={200: RemoteObservationSerializer})
+    def post(self, request: Request, content_id: UUID, observation_id: UUID) -> Response:
+        workspace = _msp_workspace(request, PermissionKey.DOCUMENTS_EDIT)
+        return _source_apply(_native_source(workspace, content_id), observation_id, request)
+
+
+class OrganizationNativeRemoteObservationApplyView(APIView):
+    @extend_schema(request=RemoteObservationApplySerializer, responses={200: RemoteObservationSerializer})
+    def post(
+        self, request: Request, organization_entity_id: UUID, content_id: UUID, observation_id: UUID,
+    ) -> Response:
+        workspace = _organization_workspace(request, organization_entity_id, PermissionKey.DOCUMENTS_EDIT)
+        return _source_apply(_native_source(workspace, content_id), observation_id, request)
 
 
 class MSPDocumentRemoteSourceView(APIView):

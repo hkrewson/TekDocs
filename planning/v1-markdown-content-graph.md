@@ -6,6 +6,11 @@ Architecture input baseline: 0.8.46
 Current baseline: 0.9.0
 Target: 1.0.0
 
+Immediate execution order is maintained in the [1.0 closeout plan](1.0-closeout-plan.md):
+recovery correction, a finite document support matrix, required migration
+completion, then candidate acceptance. The maintainer's first post-1.0 priority
+is the [end-to-end interface rework](post-1.0-interface-rework.md).
+
 ## Version boundary
 
 The Markdown content graph defines the version 1 architecture. The version

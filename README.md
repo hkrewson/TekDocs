@@ -14,6 +14,24 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
+The [immediate 1.0 closeout plan](planning/1.0-closeout-plan.md) orders recovery,
+document-scope decisions, remaining migration work and final acceptance. A
+distinct TekDocs [interface rework](planning/post-1.0-interface-rework.md) is the
+first post-1.0 priority.
+
+## Cross-Workspace reuse migration development
+
+The [remaining-gap audit](planning/migrations/remaining-migration-audit.md) starts
+with [scoped cross-Workspace reuse](planning/migrations/cross-workspace-reuse-migration.md):
+ordinary shared MSP blocks, client-listing primary references and template blocks
+reused without enrollment. Reviewed immutable source archives preserve pre-Git
+pins; new v13 publication proof keeps ordinary and enrolled provenance distinct.
+Signed publications, PDFs and file versions retain their existing custody.
+Both source-review axes, 704 combined Docker cases and nine real browser/server
+journeys passed, including isolation and rollback/recovery. Exact-source hosted
+upgrade and independent restore evidence remain required. Development stays at
+0.9.18; broader migration coverage is tracked explicitly.
+
 ## Repeated shared-block migration development
 
 The [#105/#106 continuation](planning/migrations/repeated-shared-block-migration.md)

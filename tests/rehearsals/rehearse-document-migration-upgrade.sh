@@ -132,6 +132,18 @@ run_repeated_block_fixture() {
     migrate python manage.py shell --no-imports \
     < "$repository_root/backend/apps/core/tests/repeated_block_fixture.py"
 }
+run_cross_workspace_fixture() {
+  cross_workspace_project=$1
+  cross_workspace_environment=$2
+  cross_workspace_directory=$3
+  cross_workspace_mode=$4
+  cross_workspace_legacy_sha=${5:-}
+  compose_for "$cross_workspace_project" "$cross_workspace_environment" "$cross_workspace_directory" run --rm -T \
+    -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE="$cross_workspace_mode" \
+    -e TEKDOCS_CROSS_WORKSPACE_LEGACY_SHA256="$cross_workspace_legacy_sha" \
+    migrate python manage.py shell --no-imports \
+    < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py"
+}
 
 #=========================# MAIN #==========================#
 trap cleanup EXIT HUP INT TERM
@@ -171,10 +183,13 @@ run_diagram_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directo
 run_monitored_source_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/monitored_source-legacy.log"
 run_client_publication_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/client-publication-upgrade.log"
 run_repeated_block_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/repeated-block-upgrade.log"
+run_cross_workspace_fixture "$upgrade_project" "$upgrade_environment" "$baseline_directory" seed > "$work_directory/cross-workspace-upgrade.log"
 client_publication_upgrade_sha=$(sed -n 's/^CLIENT_PUBLICATION_LEGACY_SHA256=//p' "$work_directory/client-publication-upgrade.log")
 repeated_block_upgrade_sha=$(sed -n 's/^REPEATED_BLOCK_LEGACY_SHA256=//p' "$work_directory/repeated-block-upgrade.log")
+cross_workspace_upgrade_sha=$(sed -n 's/^CROSS_WORKSPACE_LEGACY_SHA256=//p' "$work_directory/cross-workspace-upgrade.log")
 printf '%s\n' "$client_publication_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$repeated_block_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
+printf '%s\n' "$cross_workspace_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
 diagram_upgrade_sha=$(sed -n 's/^DIAGRAM_LEGACY_SHA256=//p' "$work_directory/diagram-legacy.log")
 monitored_source_upgrade_sha=$(sed -n 's/^MONITORED_SOURCE_LEGACY_SHA256=//p' "$work_directory/monitored_source-legacy.log")
 printf '%s\n' "$diagram_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
@@ -195,6 +210,7 @@ run_diagram_fixture "$upgrade_project" "$upgrade_environment" "$repository_root"
 run_monitored_source_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$monitored_source_upgrade_sha"
 run_client_publication_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$client_publication_upgrade_sha"
 run_repeated_block_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$repeated_block_upgrade_sha"
+run_cross_workspace_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$cross_workspace_upgrade_sha"
 
 echo "Running the identical migration workflow on a fresh installation"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" up -d --build --wait backend
@@ -207,10 +223,13 @@ run_diagram_fixture "$fresh_project" "$fresh_environment" "$repository_root" see
 run_monitored_source_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/monitored_source-fresh.log"
 run_client_publication_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/client-publication-fresh.log"
 run_repeated_block_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/repeated-block-fresh.log"
+run_cross_workspace_fixture "$fresh_project" "$fresh_environment" "$repository_root" seed > "$work_directory/cross-workspace-fresh.log"
 client_publication_fresh_sha=$(sed -n 's/^CLIENT_PUBLICATION_LEGACY_SHA256=//p' "$work_directory/client-publication-fresh.log")
 repeated_block_fresh_sha=$(sed -n 's/^REPEATED_BLOCK_LEGACY_SHA256=//p' "$work_directory/repeated-block-fresh.log")
+cross_workspace_fresh_sha=$(sed -n 's/^CROSS_WORKSPACE_LEGACY_SHA256=//p' "$work_directory/cross-workspace-fresh.log")
 printf '%s\n' "$client_publication_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 printf '%s\n' "$repeated_block_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
+printf '%s\n' "$cross_workspace_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
 diagram_fresh_sha=$(sed -n 's/^DIAGRAM_LEGACY_SHA256=//p' "$work_directory/diagram-fresh.log")
 monitored_source_fresh_sha=$(sed -n 's/^MONITORED_SOURCE_LEGACY_SHA256=//p' "$work_directory/monitored_source-fresh.log")
 printf '%s\n' "$diagram_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
@@ -229,6 +248,7 @@ run_diagram_fixture "$fresh_project" "$fresh_environment" "$repository_root" pro
 run_monitored_source_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$monitored_source_fresh_sha"
 run_client_publication_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$client_publication_fresh_sha"
 run_repeated_block_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$repeated_block_fresh_sha"
+run_cross_workspace_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$cross_workspace_fresh_sha"
 cmp "$work_directory/upgraded-result.json" "$work_directory/fresh-result.json"
 
 echo "Document migration fresh/0.8.46 upgrade acceptance passed"

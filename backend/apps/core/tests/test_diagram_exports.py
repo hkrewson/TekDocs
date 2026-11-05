@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 from io import BytesIO
+from pathlib import Path
 from types import SimpleNamespace
 from zipfile import ZipFile
 
@@ -44,6 +46,43 @@ flowchart LR
   Browser --> API
 ```
 """
+
+
+def test_renderer_can_claim_ready_before_producer_returns(tmp_path, monkeypatch):
+    """The worker may rename ready immediately after its creation."""
+    original_write = Path.write_bytes
+    original_touch = Path.touch
+    permissions = []
+
+    def claim(path):
+        if path.name != "ready":
+            return
+        directory = path.parent
+        permissions.extend(item.stat().st_mode & 0o777 for item in directory.iterdir())
+        path.rename(directory / "processing")
+        (directory / "output-1.svg").write_text("<svg><title>Request path</title></svg>")
+        original_write(directory / "output-1.png", b"\x89PNG\r\n\x1a\nsynthetic")
+        (directory / "result.json").write_text(json.dumps({
+            "status": "ok", "count": 1, "renderer": "@mermaid-js/mermaid-cli@11.16.0",
+        }))
+
+    def write_and_claim(path, data):
+        result = original_write(path, data)
+        claim(path)
+        return result
+
+    def touch_and_claim(path, mode=0o666, exist_ok=True):
+        original_touch(path, mode=mode, exist_ok=exist_ok)
+        claim(path)
+
+    monkeypatch.setattr(Path, "write_bytes", write_and_claim)
+    monkeypatch.setattr(Path, "touch", touch_and_claim)
+    with override_settings(TEKDOCS_DIAGRAM_JOB_DIRECTORY=str(tmp_path)):
+        artifacts = render_diagram_exports(MARKDOWN, required=True)
+    assert len(artifacts) == 1
+    assert artifacts[0].state == "rendered"
+    assert permissions and all(mode == 0o600 for mode in permissions)
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_live_docx_uses_reader_resolutions_without_leaking_key_source():

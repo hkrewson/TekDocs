@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from django.db import transaction
+from django.db.models import Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -34,6 +35,7 @@ from .document_attachments import (
     copy_attachment_content,
     create_repository_document_attachment,
     repository_attachment_archive_eligible,
+    require_repository_primary_file_authority,
 )
 from .document_file_serializers import (
     DocumentAttachmentSerializer,
@@ -396,15 +398,20 @@ def _primary_versions(request, content_id: UUID, organization_entity_id: UUID | 
     page_size = 25
     with transaction.atomic():
         repository = _locked_attachment_repository(workspace, content_id)
+        try:
+            require_repository_primary_file_authority(repository=repository, content_id=content_id)
+        except RepositoryPrimaryFileConflict as exc:
+            return Response({"detail": str(exc)}, status=409)
         records = DocumentAttachment.objects.filter(
             tenant=repository.tenant,
             organization=repository.workspace.organization,
             owner_workspace=repository.workspace,
             owner_content_id=content_id,
-            document__isnull=True,
             purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
             archived_at__isnull=True,
-        ).select_related("replaces", "replaces__entity").order_by("-version_number", "id")
+        ).filter(Q(document__isnull=True) | Q(document_id=content_id)).select_related(
+            "replaces", "replaces__entity"
+        ).order_by("-version_number", "id")
         count = records.count()
         selected = list(records[(page - 1) * page_size:page * page_size])
         for version in selected:
@@ -448,7 +455,10 @@ class MSPContentAuthoringPrimaryFileView(APIView):
     @extend_schema(
         operation_id="content_authoring_msp_primary_file_versions",
         parameters=[RepositoryAttachmentQuerySerializer],
-        responses={200: RepositoryPrimaryFilePageSerializer},
+        responses={
+            200: RepositoryPrimaryFilePageSerializer,
+            409: OpenApiResponse(description="Repository file authority or index is unavailable"),
+        },
     )
     def get(self, request, content_id):  # type: ignore[no-untyped-def]
         return _primary_versions(request, content_id)
@@ -456,7 +466,10 @@ class MSPContentAuthoringPrimaryFileView(APIView):
     @extend_schema(
         operation_id="content_authoring_msp_primary_file_append",
         request=RepositoryPrimaryFileWriteSerializer,
-        responses={201: DocumentPrimaryFileSerializer, 409: OpenApiResponse(description="Current version changed")},
+        responses={
+            201: DocumentPrimaryFileSerializer,
+            409: OpenApiResponse(description="Source authority or current version changed"),
+        },
     )
     def post(self, request, content_id):  # type: ignore[no-untyped-def]
         return _append_primary_version(request, content_id)
@@ -468,7 +481,10 @@ class OrganizationContentAuthoringPrimaryFileView(APIView):
     @extend_schema(
         operation_id="content_authoring_organization_primary_file_versions",
         parameters=[RepositoryAttachmentQuerySerializer],
-        responses={200: RepositoryPrimaryFilePageSerializer},
+        responses={
+            200: RepositoryPrimaryFilePageSerializer,
+            409: OpenApiResponse(description="Repository file authority or index is unavailable"),
+        },
     )
     def get(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _primary_versions(request, content_id, organization_entity_id)
@@ -476,7 +492,10 @@ class OrganizationContentAuthoringPrimaryFileView(APIView):
     @extend_schema(
         operation_id="content_authoring_organization_primary_file_append",
         request=RepositoryPrimaryFileWriteSerializer,
-        responses={201: DocumentPrimaryFileSerializer, 409: OpenApiResponse(description="Current version changed")},
+        responses={
+            201: DocumentPrimaryFileSerializer,
+            409: OpenApiResponse(description="Source authority or current version changed"),
+        },
     )
     def post(self, request, organization_entity_id, content_id):  # type: ignore[no-untyped-def]
         return _append_primary_version(request, content_id, organization_entity_id)

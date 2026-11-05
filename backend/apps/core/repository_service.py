@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from django.db import connection, transaction
@@ -923,6 +924,43 @@ def read_accepted_repository_markdown_files(
         return commit, tuple(files)
 
 
+def read_accepted_repository_file_dates(
+    *, repository_id: uuid.UUID, expected_commit: str, paths: Sequence[str],
+) -> dict[str, tuple[datetime, datetime]]:
+    """Return first/latest verified path-change dates at one exact accepted head."""
+    if not paths or len(paths) > 1024:
+        raise RepositoryInputError("File-date inventory is outside the supported bound")
+    selected = {_validate_path(path) for path in paths}
+    repository, root, repository_path, object_format = _load_repository(repository_id)
+    with _repository_lock(root, repository.id, exclusive=False):
+        repository.refresh_from_db(fields=("accepted_commit",))
+        accepted = _accepted_object(repository, object_format)
+        if accepted != expected_commit:
+            raise RepositoryConflictError("Repository changed before discovery")
+        git = _GitRepository(repository.id, repository_path, object_format)
+        # NUL framing keeps quoted/unicode filenames distinct from commit headers.
+        _, output = git._run("read_file_dates", (
+            "--literal-pathspecs", "log", "-z", "--first-parent", "--format=%x00%H", "--name-only", "--no-renames",
+            expected_commit, "--", *sorted(selected),
+        ))
+        changes: dict[str, tuple[str, str]] = {}
+        commit_id = ""
+        for token in output.decode("utf-8").split("\0"):
+            token = token.lstrip("\n")
+            if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", token):
+                commit_id = _validate_object_id(token, object_format)
+            elif token in selected and commit_id:
+                latest = changes.get(token, (commit_id, commit_id))[1]
+                changes[token] = (commit_id, latest)
+        identities = {identity for pair in changes.values() for identity in pair}
+        dates = dict(RepositoryCommit.objects.filter(
+            repository=repository, object_id__in=identities,
+        ).values_list("object_id", "created_at"))
+        if set(changes) != selected or set(dates) != identities:
+            raise RepositoryInputError("Verified file history is unavailable")
+        return {path: (dates[first], dates[last]) for path, (first, last) in changes.items()}
+
+
 def list_accepted_repository_history(
     *, repository_id: uuid.UUID, limit: int = 32, record_reconciliation: bool = True
 ) -> tuple[str, ...]:
@@ -1119,20 +1157,21 @@ def repository_health_diagnostics() -> dict[str, object]:
 
 
 @dataclass(frozen=True, slots=True)
-class TemplateLibraryFragmentRead:
+class LibraryFragmentRead:
     object_id: str
     source: bytes
     expected_body_sha256: str
     source_path: str
-    template_revision_id: uuid.UUID
+    revision_id: uuid.UUID
 
 
-def read_template_library_fragment(
-    *, destination_document_id: uuid.UUID, library_workspace_id: uuid.UUID,
+def read_library_fragment(
+    *, tenant_id: uuid.UUID, destination_document_id: uuid.UUID, library_workspace_id: uuid.UUID,
     source_block_id: uuid.UUID, mode: str, pinned_object_id: str = "",
-    template_revision_id: uuid.UUID | None = None, audience: str = "shared",
-) -> TemplateLibraryFragmentRead:
-    """Read one approved enrolled source without granting access to its repository."""
+    library_revision_id: uuid.UUID | None = None, audience: str = "shared",
+    library_source_id: uuid.UUID | None = None,
+) -> LibraryFragmentRead:
+    """Read one approved shared source without granting access to its repository."""
     from .repository_storage import configured_repository_root, repository_path
 
     if mode not in {"live", "pinned"} or (mode == "live" and pinned_object_id):
@@ -1144,23 +1183,34 @@ def read_template_library_fragment(
 
     from .document_template_migration import TemplateMigrationError, template_enrollment_evidence
     from .document_template_models import DocumentTemplateEnrollment
+    from .library_source_descriptor import LibrarySourceDescriptor
     from .models import DocumentPlacement
 
-    def descriptor() -> tuple[uuid.UUID, str, str, str, str, str, uuid.UUID, str]:
+    def descriptor() -> LibrarySourceDescriptor:
+        if library_source_id is not None:
+            from .shared_library_scope import ordinary_library_descriptor
+
+            return ordinary_library_descriptor(
+                tenant_id=tenant_id,
+                destination_document_id=destination_document_id, library_workspace_id=library_workspace_id,
+                source_document_id=library_source_id, source_block_id=source_block_id,
+                mode=mode, audience=audience, revision_id=library_revision_id,
+            )
         enrollment = DocumentTemplateEnrollment.objects.filter(
-            destination_document_id=destination_document_id, archived_at__isnull=True,
+            tenant_id=tenant_id, destination_document_id=destination_document_id, archived_at__isnull=True,
         ).first()
         if enrollment is None:
             raise RepositoryInputError("Enrolled template library source is unavailable")
         try:
             destination, template = enrollment.destination_document, enrollment.source_template
-            if template_revision_id is not None and template_revision_id != enrollment.applied_revision_id:
+            if library_revision_id is not None and library_revision_id != enrollment.applied_revision_id:
                 raise TemplateMigrationError("template_library_revision_changed")
             evidence = template_enrollment_evidence(destination)
             source_workspace = template.entity.workspace_id
             if evidence is None or source_workspace != library_workspace_id or not template.library_visible:
                 raise TemplateMigrationError("template_library_scope_invalid")
             placement = DocumentPlacement.objects.select_related("block", "pinned_revision").get(
+                pk__in=evidence.library_placement_ids,
                 document=destination, block_id=source_block_id, resolution_mode=mode, audience_profile=audience,
                 block__source_document=template, block__library_visible=True,
             )
@@ -1181,14 +1231,18 @@ def read_template_library_fragment(
                 raise TemplateMigrationError("template_library_repository_unavailable")
         except (ObjectDoesNotExist, TemplateMigrationError) as exc:
             raise RepositoryInputError("Enrolled template library source is unavailable") from exc
-        return (
-            repository.id, repository.storage_relative_path, repository.accepted_commit.object_id,
-            repository.accepted_commit.object_format, revision.checksum, evidence.fingerprint,
-            enrollment.applied_revision_id, enrollment.applied_revision.checksum,
+        return LibrarySourceDescriptor(
+            repository_id=repository.id, storage_relative_path=repository.storage_relative_path,
+            accepted_commit=repository.accepted_commit.object_id,
+            object_format=repository.accepted_commit.object_format, body_sha256=revision.checksum,
+            scope_sha256=evidence.fingerprint, revision_id=enrollment.applied_revision_id,
+            retention_manifest_sha256=enrollment.applied_revision.checksum,
         )
 
     selected = descriptor()
-    identity, relative_path, accepted, object_format, checksum, _fingerprint, revision_id, manifest_sha256 = selected
+    identity, relative_path = selected.repository_id, selected.storage_relative_path
+    accepted, object_format = selected.accepted_commit, selected.object_format
+    revision_id = selected.revision_id
     root = configured_repository_root()
     if root is None:
         raise RepositoryStorageError("Managed repository storage is not configured")
@@ -1209,7 +1263,8 @@ def read_template_library_fragment(
             raise RepositoryInputError("Template library pin is not retained in accepted history")
         source_path = f"fragments/{source_block_id}.md"
         if mode == "pinned":
-            retained_path = f"template-snapshots/{revision_id}/fragments/{source_block_id}.content"
+            prefix = "template-snapshots" if library_source_id is None else "shared-snapshots"
+            retained_path = f"{prefix}/{revision_id}/fragments/{source_block_id}.content"
             try:
                 source = git.read_file(object_id, retained_path)
             except RepositoryFileNotFoundError:
@@ -1217,15 +1272,30 @@ def read_template_library_fragment(
             else:
                 import hashlib
 
-                retained_manifest = git.read_file(object_id, f"template-snapshots/{revision_id}/manifest.json")
-                if hashlib.sha256(retained_manifest).hexdigest() != manifest_sha256:
-                    raise RepositoryInputError("Retained template version differs from its immutable manifest")
+                if library_source_id is None:
+                    retained_manifest = git.read_file(object_id, f"template-snapshots/{revision_id}/manifest.json")
+                    if hashlib.sha256(retained_manifest).hexdigest() != selected.retention_manifest_sha256:
+                        raise RepositoryInputError("Retained template version differs from its immutable manifest")
                 source_path = retained_path
         else:
             source = git.read_file(object_id, source_path)
         if descriptor() != selected:
             raise RepositoryConflictError("Template library enrollment changed during read")
-    return TemplateLibraryFragmentRead(object_id, source, checksum, source_path, revision_id)
+    return LibraryFragmentRead(object_id, source, selected.body_sha256, source_path, revision_id)
+
+
+def read_template_library_fragment(
+    *, tenant_id: uuid.UUID, destination_document_id: uuid.UUID, library_workspace_id: uuid.UUID,
+    source_block_id: uuid.UUID, mode: str, pinned_object_id: str = "",
+    template_revision_id: uuid.UUID | None = None, audience: str = "shared",
+) -> LibraryFragmentRead:
+    """Compatibility entry point retaining the enrolled-template-only boundary."""
+    return read_library_fragment(
+        tenant_id=tenant_id,
+        destination_document_id=destination_document_id, library_workspace_id=library_workspace_id,
+        source_block_id=source_block_id, mode=mode, pinned_object_id=pinned_object_id,
+        library_revision_id=template_revision_id, audience=audience,
+    )
 
 
 class _CoordinatedRepositoryTransaction:

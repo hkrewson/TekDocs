@@ -76,7 +76,7 @@ def _cohort(owner):
     return document, companion, original, approver, client
 
 
-def seed_client_publication_fixture(owner):
+def seed_client_publication_fixture(owner, *, approver_password=None):
     tenant = require_installation_member(owner).tenant
     assert not Document.objects.filter(tenant=tenant, entity__display_name=TITLE).exists()
     if not Authenticator.objects.filter(user=owner, type=Authenticator.Type.TOTP).exists():
@@ -92,6 +92,7 @@ def seed_client_publication_fixture(owner):
     approver = User.objects.create_user(
         email=f"publication-approver-{uuid.uuid4()}@example.invalid",
         display_name="Client publication fixture approver",
+        password=approver_password,
     )
     TenantMembership.objects.create(tenant=tenant, user=approver, role=BuiltInRole.ADMINISTRATOR)
     TOTP.activate(approver, generate_totp_secret())

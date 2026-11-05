@@ -22,12 +22,12 @@ from django.db import connection
 from django.db.backends.signals import connection_created
 from django.test import Client, override_settings
 
+from apps.accounts.access_control import assign_organization_staff
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core import document_migration_import, repository_storage
 from apps.core.content_index import index_repository_content
 from apps.core.document_attachments import (
-    copy_attachment_content,
     create_document_attachment,
     replace_primary_document_file,
 )
@@ -211,6 +211,24 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.template_browser_fixture import prepare_template_browser_fixture
 
         template_fixture = prepare_template_browser_fixture(installation.owner)
+        modes = ("copy", "live", "pinned")
+        assert template_fixture.browser["documents"] == {
+            mode: str(document.entity_id)
+            for mode, document in zip(modes, template_fixture.documents, strict=True)
+        }
+        assert template_fixture.browser["content_ids"] == {
+            mode: str(document.id)
+            for mode, document in zip(modes, template_fixture.documents, strict=True)
+        }
+        assert template_fixture.browser["documents"] != template_fixture.browser["content_ids"]
+        from apps.core.tests.native_template_browser_fixture import prepare_native_template_browser_fixture
+
+        native_template_fixture = prepare_native_template_browser_fixture(installation.owner)
+        assign_organization_staff(
+            actor=installation.owner,
+            organization_entity_id=uuid.UUID(native_template_fixture["organization_id"]),
+            member_user_id=viewer.id,
+        )
         from apps.core.tests.key_entity_fixture import promote_addressed_fixture, seed_addressed_fixture
 
         addressed_fixture = seed_addressed_fixture(installation.owner)
@@ -253,7 +271,9 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             seed_client_publication_fixture,
         )
 
-        seed_client_publication_fixture(installation.owner)
+        # Set the generated password before both the custody baseline and sessions.
+        approval_password = f"{secrets.token_urlsafe(24)}Aa7!"
+        seed_client_publication_fixture(installation.owner, approver_password=approval_password)
         client_publication_legacy = prepare_client_publication_fixture(installation.owner)
         from apps.core.tests.repeated_block_fixture import (
             browser_state as repeated_browser_state,
@@ -265,7 +285,35 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
 
         seed_repeated_block_fixture(installation.owner)
         repeated_legacy = prepare_repeated_block_fixture(installation.owner)
+        from apps.core.tests.cross_workspace_fixture import (
+            browser_state as cross_workspace_browser_state,
+        )
+        from apps.core.tests.cross_workspace_fixture import (
+            prepare_cross_workspace_fixture,
+            seed_cross_workspace_fixture,
+        )
+
+        seed_cross_workspace_fixture(installation.owner)
+        cross_workspace_legacy = prepare_cross_workspace_fixture(installation.owner)
+        from apps.core.models import Entity, EntityVisibility, Organization
+        from apps.core.sites import create_site
+
+        native_sites = {}
+        for key, organization in (("staff", None), ("client", Organization.objects.get(
+            entity_id=client_publication_browser_state(installation.owner)["organization_id"],
+        ))):
+            site = create_site(
+                tenant=installation.tenant, organization=organization, actor_id=installation.owner.id,
+                name=f"Native browser {key} location", code="NKB", address_line_1="", address_line_2="",
+                city="", region="", postal_code="", country_code="", timezone="UTC", phone="",
+            )
+            if organization is not None:
+                Entity.objects.filter(pk=site.entity_id).update(visibility=EntityVisibility.CLIENT_VISIBLE)
+            native_sites[key] = {"id": str(site.entity_id), "title": site.entity.display_name}
         prepared_state = {
+            "native_templates": native_template_fixture,
+            "native_sites": native_sites,
+            "cross_workspace": cross_workspace_browser_state(installation.owner),
             "repeated": repeated_browser_state(installation.owner),
             "client_publication": client_publication_browser_state(installation.owner),
             "addressed": addressed_fixture.browser,
@@ -291,6 +339,8 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 )
             ],
         }
+        # A generated password stays in private IPC; the browser reauthenticates.
+        prepared_state["native_approval_password"] = approval_password
         # The live server opens its own connections through the constrained role.
         # Fixture metadata is collected beforehand, outside the request RLS scope.
         served_roles = set()
@@ -313,6 +363,92 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
                 server.stop()
                 connection_created.disconnect(record_http_connection)
         assert served_roles == {RUNTIME_ROLE}
+
+        from apps.core.document_attachments import copy_attachment_content
+        from apps.core.models import (
+            ContentNode,
+            Document,
+            DocumentAttachment,
+            DocumentAttachmentPurpose,
+            RepositoryPublicationEvidence,
+            RepositoryStaticPublication,
+        )
+        from apps.core.repository_internal_publications import internal_publication_state
+        from apps.core.repository_publication_evidence import verify_repository_publication_evidence
+        from apps.core.repository_static_controls import repository_static_state
+        from apps.core.repository_static_delivery import repository_static_delivery_ready
+        from apps.core.repository_static_publications import verify_repository_static_publication
+
+        for title, internal in (("Native staff browser guide", True), ("Native client browser guide", False)):
+            node = ContentNode.objects.get(title=title)
+            assert not Document.objects.filter(pk=node.content_id).exists()
+            native_snapshots = list(RepositoryPublicationEvidence.objects.filter(
+                workspace_id=node.workspace_id, content_id=node.content_id,
+            ).order_by("signed_at"))
+            assert len(native_snapshots) == 2
+            assert all(verify_repository_publication_evidence(item)["valid"] for item in native_snapshots)
+            primary_versions = list(DocumentAttachment.objects.filter(
+                owner_workspace_id=node.workspace_id, owner_content_id=node.content_id,
+                purpose=DocumentAttachmentPurpose.PRIMARY_FILE, document__isnull=True,
+            ).order_by("version_number"))
+            expected_versions = (
+                [
+                    b"Staff primary version one.\n", b"Staff primary version two.\n",
+                    b"Staff primary after publication.\n",
+                ]
+                if internal else [b"Client primary version 1.\n", b"Client primary version 2.\n"]
+            )
+            for index, (version, expected_bytes) in enumerate(zip(primary_versions, expected_versions, strict=True)):
+                assert copy_attachment_content(version) == expected_bytes
+                assert version.version_number == index + 1
+                assert version.replaces_id == (primary_versions[index - 1].id if index else None)
+            for index, snapshot in enumerate(native_snapshots):
+                assert snapshot.manifest["primary_file"]["selected_source_id"] == str(primary_versions[index].entity_id)
+                assert [row["source_id"] for row in snapshot.manifest["primary_file"]["versions"]] == [
+                    str(version.entity_id) for version in primary_versions[:index + 1]
+                ]
+            assert "original" in native_snapshots[0].canonical_markdown
+            assert "corrected" in native_snapshots[1].canonical_markdown
+            if internal:
+                assert [internal_publication_state(item) for item in native_snapshots] == ["superseded", "withdrawn"]
+                assert all(item.internal_events.filter(action="released").exists() for item in native_snapshots)
+            else:
+                native_publications = list(RepositoryStaticPublication.objects.filter(
+                    authorization__package__decision__evidence__in=native_snapshots,
+                ).order_by("created_at"))
+                assert len(native_publications) == 2
+                assert [repository_static_state(item) for item in native_publications] == ["superseded", "withdrawn"]
+                assert all(verify_repository_static_publication(item) for item in native_publications)
+                assert not any(repository_static_delivery_ready(item) for item in native_publications)
+
+        keyed_node = ContentNode.objects.get(title="Native keyed browser guide")
+        keyed_fragment = ContentNode.objects.get(title="Native browser reusable steps")
+        assert not Document.objects.filter(pk=keyed_node.content_id).exists()
+        from apps.core.models import Block
+
+        assert not Block.objects.filter(pk=keyed_fragment.content_id).exists()
+        keyed_snapshot = RepositoryPublicationEvidence.objects.get(content_id=keyed_node.content_id)
+        assert keyed_snapshot.manifest["format"] == "tekdocs-repository-publication-evidence/v3"
+        assert verify_repository_publication_evidence(keyed_snapshot)["valid"]
+        assert {row["kind"] for row in keyed_snapshot.manifest["key_snapshot"]["records"]} == {"field", "content"}
+        assert "Native publication original." in keyed_snapshot.manifest["key_snapshot"]["markdown"]
+        assert "Native browser later fragment." not in keyed_snapshot.manifest["key_snapshot"]["markdown"]
+        assert "Native browser later fragment." in keyed_fragment.markdown
+        assert len(keyed_snapshot.manifest["entity_cards"]) == 1
+
+        primary_node = ContentNode.objects.get(title="Native primary-file browser guide")
+        assert not Document.objects.filter(pk=primary_node.content_id).exists()
+        assert not RepositoryPublicationEvidence.objects.filter(content_id=primary_node.content_id).exists()
+        primary_versions = list(DocumentAttachment.objects.filter(
+            owner_workspace_id=primary_node.workspace_id, owner_content_id=primary_node.content_id,
+            document__isnull=True, purpose=DocumentAttachmentPurpose.PRIMARY_FILE,
+        ).order_by("version_number"))
+        assert [version.version_number for version in primary_versions] == [1, 2, 3]
+        assert [copy_attachment_content(version) for version in primary_versions] == [
+            b"Primary browser original.\n", b"Primary browser concurrent replacement.\n",
+            b"Primary browser reviewed retry.\n",
+        ]
+        assert primary_node.markdown == "Native publication original.\n"
 
         original.refresh_from_db()
         assert (original.manifest, original.signature, original.content_digest) == retained
@@ -362,6 +498,9 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.template_browser_fixture import verify_template_browser_fixture
 
         verify_template_browser_fixture(template_fixture, installation.owner)
+        from apps.core.tests.native_template_browser_fixture import verify_native_template_browser_fixture
+
+        verify_native_template_browser_fixture(native_template_fixture, installation.owner)
         from apps.core.tests.key_entity_fixture import verify_addressed_browser_fixture
 
         verify_addressed_browser_fixture(addressed_fixture, installation.owner)
@@ -381,3 +520,6 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.tests.repeated_block_fixture import exercise_repeated_block_fixture
 
         exercise_repeated_block_fixture(installation.owner, repeated_legacy)
+        from apps.core.tests.cross_workspace_fixture import exercise_cross_workspace_fixture
+
+        exercise_cross_workspace_fixture(installation.owner, cross_workspace_legacy)

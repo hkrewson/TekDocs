@@ -17,9 +17,18 @@ for shard in route-access route-methods route-session accounts migration-foundat
 done
 
 if [ ! -s "$coverage_directory/coverage.core" ]; then
-  for shard in core-a core-b core-c template-migration-a template-migration-b template-migration-c key-entity-migration content-key-migration diagram-migration monitored-migration client-publication-migration; do
+  # core-a is the complete legacy aggregate; current CI must supply all three groups.
+  if [ ! -s "$coverage_directory/coverage.core-a" ]; then
+    for shard in core-a-1 core-a-2 core-a-3; do
+      test -s "$coverage_directory/coverage.$shard" || {
+        echo "Missing coverage data for PostgreSQL shard: $shard" >&2
+        exit 1
+      }
+    done
+  fi
+  for shard in core-b core-c template-migration-a template-migration-b template-migration-c key-entity-migration content-key-migration diagram-migration monitored-migration client-publication-migration; do
     test -s "$coverage_directory/coverage.$shard" || {
-      echo "Missing coverage data for PostgreSQL shard: core or core-a/core-b/core-c/template-migration-a/template-migration-b/template-migration-c/key-entity-migration/content-key-migration/diagram-migration/monitored-migration/client-publication-migration" >&2
+      echo "Missing coverage data for PostgreSQL shard: $shard" >&2
       exit 1
     }
   done

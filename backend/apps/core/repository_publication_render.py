@@ -7,6 +7,8 @@ from typing import Any
 
 from .document_key_freeze import verify_frozen_field_keys
 from .rendering import RenderedAttachment, RenderedEntityMention, render_markdown, render_pdf
+from .repository_key_evidence import NATIVE_KEY_EVIDENCE_FORMAT, verify_native_key_evidence
+from .repository_template_evidence import NATIVE_TEMPLATE_EVIDENCE_FORMAT
 
 RENDERED_SNAPSHOT_FORMAT = "tekdocs-repository-rendered-snapshot/v1"
 MAX_RENDERED_HTML_BYTES = 4 * 1024 * 1024
@@ -16,6 +18,10 @@ MAX_RENDERED_PDF_BYTES = 8 * 1024 * 1024
 
 def frozen_repository_markdown(*, markdown: str, manifest: dict[str, Any]) -> str:
     key_snapshot = manifest.get("key_snapshot")
+    if manifest.get("format") in {NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT}:
+        if not verify_native_key_evidence(markdown, manifest):
+            raise ValueError("Native key snapshot is unavailable")
+        return key_snapshot["markdown"] if key_snapshot is not None else markdown
     if key_snapshot is None:
         return markdown
     if not verify_frozen_field_keys(markdown, key_snapshot):
@@ -30,7 +36,12 @@ def retained_pdf_snapshot(*, markdown: str, manifest: dict[str, Any]) -> tuple[d
     title = manifest.get("title")
     if not isinstance(title, str) or not title.strip():
         raise ValueError("Repository document title is unavailable")
-    content = render_pdf(frozen_repository_markdown(markdown=markdown, manifest=manifest), title=title)
+    frozen_markdown = frozen_repository_markdown(markdown=markdown, manifest=manifest)
+    if manifest.get("format") in {NATIVE_KEY_EVIDENCE_FORMAT, NATIVE_TEMPLATE_EVIDENCE_FORMAT}:
+        mentions, attachments = _render_context(manifest)
+        content = render_pdf(frozen_markdown, title=title, entity_mentions=mentions, attachments=attachments)
+    else:
+        content = render_pdf(frozen_markdown, title=title)
     if not content.startswith(b"%PDF-") or len(content) > MAX_RENDERED_PDF_BYTES:
         raise ValueError("Rendered publication PDF is unavailable or exceeds its size limit")
     return (
@@ -72,11 +83,9 @@ def pdf_snapshot_matches_current_renderer(*, markdown: str, manifest: dict[str, 
     return manifest.get("pdf_snapshot") == expected and content == rendered
 
 
-def render_repository_evidence_html(*, markdown: str, manifest: dict[str, Any]) -> str:
-    """Render frozen dependencies without consulting Git, assets, or source files."""
-
-    frozen_markdown = frozen_repository_markdown(markdown=markdown, manifest=manifest)
-
+def _render_context(
+    manifest: dict[str, Any],
+) -> tuple[dict[str, RenderedEntityMention], dict[str, RenderedAttachment]]:
     cards = manifest.get("entity_cards")
     attachments = manifest.get("attachments")
     if not isinstance(cards, list) or not isinstance(attachments, list):
@@ -114,6 +123,15 @@ def render_repository_evidence_html(*, markdown: str, manifest: dict[str, Any]) 
             size=descriptor["size"],
         )
 
+    return entity_mentions, rendered_attachments
+
+
+def render_repository_evidence_html(*, markdown: str, manifest: dict[str, Any]) -> str:
+    """Render frozen dependencies without consulting Git, assets, or source files."""
+
+    frozen_markdown = frozen_repository_markdown(markdown=markdown, manifest=manifest)
+
+    entity_mentions, rendered_attachments = _render_context(manifest)
     # No download URL is introduced here: the retained bytes have no routed
     # distribution decision yet. The renderer creates an inert attachment card.
     html = render_markdown(

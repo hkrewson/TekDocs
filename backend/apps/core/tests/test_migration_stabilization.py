@@ -1467,3 +1467,32 @@ def test_legacy_supplement_drafts_upgrade_to_complete_revisions(migration_head_r
         "Site visit",
         "Missed cable run",
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_native_key_evidence_blocks_schema_rollback_without_changing_custody(migration_head_restored, tmp_path):
+    from allauth.mfa.totp.internal.auth import TOTP, generate_totp_secret
+
+    from apps.core.tests.native_internal_publication_fixture import (
+        create_native_internal_publication_fixture,
+        native_internal_publication_fingerprint,
+    )
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    result = bootstrap_owner(
+        tenant_name='Native key rollback MSP', owner_email=f'native-rollback-{uuid.uuid4()}@example.invalid',
+        owner_display_name='Native key owner', password=f'{secrets.token_urlsafe(24)}Aa7!',
+    )
+    TOTP.activate(result.owner, generate_totp_secret())
+    with override_settings(
+        TEKDOCS_REPOSITORY_ROOT=str(tmp_path / 'repositories'), MEDIA_ROOT=str(tmp_path / 'media'),
+    ):
+        expected = create_native_internal_publication_fixture(result.owner)
+        with pytest.raises(DatabaseError, match='Retained native key evidence prevents schema rollback'):
+            call_command('migrate', 'core', '0219_native_internal_publication', verbosity=0, interactive=False)
+        assert native_internal_publication_fingerprint(result.owner) == expected
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT relforcerowsecurity FROM pg_class WHERE relname='core_repositorypublicationevidence'"
+            )
+            assert cursor.fetchone() == (True,)

@@ -73,6 +73,9 @@ def inventory_legacy_documents(workspace: Workspace) -> dict[str, Any]:
                 referenced_block_ids.difference_update(
                     item.block_id for item in document_placements if item.id in enrollment.library_placement_ids
                 )
+            from .shared_library_scope import ordinary_library_placements
+
+            referenced_block_ids.difference_update(item.block_id for item in ordinary_library_placements(document))
         reasons: list[str] = []
         from .document_source_state import MonitoredSourceStateError, monitored_source_fingerprint
 

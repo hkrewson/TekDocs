@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   release-codeql:
@@ -20,6 +20,7 @@ jobs:
     if: needs.prepare.outputs.release == 'true'
     permissions:
       contents: read
+      actions: read
       security-events: write
     uses: ./.github/workflows/codeql.yml
 
@@ -37,10 +38,37 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.release.outputs.release }}
+      lane: ${{ steps.lane.outputs.lane }}
+      code: ${{ steps.lane.outputs.code }}
+      integration: ${{ steps.lane.outputs.integration }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+      - id: lane
+        name: Select the validation lane
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          {
+            case "$EVENT_NAME" in
+              pull_request)
+                git diff --name-only "$BASE_SHA" "$GITHUB_SHA"
+                ;;
+              push)
+                if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+                  git diff-tree --root --no-commit-id --name-only -r "$GITHUB_SHA"
+                else
+                  git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA"
+                fi
+                ;;
+              workflow_dispatch)
+                ;;
+            esac
+          } | python3 scripts/ci_lane.py --event "$EVENT_NAME" --github-output "$GITHUB_OUTPUT"
       - id: version
         name: Validate version metadata
         run: |
@@ -74,11 +102,13 @@ jobs:
           {
             echo "## TekDocs validation path"
             echo
-            echo "1. Static checks, browser journeys, the focused runtime/RLS gate, and the named PostgreSQL shards start in parallel."
-            echo "2. PostgreSQL shard coverage is merged and enforced after every shard passes."
-            echo "3. Browser and authorization failures are reported without waiting for the complete backend suite."
+            echo "Selected lane: ${{ steps.lane.outputs.lane }}."
+            echo
+            echo "1. Documentation-only changes stop after repository policy checks."
+            echo "2. Pull requests add backend/frontend static and component checks plus dependency/security policy."
+            echo "3. Code pushes to main add browser journeys, runtime/RLS and PostgreSQL shards with combined coverage."
             echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
-            echo "5. New versions on main publish verified images, application and receipt tags in this run."
+            echo "5. New versions on main add CodeQL and Extended validation before verified images and atomic application/receipt tags."
             echo
             echo "CodeQL and extended validation are required release dependencies; schedules remain available."
           } >> "$GITHUB_STEP_SUMMARY"
@@ -86,6 +116,7 @@ jobs:
   backend:
     name: Backend static validation
     needs: prepare
+    if: needs.prepare.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -111,6 +142,7 @@ jobs:
   frontend:
     name: Frontend code and tests
     needs: prepare
+    if: needs.prepare.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -134,6 +166,7 @@ jobs:
   security:
     name: Dependency, license, code, and secret policy
     needs: prepare
+    if: needs.prepare.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -225,6 +258,7 @@ jobs:
   runtime-authorization:
     name: Focused PostgreSQL runtime and RLS boundary
     needs: prepare
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -234,12 +268,13 @@ jobs:
   postgres-shards:
     name: PostgreSQL shard (${{ matrix.shard }})
     needs: prepare
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [route-access, route-methods, route-session, accounts, core-a, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, migration-guards]
+        shard: [route-access, route-methods, route-session, accounts, core-a-1, core-a-2, core-a-3, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, migration-guards]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Run isolated PostgreSQL shard
@@ -254,6 +289,7 @@ jobs:
   postgres-coverage:
     name: Combined PostgreSQL coverage
     needs: [prepare, postgres-shards, runtime-authorization]
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -284,6 +320,7 @@ jobs:
   browser:
     name: Chromium regression
     needs: [prepare, frontend]
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -316,6 +353,7 @@ jobs:
   live-workspace:
     name: Live browser-to-PostgreSQL journey
     needs: [prepare, frontend]
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -336,6 +374,7 @@ jobs:
   diagram-exports:
     name: Diagram authoring, failures, and exports
     needs: [prepare, backend, frontend]
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -373,6 +412,7 @@ jobs:
   production-containers:
     name: Production containers, SBOMs, and vulnerability scan
     needs: [prepare, backend, frontend, security, runtime-authorization, postgres-coverage, browser, live-workspace, diagram-exports]
+    if: needs.prepare.outputs.integration == 'true'
     runs-on: ubuntu-latest
     env:
       TEKDOCS_VERSION: ${{ needs.prepare.outputs.version }}
@@ -644,6 +684,7 @@ jobs:
           --reference "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           --immutable-identifier "${{ steps.publish.outputs.backend-digest }}:${{ steps.publish.outputs.frontend-digest }}:${{ steps.publish.outputs.renderer-digest }}:${{ steps.publish.outputs.mailpit-digest }}"
           --output artifacts/security-evidence/production-images-sbom-provenance.json
+
       - name: Record diagram renderer supply-chain evidence
         run: >-
           python3 scripts/diagram_release_evidence.py write
@@ -679,3 +720,32 @@ jobs:
             echo "Production deployments resolve these commit tags to immutable registry digests."
             echo "The package visibility must be Public in GitHub Packages for unauthenticated production pulls."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  validation-gate:
+    name: Validation passed
+    if: ${{ always() }}
+    needs:
+      - prepare
+      - backend
+      - frontend
+      - security
+      - runtime-authorization
+      - postgres-shards
+      - postgres-coverage
+      - browser
+      - live-workspace
+      - diagram-exports
+      - production-containers
+      - release-codeql
+      - release-extended
+      - publish-containers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Evaluate the selected lane
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: >-
+          python3 scripts/ci_validation_gate.py
+          --needs-json "$NEEDS_JSON"
+          --github-step-summary "$GITHUB_STEP_SUMMARY"

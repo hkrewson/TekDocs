@@ -66,6 +66,7 @@ from .document_key_models import DocumentKeyBinding
 from .document_keys import KEY_TARGET_SCHEME, MAXIMUM_KEYS_PER_DOCUMENT, DocumentKey, keys_in_markdown
 from .models import Block, BlockRevision, Document, Entity, NetBoxReference, Organization, WorkspaceRepository
 from .rendering import RenderedKey
+from .repository_key_context import RepositoryKeyBinding, RepositoryKeyContext
 from .workspaces import ResolvedWorkspace
 
 
@@ -164,7 +165,13 @@ def _read(record: object, field: ResolvableField) -> str:
     return str(value).strip()
 
 
-def _bindings(document: Document, names: set[str], *, lock: bool) -> dict[str, DocumentKeyBinding]:
+def _bindings(
+    document: Document | RepositoryKeyContext | None, names: set[str], *, lock: bool,
+) -> dict[str, DocumentKeyBinding | RepositoryKeyBinding]:
+    if document is None:
+        return {}
+    if isinstance(document, RepositoryKeyContext):
+        return dict(document.selected_bindings(names, lock=lock))
     queryset = (
         DocumentKeyBinding.objects.filter(document=document, name__in=names, archived_at__isnull=True)
         .select_related("target_entity")
@@ -282,7 +289,7 @@ def resolve_keys(
     keys: Iterable[DocumentKey],
     *,
     context: InstallationMemberContext,
-    document: Document,
+    document: Document | RepositoryKeyContext | None,
     audience: DataAudience,
     organization: Organization | None,
     lock: bool = False,
@@ -293,6 +300,8 @@ def resolve_keys(
     Keying by target rather than by expression lets the renderer look a key up by the
     href it already has, and lets a malformed target carry a result of its own.
     """
+    if isinstance(document, RepositoryKeyContext):
+        content_repository = document.repository
     requested = list(dict.fromkeys(keys))
     resolutions: dict[str, ResolvedKey] = {}
 
@@ -304,7 +313,8 @@ def resolve_keys(
         requested = requested[:MAXIMUM_KEYS_PER_DOCUMENT]
 
     bindings = _bindings(document, {key.binding for key in requested}, lock=lock)
-    entities = list({binding.target_entity_id: binding.target_entity for binding in bindings.values()}.values())
+    entities = list({binding.target_entity_id: binding.target_entity for binding in bindings.values()
+                     if binding.target_entity is not None}.values())
     visible = {
         entity.id
         for entity in entities
@@ -335,7 +345,7 @@ def _resolve_one(
     key: DocumentKey,
     *,
     context: InstallationMemberContext,
-    binding: DocumentKeyBinding | None,
+    binding: DocumentKeyBinding | RepositoryKeyBinding | None,
     records: Mapping[UUID, object],
     visible: set[UUID],
     observed: Mapping[UUID, tuple[str, datetime]],
@@ -346,8 +356,20 @@ def _resolve_one(
     if binding is None:
         return _unresolvable(key, key.expression, UnresolvableReason.NO_BINDING)
 
+    if isinstance(binding, RepositoryKeyBinding) and binding.fragment_id is not None:
+        from apps.accounts.policy import PermissionKey, context_has_permission
+
+        from .repository_content_keys import resolve_native_fragment_key
+
+        if not context_has_permission(context, PermissionKey.DOCUMENTS_VIEW, organization=organization):
+            return _withheld(key, key.expression)
+        if key.path != ("content",) or content_repository is None:
+            return _unresolvable(key, key.expression, UnresolvableReason.NOT_ADDRESSABLE)
+        return resolve_native_fragment_key(
+            repository=content_repository, content_id=binding.fragment_id, expression=key.expression,
+        )
     entity = binding.target_entity
-    if entity.id not in visible:
+    if entity is None or entity.id not in visible:
         # Withheld before the record type is consulted, so the marker carries only
         # the key the author wrote. Deriving the field label here would disclose
         # what kind of record the binding points at, which a direct denial does not.
@@ -431,7 +453,7 @@ def resolve_markdown_keys(
     markdown: str,
     *,
     context: InstallationMemberContext,
-    document: Document,
+    document: Document | RepositoryKeyContext | None,
     audience: DataAudience,
     organization: Organization | None,
     lock: bool = False,
@@ -477,7 +499,7 @@ def audience_for(context: InstallationMemberContext) -> DataAudience:
 
 
 def resolve_rendered_keys(
-    *, workspace: ResolvedWorkspace, document: Document | None, markdown: str
+    *, workspace: ResolvedWorkspace, document: Document | RepositoryKeyContext | None, markdown: str
 ) -> dict[str, RenderedKey]:
     """The renderer's view of every key in ``markdown``, authorized for this reader.
 

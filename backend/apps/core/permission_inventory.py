@@ -24,6 +24,35 @@ def route(
 
 
 AUTHENTICATED_ROUTE_PERMISSIONS = (
+    route(
+        "msp-repository-publication-evidence-workflow", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+    ),
+    route(
+        "msp-repository-publication-evidence-internal-publication", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_PUBLISH, PermissionKey.DOCUMENTS_APPROVE),
+    ),
+    route(
+        "msp-repository-publication-evidence-internal-publication-pdf", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+    ),
+    route(
+        "organization-repository-publication-evidence-workflow", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-internal-publication", ("GET", "POST"),
+        PermissionKey.DOCUMENTS_VIEW,
+        (PermissionKey.DOCUMENTS_PUBLISH, PermissionKey.DOCUMENTS_APPROVE),
+        organization_scoped=True,
+    ),
+    route(
+        "organization-repository-publication-evidence-internal-publication-pdf", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW,
+        organization_scoped=True,
+    ),
     route("auth-context", ("GET",)),
     route("auth-profile", ("PATCH",)),
     route("system-diagnostics", ("GET",), PermissionKey.SYSTEM_DIAGNOSTICS_VIEW),
@@ -89,8 +118,22 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "msp-content-authoring-primary-file", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
         mutations=(PermissionKey.DOCUMENTS_EDIT,),
     ),
+    route(
+        "msp-content-authoring-remote-source", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route(
+        "msp-content-authoring-remote-observations", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
+    route("msp-content-authoring-remote-observation-apply", ("POST",), mutations=(PermissionKey.DOCUMENTS_EDIT,)),
     route("msp-content-authoring-export", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route("msp-content-authoring-keys", ("GET",), PermissionKey.DOCUMENTS_VIEW),
+    route(
+        "msp-content-authoring-template", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,),
+    ),
     route("msp-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-documents", ("GET",), PermissionKey.DOCUMENTS_VIEW),
     route("msp-content-document-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW),
@@ -1471,7 +1514,32 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
         "organization-content-authoring-primary-file", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
         mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
     ),
+    route(
+        "organization-content-authoring-remote-source", ("GET", "PUT"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-remote-observations", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-remote-observation-apply", ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
     route("organization-content-authoring-source", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
+    route(
+        "organization-content-authoring-template", ("GET", "POST"), PermissionKey.DOCUMENTS_VIEW,
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route("organization-content-templates", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
+    route(
+        "organization-content-template-enrollments", ("POST",),
+        mutations=(PermissionKey.DOCUMENTS_EDIT,), organization_scoped=True,
+    ),
+    route(
+        "organization-content-authoring-keys", ("GET",),
+        PermissionKey.DOCUMENTS_VIEW, organization_scoped=True,
+    ),
     route("organization-content-resolve-path", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route("organization-content-documents", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),
     route("organization-content-document-detail", ("GET",), PermissionKey.DOCUMENTS_VIEW, organization_scoped=True),

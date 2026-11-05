@@ -41,7 +41,7 @@ from .repository_service import (
 )
 
 MAX_AUTHORING_SOURCE = 1024 * 1024
-EDITABLE_FIELDS = ALLOWED_FIELDS - {"schema", "id", "kind", "aliases", "key_bindings"}
+EDITABLE_FIELDS = ALLOWED_FIELDS - {"schema", "id", "kind", "aliases"}
 TOP_LEVEL_FIELD = re.compile(r"^([a-z][a-z0-9_]*):")
 logger = logging.getLogger(__name__)
 
@@ -280,12 +280,21 @@ def author_content(
     if operation not in {"create", "update", "move"}:
         raise ContentAuthoringError("Authoring operation is unsupported")
     _validate_patch(metadata_patch)
+    from .native_templates import _native_operation, native_enrollment
+    if (
+        {'includes', 'derived_from', 'template_sources'} & metadata_patch.keys()
+        and not _native_operation.get() and native_enrollment(repository, content_id)
+    ):
+        raise ContentAuthoringError('Enrolled template sections must be changed through reviewed template updates')
+
     owner = {
         "id": content_id,
         "tenant_id": repository.tenant_id,
         "organization_id": cast(uuid.UUID, repository.workspace.organization_id),
     }
     legacy_document = Document.objects.filter(**owner).exists()
+    if legacy_document and "key_bindings" in metadata_patch:
+        raise ContentAuthoringError("Legacy key bindings remain read-only under Git authority")
     if legacy_document:
         authority = DocumentAuthority.objects.filter(
             workspace_id=repository.workspace_id,
@@ -406,7 +415,23 @@ def author_content(
             candidate.pop(changed_path, None)
         else:
             candidate[changed_path] = changed_source
+    from .native_templates import validate_native_template_snapshot
+    validate_native_template_snapshot(repository, candidate)
     validate_candidate_snapshot(repository=repository, files=tuple(sorted(candidate.items())))
+    if "key_bindings" in metadata_patch:
+        from apps.accounts.models import User
+
+        from .repository_key_context import validate_native_key_targets
+        from .workspaces import resolve_msp_workspace, resolve_organization_workspace
+
+        actor = User.objects.get(pk=actor_id)
+        organization = repository.workspace.organization
+        workspace = (resolve_organization_workspace(actor, entity_id=organization.entity_id)
+                     if organization is not None else resolve_msp_workspace(actor))
+        validate_native_key_targets(
+            workspace=workspace, repository=repository,
+            bindings=parse_content(proposed).frontmatter.get("key_bindings", {}),
+        )
     try:
         result = commit_repository_files(
             repository_id=repository.id,

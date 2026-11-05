@@ -35,6 +35,9 @@ from .document_source_models import DocumentSourceKind as DocumentSourceKind
 from .document_template_models import DocumentTemplateEnrollment as DocumentTemplateEnrollment
 from .document_template_models import DocumentTemplateRevision as DocumentTemplateRevision
 from .model_support import TimestampedModel
+from .native_template_models import RepositoryTemplate as RepositoryTemplate
+from .native_template_models import RepositoryTemplateEnrollment as RepositoryTemplateEnrollment
+from .native_template_models import RepositoryTemplateRevision as RepositoryTemplateRevision
 from .scoping import OrganizationScopedManager, TenantScopedManager
 
 WORKSPACE_UUID_NAMESPACE = uuid.UUID("6890dc87-8d91-4f76-a6eb-99dfd06904a5")
@@ -5024,10 +5027,11 @@ class DocumentPublication(models.Model):
                 raise ValidationError("Publication key resolutions must be unique and ordered")
         if manifest.get("format") in {"tekdocs-static-publication/v9", "tekdocs-static-publication/v10"}:
             from .document_addressed_publications import verify_addressed_publication_manifest
+            from .document_diagram_publications import has_repeated_source_envelope
 
             if not verify_addressed_publication_manifest(
                 manifest, self.document_id, self.canonical_markdown,
-                allow_repeated=self.manifest.get("format") == "tekdocs-static-publication/v12",
+                allow_repeated=has_repeated_source_envelope(self.manifest),
             ):
                 raise ValidationError("Addressed publication snapshot is invalid")
         if manifest.get("format") == "tekdocs-static-publication/v4":
@@ -5177,6 +5181,8 @@ class RepositoryPublicationEvidence(models.Model):
             or self.manifest.get("format") not in {
                 "tekdocs-repository-publication-evidence/v1",
                 "tekdocs-repository-publication-evidence/v2",
+                "tekdocs-repository-publication-evidence/v3",
+                "tekdocs-repository-publication-evidence/v4",
             }
             or self.manifest.get("evidence_id") != str(self.id)
             or self.manifest.get("workspace_id") != str(self.workspace_id)
@@ -5187,7 +5193,11 @@ class RepositoryPublicationEvidence(models.Model):
             or self.manifest.get("signed_at")
             != self.signed_at.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
             or self.manifest.get("source_commit") != self.source_commit.object_id
-            or source.get("format") != "tekdocs.git-dependencies/v1"
+            or source.get("format") != (
+                "tekdocs.git-dependencies/v4"
+                if self.manifest.get("format") == "tekdocs-repository-publication-evidence/v4"
+                else "tekdocs.git-dependencies/v1"
+            )
             or source.get("repository_id") != str(self.repository_id)
             or source.get("workspace_id") != str(self.workspace_id)
             or source.get("content_id") != str(self.content_id)
@@ -5329,6 +5339,57 @@ class RepositoryPackageAuthorization(models.Model):
 
     def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
         raise ValidationError("Repository package authorizations are append-only")
+
+
+class RepositoryInternalPublicationEvent(models.Model):
+    """Append-only staff publication decisions over a signed retained snapshot."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT)
+    organization = models.ForeignKey(Organization, null=True, blank=True, on_delete=models.PROTECT)
+    workspace = models.ForeignKey(Workspace, on_delete=models.PROTECT)
+    evidence = models.ForeignKey(
+        RepositoryPublicationEvidence, on_delete=models.PROTECT, related_name="internal_events"
+    )
+    supersedes = models.OneToOneField(
+        RepositoryPublicationEvidence,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="internal_supersession",
+    )
+    action = models.CharField(max_length=16, choices=(("released", "Published"), ("withdrawn", "Withdrawn")))
+    reason = models.CharField(max_length=500)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    class Meta:
+        ordering = ("occurred_at", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(action__in=("released", "withdrawn")), name="repository_internal_action_valid"
+            ),
+            models.CheckConstraint(condition=~models.Q(reason=""), name="repository_internal_reason_required"),
+            models.UniqueConstraint(fields=("evidence", "action"), name="repository_internal_one_action"),
+            models.CheckConstraint(
+                condition=models.Q(action="released") | models.Q(supersedes__isnull=True),
+                name="repository_internal_supersedes_release",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.evidence_id}: {self.action}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Internal publication decisions are append-only")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Internal publication decisions are append-only")
 
 
 class RepositoryStaticPublication(models.Model):

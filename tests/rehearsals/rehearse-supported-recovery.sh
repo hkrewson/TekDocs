@@ -148,6 +148,25 @@ compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entr
 repeated_block_recovery_sha=$(sed -n 's/^REPEATED_BLOCK_RECOVERY_SHA256=//p' "$repeated_block_recovery_log")
 printf '%s\n' "$repeated_block_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 sed -n '/Repeated shared occurrences, distinct pins, signatures, file versions, PDFs and rollback verified/p' "$repeated_block_recovery_log"
+cross_workspace_recovery_log="$work_directory/cross-workspace-recovery.log"
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_create migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
+sed -n '/Cross-Workspace isolation, pins, signed publications, files, PDFs and rollback verified/p' "$cross_workspace_recovery_log"
+# Create native staff decisions before source-snapshot baselines: authoring this
+# fixture advances the MSP repository; retained evidence itself is head-independent.
+internal_publication_log="$work_directory/internal-publication.log"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_NATIVE_INTERNAL_FIXTURE_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/native_internal_publication_fixture.py" > "$internal_publication_log"
+internal_publication_sha=$(sed -n 's/^INTERNAL_PUBLICATION_SHA256=//p' "$internal_publication_log")
+printf '%s\n' "$internal_publication_sha" | grep -Eq '^[0-9a-f]{64}$'
+native_template_log="$work_directory/native-template.log"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_NATIVE_TEMPLATE_FIXTURE_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/native_template_recovery_fixture.py" > "$native_template_log"
+native_template_sha=$(sed -n 's/^NATIVE_TEMPLATE_SHA256=//p' "$native_template_log")
+printf '%s\n' "$native_template_sha" | grep -Eq '^[0-9a-f]{64}$'
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -222,6 +241,14 @@ fi
 [ ! -e "$limited_backup" ]
 [ -z "$(find "$work_directory" -maxdepth 1 -name 'limited-backup.partial.*' -print -quit)" ]
 compose_for "$source_environment" "$source_secrets" up -d --wait backend
+
+# Final source setup has advanced the shared MSP repository since the library
+# fixture was exercised. Capture its exact custody at the backup boundary.
+compose_for "$source_environment" "$source_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_record migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py" > "$cross_workspace_recovery_log"
+cross_workspace_recovery_sha=$(sed -n 's/^CROSS_WORKSPACE_RECOVERY_SHA256=//p' "$cross_workspace_recovery_log")
+printf '%s\n' "$cross_workspace_recovery_sha" | grep -Eq '^[0-9a-f]{64}$'
 
 "$repository_root/scripts/tekdocs-backup.sh" --env-file "$source_environment" \
   --secret-directory "$source_secrets" --key-file "$recovery_key" --output "$backup_directory"
@@ -418,6 +445,10 @@ compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --e
   -e TEKDOCS_REPEATED_BLOCK_FIXTURE_MODE=recovery_verify \
   -e TEKDOCS_REPEATED_BLOCK_RECOVERY_SHA256="$repeated_block_recovery_sha" migrate manage.py shell --no-imports \
   < "$repository_root/backend/apps/core/tests/repeated_block_fixture.py"
+compose_for "$restore_environment" "$restored_secrets" run --rm --no-deps -T --entrypoint python \
+  -e TEKDOCS_CROSS_WORKSPACE_FIXTURE_MODE=recovery_verify \
+  -e TEKDOCS_CROSS_WORKSPACE_RECOVERY_SHA256="$cross_workspace_recovery_sha" migrate manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/cross_workspace_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_FIXTURE_MODE=verify backend python manage.py shell \
   < "$repository_root/tests/rehearsals/fixtures/compliance-monitoring-validation-fixture.py"
@@ -431,6 +462,8 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=verify \
+  -e TEKDOCS_RECOVERY_INTERNAL_PUBLICATION_SHA256="$internal_publication_sha" \
+  -e TEKDOCS_RECOVERY_NATIVE_TEMPLATE_SHA256="$native_template_sha" \
   -e TEKDOCS_RECOVERY_PUBLICATION_ID="$publication_id" \
   -e TEKDOCS_RECOVERY_PUBLICATION_HTML_SHA256="$publication_html_sha" \
   -e TEKDOCS_RECOVERY_PUBLICATION_PDF_SHA256="$publication_pdf_sha" \

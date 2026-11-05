@@ -302,6 +302,11 @@ def _resolve_compositions(
     for content_id, parsed in sorted(accepted.items(), key=lambda item: str(item[0])):
         path = paths[content_id]
         try:
+            from .native_templates import NativeTemplateConflict, validate_native_enrollment_shape
+            try:
+                validate_native_enrollment_shape(repository, parsed)
+            except NativeTemplateConflict as exc:
+                raise ContentCompositionError('include.library.scope', str(exc)) from exc
             for include in parsed.includes:
                 object_id, target = resolver.direct_target(
                     context_object_id=accepted_object_id,
@@ -360,7 +365,16 @@ def _resolve_compositions(
                 }
             compositions[content_id] = variants
         except ContentCompositionError as exc:
-            diagnostics.append(_diagnostic(path=path, code=exc.code, message=str(exc)))
+            if exc.code == 'include.native.unavailable':
+                compositions[content_id] = {
+                    audience: {'digest': hashlib.sha256(b'').hexdigest(), 'manifest': [], 'markdown': '',
+                               'entity_links': [], 'unavailable': True}
+                    for audience in ('all', 'msp_internal', 'client_visible')
+                }
+                for include_key in [item for item in direct if item[0] == content_id]:
+                    direct.pop(include_key)
+            else:
+                diagnostics.append(_diagnostic(path=path, code=exc.code, message=str(exc)))
 
     return (
         compositions,
@@ -373,6 +387,8 @@ def _resolve_compositions(
 def _effective_findings(
     parsed: ParsedContent, compositions: dict[uuid.UUID, dict[str, dict[str, Any]]]
 ) -> list[dict[str, object]]:
+    if compositions[parsed.content_id]['all'].get('unavailable'):
+        return [{'code': 'include.native.unavailable', 'severity': 'warning'}]
     if parsed.topic_type and parsed.kind == "document":
         return inspect_markdown(parsed.topic_type, compositions[parsed.content_id]["all"]["markdown"])
     return list(parsed.findings)
@@ -411,8 +427,10 @@ def _projection_payload(
                     "id": str(include.target_content_id),
                     "mode": include.mode,
                     "ordinal": include.ordinal,
-                    **({"library_workspace": str(include.library_workspace_id),
-                        "library_revision": str(include.library_revision_id)} if include.library_workspace_id else {}),
+                    **({"library_workspace": str(include.library_workspace_id)}
+                       if include.library_workspace_id else {}),
+                    **({"library_revision": str(include.library_revision_id)} if include.library_revision_id else {}),
+                    **({"library_source": str(include.library_source_id)} if include.library_source_id else {}),
                 }
                 for include in parsed.includes
             ],
@@ -641,6 +659,8 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
         for _path, parsed in sorted(parsed_by_path.items()):
             source = nodes[parsed.content_id]
             for include in parsed.includes:
+                if compositions[parsed.content_id]['all'].get('unavailable'):
+                    continue
                 resolved = direct_includes[(parsed.content_id, include.ordinal)]
                 includes.append(
                     ContentInclude(
@@ -650,6 +670,7 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                         target_content_id=include.target_content_id,
                         library_workspace_id=include.library_workspace_id,
                         library_revision_id=include.library_revision_id,
+                        library_source_id=include.library_source_id,
                         ordinal=include.ordinal,
                         resolution_mode=include.mode,
                         audience_profile=include.audience,
@@ -714,11 +735,15 @@ def index_repository_content(*, repository_id: uuid.UUID, force: bool = False) -
                 "projection_digest": projection_digest,
             },
         )
-        from .template_library_projection import project_template_source_content
+        from .template_library_projection import project_library_source_content
 
-        project_template_source_content(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
         locked.indexed_commit = commit
         locked.save(update_fields=("indexed_commit", "updated_at"))
+        # The projection uses the new rows above while this transaction remains
+        # invisible to readers. A projection failure rolls back this pointer too.
+        project_library_source_content(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
+        from .native_templates import project_native_templates
+        project_native_templates(repository=locked, commit=commit, parsed_by_path=parsed_by_path)
 
     logger.info(
         "content_index_accepted repository=%s commit=%s nodes=%s links=%s",

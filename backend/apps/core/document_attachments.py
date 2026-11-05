@@ -142,8 +142,25 @@ def create_repository_document_attachment(
     )
 
 
-class RepositoryPrimaryFileConflict(Exception):
-    """The requested primary-file predecessor is no longer current."""
+class RepositoryPrimaryFileConflict(ValidationError):
+    """Invalid primary-file state; HTTP adapters translate this validation failure to 409."""
+
+    def __str__(self) -> str:
+        return str(self.detail[0])
+
+
+def require_repository_primary_file_authority(*, repository: WorkspaceRepository, content_id: UUID) -> None:
+    """Check legacy-owner authority while the caller holds its repository transaction lock."""
+    legacy_document = Document.objects.select_for_update().filter(
+        id=content_id,
+        tenant=repository.tenant,
+        organization=repository.workspace.organization,
+        entity__workspace=repository.workspace,
+    ).first()
+    if legacy_document is not None and not DocumentAuthority.objects.filter(
+        workspace=repository.workspace, content_id=content_id, authority=DocumentAuthorityMode.REPOSITORY,
+    ).exists():
+        raise RepositoryPrimaryFileConflict("Legacy content remains authoritative for this document.")
 
 
 @transaction.atomic
@@ -155,8 +172,9 @@ def append_repository_primary_document_file(
     upload: UploadedFile,
     expected_current_entity_id: UUID | None,
 ) -> DocumentAttachment:
-    """Append a scanned version for one accepted Git-only document."""
+    """Append a scanned version for an accepted, repository-authoritative document."""
     locked_repository = WorkspaceRepository.objects.select_for_update().get(pk=repository.pk)
+    require_repository_primary_file_authority(repository=locked_repository, content_id=content_id)
     versions = DocumentAttachment.objects.select_for_update().filter(
         tenant=locked_repository.tenant,
         organization=locked_repository.workspace.organization,

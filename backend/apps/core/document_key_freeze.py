@@ -12,6 +12,7 @@ from apps.accounts.policy import DataAudience
 from .document_key_resolution import KeyResolutionKind, ResolutionState, ResolvedKey, resolve_markdown_keys
 from .document_keys import MAXIMUM_KEYS_PER_DOCUMENT, key_targets_in_markdown, keys_in_markdown
 from .models import Document, WorkspaceRepository
+from .repository_key_context import RepositoryKeyContext
 from .workspaces import ResolvedWorkspace
 
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
@@ -42,7 +43,7 @@ def _ordered_unique_records(records: list[dict[str, object]]) -> tuple[dict[str,
 
 
 def _finalize_resolution_timestamp(
-    records: list[dict[str, object]], *, document: Document, resolved_at: str | None
+    records: list[dict[str, object]], *, document: Document | RepositoryKeyContext, resolved_at: str | None
 ) -> list[dict[str, object]]:
     """Apply one honest timestamp without making unchanged editable bundles drift.
 
@@ -199,7 +200,7 @@ def _manifest_record(
 def _expand_content_keys(
     *,
     workspace: ResolvedWorkspace,
-    document: Document,
+    document: Document | RepositoryKeyContext,
     markdown: str,
     audience: DataAudience,
     resolved_at: str | None,
@@ -269,7 +270,7 @@ def _expand_content_keys(
 
 
 def expand_rendered_content_keys(
-    *, workspace: ResolvedWorkspace, document: Document | None, markdown: str,
+    *, workspace: ResolvedWorkspace, document: Document | RepositoryKeyContext | None, markdown: str,
     content_repository: WorkspaceRepository | None = None,
 ) -> str:
     """Expand valid content keys for a live read; leave failures for explicit markers."""
@@ -298,7 +299,7 @@ def expand_rendered_content_keys(
 def freeze_document_keys(
     *,
     workspace: ResolvedWorkspace,
-    document: Document,
+    document: Document | RepositoryKeyContext,
     markdown: str,
     audience: DataAudience,
     resolved_at: str | None,

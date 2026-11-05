@@ -9646,6 +9646,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/keys:
+    get:
+      operationId: content_authoring_msp_keys
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: target_id
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 64
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryKeyState'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Saved source/index unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/content-graph/authoring/{content_id}/primary-file:
     get:
       operationId: content_authoring_msp_primary_file_versions
@@ -9681,6 +9735,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Repository file authority or index is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
     post:
       operationId: content_authoring_msp_primary_file_append
       parameters:
@@ -9715,7 +9781,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Current version changed
+          description: Source authority or current version changed
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -9726,6 +9792,248 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/remote-source:
+    get:
+      operationId: workspaces_msp_content_graph_authoring_remote_source_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_msp_content_graph_authoring_remote_source_update
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/remote-source/observations:
+    get:
+      operationId: workspaces_msp_content_graph_authoring_remote_source_observations_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservationList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_content_graph_authoring_remote_source_observations_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/remote-source/observations/{observation_id}/apply:
+    post:
+      operationId: workspaces_msp_content_graph_authoring_remote_source_observations_apply_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: observation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/content-graph/authoring/{content_id}/template:
+    get:
+      operationId: workspaces_msp_content_graph_authoring_template_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateStatus'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_content_graph_authoring_template_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/content-graph/authoring/export:
     get:
       operationId: content_authoring_msp_export
@@ -15840,6 +16148,114 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/internal-publication:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/internal-publication/pdf:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_internal_publication_pdf_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/review:
     get:
       operationId: repository_evidence_msp_review
@@ -15997,6 +16413,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/msp/repository-publication-evidence/{evidence_id}/workflow:
+    get:
+      operationId: workspaces_msp_repository_publication_evidence_workflow_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/msp/service-rates:
     get:
       operationId: workspaces_msp_service_rates_list
@@ -19979,6 +20423,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/keys:
+    get:
+      operationId: content_authoring_organization_keys
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: q
+        schema:
+          type: string
+          default: ''
+          maxLength: 120
+      - in: query
+        name: target_id
+        schema:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 64
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryKeyState'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Saved source/index unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/primary-file:
     get:
       operationId: content_authoring_organization_primary_file_versions
@@ -20020,6 +20524,18 @@ paths:
               schema:
                 type: string
                 format: uuid
+        '409':
+          description: Repository file authority or index is unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
     post:
       operationId: content_authoring_organization_primary_file_append
       parameters:
@@ -20060,7 +20576,7 @@ paths:
                 type: string
                 format: uuid
         '409':
-          description: Current version changed
+          description: Source authority or current version changed
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.
@@ -20071,6 +20587,290 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/remote-source:
+    get:
+      operationId: workspaces_organizations_content_graph_authoring_remote_source_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '204':
+          description: No response body
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    put:
+      operationId: workspaces_organizations_content_graph_authoring_remote_source_update
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteSourceWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteSourceResult'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/remote-source/observations:
+    get:
+      operationId: workspaces_organizations_content_graph_authoring_remote_source_observations_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservationList'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_content_graph_authoring_remote_source_observations_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/remote-source/observations/{observation_id}/apply
+  : post:
+      operationId: workspaces_organizations_content_graph_authoring_remote_source_observations_apply_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: observation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RemoteObservationApply'
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoteObservation'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/{content_id}/template:
+    get:
+      operationId: workspaces_organizations_content_graph_authoring_template_retrieve
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateStatus'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_content_graph_authoring_template_create
+      parameters:
+      - in: path
+        name: content_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateMutation'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/authoring/export:
     get:
       operationId: content_authoring_organization_export
@@ -20526,6 +21326,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EntityContent'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/template-enrollments:
+    post:
+      operationId: workspaces_organizations_content_graph_template_enrollments_create
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NativeTemplateEnrollment'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentAuthoringSource'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  /api/v1/workspaces/organizations/{organization_entity_id}/content-graph/templates:
+    get:
+      operationId: workspaces_organizations_content_graph_templates_retrieve
+      parameters:
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeTemplateLibraryPage'
           description: ''
           headers:
             X-Request-ID:
@@ -33487,6 +34355,132 @@ paths:
               schema:
                 type: string
                 format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/internal-publication
+  : get:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+    post:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_create
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepositoryStaticControlWrite'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+  ? /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/internal-publication/pdf
+  : get:
+      operationId: workspaces_organizations_repository_publication_evidence_internal_publication_pdf_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '409':
+          description: Integrity conflict
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/package:
     get:
       operationId: repository_evidence_organization_package_retrieve
@@ -34197,6 +35191,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
+  /api/v1/workspaces/organizations/{organization_entity_id}/repository-publication-evidence/{evidence_id}/workflow:
+    get:
+      operationId: workspaces_organizations_repository_publication_evidence_workflow_retrieve
+      parameters:
+      - in: path
+        name: evidence_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: organization_entity_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - workspaces
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryWorkflow'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
   /api/v1/workspaces/organizations/{organization_entity_id}/search:
     get:
       operationId: workspace_search_organization
@@ -38407,6 +39435,10 @@ components:
     ContentReadItem:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          description: No retained legacy Document row exists for this exact Workspace/content
+            identity, including archived rows.
         id:
           type: string
           format: uuid
@@ -38426,6 +39458,7 @@ components:
       - id
       - kind
       - path
+      - repository_native
       - title
       - topic
     ContentTemplateSource:
@@ -39612,6 +40645,13 @@ components:
     Document:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          readOnly: true
+          default: false
+          description: Native-only discovery summary; open by content_id in the repository
+            editor. Legacy lifecycle fields are not populated; repository APIs provide
+            files and publication evidence.
         id:
           type: string
           format: uuid
@@ -39873,6 +40913,7 @@ components:
       - primary_file_versions
       - publication_count
       - publications
+      - repository_native
       - resolved_markdown
       - review_decided_at
       - review_due_on
@@ -41108,6 +42149,13 @@ components:
     DocumentSearchHit:
       type: object
       properties:
+        repository_native:
+          type: boolean
+          readOnly: true
+          default: false
+          description: Native-only discovery summary; open by content_id in the repository
+            editor. Legacy lifecycle fields are not populated; repository APIs provide
+            files and publication evidence.
         id:
           type: string
           format: uuid
@@ -41373,6 +42421,7 @@ components:
       - primary_file_versions
       - publication_count
       - publications
+      - repository_native
       - resolved_markdown
       - review_decided_at
       - review_due_on
@@ -46095,6 +47144,265 @@ components:
       - name
       - specification_version_id
       - specifications
+    NativeTemplateChange:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        markdown:
+          type: string
+        mode:
+          enum:
+          - copy
+          - live
+          - pinned
+          type: string
+          description: |-
+            * `copy` - copy
+            * `live` - live
+            * `pinned` - pinned
+          x-spec-enum-id: e159dafe529a6480
+        state:
+          enum:
+          - unchanged
+          - updated
+          - added
+          - removed
+          - conflict
+          type: string
+          description: |-
+            * `unchanged` - unchanged
+            * `updated` - updated
+            * `added` - added
+            * `removed` - removed
+            * `conflict` - conflict
+          x-spec-enum-id: af2b8de9f85d4aa0
+        current_markdown:
+          type: string
+      required:
+      - id
+      - markdown
+      - mode
+      - state
+      - title
+    NativeTemplateEnrollment:
+      type: object
+      properties:
+        source_content_id:
+          type: string
+          format: uuid
+        definition_sha256:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+        title:
+          type: string
+          maxLength: 240
+        rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+            x-spec-enum-id: e159dafe529a6480
+      required:
+      - definition_sha256
+      - rules
+      - source_content_id
+      - title
+    NativeTemplateLibraryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        definition_sha256:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateSection'
+      required:
+      - definition_sha256
+      - id
+      - sections
+      - title
+    NativeTemplateLibraryPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateLibraryItem'
+        count:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_more:
+          type: boolean
+      required:
+      - count
+      - has_more
+      - page
+      - page_size
+      - results
+    NativeTemplateMutation:
+      type: object
+      properties:
+        action:
+          enum:
+          - configure
+          - apply
+          - detach
+          type: string
+          description: |-
+            * `configure` - configure
+            * `apply` - apply
+            * `detach` - detach
+          x-spec-enum-id: 18059ba311880d71
+        base_commit:
+          type: string
+          maxLength: 64
+        base_blob:
+          type: string
+          maxLength: 64
+        enabled:
+          type: boolean
+        library_visible:
+          type: boolean
+        fragment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 128
+        expected_applied_revision_id:
+          type: string
+          format: uuid
+        expected_available_revision_id:
+          type: string
+          format: uuid
+        rules:
+          type: object
+          additionalProperties:
+            enum:
+            - copy
+            - live
+            - pinned
+            - keep
+            type: string
+            description: |-
+              * `copy` - copy
+              * `live` - live
+              * `pinned` - pinned
+              * `keep` - keep
+            x-spec-enum-id: 1dfef6801517786d
+        section_id:
+          type: string
+          format: uuid
+      required:
+      - action
+      - base_blob
+      - base_commit
+    NativeTemplateReview:
+      type: object
+      properties:
+        source_title:
+          type: string
+        applied_revision_id:
+          type: string
+          format: uuid
+        available_revision_id:
+          type: string
+          format: uuid
+        expected_base:
+          type: string
+        expected_blob:
+          type: string
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateChange'
+        can_apply:
+          type: boolean
+      required:
+      - applied_revision_id
+      - available_revision_id
+      - can_apply
+      - changes
+      - expected_base
+      - expected_blob
+      - source_title
+    NativeTemplateSection:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        markdown:
+          type: string
+      required:
+      - id
+      - markdown
+      - title
+    NativeTemplateSource:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        library_visible:
+          type: boolean
+        fragments:
+          type: array
+          items:
+            $ref: '#/components/schemas/NativeTemplateSection'
+        selected_fragment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+      - enabled
+      - fragments
+      - library_visible
+      - selected_fragment_ids
+    NativeTemplateStatus:
+      type: object
+      properties:
+        role:
+          enum:
+          - source
+          - enrolled
+          - none
+          type: string
+          description: |-
+            * `source` - source
+            * `enrolled` - enrolled
+            * `none` - none
+          x-spec-enum-id: c29f2127d758b5c4
+        read_only:
+          type: boolean
+        source:
+          $ref: '#/components/schemas/NativeTemplateSource'
+        enrollment:
+          $ref: '#/components/schemas/NativeTemplateReview'
+      required:
+      - read_only
+      - role
     NetBoxAdoption:
       type: object
       properties:
@@ -51611,9 +52919,98 @@ components:
             * `msp_internal` - MSP internal
             * `client_visible` - Client visible
           x-spec-enum-id: 489f26fd4031dd3a
+        expected_commit:
+          type: string
+          pattern: ^(?:[a-f0-9]{40}|[a-f0-9]{64})$
       required:
       - audience
       - content_id
+    RepositoryKeyReportRow:
+      type: object
+      properties:
+        expression:
+          type: string
+        state:
+          type: string
+        label:
+          type: string
+        reason:
+          type: string
+          nullable: true
+      required:
+      - expression
+      - label
+      - reason
+      - state
+    RepositoryKeyState:
+      type: object
+      properties:
+        source_blob:
+          type: string
+        accepted_commit:
+          type: string
+        read_only:
+          type: boolean
+        key_bindings:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+        targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyTarget'
+        bound_targets:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyTarget'
+        has_more:
+          type: boolean
+        report:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryKeyReportRow'
+        report_has_more:
+          type: boolean
+      required:
+      - accepted_commit
+      - bound_targets
+      - has_more
+      - key_bindings
+      - read_only
+      - report
+      - report_has_more
+      - source_blob
+      - targets
+    RepositoryKeyTarget:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        kind:
+          enum:
+          - entity
+          - fragment
+          type: string
+          description: |-
+            * `entity` - entity
+            * `fragment` - fragment
+          x-spec-enum-id: 475a2145e3e79cfc
+        entity_type:
+          type: string
+        fields:
+          type: array
+          items:
+            type: string
+      required:
+      - entity_type
+      - fields
+      - id
+      - kind
+      - title
     RepositoryPackage:
       type: object
       properties:
@@ -51930,6 +53327,55 @@ components:
       - package_id
       - permits_distribution
       - source_commit
+      - verified
+    RepositoryWorkflow:
+      type: object
+      properties:
+        evidence_id:
+          type: string
+          format: uuid
+        source_commit:
+          type: string
+        audience:
+          type: string
+        verified:
+          type: boolean
+        stage:
+          type: string
+        state:
+          type: string
+        actions:
+          type: array
+          items:
+            type: string
+        active_publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        publication_id:
+          type: string
+          format: uuid
+          nullable: true
+        content_digest:
+          type: string
+        delivery_effective:
+          type: boolean
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryStaticControlEvent'
+      required:
+      - actions
+      - active_publication_id
+      - audience
+      - content_digest
+      - delivery_effective
+      - events
+      - evidence_id
+      - publication_id
+      - source_commit
+      - stage
+      - state
       - verified
     ReuseAudience:
       type: object

@@ -353,3 +353,31 @@ describe('application shell', () => {
     for (const link of sidebar.getAllByRole('link')) expect(link.getAttribute('href')).not.toMatch(/^\/workspaces\/organizations\//)
   })
 })
+
+it('opens a newly enrolled native document through the complete organization shell', async () => {
+  const user = userEvent.setup()
+  const organizationId = '00000000-0000-4000-8000-000000000010'
+  const source = { content_id: '11111111-1111-4111-8111-111111111111', path: 'docs/native.md', kind: 'document', title: 'Native enrolled', markdown: 'Native template introduction.\n', source: '', source_blob: 'b'.repeat(40), accepted_commit: 'a'.repeat(40), indexed_commit: 'a'.repeat(40) }
+  const previous = window.location.href
+  window.history.replaceState(null, '', `/workspaces/organizations/${organizationId}/documentation`)
+  document.cookie = 'csrftoken=synthetic-shell-test'
+  const requests: string[] = []
+  const transport = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+    const path = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    requests.push(path)
+    const payload = path.includes('/content-graph/templates?')
+      ? { results: [{ id: '22222222-2222-4222-8222-222222222222', title: 'Native browser template', definition_sha256: 'c'.repeat(64), sections: [] }], count: 1, page: 1, page_size: 25, has_more: false }
+      : path.endsWith('/template-enrollments') || path.endsWith(`/authoring/${source.content_id}`)
+        ? source : { results: [], count: 0, page: 1, page_size: 25, has_more: false, accepted_commit: source.accepted_commit, indexed_commit: source.indexed_commit }
+    return new Promise(resolve => window.setTimeout(() => resolve(new Response(JSON.stringify(payload), { status: path.endsWith('/template-enrollments') ? 201 : 200, headers: { 'Content-Type': 'application/json' } })), 30))
+  })
+  try {
+    render(<App initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />)
+    await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+    await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
+    await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
+    await waitFor(() => expect(window.location.search).toContain(`repository=${source.content_id}`))
+    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Native template introduction.\n')
+    expect(requests).toContain(`/api/v1/workspaces/organizations/${organizationId}/content-graph/authoring/${source.content_id}`)
+  } finally { transport.mockRestore(); window.history.replaceState(null, '', previous); document.cookie = 'csrftoken=; Max-Age=0' }
+})

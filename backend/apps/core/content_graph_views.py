@@ -19,6 +19,7 @@ from .content_index import (
     content_graph_projection,
     index_repository_content,
 )
+from .content_read import repository_for_reader
 from .document_views import _msp_workspace, _organization_workspace
 from .models import WorkspaceRepository, workspace_for_owner
 from .workspaces import ResolvedWorkspace
@@ -35,8 +36,7 @@ def _get(resolved, request) -> Response:  # type: ignore[no-untyped-def]
     query = ContentGraphQuerySerializer(data=request.query_params)
     query.is_valid(raise_exception=True)
     audience = query.validated_data["audience"]
-    repository = _repository(resolved)
-    repository = type(repository).objects.select_related("accepted_commit", "indexed_commit").get(pk=repository.pk)
+    repository = repository_for_reader(resolved)
     return Response(
         ContentGraphSerializer(
             content_graph_projection(

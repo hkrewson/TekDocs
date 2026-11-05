@@ -95,7 +95,9 @@ class PreparedGitPublication:
 def verify_git_publication_source(publication: DocumentPublication) -> bool:
     """Check the signed source descriptor without consulting current Git state."""
     try:
-        repeated = publication.manifest.get("format") == OCCURRENCE_GIT_STATIC_FORMAT
+        from .document_diagram_publications import has_repeated_source_envelope
+
+        repeated = has_repeated_source_envelope(publication.manifest)
         manifest = publication_content_manifest(publication.manifest, publication.canonical_markdown)
         source = manifest["git_source"]
         sources = source["sources"]
@@ -200,6 +202,15 @@ def _validated_git_publication_content(
     from .document_template_migration import template_enrollment_evidence
 
     enrollment = template_enrollment_evidence(document)
+    from .shared_library_scope import ordinary_library_placements
+
+    for placement in ordinary_library_placements(document):
+        owner = placement.block.source_document
+        if owner is None or not DocumentAuthority.objects.filter(
+            tenant_id=document.tenant_id, workspace_id=owner.entity.workspace_id,
+            content_id=owner.id, authority="repository",
+        ).exists():
+            raise PublicationConflict("Shared library source requires the complete authority handoff")
     if enrollment is not None and enrollment.library_placement_ids:
         library_source = Document.objects.get(tenant_id=document.tenant_id, pk=enrollment.source_document_id)
         if not DocumentAuthority.objects.filter(
@@ -456,7 +467,7 @@ def publish_git_document(
             if audience == "client_visible" or locked.placements.exclude(audience_profile="shared").exists():
                 source = {**source, "audience_filtered": True}
             shared_composition = (retention != "permanent" or source.get("audience_filtered") is True
-                                  or source["format"] == "tekdocs.git-dependencies/v2"
+                                  or source["format"] in {"tekdocs.git-dependencies/v2", "tekdocs.git-dependencies/v3"}
                                   or locked.placements.count() != 1 or len(source["sources"]) != 2
                                   or any(s["mode"] == "pinned" for s in source["sources"]))
             key_bindings = node.frontmatter.get("key_bindings", {})
@@ -470,7 +481,8 @@ def publish_git_document(
                 "format": (CONTENT_KEY_GIT_STATIC_FORMAT if prepared.key_snapshot is not None
                            and any(item["kind"] == "content" for item in prepared.key_snapshot["records"])
                            else ADDRESSED_GIT_STATIC_FORMAT if prepared.addressed
-                           else TEMPLATE_GIT_STATIC_FORMAT if source["format"] == "tekdocs.git-dependencies/v2"
+                           else TEMPLATE_GIT_STATIC_FORMAT if source["format"] in {
+                               "tekdocs.git-dependencies/v2", "tekdocs.git-dependencies/v3"}
                            else SHARED_GIT_STATIC_FORMAT if shared_composition
                            else FILE_GIT_STATIC_FORMAT if files else GIT_STATIC_FORMAT),
                 "publication_id": str(publication_id),
@@ -514,6 +526,9 @@ def publish_git_document(
                     for item in source["sources"]}) != len(source["sources"]):
                 manifest["occurrence_format"] = manifest["format"]
                 manifest["format"] = OCCURRENCE_GIT_STATIC_FORMAT
+            if source["format"] == "tekdocs.git-dependencies/v3":
+                manifest["library_format"] = manifest["format"]
+                manifest["format"] = "tekdocs-static-publication/v13"
             html = render_markdown(
                 markdown, attachments=rendered_files,
                 entity_mentions={item["id"]: item for item in prepared.entities},

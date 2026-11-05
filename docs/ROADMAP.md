@@ -1,5 +1,25 @@
 # Release Roadmap
 
+## Immediate route to 1.0
+
+The maintainer-authorized [closeout plan](../planning/1.0-closeout-plan.md) orders
+the remaining work: repair current recovery validation, freeze the document
+support matrix, complete required migration gaps, then finish candidate
+acceptance and the 1.0 compatibility decision. Full completion of the current
+migration scope remains an option; no valid legacy shape is silently deferred.
+The first post-1.0 priority is a distinct TekDocs
+[end-to-end interface rework](../planning/post-1.0-interface-rework.md), covering
+copy, controls/forms, workflow simplification, navigation and visual identity.
+
+The maintainer-authorized [remaining-gap audit](../planning/migrations/remaining-migration-audit.md)
+now starts with [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md).
+It covers ordinary library and client-listing references, unenrolled template
+reuse, reviewed pre-Git pin custody and distinct signed source proof. Both review
+axes, 704 combined Docker cases and nine real browser/server journeys passed.
+Exact-source hosted upgrade/recovery artifacts remain required. Other valid
+structural, local-history and relationship shapes remain
+explicit audit work; this is development at 0.9.18, not aggregate 1.0 acceptance.
+
 The maintainer-authorized [repeated shared-block slice](../planning/migrations/repeated-shared-block-migration.md)
 continues #105/#106 after published 0.9.18 (`81fed48f`, release CI 41362859970).
 Acceptance preserves distinct pinned/live occurrences, signed publications, PDFs
@@ -1822,9 +1842,10 @@ document model.
   and network-isolated restore on the candidate. Verify organization
   isolation, document authority, content/index consistency, retained files,
   publication evidence, and restore without GitHub access.
-- [ ] **Pilot and release evidence:** Complete the planned pilot against the
-  Git-backed candidate, reconcile findings, and record exact commit/image
-  digests with links to each gate.
+- [ ] **Maintainer and release evidence:** Complete maintainer-led acceptance
+  against the Git-backed candidate, reconcile findings, and record exact
+  commit/image digests with links to each gate. External pilots are excluded
+  by the maintainer's October 20, 2026 scope decision.
 
 Each checkbox requires dated evidence for the candidate commit or image.
 Historical responsive acceptance, prior local rehearsals, and CI from another
@@ -2395,3 +2416,27 @@ Remote Git replication, pull-request authoring and external repository authority
 blocker. The work must review all caller-settable RLS context and transition
 flags under the actual runtime role, then establish and test a stronger
 least-privilege database boundary before claiming resistance to hostile SQL.
+
+## Native keys and entity references (bounded development slice)
+
+New Git-only documents can stage field/content bindings and entity references in
+the protected draft without legacy Document/Block records. Publication evidence
+v3 freezes field values, exact fragment source proof and entity cards; earlier
+signed output, PDFs and file versions remain immutable. See
+[acceptance and validation](../planning/git-native-keys.md). Local tests, all 14 browser/server journeys and both source reviews pass;
+exact-source hosted validation follows the authorized push. Legacy-backed
+fragment identities cannot bypass permissions through native keys.
+Native template enrollment is implemented; monitored-source configuration remains next, followed by
+clean-start combined acceptance. The six legacy migration gaps remain deferred;
+no existing-data migration or production deployment is included.
+
+## Native template enrollment (bounded development slice)
+
+[Native template enrollment](../planning/git-native-templates.md) connects saved
+MSP Git sources to new client documents through the existing Templates interface.
+It covers independent introductions/copies, live and pinned sections, exact-version
+update review, detach, Workspace isolation and retained publication proof.
+Local validation passes 796 combined backend cases, 883 frontend cases and all 15
+browser/server journeys; source reviews are clear. Exact-source hosted upgrade and
+independent encrypted restore follow the authorized push. The change does not
+migrate existing documents or alter the published 0.9.18 checkpoint.

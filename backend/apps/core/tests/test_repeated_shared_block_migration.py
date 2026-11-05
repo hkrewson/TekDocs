@@ -134,19 +134,21 @@ def test_occurrence_guard_reverse_reapply_preserves_existing_signed_rows(repeate
     from django.db.migrations.executor import MigrationExecutor
 
     from apps.core.publications import verify_retained_publication_custody
+    from apps.core.tests.publication_guard_fixture import assert_current_guard_accepts, reinsert_signed_publication
 
     owner = repeated_context.owner
     prepare_repeated_block_fixture(owner)
     _source, consumer = documents(owner)
     snapshot = publish(owner, consumer, "Retain occurrence proof across schema rollback")
     before = fingerprint(retained_state(owner))
+    assert_current_guard_accepts(snapshot)
     targets = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
     try:
         MigrationExecutor(connection).migrate([("core", "0212_client_git_publication")])
         assert verify_retained_publication_custody(snapshot)
         assert fingerprint(retained_state(owner)) == before
-        with pytest.raises(DatabaseError), transaction.atomic():
-            publish(owner, consumer, "Old schema refuses new occurrence certificates")
+        with pytest.raises(DatabaseError, match="publication integrity metadata is invalid"), transaction.atomic():
+            reinsert_signed_publication(snapshot)
     finally:
         MigrationExecutor(connection).migrate(targets)
     assert fingerprint(retained_state(owner)) == before

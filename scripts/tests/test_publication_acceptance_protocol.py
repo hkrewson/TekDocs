@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import secrets
 import tempfile
 import unittest
 from pathlib import Path
@@ -63,16 +64,52 @@ class PublicationAcceptanceProtocolTests(unittest.TestCase):
         self.assertGreater(budget["suite_timeout_ms"], 7 * budget["test_timeout_ms"])
         self.assertEqual(protocol.completion_timeout_seconds(self.budget), 960)
 
+    def test_controller_readiness_uses_the_shared_bounded_startup_budget(self):
+        harness = (ROOT / "tests/rehearsals/rehearse-publication-browser.sh").read_text()
+        self.assertEqual(protocol.startup_timeout_seconds(self.budget), 600)
+        self.assertIn("startup_timeout_seconds", harness)
+        self.assertNotIn("seq 1 240", harness)
+
     def test_invalid_or_unbounded_budget_is_rejected(self):
         path = Path(self.directory.name) / "budget.json"
         for value in ([], {}, {
-            "test_timeout_ms": True, "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
+            "test_timeout_ms": True, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
         }, {
-            "test_timeout_ms": 120000, "suite_timeout_ms": 900000, "controller_grace_ms": 60001,
+            "test_timeout_ms": 120000, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60001,
         }, {
-            "test_timeout_ms": 120000, "suite_timeout_ms": 1800000, "controller_grace_ms": 60000,
+            "test_timeout_ms": 120000, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 1800000, "controller_grace_ms": 60000,
+        }, {
+            "test_timeout_ms": 120000, "startup_timeout_ms": 900001,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
         }):
             with self.subTest(value=value):
                 path.write_text(json.dumps(value))
                 with self.assertRaisesRegex(ValueError, "Invalid publication browser budget"):
                     protocol.completion_timeout_seconds(path)
+
+    def test_server_failure_locations_survive_without_private_exception_values(self):
+        value = secrets.token_hex(24)
+        path = ROOT / "backend/apps/core/tests/cross_workspace_fixture.py"
+        try:
+            exec(compile("raise AssertionError(value)", str(path), "exec"), {"value": value})
+        except AssertionError as error:
+            report = protocol.safe_failure_report(error, "call")
+        checked = protocol.validate_failure_report(report)
+        self.assertEqual(checked["category"], "assertion")
+        self.assertIn({"file": "apps/core/tests/cross_workspace_fixture.py", "line": 1}, checked["locations"])
+        self.assertNotIn(value, json.dumps(checked))
+        self.assertNotIn("message", checked)
+
+    def test_server_failure_report_rejects_values_unknown_fields_and_escaping_paths(self):
+        report = {"version": 1, "phase": "call", "category": "assertion", "locations": []}
+        for candidate in (
+            {**report, "message": secrets.token_hex(24)},
+            {**report, "phase": "private-value"},
+            {**report, "locations": [{"file": "../.env", "line": 1}]},
+            {**report, "locations": [{"file": "apps/core/tests/cross_workspace_fixture.py", "line": True}]},
+        ):
+            with self.subTest(candidate=candidate), self.assertRaises(ValueError):
+                protocol.validate_failure_report(candidate)

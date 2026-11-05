@@ -1,5 +1,76 @@
-import { browserCsrfToken } from '../auth/api'
+import { browserAuthClient, browserCsrfToken } from '../auth/api'
 import { translate } from '../i18n/localization'
+import type { DocumentPrimaryFile, DocumentRemoteObservation, DocumentRemoteSource } from './api'
+
+export type RepositoryPrimaryFilePage = { results: DocumentPrimaryFile[]; count: number; page: number; page_size: number; has_more: boolean }
+
+export class RepositoryPrimaryFileConflictError extends Error {}
+
+function primaryFile(value: unknown): DocumentPrimaryFile {
+  if (!value || typeof value !== 'object') throw new Error('Invalid primary-file response')
+  const row = value as Record<string, unknown>
+  const uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i
+  if (typeof row.id !== 'string' || !uuid.test(row.id)
+    || typeof row.filename !== 'string' || !row.filename || row.filename.length > 255
+    || typeof row.size !== 'number' || !Number.isSafeInteger(row.size) || row.size < 0
+    || typeof row.version_number !== 'number' || !Number.isSafeInteger(row.version_number) || row.version_number < 1
+    || (row.replaces_id !== null && (typeof row.replaces_id !== 'string' || !uuid.test(row.replaces_id)))
+    || ((row.version_number === 1) !== (row.replaces_id === null)) || row.replaces_id === row.id
+    || typeof row.is_current !== 'boolean' || row.scan_status !== 'clean'
+    || typeof row.checksum !== 'string' || !/^[a-f0-9]{64}$/.test(row.checksum)
+    || !['media_type', 'scan_engine', 'scanned_at', 'created_at'].every(key => typeof row[key] === 'string' && row[key])) {
+    throw new Error('Invalid primary-file response')
+  }
+  return row as DocumentPrimaryFile
+}
+
+export type RepositoryKeyTarget = {
+  id: string; title: string; kind: 'entity' | 'fragment'; entity_type: string; fields: string[]
+}
+export type RepositoryKeyState = {
+  source_blob: string; accepted_commit: string; read_only: boolean; key_bindings: Record<string, string>
+  targets: RepositoryKeyTarget[]; bound_targets: RepositoryKeyTarget[]; has_more: boolean
+  report: { expression: string; state: 'resolved' | 'withheld' | 'unresolvable'; label: string; reason: string | null }[]
+  report_has_more: boolean
+}
+
+function validKeyState(result: RepositoryKeyState): boolean {
+  const uuid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i
+  const object = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/
+  if (!result || !object.test(result.source_blob) || !object.test(result.accepted_commit)
+    || typeof result.read_only !== 'boolean' || typeof result.has_more !== 'boolean'
+    || typeof result.report_has_more !== 'boolean' || !result.key_bindings || typeof result.key_bindings !== 'object'
+    || Array.isArray(result.key_bindings) || Object.keys(result.key_bindings).length > 64
+    || !Object.entries(result.key_bindings).every(([name, id]) => /^[a-z][a-z0-9_]{0,39}$/.test(name) && typeof id === 'string' && uuid.test(id))
+    || !Array.isArray(result.targets) || result.targets.length > 50
+    || !Array.isArray(result.bound_targets) || result.bound_targets.length > 128
+    || !Array.isArray(result.report) || result.report.length > 200) return false
+  for (const targets of [result.targets, result.bound_targets]) {
+    if (new Set(targets.map(target => target?.id)).size !== targets.length || !targets.every(target => target
+      && typeof target.id === 'string' && uuid.test(target.id) && typeof target.title === 'string' && target.title.length <= 240
+      && ['entity', 'fragment'].includes(target.kind) && typeof target.entity_type === 'string' && target.entity_type.length <= 64
+      && Array.isArray(target.fields) && target.fields.length <= 100 && target.fields.every(field => typeof field === 'string' && /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*){0,2}$/.test(field))
+      && (target.kind !== 'fragment' || (target.entity_type === 'repository_fragment' && target.fields.length === 1 && target.fields[0] === 'content')))) return false
+  }
+  return result.report.every(row => row && typeof row.expression === 'string' && typeof row.label === 'string'
+    && ['resolved', 'withheld', 'unresolvable'].includes(row.state) && (row.reason === null || typeof row.reason === 'string'))
+}
+
+export type RepositoryTemplateMode = 'copy' | 'live' | 'pinned'
+export type RepositoryTemplateSection = { id: string; title: string; markdown: string }
+export type RepositoryTemplateState = {
+  role: 'source' | 'enrolled' | 'none'; read_only: boolean
+  source?: { enabled: boolean; library_visible: boolean; fragments: RepositoryTemplateSection[]; selected_fragment_ids: string[] }
+  enrollment?: { source_title: string; applied_revision_id: string; available_revision_id: string; expected_base: string; expected_blob: string; can_apply: boolean; changes: (RepositoryTemplateSection & { mode: RepositoryTemplateMode; current_markdown?: string; state: 'unchanged' | 'updated' | 'added' | 'removed' | 'conflict' })[] }
+}
+export type RepositoryTemplateDefinition = { id: string; title: string; definition_sha256: string; sections: RepositoryTemplateSection[] }
+export type RepositoryTemplatePage = { results: RepositoryTemplateDefinition[]; count: number; page: number; page_size: number; has_more: boolean }
+export type RepositoryTemplateAction = { base_commit: string | null; base_blob: string } & (
+  { action: 'configure'; enabled: boolean; library_visible: boolean; fragment_ids: string[] }
+  | ({ expected_applied_revision_id: string; expected_available_revision_id: string } & (
+    { action: 'apply'; rules: Record<string, RepositoryTemplateMode | 'keep'> } | { action: 'detach'; section_id: string }
+  ))
+)
 
 export type RepositorySummary = {
   id: string
@@ -78,6 +149,23 @@ export type RepositoryStaticPublication = {
 
 export type RepositoryStaticFormat = 'md' | 'html' | 'pdf'
 
+export type RepositoryPublicationAction = 'accept_review' | 'reject_review' | 'create_package' | 'authorize_package' | 'reject_package' | 'create_static' | 'release_client' | 'withdraw_client' | 'authorize_delivery' | 'release_internal' | 'withdraw_internal'
+
+export type RepositoryWorkflow = {
+  evidence_id: string
+  source_commit: string
+  audience: string
+  verified: boolean
+  stage: string
+  state: string
+  actions: RepositoryPublicationAction[]
+  active_publication_id: string | null
+  publication_id: string | null
+  content_digest: string
+  delivery_effective: boolean
+  events: { id: string; action: string; supersedes_id: string | null; reason: string; actor_id: string; occurred_at: string }[]
+}
+
 export type RepositoryMutation = {
   operation: 'create' | 'update' | 'move'
   content_id: string
@@ -106,6 +194,8 @@ export class RepositoryConflictError extends Error {
   }
 }
 
+export class RepositoryRecentAuthenticationRequiredError extends Error {}
+
 function path(organizationId?: string) {
   return organizationId
     ? `/api/v1/workspaces/organizations/${encodeURIComponent(organizationId)}/content-graph`
@@ -132,11 +222,155 @@ async function parse<T>(response: Response): Promise<T> {
   if (response.ok) return response.json() as Promise<T>
   if (response.status === 409) throw new RepositoryConflictError(await response.json() as RepositoryConflict)
   let detail: unknown
-  try { detail = (await response.json() as { detail?: unknown }).detail } catch { /* An upstream error may be HTML. */ }
+  try {
+    const body = await response.json() as { detail?: unknown; error?: { code?: unknown } }
+    if (response.status === 403 && body.error?.code === 'recent_authentication_required') throw new RepositoryRecentAuthenticationRequiredError()
+    detail = body.detail
+  } catch (error) {
+    if (error instanceof RepositoryRecentAuthenticationRequiredError) throw error
+    /* An upstream error may be HTML. */
+  }
   throw new Error(typeof detail === 'string' && detail.length < 300 ? detail : translate('repository.requestFailed', { status: response.status }))
 }
 
 export const browserRepositoryClient = {
+  async remoteSource(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source', {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    if (response.status === 204) return undefined
+    return parse<DocumentRemoteSource>(response)
+  },
+  async saveRemoteSource(contentId: string, input: Pick<DocumentRemoteSource, 'url' | 'source_kind' | 'enabled' | 'check_interval_minutes'>, organizationId?: string) {
+    return parse<DocumentRemoteSource>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source', {
+      method: 'PUT', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify(input),
+    }))
+  },
+  async remoteObservations(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<{ results: DocumentRemoteObservation[]; count: number }>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations', {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
+  },
+  async checkRemoteSource(contentId: string, organizationId?: string) {
+    return parse<DocumentRemoteObservation>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations', {
+      method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'X-CSRFToken': await token() },
+    }))
+  },
+  async applyRemoteObservation(contentId: string, observationId: string, fingerprint: string, organizationId?: string) {
+    return parse<DocumentRemoteObservation>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/remote-source/observations/' + encodeURIComponent(observationId) + '/apply', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify({ review_fingerprint: fingerprint }),
+    }))
+  },
+  async template(contentId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryTemplateState>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/template', { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async templateAction(contentId: string, action: RepositoryTemplateAction, organizationId?: string) {
+    return parse<RepositorySource>(await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/template', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(action) }))
+  },
+  async templates(organizationId: string, query = '', page = 1, signal?: AbortSignal) {
+    return parse<RepositoryTemplatePage>(await fetch(path(organizationId) + '/templates?' + new URLSearchParams({ q: query, page: String(page) }).toString(), { credentials: 'same-origin', headers: { Accept: 'application/json' }, signal }))
+  },
+  async enrollTemplate(organizationId: string, input: { source_content_id: string; definition_sha256: string; title: string; rules: Record<string, RepositoryTemplateMode> }) {
+    return parse<RepositorySource>(await fetch(path(organizationId) + '/template-enrollments', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(input) }))
+  },
+  async keys(contentId: string, organizationId?: string, query = '', targetIds: string[] = [], signal?: AbortSignal): Promise<RepositoryKeyState> {
+    const parameters = new URLSearchParams({ q: query })
+    targetIds.forEach(id => parameters.append('target_id', id))
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/keys?' + parameters.toString(), {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    const result = await parse<RepositoryKeyState>(response)
+    if (!validKeyState(result)) throw new Error('Invalid key configuration response')
+    return result
+  },
+  async primaryFiles(contentId: string, organizationId?: string, page = 1, signal?: AbortSignal): Promise<RepositoryPrimaryFilePage> {
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/primary-file?page=' + page, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    })
+    const result = await parse<RepositoryPrimaryFilePage>(response)
+    if (!Array.isArray(result.results) || result.page !== page || result.page_size !== 25
+      || !Number.isSafeInteger(result.count) || result.count < 0 || typeof result.has_more !== 'boolean') throw new Error('Invalid primary-file history')
+    const results = result.results.map(primaryFile)
+    if (results.length !== Math.min(25, Math.max(0, result.count - (page - 1) * 25))
+      || result.has_more !== (page * 25 < result.count)
+      || results.some((row, index) => row.version_number !== result.count - (page - 1) * 25 - index
+        || row.is_current !== (page === 1 && index === 0))) throw new Error('Invalid primary-file history')
+    return { ...result, results }
+  },
+  async appendPrimaryFile(contentId: string, file: File, expectedCurrentId: string | null, organizationId?: string, signal?: AbortSignal): Promise<DocumentPrimaryFile> {
+    const form = new FormData()
+    form.set('file', file)
+    if (expectedCurrentId !== null) form.set('expected_current_id', expectedCurrentId)
+    const response = await fetch(path(organizationId) + '/authoring/' + encodeURIComponent(contentId) + '/primary-file', {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { Accept: 'application/json', 'X-CSRFToken': await token() }, body: form,
+    })
+    if (response.status === 409) throw new RepositoryPrimaryFileConflictError('Current primary file changed')
+    return primaryFile(await parse<unknown>(response))
+  },
+  primaryFileDownloadUrl(contentId: string, fileId: string, organizationId?: string) {
+    return path(organizationId) + '/documents/' + encodeURIComponent(contentId) + '/attachments/' + encodeURIComponent(fileId) + '/download'
+  },
+  async downloadPrimaryFile(contentId: string, version: DocumentPrimaryFile, organizationId?: string, signal?: AbortSignal): Promise<{ content: Blob; name: string }> {
+    const response = await fetch(browserRepositoryClient.primaryFileDownloadUrl(contentId, version.id, organizationId), { credentials: 'same-origin', signal })
+    if (response.status !== 200 || response.headers.get('Content-Type') !== 'application/octet-stream'
+      || !response.headers.get('Content-Disposition')?.startsWith('attachment;')
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') throw new Error(translate('repository.primary.downloadFailed'))
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength !== version.size) throw new Error(translate('repository.primary.downloadFailed'))
+    return { content: new Blob([bytes], { type: 'application/octet-stream' }), name: version.filename }
+  },
+  reauthenticate: (password: string) => browserAuthClient.reauthenticate(password),
+  async createEvidence(contentId: string, audience: string, expectedCommit: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryEvidence>(await fetch(evidencePath(organizationId), {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() },
+      body: JSON.stringify({ content_id: contentId, audience, expected_commit: expectedCommit }),
+    }))
+  },
+  async publicationWorkflow(evidenceId: string, organizationId?: string, signal?: AbortSignal) {
+    return parse<RepositoryWorkflow>(await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/workflow`, {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }, signal,
+    }))
+  },
+  async publicationAction(evidenceId: string, action: RepositoryPublicationAction, reason: string, supersedesId: string | null, organizationId?: string, signal?: AbortSignal) {
+    const actions: Record<RepositoryPublicationAction, { suffix: string; body: Record<string, unknown> }> = {
+      accept_review: { suffix: '/decision', body: { outcome: 'accepted_for_packaging', reason } },
+      reject_review: { suffix: '/decision', body: { outcome: 'rejected', reason } },
+      create_package: { suffix: '/package', body: {} },
+      authorize_package: { suffix: '/package/authorization', body: { outcome: 'authorized_for_publication', reason } },
+      reject_package: { suffix: '/package/authorization', body: { outcome: 'rejected', reason } },
+      create_static: { suffix: '/package/static-publication', body: {} },
+      release_client: { suffix: '/package/static-publication/control', body: { action: 'released', reason, supersedes_id: supersedesId } },
+      withdraw_client: { suffix: '/package/static-publication/control', body: { action: 'withdrawn', reason } },
+      authorize_delivery: { suffix: '/package/static-publication/delivery-authorization', body: { reason } },
+      release_internal: { suffix: '/internal-publication', body: { action: 'released', reason, supersedes_id: supersedesId } },
+      withdraw_internal: { suffix: '/internal-publication', body: { action: 'withdrawn', reason } },
+    }
+    const operation = actions[action]
+    await parse<unknown>(await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}${operation.suffix}`, {
+      method: 'POST', credentials: 'same-origin', signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': await token() }, body: JSON.stringify(operation.body),
+    }))
+  },
+  async internalPublicationPdf(evidenceId: string, expectedDigest: string, organizationId?: string, signal?: AbortSignal) {
+    const response = await fetch(`${evidencePath(organizationId)}/${encodeURIComponent(evidenceId)}/internal-publication/pdf`, { credentials: 'same-origin', signal })
+    if (!response.ok || !/^[a-f0-9]{64}$/.test(expectedDigest)
+      || response.headers.get('X-TekDocs-Publication-Digest') !== expectedDigest
+      || response.headers.get('X-TekDocs-Export-Class') !== 'immutable_internal_publication'
+      || response.headers.get('Content-Type') !== 'application/pdf'
+      || response.headers.get('Content-Disposition') !== 'attachment; filename="repository-internal-publication.pdf"'
+      || response.headers.get('Cache-Control') !== 'private, no-store'
+      || response.headers.get('X-Content-Type-Options') !== 'nosniff') throw new Error(translate('repository.lifecycle.downloadFailed'))
+    const bytes = await response.arrayBuffer()
+    if (bytes.byteLength > 8 * 1024 * 1024 || new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') throw new Error(translate('repository.lifecycle.downloadFailed'))
+    return { content: new Blob([bytes], { type: 'application/pdf' }), name: 'repository-internal-publication.pdf' }
+  },
   async list(organizationId?: string, q = '', signal?: AbortSignal) {
     const query = new URLSearchParams({ page_size: '100' })
     if (q) query.set('q', q)

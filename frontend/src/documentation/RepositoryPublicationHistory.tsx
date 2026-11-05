@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatDateTime, translate } from '../i18n/localization'
 import { type RepositoryClient, type RepositoryEvidence, type RepositoryStaticFormat, type RepositoryStaticPublication } from './repositoryApi'
+import { RepositoryPublicationActions } from './RepositoryPublicationActions'
 
-export function RepositoryPublicationHistory({ contentId, organizationId, client }: {
+export function RepositoryPublicationHistory({ contentId, organizationId, client, commit, canRetain }: {
   contentId: string
   organizationId?: string
   client: RepositoryClient
+  commit: string | null
+  canRetain: boolean
 }) {
   const [records, setRecords] = useState<RepositoryEvidence[]>([])
   const [page, setPage] = useState(0)
@@ -19,6 +22,7 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
   const [downloadError, setDownloadError] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [reviewError, setReviewError] = useState(false)
+  const [lifecycleEditing, setLifecycleEditing] = useState(false)
   const listRequest = useRef<AbortController | null>(null)
   const staticRequest = useRef<AbortController | null>(null)
   const exportRequest = useRef<AbortController | null>(null)
@@ -31,8 +35,8 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
     reviewRequest.current?.abort()
   }, [])
 
-  async function load(nextPage: number) {
-    if (phase === 'loading') return
+  async function load(nextPage: number, force = false) {
+    if (phase === 'loading' && !force) return
     listRequest.current?.abort()
     const controller = new AbortController()
     listRequest.current = controller
@@ -123,12 +127,14 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
 
   return <section className="repository-publication-history" aria-label={translate('repository.publicationHistory')}>
     <h2>{translate('repository.publicationHistory')}</h2>
+    <RepositoryPublicationActions key={selected?.id ?? 'new'} contentId={contentId} organizationId={organizationId} commit={commit} canRetain={canRetain} selected={selected} client={client}
+      onCreated={record => { void load(1, true); void inspect(record) }} onChanged={() => { if (selected) void inspect(selected) }} onEditingChange={setLifecycleEditing} />
     <p>{translate('repository.publicationHistoryNotice')}</p>
     {phase === 'idle' && <button type="button" className="secondary-button" onClick={() => { void load(1) }}>{translate('repository.loadPublicationHistory')}</button>}
     {phase === 'loading' && <p role="status">{translate('repository.publicationHistoryLoading')}</p>}
     {phase === 'error' && <p role="alert" className="form-message error">{translate('repository.publicationHistoryFailed')} <button type="button" className="secondary-button" onClick={() => { void load(failedPage) }}>{translate('common.retry')}</button></p>}
     {phase === 'ready' && records.length === 0 && <p className="empty-state">{translate('repository.publicationHistoryEmpty')}</p>}
-    {records.length > 0 && <ul className="document-title-list">{records.map((record) => <li key={record.id}><button type="button" aria-current={selected?.id === record.id ? 'true' : undefined} onClick={() => { void inspect(record) }}><span><strong>{record.title}</strong><small>{translate('repository.publicationEvidenceSummary', { audience: translate(record.audience === 'client_visible' ? 'repository.audienceClient' : 'repository.audienceInternal'), commit: record.source_commit.slice(0, 12) })} · <time dateTime={record.signed_at}>{formatDateTime(record.signed_at)}</time></small></span></button></li>)}</ul>}
+    {records.length > 0 && <ul className="document-title-list">{records.map((record) => <li key={record.id}><button type="button" disabled={lifecycleEditing} aria-current={selected?.id === record.id ? 'true' : undefined} onClick={() => { void inspect(record) }}><span><strong>{record.title}</strong><small>{translate('repository.publicationEvidenceSummary', { audience: translate(record.audience === 'client_visible' ? 'repository.audienceClient' : 'repository.audienceInternal'), commit: record.source_commit.slice(0, 12) })} · <time dateTime={record.signed_at}>{formatDateTime(record.signed_at)}</time></small></span></button></li>)}</ul>}
     {phase === 'ready' && hasMore && <button type="button" className="secondary-button" onClick={() => { void load(page + 1) }}>{translate('repository.publicationHistoryMore')}</button>}
     {selected && <div className="repository-publication-detail">
       <h3>{translate('repository.publicationEvidenceSelected')}</h3>
@@ -139,7 +145,7 @@ export function RepositoryPublicationHistory({ contentId, organizationId, client
       {staticPhase === 'error' && <p role="alert" className="form-message error">{translate('repository.staticCheckFailed')} <button type="button" className="secondary-button" onClick={() => { void inspect(selected) }}>{translate('common.retry')}</button></p>}
       {staticPhase === 'ready' && !staticRecord && <p>{translate('repository.staticNotFinalized')}</p>}
       {staticPhase === 'ready' && staticRecord && <p role="status">{translate(verifiedStatic ? 'repository.staticVerified' : 'repository.staticUnverified')}</p>}
-      {verifiedStatic && organizationId && <><p>{translate('repository.staticDownloadNotice')}</p><div className="form-actions">{(['md', 'html', 'pdf'] as const).map((format) => <button key={format} type="button" className="secondary-button" disabled={exporting !== null} onClick={() => { void download(format) }}>{translate(format === 'md' ? 'repository.staticDownloadMarkdown' : format === 'html' ? 'repository.staticDownloadHtml' : 'repository.staticDownloadPdf')}</button>)}</div></>}
+      {verifiedStatic && organizationId && <><p>{translate('repository.staticDownloadNotice')}</p><div className="form-actions">{(['md', 'html'] as const).map((format) => <button key={format} type="button" className="secondary-button" disabled={exporting !== null} onClick={() => { void download(format) }}>{translate(format === 'md' ? 'repository.staticDownloadMarkdown' : 'repository.staticDownloadHtml')}</button>)}</div></>}
       {exporting && <p role="status">{translate('repository.staticDownloading')}</p>}
       {downloadError && <p role="alert" className="form-message error">{translate('repository.staticDownloadFailed')}</p>}
     </div>}

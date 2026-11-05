@@ -18,6 +18,7 @@ from .entity_mentions import resolve_entity_mentions
 from .models import Document, Entity, PublicationAudience, WorkspaceRepository
 from .publications import MAX_PUBLICATION_MARKDOWN_BYTES
 from .rendering import RenderedEntityMention, entity_ids_in_markdown
+from .repository_key_context import RepositoryKeyContext, canonical_key_bindings
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
 
 
@@ -96,18 +97,34 @@ def freeze_repository_key_snapshot(
     """Freeze portable keys whose authored bindings match the live owner."""
     if not key_targets_in_markdown(markdown):
         return None
+    context: Document | RepositoryKeyContext
     if document is None:
-        raise RepositoryPublicationDependencyError(
-            "Repository publication preflight blocked: repository.key.unavailable"
+        if repository.accepted_commit is None:
+            raise RepositoryPublicationDependencyError("Repository key source is unavailable")
+        if Document.objects.filter(
+            id=node.content_id, tenant_id=repository.tenant_id,
+            organization=repository.workspace.organization, entity__workspace_id=repository.workspace_id,
+        ).exists():
+            raise RepositoryPublicationDependencyError("Legacy key owner is unavailable")
+        context = RepositoryKeyContext(
+            repository, canonical_key_bindings(node.frontmatter.get("key_bindings", {})),
+            repository.accepted_commit.created_at,
         )
-    # Hold active binding identities stable through portable parity and resolution.
-    list(DocumentKeyBinding.objects.select_for_update().filter(document=document, archived_at__isnull=True))
-    try:
-        bindings, _identities = portable_document_keys(document, markdown)
+    else:
+        # Promoted bindings remain SQL-owned/read-only and must retain exact parity.
+        list(DocumentKeyBinding.objects.select_for_update().filter(document=document, archived_at__isnull=True))
+        try:
+            bindings, _identities = portable_document_keys(document, markdown)
+        except DocumentMigrationKeyError as exc:
+            raise RepositoryPublicationDependencyError(
+                "Repository publication preflight blocked: repository.key.unavailable"
+            ) from exc
         if bindings != node.frontmatter.get("key_bindings", {}):
             raise RepositoryPublicationDependencyError(
                 "Repository publication preflight blocked: repository.key.binding_mismatch"
             )
+        context = document
+    try:
         organization = repository.workspace.organization
         workspace = (
             resolve_organization_workspace(actor, entity_id=organization.entity_id)
@@ -116,7 +133,7 @@ def freeze_repository_key_snapshot(
         )
         frozen = freeze_document_keys(
             workspace=workspace,
-            document=document,
+            document=context,
             markdown=markdown,
             audience=(
                 DataAudience.CLIENT_PORTAL if audience == PublicationAudience.CLIENT_VISIBLE else DataAudience.MSP_STAFF
@@ -136,7 +153,9 @@ def freeze_repository_key_snapshot(
         "sha256": hashlib.sha256(frozen.markdown.encode("utf-8")).hexdigest(),
         "records": list(frozen.manifest_records),
     }
-    if not (verify_frozen_field_keys(markdown, snapshot) or verify_frozen_content_keys(markdown, snapshot)):
+    if not (verify_frozen_field_keys(markdown, snapshot) or verify_frozen_content_keys(
+        markdown, snapshot, allow_native_fragments=document is None,
+    )):
         raise RepositoryPublicationDependencyError(
             "Repository publication preflight blocked: repository.key.unavailable"
         )

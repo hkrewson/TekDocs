@@ -8,6 +8,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from django.db.models import BooleanField, Q
+from django.db.models.expressions import RawSQL
+
 from .content_profile import ParsedContent, parse_content
 from .models import (
     AuditEvent,
@@ -88,7 +91,7 @@ def verify_template_source_projection(document: Document) -> None:
         ) from exc
 
 
-def project_template_source_content(
+def project_library_source_content(
     *,
     repository: WorkspaceRepository,
     commit: RepositoryCommit,
@@ -113,8 +116,12 @@ def project_template_source_content(
             organization__isnull=True,
             entity__workspace_id=repository.workspace_id,
             id__in=roots,
-            is_template=True,
         )
+        .annotate(_shared_live=RawSQL(
+            "tekdocs_library_has_live_clients(%s, core_document.id, 'document')",
+            [repository.tenant_id], output_field=BooleanField(),
+        ))
+        .filter(Q(is_template=True) | Q(library_visible=True) | Q(_shared_live=True))
         .select_related("entity")
         .order_by("id")
     )
@@ -178,7 +185,8 @@ def project_template_source_content(
         AuditEvent.objects.create(
             tenant_id=repository.tenant_id,
             actor_id=attribution.audit_event.actor_id,
-            action="document.template_git_snapshot_projected",
+            action=("document.template_git_snapshot_projected" if source.is_template
+                    else "document.shared_library_git_snapshot_projected"),
             entity_id=source.entity_id,
             metadata={"commit": commit.object_id, "block_revision_ids": revisions, "derived_from_git": True},
         )

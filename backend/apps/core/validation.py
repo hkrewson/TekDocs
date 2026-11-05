@@ -32,6 +32,8 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_documentauthority"
         else "Append-only signed repository source evidence; exact-workspace RLS and source-identity guard."
         if table == "core_repositorypublicationevidence"
+        else "Append-only staff publication decisions over signed evidence; exact-workspace RLS and lineage guards."
+        if table == "core_repositoryinternalpublicationevent"
         else "Append-only exact-evidence internal review decision; exact-workspace RLS and scope guard."
         if table == "core_repositoryevidencereviewdecision"
         else "Append-only accepted-evidence handoff; exact-workspace RLS and decision-scope guard."
@@ -48,6 +50,10 @@ TENANT_MODEL_CONTRACTS = tuple(
         if table == "core_repositoryevidenceattachment"
         else "Exact-client recurring enrollment, approved terms, and permanent period claims."
         if table.startswith("core_recurringinvoice")
+        else "Approved native Git template sources and immutable revisions; library-read-only and MSP-write RLS."
+        if table in {"core_repositorytemplate", "core_repositorytemplaterevision"}
+        else "Native enrollment identities with exact-client Workspace RLS and scope guards."
+        if table == "core_repositorytemplateenrollment"
         else "Tenant-owned entity-domain data.",
     )
     for table in RLS_TABLES

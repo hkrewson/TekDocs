@@ -1,8 +1,16 @@
-import type { ReactElement } from 'react'
+import { StrictMode, type ReactElement } from 'react'
 import { ApplicationRouter } from '../navigation/ApplicationRouter'
 import { act, render as testingRender, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
+import { browserRepositoryClient } from './repositoryApi'
+
+let restoreNativeCatalog: () => void
+beforeEach(() => {
+  const catalog = vi.spyOn(browserRepositoryClient, 'templates').mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false })
+  restoreNativeCatalog = () => { catalog.mockRestore() }
+})
+afterEach(() => { restoreNativeCatalog() })
 
 vi.mock('../editor/EditorSpike', () => ({
   EditorSpike: ({ initialMarkdown, onMarkdownChange }: { initialMarkdown: string; onMarkdownChange: (value: string) => void }) => <textarea aria-label="Document Markdown" defaultValue={initialMarkdown} onChange={(event) => onMarkdownChange(event.target.value)} />,
@@ -228,6 +236,25 @@ it('paginates the library and gives an opened document a focused workspace', asy
   await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
     {}, expect.any(AbortSignal), expect.objectContaining({ page: 2, page_size: 25 }),
   ))
+})
+
+it('opens a discovered native document in the repository editor without legacy detail calls', async () => {
+  const originalLocation = window.location.pathname + window.location.search
+  try {
+    const user = userEvent.setup()
+    const { documents, workspaces, getDocument } = clients()
+    vi.spyOn(documents, 'list').mockResolvedValue({ results: [{ ...document, repository_native: true, content_authority: 'repository', content_id: 'native-content' }], count: 1 })
+    const { browserRepositoryClient } = await import('./repositoryApi')
+    vi.spyOn(browserRepositoryClient, 'list').mockResolvedValue({ results: [], accepted_commit: null, indexed_commit: null, count: 0, has_more: false })
+    const source = vi.spyOn(browserRepositoryClient, 'source').mockResolvedValue({ content_id: 'native-content', title: 'Native guide', kind: 'document', path: 'docs/native.md', markdown: 'Native saved body', source: '', source_blob: 'blob', accepted_commit: null, indexed_commit: null })
+    render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
+    await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
+    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Native saved body')
+    expect(source).toHaveBeenCalledWith('native-content', undefined, expect.any(AbortSignal))
+    expect(getDocument).not.toHaveBeenCalled()
+  } finally {
+    window.history.replaceState(null, '', originalLocation)
+  }
 })
 
 it.each([false, true])('reads repository-owned documents by content identity (organization scope: %s)', async (organizationScope) => {
@@ -1750,4 +1777,24 @@ it('uses the correction submit control for a retained promoted client publicatio
   expect(screen.getByLabelText('Who can see it?')).toHaveValue('client_visible')
   expect(screen.getByRole('button', { name: 'Publish correction' })).toBeEnabled()
   expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument()
+})
+
+it('opens the exact newly enrolled native document from the template library', async () => {
+  const user = userEvent.setup()
+  const { documents, workspaces } = clients()
+  const source = { content_id: 'native-enrolled', path: 'docs/native-enrolled.md', kind: 'document' as const, title: 'Native enrolled document', markdown: 'Independent introduction.\n', source: '', source_blob: 'b'.repeat(40), accepted_commit: 'a'.repeat(40), indexed_commit: 'a'.repeat(40) }
+  vi.spyOn(browserRepositoryClient, 'templates').mockResolvedValue({ results: [{ id: 'template', title: 'Native template', definition_sha256: 'c'.repeat(64), sections: [] }], count: 1, page: 1, page_size: 25, has_more: false })
+  const enrollment = vi.spyOn(browserRepositoryClient, 'enrollTemplate').mockImplementation(() => new Promise(resolve => window.setTimeout(() => resolve(source), 30)))
+  const read = vi.spyOn(browserRepositoryClient, 'source').mockImplementation(() => new Promise(resolve => window.setTimeout(() => resolve(source), 30)))
+  const list = vi.spyOn(browserRepositoryClient, 'list').mockResolvedValue({ results: [], accepted_commit: source.accepted_commit, indexed_commit: source.indexed_commit, count: 0, has_more: false })
+  const attachments = vi.spyOn(browserRepositoryClient, 'listAttachments').mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false })
+  try {
+    render(<StrictMode><Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} initialDocumentId={null} /></StrictMode>)
+    await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+    await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
+    await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
+    await waitFor(() => expect(window.location.search).toContain('repository=native-enrolled'))
+    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Independent introduction.\n')
+    expect(read).toHaveBeenCalledWith('native-enrolled', 'org-1', expect.any(AbortSignal))
+  } finally { enrollment.mockRestore(); read.mockRestore(); list.mockRestore(); attachments.mockRestore() }
 })

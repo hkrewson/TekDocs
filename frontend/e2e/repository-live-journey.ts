@@ -33,6 +33,11 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   await page.getByLabel('Markdown body').fill(initialBody)
   const created = await saveToGit(page, endpoint)
   expect(created.markdown).toBe(initialBody)
+  // A fresh Git-only document is discoverable in the ordinary library too.
+  await page.goto(documentation)
+  await page.getByRole('button', { name: /Live Git setup guide/ }).click()
+  await expect(page.getByLabel('Markdown body')).toHaveValue(initialBody)
+  await expect(page).toHaveURL(new RegExp(`repository=${created.content_id}`))
   const directLink = `${documentation}?repository=${created.content_id}`
 
   // Reopening must read the saved Git file, including after a browser reload.
@@ -72,9 +77,16 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
 
   await page.goto(directLink)
   await expect(page.getByLabel('Markdown body')).toHaveValue(proposedBody)
+  // Source and repository listing load independently. Finish the listing before
+  // asserting a single upload status, then verify the actual scanned intake.
+  await expect(page.getByRole('button', { name: 'New Markdown file', exact: true })).toBeEnabled()
+  const attachmentResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === `${endpoint}/${created.content_id}/attachments`
+      && response.request().method() === 'POST')
   await page.getByLabel('Attach file to saved document').setInputFiles({
     name: 'live-git-setup.txt', mimeType: 'text/plain', buffer: Buffer.from('Live device setup details.'),
   })
+  expect((await attachmentResponse).status()).toBe(201)
   await expect(page.getByRole('status')).toContainText('Save to Git to keep its link')
   const linkedBody = await page.getByLabel('Markdown body').inputValue()
   expect(linkedBody).toMatch(/\[live-git-setup\.txt\]\(tekdocs:\/\/attachment\/[0-9a-f-]{36}\)/)

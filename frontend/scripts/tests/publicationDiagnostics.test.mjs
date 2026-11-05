@@ -3,6 +3,84 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import { attachPublicationDiagnostics } from '../../e2e/publicationDiagnostics.ts'
 
+test('native workflow and password-confirmation diagnostics never read or retain request values', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_publications', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['POST', '/api/v1/workspaces/msp/repository-publication-evidence'],
+    ['GET', '/api/v1/workspaces/organizations/private-org/repository-publication-evidence/private-evidence/workflow'],
+    ['POST', '/api/v1/workspaces/organizations/private-org/repository-publication-evidence/private-evidence/package/static-publication/delivery-authorization'],
+    ['POST', '/_allauth/browser/v1/auth/reauthenticate'],
+  ]) {
+    const request = { url: () => `http://localhost${path}?private-query=private-value`, method: () => method, headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('Password must not be read') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 403 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_publications')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['native_snapshot', 'native_workflow', 'native_delivery', 'native_reauthentication'])
+  assert.ok(!lines[0].includes('private-') && !lines[0].includes('localhost'))
+  diagnostic.dispose()
+})
+
+test('primary-file diagnostics distinguish intake and download without reading file values', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_primary_files', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['GET', '/api/v1/workspaces/organizations/private-org/content-graph/authoring/private-document/primary-file'],
+    ['POST', '/api/v1/workspaces/msp/content-graph/authoring/private-document/primary-file'],
+    ['GET', '/api/v1/workspaces/organizations/private-org/content-graph/documents/private-document/attachments/private-file/download'],
+  ]) {
+    const request = { url: () => 'http://localhost' + path + '?filename=private-value', method: () => method,
+      headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('File bytes must not be read') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 409 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_primary_files')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['primary_file_read', 'primary_file_write', 'managed_file_download'])
+  for (const value of ['localhost', 'private-', 'filename', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
+test('a pending Git document read is visible without retaining document or query values', () => {
+  const page = new EventEmitter(), lines = []
+  let time = 0
+  const diagnostic = attachPublicationDiagnostics(page, {
+    scenario: 'history_templates', now: () => time, write: line => lines.push(line),
+  })
+  for (const path of [
+    '/api/v1/workspaces/organizations/private-organization/documents',
+    '/api/v1/workspaces/organizations/private-organization/documents/private-document',
+  ]) {
+    const request = { url: () => `http://localhost${path}?caption=private-caption`, method: () => 'GET' }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 200 })
+    page.emit('requestfinished', request)
+  }
+  const request = {
+    url: () => 'http://localhost/api/v1/workspaces/organizations/private-organization/content-graph/documents/private-content?caption=private-caption',
+    method: () => 'GET',
+    headers: () => { throw new Error('Session headers must not be read') },
+    postData: () => { throw new Error('Content must not be read') },
+  }
+  time = 100
+  page.emit('request', request)
+  time = 5100
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.deepEqual(report.events.filter(event => event.event === 'request').map(event => event.phase), [
+    'document_list', 'document_read', 'git_document_read',
+  ])
+  assert.deepEqual(report.pending, [{ phase: 'git_document_read', age_ms: 5000 }])
+  for (const value of ['localhost', 'private-', 'caption', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
 test('client workflow failures identify the boundary without retaining identities or session values', () => {
   const page = new EventEmitter(), lines = []
   const diagnostic = attachPublicationDiagnostics(page, { scenario: 'client_publications', write: line => lines.push(line) })
@@ -149,4 +227,74 @@ test('skipped runs stay silent and failure reporting is emitted only once', () =
   assert.ok(!lines[0].includes('unpublished-heading'))
   assert.deepEqual(JSON.parse(lines[0]).events.map(event => event.event), ['dialog', 'page_error'])
   failed.dispose()
+})
+
+
+test('native key reads never retain searches or pending target identities', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_keys', write: line => lines.push(line) })
+  const request = { url: () => 'http://localhost/api/v1/workspaces/msp/content-graph/authoring/private-document/keys?q=private-search&target_id=private-target', method: () => 'GET',
+    headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('Body must not be read') } }
+  page.emit('request', request)
+  page.emit('response', { request: () => request, status: () => 409 })
+  page.emit('requestfinished', request)
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_keys')
+  assert.equal(report.events.find(event => event.event === 'response').phase, 'native_keys_read')
+  for (const value of ['localhost', 'private-', 'target_id', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
+test('native template diagnostics distinguish scoped operations without recording reviewed source', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_templates', write: line => lines.push(line) })
+  for (const [method, path] of [
+    ['GET', '/api/v1/workspaces/msp/content-graph/authoring/private-document/template'],
+    ['POST', '/api/v1/workspaces/organizations/private-org/content-graph/authoring/private-document/template'],
+    ['POST', '/api/v1/workspaces/organizations/private-org/content-graph/template-enrollments'],
+  ]) {
+    const request = { url: () => `http://localhost${path}?private-query=value`, method: () => method,
+      headers: () => { throw new Error('Headers must not be read') }, postData: () => { throw new Error('Reviewed text must not be read') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 409 })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.equal(report.scenario, 'native_templates')
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['native_template_read', 'native_template_write', 'native_template_enroll'])
+  for (const value of ['localhost', 'private-', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
+
+test('native source read diagnostics record safe status and only fixed editor state', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_templates', write: line => lines.push(line) })
+  const request = { url: () => 'http://localhost/api/v1/workspaces/organizations/private-org/content-graph/authoring/private-doc?private=value', method: () => 'GET' }
+  page.emit('request', request)
+  page.emit('response', { request: () => request, status: () => 404 })
+  diagnostic.finish('failed', { repositoryEditor: true, repositorySourceFailure: true, nativeLibrary: false, privateError: 'private-content' })
+  const report = JSON.parse(lines[0])
+  assert.equal(report.events.find(event => event.event === 'response').phase, 'native_source_read')
+  assert.deepEqual(report.visible, { repositoryEditor: true, repositorySourceFailure: true, nativeLibrary: false })
+  for (const value of ['localhost', 'private-', 'content-graph']) assert.ok(!lines[0].includes(value))
+  diagnostic.dispose()
+})
+
+test('reader authentication boundaries retain status without inspecting account or session bodies', () => {
+  const page = new EventEmitter(), lines = []
+  const diagnostic = attachPublicationDiagnostics(page, { scenario: 'native_templates', write: line => lines.push(line) })
+  for (const path of ['/_allauth/browser/v1/auth/session', '/api/v1/auth/context']) {
+    const request = { url: () => 'http://localhost' + path, method: () => 'GET', headers: () => { throw new Error('No session headers') } }
+    page.emit('request', request)
+    page.emit('response', { request: () => request, status: () => 200, json: () => { throw new Error('No account payload') } })
+    page.emit('requestfinished', request)
+  }
+  diagnostic.finish('failed')
+  const report = JSON.parse(lines[0])
+  assert.deepEqual(report.events.filter(event => event.event === 'response').map(event => event.phase), ['auth_session', 'auth_context'])
+  assert.ok(!lines[0].includes('localhost') && !lines[0].includes('/api'))
+  diagnostic.dispose()
 })

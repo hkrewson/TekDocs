@@ -28,12 +28,16 @@ from .repository_service import (
 @contextmanager
 def locked_remote_source(
     source_id: UUID,
-) -> Iterator[tuple[DocumentRemoteSource, Document, WorkspaceRepository | None]]:
+) -> Iterator[tuple[DocumentRemoteSource, Document | None, WorkspaceRepository | None]]:
     """Use the handoff lock order: repository, document, then source workflow."""
-    original = DocumentRemoteSource.objects.select_related("document__entity").get(pk=source_id)
-    repository = WorkspaceRepository.objects.filter(
-        workspace_id=original.document.entity.workspace_id, tenant_id=original.tenant_id,
-    ).first()
+    original = DocumentRemoteSource.objects.select_related(
+        "document__entity", "repository__workspace"
+    ).get(pk=source_id)
+    repository = original.repository
+    if repository is None and original.document is not None:
+        repository = WorkspaceRepository.objects.filter(
+            workspace_id=original.document.entity.workspace_id, tenant_id=original.tenant_id,
+        ).first()
     with coordinated_repository_transaction():
         active = _active_repository_transaction()
         if active is None:
@@ -44,18 +48,28 @@ def locked_remote_source(
             # transaction ownership if dispatch actually reaches a Git write.
             active.enlist(repository.id, write=False)
             repository = WorkspaceRepository.objects.select_for_update().get(pk=repository.id)
-        document = Document.objects.select_for_update(of=("self",)).select_related("entity__workspace").get(
-            pk=original.document_id, tenant_id=original.tenant_id, organization_id=cast(UUID, original.organization_id),
-        )
-        source = DocumentRemoteSource.objects.select_for_update().get(pk=source_id, document=document)
-        if document.archived_at is not None or source.archived_at is not None:
+        document = None
+        if original.document_id is not None:
+            document = Document.objects.select_for_update(of=("self",)).select_related("entity__workspace").get(
+                pk=original.document_id, tenant_id=original.tenant_id,
+                organization_id=cast(UUID, original.organization_id),
+            )
+        source = DocumentRemoteSource.objects.select_for_update().get(pk=source_id)
+        if (document is not None and document.archived_at is not None) or source.archived_at is not None:
             raise PlacementConflict("The monitored document is unavailable.")
         yield source, document, repository
 
 
 def source_uses_git(source: DocumentRemoteSource) -> bool:
+    if source.repository_id is not None:
+        return True
+    if source.document_id is None:
+        return False
+    document = source.document
+    if document is None:
+        return False
     return DocumentAuthority.objects.filter(
-        tenant_id=source.tenant_id, workspace_id=source.document.entity.workspace_id,
+        tenant_id=source.tenant_id, workspace_id=document.entity.workspace_id,
         content_id=source.document_id, authority="repository",
     ).exists()
 
@@ -68,8 +82,35 @@ class _SourceReviewSnapshot:
 
 
 def _source_review_snapshot(
-    source: DocumentRemoteSource, document: Document, repository: WorkspaceRepository | None,
+    source: DocumentRemoteSource, document: Document | None, repository: WorkspaceRepository | None,
 ) -> _SourceReviewSnapshot:
+    if source.repository_id is not None:
+        if (
+            repository is None or repository.id != source.repository_id
+            or repository.accepted_commit_id is None
+            or repository.indexed_commit_id != repository.accepted_commit_id
+            or source.content_id is None
+        ):
+            raise PlacementConflict("The Git-backed document is unavailable or its index is not current.")
+        authored = read_authored_content(repository=repository, content_id=source.content_id)
+        if authored.kind != "document" or Document.objects.filter(
+            pk=source.content_id,
+            tenant_id=source.tenant_id,
+            organization=source.organization,
+        ).exists():
+            raise PlacementConflict("The monitored document is unavailable.")
+        prior = source.last_applied_observation
+        fingerprint = hashlib.sha256(json.dumps({
+            "source": str(source.id), "updated": source.updated_at.isoformat(),
+            "repository": str(repository.id), "document": str(source.content_id),
+            "commit": authored.accepted_commit, "blob": authored.source_blob,
+            "last_applied": str(source.last_applied_observation_id or ""),
+        }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        return _SourceReviewSnapshot(
+            fingerprint, authored, prior.canonical_markdown if prior else None,
+        )
+    if document is None:
+        raise PlacementConflict("The monitored document is unavailable.")
     if (
         repository is None or repository.accepted_commit_id is None
         or repository.indexed_commit_id != repository.accepted_commit_id or not source_uses_git(source)
@@ -145,10 +186,13 @@ def preview_remote_observations(
 
 
 def apply_git_observation(
-    *, source: DocumentRemoteSource, document: Document, repository: WorkspaceRepository | None,
+    *, source: DocumentRemoteSource, document: Document | None, repository: WorkspaceRepository | None,
     observation: DocumentRemoteObservation, actor_id: UUID, review_fingerprint: str | None,
 ) -> None:
-    if not publication_migration_actor_allowed(workspace=document.entity.workspace, actor_id=actor_id):
+    workspace = repository.workspace if source.repository_id is not None and repository is not None else (
+        document.entity.workspace if document is not None else None
+    )
+    if workspace is None or not publication_migration_actor_allowed(workspace=workspace, actor_id=actor_id):
         raise PlacementConflict("Source changes require permission to edit this Workspace.")
     try:
         retained = source.observations.get(pk=observation.id)
@@ -176,6 +220,6 @@ def apply_git_observation(
     source.save(update_fields=("last_applied_observation", "updated_at"))
     AuditEvent.objects.create(
         tenant=source.tenant, actor_id=actor_id, action="document.remote_source_applied",
-        entity_id=document.entity_id,
+        entity_id=document.entity_id if document is not None else source.content_id,
         metadata={"observation_id": str(retained.id), "commit": result.accepted_commit},
     )

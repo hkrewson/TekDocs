@@ -13,6 +13,7 @@ async function setup(page: Page, baseURL: string) {
   await page.route('**/_allauth/browser/v1/auth/session', (r) => r.fulfill({ json: { meta: { is_authenticated: true } } }))
   await page.route('**/api/v1/auth/context', (r) => r.fulfill({ json: { user: { id: reviewerId, email: 'reviewer@example.invalid', display_name: 'Alex Rivera' }, tenant: { id: crypto.randomUUID(), name: 'Example MSP' }, role: 'owner', permissions: ['documents.view', 'documents.edit', 'documents.approve'] } }))
   await page.route(`**/api/v1/workspaces/organizations/${organizationId}`, (r) => r.fulfill({ json: { kind: 'organization', id: organizationId, name: 'Example client', classifications: ['client'], capabilities: ['overview', 'documentation'], organization: null } }))
+  await page.route(url => url.pathname === `/api/v1/workspaces/organizations/${organizationId}/content-graph/templates`, route => route.fulfill({ json: { results: [], count: 0, page: 1, page_size: 25, has_more: false } }))
   await page.route('**/api/v1/documents/topic-schemas', (r) => r.fulfill({ json: { topics: [] } }))
   await page.route(`**/api/v1/workspaces/organizations/${organizationId}/taxonomies`, (r) => r.fulfill({ json: { results: [], count: 0 } }))
   await page.route(`**/api/v1/workspaces/organizations/${organizationId}/documents**`, async (r) => {
@@ -95,6 +96,28 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole('button', { name: 'Ownership and review' })).toBeFocused()
   })
 }
+
+// Retain only structural state if the intermittent Back failure recurs in CI.
+// Never log route identifiers, review text, history state or response bodies.
+test.afterEach(async ({ page }, info) => {
+  if (info.title !== 'browser Back protects an unfinished review request'
+    || info.status === info.expectedStatus || page.isClosed()) return
+  try {
+    const state = await page.evaluate(() => {
+      const parameters = new URL(location.href).searchParams
+      return {
+        documentRoute: parameters.has('document'),
+        operationsRoute: parameters.get('document_view') === 'operations',
+        historyLength: history.length,
+        reviewPanel: document.querySelector('.document-operations') !== null,
+        navigationDialog: document.querySelector('.unsaved-changes-dialog[open]') !== null,
+      }
+    })
+    console.info(`Review Back failure state: ${JSON.stringify(state)}`)
+  } catch {
+    console.info('Review Back failure state unavailable.')
+  }
+})
 
 test('browser Back protects an unfinished review request', async ({ page, baseURL }) => {
   const { allowChoices } = await setup(page, baseURL!)

@@ -609,7 +609,7 @@ def test_addressed_migration_retains_all_primary_versions_and_linked_files(addre
 
 
 def test_addressed_guards_reverse_and_upgrade_without_rewriting_signed_history(addressed_context):
-    from django.db import DatabaseError, connection
+    from django.db import DatabaseError, connection, transaction
     from django.db.migrations.executor import MigrationExecutor
 
     context = addressed_context
@@ -625,20 +625,15 @@ def test_addressed_guards_reverse_and_upgrade_without_rewriting_signed_history(a
     )
     retained = (deepcopy(publication.manifest), publication.signature, publication.content_digest)
     pdf = read_publication_artifact(publication.artifacts.get(kind="pdf"))
+    from apps.core.tests.publication_guard_fixture import assert_current_guard_accepts, reinsert_signed_publication
+
+    assert_current_guard_accepts(publication)
     head = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
     try:
         MigrationExecutor(connection).migrate([("core", "0206_controlled_template_graph")])
         assert verify_retained_publication_custody(publication)
-        with pytest.raises(DatabaseError, match="publication integrity metadata is invalid"):
-            publish_document(
-                workspace=context.reader,
-                document=context.document,
-                actor_id=context.installation.owner.id,
-                reason="Old schema refuses a new format",
-                audience="msp_internal",
-                retention="permanent",
-                retention_review_on=None,
-            )
+        with pytest.raises(DatabaseError, match="publication integrity metadata is invalid"), transaction.atomic():
+            reinsert_signed_publication(publication)
         MigrationExecutor(connection).migrate(head)
         successor = publish_document(
             workspace=context.reader,

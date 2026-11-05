@@ -1347,7 +1347,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   .sidebar-backdrop { position: fixed; inset: 0; background: rgba(20, 21, 19, .55); border: 0; z-index: 25; }
   .desktop-collapse { display: none; }
   .mobile-close, .mobile-menu { display: inline-grid; }
-  .app-body, .app-body.sidebar-collapsed { margin-left: 0; }
+  .app-body, .app-body.sidebar-collapsed { margin-left: 0; transition: none; }
   .topbar { padding-inline: var(--space-3); }
   .search-field { width: auto; flex: 1; }
   .profile-copy, .profile-trigger > svg:last-child { display: none; }

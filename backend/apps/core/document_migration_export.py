@@ -151,7 +151,10 @@ def _source(frontmatter: dict[str, object], markdown: str) -> bytes:
     return encoded
 
 
-def _include_source(placement: DocumentPlacement, pinned_commits: dict[uuid.UUID, str]) -> dict[str, str]:
+def _include_source(
+    placement: DocumentPlacement, pinned_commits: dict[uuid.UUID, str],
+    library_revisions: dict[uuid.UUID, uuid.UUID],
+) -> dict[str, str]:
     source = {"id": str(placement.block_id), "mode": "live", "audience": placement.audience_profile}
     if placement.resolution_mode == PlacementResolutionMode.PINNED:
         source.update({"mode": "pinned", "commit": pinned_commits[placement.id]})
@@ -161,8 +164,14 @@ def _include_source(placement: DocumentPlacement, pinned_commits: dict[uuid.UUID
             raise DocumentMigrationReferenceError("cross_document_source_unavailable")
         source.update({
             "library_workspace": str(source_document.entity.workspace_id),
-            "library_revision": str(placement.document.template_enrollment.applied_revision_id),
         })
+        enrollment_revision = library_revisions.get(placement.id)
+        if enrollment_revision is not None:
+            source["library_revision"] = str(enrollment_revision)
+        else:
+            source["library_source"] = str(source_document.id)
+            if placement.resolution_mode == "pinned":
+                source["library_revision"] = str(placement.pinned_revision_id)
     return source
 
 
@@ -197,6 +206,7 @@ def _linked_historical_leaf(
 
 def _existing_references(
     document: Document, placements: tuple[DocumentPlacement, ...], *, allow_repository_divergence: bool = False,
+    library_revisions: dict[uuid.UUID, uuid.UUID],
 ) -> tuple[str | None, dict[uuid.UUID, ParsedContent], dict[uuid.UUID, str]]:
     """Require exact, indexed, same-workspace leaf sources; never copy them."""
 
@@ -289,15 +299,20 @@ def _existing_references(
             owner = placement.block.source_document
             if owner is None:
                 raise DocumentMigrationReferenceError("cross_document_source_unavailable")
-            source_repository = WorkspaceRepository.objects.select_related("accepted_commit").get(
+            source_repository = WorkspaceRepository.objects.select_related("accepted_commit").filter(
                 tenant_id=document.tenant_id, workspace_id=owner.entity.workspace_id,
-            )
-            if source_repository.accepted_commit is None:
+            ).first()
+            if source_repository is None or source_repository.accepted_commit is None:
                 raise DocumentMigrationReferenceError("cross_document_source_unavailable")
             prior_library_root = prior_files.get(
                 placement.parent.block_id if placement.parent is not None else document.id
             )
             selected_commit = source_repository.accepted_commit.object_id
+            enrollment_revision = library_revisions.get(placement.id)
+            library_revision = (
+                enrollment_revision if enrollment_revision is not None
+                else placement.pinned_revision_id if placement.resolution_mode == "pinned" else None
+            )
             if prior_library_root is not None:
                 previous_include = next(
                     (item for item in prior_library_root.includes if item.ordinal == placement.position
@@ -309,15 +324,16 @@ def _existing_references(
                 if placement.resolution_mode == "pinned":
                     from .template_git_operation import permits_template_document
 
-                    if (not permits_template_document(document)
-                        or previous_include.library_revision_id == document.template_enrollment.applied_revision_id):
+                    if (enrollment_revision is None or not permits_template_document(document)
+                        or previous_include.library_revision_id == library_revision):
                         selected_commit = previous_include.pinned_object_id
             include = ParsedInclude(
                 target_content_id=placement.block_id, mode=placement.resolution_mode,
                 audience=placement.audience_profile,
                 pinned_object_id=selected_commit if placement.resolution_mode == "pinned" else "",
                 ordinal=placement.position, library_workspace_id=owner.entity.workspace_id,
-                library_revision_id=document.template_enrollment.applied_revision_id,
+                library_revision_id=library_revision,
+                library_source_id=None if enrollment_revision is not None else owner.id,
             )
             try:
                 with transaction.atomic():
@@ -461,6 +477,7 @@ def build_simple_document_export(
         raise DocumentMigrationExportError(exc.reason) from exc
     reference_commit, referenced, pinned_commits = _existing_references(
         document, tree.ordered, allow_repository_divergence=allow_repository_divergence,
+        library_revisions=tree.library_revisions,
     )
     try:
         taxonomies = portable_document_taxonomies(document)
@@ -504,7 +521,9 @@ def build_simple_document_export(
         }
         child_placements = tree.children.get(placement.id, ())
         if child_placements:
-            frontmatter["includes"] = [_include_source(child, pinned_commits) for child in child_placements]
+            frontmatter["includes"] = [
+                _include_source(child, pinned_commits, tree.library_revisions) for child in child_placements
+            ]
         fragment = _source(
             frontmatter,
             revision.markdown,
@@ -521,7 +540,8 @@ def build_simple_document_export(
             **({"taxonomies": taxonomies} if taxonomies else {}),
             **({"entity_links": entity_links} if entity_links else {}),
             **({"key_bindings": key_bindings} if key_bindings else {}),
-            "includes": [_include_source(placement, pinned_commits) for placement in tree.children[None]],
+            "includes": [_include_source(placement, pinned_commits, tree.library_revisions)
+                         for placement in tree.children[None]],
         },
         "",
     )
@@ -590,7 +610,8 @@ def build_simple_document_export(
         monitored_source_sha256=source_state,
         library_references=tuple(
             (uuid.UUID(str(item["id"])), uuid.UUID(str(item["workspace"])),
-             uuid.UUID(str(item["template_revision"])), str(item["commit"]), str(item["digest"]))
+             uuid.UUID(str(item.get("template_revision", item.get("library_source")))),
+             str(item["commit"]), str(item["digest"]))
             for item in resolved.manifest if "workspace" in item
         ),
     )

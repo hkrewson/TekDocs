@@ -507,11 +507,12 @@ def test_offline_content_key_verification_rejects_incoherent_substitution_proof(
 
 
 def test_content_key_schema_can_reverse_and_reapply_without_rewriting_retained_publications(published_context):
-    from django.db import DatabaseError, connection
+    from django.db import DatabaseError, connection, transaction
     from django.db.migrations.executor import MigrationExecutor
 
-    from apps.core.publications import publish_document, verify_retained_publication_custody
+    from apps.core.publications import publish_document, read_publication_artifact, verify_retained_publication_custody
     from apps.core.tests.content_key_fixture import promote_content_key_fixture, seed_content_key_fixture
+    from apps.core.tests.publication_guard_fixture import assert_current_guard_accepts, reinsert_signed_publication
 
     owner = published_context[0].owner
     document = seed_content_key_fixture(owner)
@@ -524,17 +525,27 @@ def test_content_key_schema_can_reverse_and_reapply_without_rewriting_retained_p
         reason="Verify additive schema guard", audience="msp_internal", retention="permanent",
         retention_review_on=None,
     )
+    snapshot = publish_document(**arguments)
+    assert snapshot.manifest["format"] == "tekdocs-static-publication/v10"
+    before = [(item.manifest, item.signature, read_publication_artifact(item.artifacts.get(kind="pdf")))
+              for item in (original, snapshot)]
+    assert document.publications.count() == 2
+    assert_current_guard_accepts(snapshot)
     try:
         executor.migrate([("core", "0208_promoted_key_binding_guard")])
-        with pytest.raises(DatabaseError, match="publication.*invalid"):
-            publish_document(**arguments)
-        assert document.publications.count() == 1
-        assert verify_retained_publication_custody(original)
+        with pytest.raises(DatabaseError, match="publication.*invalid"), transaction.atomic():
+            reinsert_signed_publication(snapshot)
+        assert document.publications.count() == 2
+        assert verify_retained_publication_custody(original) and verify_retained_publication_custody(snapshot)
     finally:
         MigrationExecutor(connection).migrate(head)
     publication = publish_document(**arguments)
     assert publication.manifest["format"] == "tekdocs-static-publication/v10"
     assert verify_retained_publication_custody(publication) and verify_retained_publication_custody(original)
+    for item, (manifest, signature, pdf) in zip((original, snapshot), before, strict=True):
+        item.refresh_from_db()
+        assert (item.manifest, item.signature) == (manifest, signature)
+        assert read_publication_artifact(item.artifacts.get(kind="pdf")) == pdf
 
 
 def test_constrained_role_reads_publishes_and_rolls_back_content_keys(content_key_context, django_runtime_role):

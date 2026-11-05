@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import APIException
@@ -20,9 +20,7 @@ from .content_index_models import (
 )
 from .document_attachments import resolve_rendered_attachments, resolve_repository_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
-from .document_key_models import DocumentKeyBinding
 from .document_key_resolution import resolve_rendered_keys
-from .document_keys import key_targets_in_markdown
 from .entity_mentions import resolve_entity_mentions
 from .models import ClientAsset, Document, Entity, WorkspaceRepository, workspace_for_owner
 from .relationships import entity_for_workspace, entity_projection, visible_entities_for_workspace
@@ -92,6 +90,8 @@ def document_detail(
         for entity_id, item in visible.items()
     }
     composition = node.composition_variants.get(audience)
+    if isinstance(composition, dict) and composition.get('unavailable'):
+        raise RepositoryContentNotIndexed('Template source is unavailable; review this document’s template updates.')
     markdown = str(composition.get("markdown", "")) if isinstance(composition, dict) else node.markdown
     legacy_document = (
         Document.objects.filter(
@@ -104,16 +104,9 @@ def document_detail(
         if node.kind == "document"
         else None
     )
-    key_document = None
-    if legacy_document is not None and key_targets_in_markdown(markdown):
-        active_key_bindings = {
-            name: str(target_id)
-            for name, target_id in DocumentKeyBinding.objects.filter(
-                document=legacy_document, archived_at__isnull=True
-            ).values_list("name", "target_entity_id")
-        }
-        if node.frontmatter.get("key_bindings", {}) == active_key_bindings:
-            key_document = legacy_document
+    from .repository_key_context import key_context_for_node
+
+    key_document = key_context_for_node(repository=repository, node=node, document=legacy_document)
     rendered_markdown = expand_rendered_content_keys(
         workspace=workspace, document=key_document, markdown=markdown, content_repository=repository,
     )
@@ -156,6 +149,7 @@ def document_detail(
         ],
     }
     if include_render_context:
+        result["_render_markdown"] = rendered_markdown
         result["_render_context"] = {
             "entity_mentions": mentions,
             "attachments": attachments,
@@ -201,6 +195,9 @@ def document_collection(
     nodes = nodes.distinct().order_by("title", "content_id")
     count = nodes.count()
     offset = (page - 1) * page_size
+    nodes = nodes.annotate(_has_legacy_document=Exists(Document.objects.filter(
+        tenant=workspace.member.tenant, entity__workspace_id=repository.workspace_id, id=OuterRef("content_id"),
+    )))
     selected = list(nodes[offset : offset + page_size + 1])
     results = [
         {
@@ -210,6 +207,7 @@ def document_collection(
             "path": node.source_path,
             "topic": node.topic_type or None,
             "finding_count": ContentFinding.objects.filter(node=node).count(),
+            "repository_native": not node._has_legacy_document,
         }
         for node in selected[:page_size]
     ]

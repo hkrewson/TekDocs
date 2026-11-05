@@ -165,9 +165,15 @@ from apps.core.document_source_views import (
     MSPDocumentRemoteObservationApplyView,
     MSPDocumentRemoteObservationView,
     MSPDocumentRemoteSourceView,
+    MSPNativeRemoteObservationApplyView,
+    MSPNativeRemoteObservationView,
+    MSPNativeRemoteSourceView,
     OrganizationDocumentRemoteObservationApplyView,
     OrganizationDocumentRemoteObservationView,
     OrganizationDocumentRemoteSourceView,
+    OrganizationNativeRemoteObservationApplyView,
+    OrganizationNativeRemoteObservationView,
+    OrganizationNativeRemoteSourceView,
 )
 from apps.core.document_views import (
     DocumentTopicSchemaView,
@@ -340,6 +346,7 @@ from apps.core.invoice_views import (
     ServiceRateDetailView,
     ServiceRateListCreateView,
 )
+from apps.core.native_template_views import NativeTemplateEnrollmentsView, NativeTemplateLibraryView, NativeTemplateView
 from apps.core.netbox_reconciliation_views import (
     NetBoxReconciliationPreviewView,
     NetBoxReferenceChoicePageView,
@@ -455,6 +462,7 @@ from apps.core.reminder_views import (
     OrganizationReminderListCreateView,
 )
 from apps.core.rendering_views import MarkdownRenderView
+from apps.core.repository_key_views import MSPRepositoryKeysView, OrganizationRepositoryKeysView
 from apps.core.repository_portal_views import (
     ClientPortalRepositoryPublicationAttachmentView,
     ClientPortalRepositoryPublicationDetailView,
@@ -483,6 +491,9 @@ from apps.core.repository_publication_views import (
     OrganizationRepositoryStaticMarkdownExportView,
     OrganizationRepositoryStaticPDFExportView,
     OrganizationRepositoryStaticPublicationView,
+    RepositoryInternalPublicationPDFView,
+    RepositoryInternalPublicationView,
+    RepositoryPublicationWorkflowView,
 )
 from apps.core.search_views import MSPWorkspaceSearchView, OrganizationUnifiedSearchView
 from apps.core.site_views import (
@@ -529,6 +540,24 @@ from apps.core.workspace_views import (
 
 urlpatterns = [
     path(
+        'api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/template',
+        NativeTemplateView.as_view(), name='msp-content-authoring-template',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/'
+        'authoring/<uuid:content_id>/template',
+        NativeTemplateView.as_view(), name='organization-content-authoring-template',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/templates',
+        NativeTemplateLibraryView.as_view(), name='organization-content-templates',
+    ),
+    path(
+        'api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/template-enrollments',
+        NativeTemplateEnrollmentsView.as_view(), name='organization-content-template-enrollments',
+    ),
+
+    path(
         "api/v1/webhooks/inbound/<uuid:endpoint_id>",
         InboundWebhookView.as_view(),
         name="inbound-webhook",
@@ -538,6 +567,39 @@ urlpatterns = [
     path("_allauth/", include("allauth.headless.urls")),
     path("api/v1/", ApiRootView.as_view(), name="api-root"),
     path("api/v1/workspaces/msp/content-graph", MSPContentGraphView.as_view(), name="msp-content-graph"),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/workflow",
+        RepositoryPublicationWorkflowView.as_view(),
+        name="msp-repository-publication-evidence-workflow",
+    ),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication",
+        RepositoryInternalPublicationView.as_view(),
+        name="msp-repository-publication-evidence-internal-publication",
+    ),
+    path(
+        "api/v1/workspaces/msp/repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf",
+        RepositoryInternalPublicationPDFView.as_view(),
+        name="msp-repository-publication-evidence-internal-publication-pdf",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/workflow",
+        RepositoryPublicationWorkflowView.as_view(),
+        name="organization-repository-publication-evidence-workflow",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/internal-publication",
+        RepositoryInternalPublicationView.as_view(),
+        name="organization-repository-publication-evidence-internal-publication",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/"
+        "repository-publication-evidence/<uuid:evidence_id>/internal-publication/pdf",
+        RepositoryInternalPublicationPDFView.as_view(),
+        name="organization-repository-publication-evidence-internal-publication-pdf",
+    ),
     path(
         "api/v1/workspaces/msp/repository-publication-evidence",
         MSPRepositoryEvidenceCollectionView.as_view(),
@@ -594,9 +656,25 @@ urlpatterns = [
         name="msp-content-authoring-attachment-archive",
     ),
     path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/keys",
+        MSPRepositoryKeysView.as_view(), name="msp-content-authoring-keys",
+    ),
+    path(
         "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/primary-file",
         MSPContentAuthoringPrimaryFileView.as_view(),
         name="msp-content-authoring-primary-file",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source",
+        MSPNativeRemoteSourceView.as_view(), name="msp-content-authoring-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source/observations",
+        MSPNativeRemoteObservationView.as_view(), name="msp-content-authoring-remote-observations",
+    ),
+    path(
+        "api/v1/workspaces/msp/content-graph/authoring/<uuid:content_id>/remote-source/observations/<uuid:observation_id>/apply",
+        MSPNativeRemoteObservationApplyView.as_view(), name="msp-content-authoring-remote-observation-apply",
     ),
     path(
         "api/v1/workspaces/msp/content-graph/authoring/resolve-path",
@@ -744,9 +822,26 @@ urlpatterns = [
         name="organization-content-authoring-attachment-archive",
     ),
     path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/keys",
+        OrganizationRepositoryKeysView.as_view(), name="organization-content-authoring-keys",
+    ),
+    path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/primary-file",
         OrganizationContentAuthoringPrimaryFileView.as_view(),
         name="organization-content-authoring-primary-file",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source",
+        OrganizationNativeRemoteSourceView.as_view(), name="organization-content-authoring-remote-source",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source/observations",
+        OrganizationNativeRemoteObservationView.as_view(), name="organization-content-authoring-remote-observations",
+    ),
+    path(
+        "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/<uuid:content_id>/remote-source/observations/<uuid:observation_id>/apply",
+        OrganizationNativeRemoteObservationApplyView.as_view(),
+        name="organization-content-authoring-remote-observation-apply",
     ),
     path(
         "api/v1/workspaces/organizations/<uuid:organization_entity_id>/content-graph/authoring/resolve-path",

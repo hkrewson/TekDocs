@@ -44,6 +44,10 @@ class ContentReadQuerySerializer(serializers.Serializer):
 
 
 class ContentReadItemSerializer(serializers.Serializer):
+    repository_native = serializers.BooleanField(
+        help_text="No retained legacy Document row exists for this exact Workspace/content identity, "
+                  "including archived rows."
+    )
     id = serializers.UUIDField()
     kind = serializers.CharField()
     title = serializers.CharField()
@@ -320,9 +324,9 @@ def _export_document_pdf(request, workspace: ResolvedWorkspace, content_id: UUID
         or detail["indexed_commit"] != revision
     ):
         return Response({"detail": "Repository content changed during export"}, status=409)
-    if len(detail["markdown"].encode("utf-8")) > MAX_HTML_EXPORT_BYTES:
+    if len(detail["_render_markdown"].encode("utf-8")) > MAX_HTML_EXPORT_BYTES:
         return Response({"detail": "Repository PDF source exceeds the size limit"}, status=409)
-    content = render_pdf(detail["markdown"], title=detail["title"], **detail["_render_context"])
+    content = render_pdf(detail["_render_markdown"], title=detail["title"], **detail["_render_context"])
     if not content.startswith(b"%PDF-") or len(content) > MAX_PDF_EXPORT_BYTES:
         return Response({"detail": "Repository PDF export exceeds the size limit"}, status=409)
     AuditEvent.objects.create(
@@ -381,9 +385,9 @@ def _export_document_docx(request, workspace: ResolvedWorkspace, content_id: UUI
         or detail["indexed_commit"] != revision
     ):
         return Response({"detail": "Repository content changed during export"}, status=409)
-    if len(detail["markdown"].encode("utf-8")) > MAX_DOCX_SOURCE_BYTES:
+    if len(detail["_render_markdown"].encode("utf-8")) > MAX_DOCX_SOURCE_BYTES:
         return Response({"detail": "Repository DOCX source exceeds the size limit"}, status=409)
-    content = export_docx(title=detail["title"], markdown=detail["markdown"], **detail["_render_context"])
+    content = export_docx(title=detail["title"], markdown=detail["_render_markdown"], **detail["_render_context"])
     if not content.startswith(b"PK\x03\x04") or len(content) > MAX_DOCX_EXPORT_BYTES:
         return Response({"detail": "Repository DOCX export exceeds the size limit"}, status=409)
     AuditEvent.objects.create(

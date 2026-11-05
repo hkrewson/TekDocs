@@ -249,3 +249,15 @@
 @media (max-width: 48rem) {
   .repository-authoring-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.repository-editor-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.repository-template-library pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

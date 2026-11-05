@@ -56,12 +56,18 @@ def _verify_shared_manifest(
                     return False
                 namespace = str(UUID(item["library_workspace"]))
                 UUID(item["repository_id"])
-                revision_id = UUID(item["template_revision"])
+                ordinary = manifest.get("ordinary_library") is True and "library_source" in item
+                revision_id = UUID(item["block_revision"] if ordinary else item["template_revision"])
+                if ordinary:
+                    UUID(item["library_source"])
+                    if "template_revision" in item or "template_checksum" in item:
+                        return False
                 if namespace == source["workspace_id"] or item["object_format"] not in {"sha1", "sha256"}:
                     return False
                 source_pattern = r"[0-9a-f]{40}" if item["object_format"] == "sha1" else r"[0-9a-f]{64}"
                 if (not re.fullmatch(source_pattern, item["accepted_commit"])
-                    or not re.fullmatch(r"[0-9a-f]{64}", item["template_checksum"])
+                    or not re.fullmatch(r"[0-9a-f]{64}", item["block_checksum"] if ordinary
+                                        else item["template_checksum"])
                     or item["body_only"] is not True
                     or (item["mode"] == "live" and item["commit"] != item["accepted_commit"])):
                     return False
@@ -91,7 +97,9 @@ def _verify_shared_manifest(
                 or item["mode"] not in {"live", "pinned"}
                 or item["audience"] not in {"shared", manifest["audience"]}
                 or item["path"] not in (
-                    {f"fragments/{identity}.md", f"template-snapshots/{revision_id}/fragments/{identity}.content"}
+                    {f"fragments/{identity}.md",
+                     f"{'shared-snapshots' if ordinary else 'template-snapshots'}/{revision_id}"
+                     f"/fragments/{identity}.content"}
                     if foreign and item["mode"] == "pinned" else {f"fragments/{identity}.md"}
                 )
                 or (not foreign and item["mode"] == "live" and item["commit"] != source["accepted_commit"])

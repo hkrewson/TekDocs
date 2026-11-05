@@ -46,6 +46,7 @@ from .document_authoring_serializers import (
     MarkdownImportSerializer,
     TopicSchemaCatalogSerializer,
 )
+from .document_discovery import native_document_summaries
 from .document_export_serializers import (
     DocumentExportQuerySerializer as DocumentExportQuerySerializer,
 )
@@ -164,6 +165,7 @@ from .serializers import (
     DocumentPublicationWriteSerializer,
     DocumentRestructureResultSerializer,
     DocumentResultSerializer,
+    DocumentSearchHitSerializer,
     DocumentSearchResultSerializer,
     DocumentSerializer,
     EntityMentionResultSerializer,
@@ -211,7 +213,15 @@ def _list(workspace: ResolvedWorkspace, request: Request) -> Response:
         "workspace": workspace,
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
-    return Response(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
+    payload = dict(DocumentResultSerializer({"results": records, "count": len(records)}, context=context).data)
+    native = native_document_summaries(workspace, serializer.validated_data)
+    for item in native:
+        item.pop("_search_markdown")
+        item.pop("_facet_tags")
+    payload["results"] = list(payload["results"]) + native
+    payload["results"].sort(key=lambda item: (item["title"].casefold(), str(item["id"])))
+    payload["count"] = len(payload["results"])
+    return Response(payload)
 
 
 def _files(workspace: ResolvedWorkspace, request: Request) -> Response:
@@ -472,84 +482,83 @@ def _search(workspace: ResolvedWorkspace, request: Request) -> Response:
     serializer.is_valid(raise_exception=True)
     values = serializer.validated_data
     selected, canonical_markdown = _search_document_records(workspace, values)
-    query = serializer.validated_data["q"]
-    ranks: dict[UUID, int] = {}
-    for record in selected:
-        markdown = (
-            canonical_markdown[record.id]
-            if record.id in canonical_markdown
-            else resolve_document(record).markdown
-        )
-        record.matching_excerpt = _matching_excerpt(markdown, query)
-        folded_title = record.entity.display_name.casefold()
-        folded_markdown = markdown.casefold()
-        folded_query = query.casefold()
-        terms = re.findall(r"\w+", folded_query)[:12]
-        ranks[record.id] = (
-            (100 if folded_query and folded_query in folded_title else 0)
-            + (25 if folded_query and folded_query in folded_markdown else 0)
-            + sum(10 for term in terms if term in folded_title)
-            + sum(min(folded_markdown.count(term), 5) for term in terms)
-        )
-    ordering = serializer.validated_data["ordering"]
-    if query and ordering == "title":
-        selected.sort(key=lambda record: (-ranks[record.id], record.entity.display_name.casefold()))
-    else:
-        descending = ordering.startswith("-")
-        field = ordering.removeprefix("-")
-        if field == "updated_at":
-            selected.sort(key=lambda record: (record.updated_at, str(record.id)), reverse=descending)
-        elif field == "category":
-            selected.sort(
-                key=lambda record: (record.category.casefold(), record.entity.display_name.casefold(), str(record.id)),
-                reverse=descending,
-            )
-        else:
-            selected.sort(
-                key=lambda record: (record.entity.display_name.casefold(), str(record.id)),
-                reverse=descending,
-            )
-    collection_counts = Counter(record.collection for record in selected if record.collection)
-    tag_counts: Counter[str] = Counter()
-    for record in selected:
-        if record.id in canonical_markdown:
-            metadata = getattr(record, "_canonical_repository_metadata", {})
-            tag_counts.update(str(tag) for tag in metadata.get("tags", []))
-            taxonomy_keys = metadata.get("taxonomies", {})
-            tag_counts.update(
-                str(stable_key)
-                for stable_keys in taxonomy_keys.values()
-                if isinstance(stable_keys, list)
-                for stable_key in stable_keys
-            )
-        else:
-            tag_counts.update(document_tag_labels(record))
-    health_records = (
-        selected
-        if not values["health"]
-        else _search_document_records(workspace, {**values, "health": ""})[0]
-    )
-    health_counts = Counter(record.health_status for record in health_records)
-    count = len(selected)
-    page = serializer.validated_data["page"]
-    page_size = serializer.validated_data["page_size"]
-    start = (page - 1) * page_size
-    page_records = selected[start : start + page_size]
+    query = values["q"]
     context = {
         "workspace": workspace,
         "workspace_organization_id": workspace.organization.id if workspace.organization else None,
     }
-    payload = {
-        "results": page_records,
-        "count": count,
-        "page": page,
-        "page_size": page_size,
-        "has_more": start + page_size < count,
-        "collections": [{"value": value, "count": count} for value, count in sorted(collection_counts.items())],
-        "tags": [{"value": value, "count": count} for value, count in sorted(tag_counts.items())],
-        "health": [{"value": value, "count": count} for value, count in sorted(health_counts.items())],
+    records: list[dict[str, Any]] = []
+    for record in selected:
+        markdown = (
+            canonical_markdown[record.id] if record.id in canonical_markdown else resolve_document(record).markdown
+        )
+        metadata = getattr(record, "_canonical_repository_metadata", None)
+        facet_tags = (
+            list(metadata["tags"]) + [str(key) for group in metadata["taxonomies"].values()
+                                      if isinstance(group, list) for key in group]
+            if metadata is not None else document_tag_labels(record)
+        )
+        records.append({
+            "id": str(record.entity_id), "content_id": str(record.id), "title": record.entity.display_name,
+            "category": record.category, "collection": record.collection, "health_status": record.health_status,
+            "updated_at": record.updated_at.isoformat(), "_search_markdown": markdown,
+            "_facet_tags": facet_tags, "_legacy_record": record,
+        })
+    records.extend(native_document_summaries(workspace, values))
+    folded_query = query.casefold()
+    terms = re.findall(r"\w+", folded_query)[:12]
+    for item in records:
+        markdown = item["_search_markdown"]
+        item["matching_excerpt"] = _matching_excerpt(markdown, query)
+        title, body = item["title"].casefold(), markdown.casefold()
+        item["_rank"] = ((100 if folded_query and folded_query in title else 0)
+                         + (25 if folded_query and folded_query in body else 0)
+                         + sum(10 for term in terms if term in title)
+                         + sum(min(body.count(term), 5) for term in terms))
+    ordering = values["ordering"]
+    if query and ordering == "title":
+        records.sort(key=lambda item: (-item["_rank"], item["title"].casefold(), item["content_id"]))
+    else:
+        field = ordering.removeprefix("-")
+        if field == "updated_at":
+            records.sort(key=lambda item: (item[field], item["content_id"]), reverse=ordering.startswith("-"))
+        else:
+            records.sort(key=lambda item: (
+                item[field].casefold(), item["title"].casefold(), item["content_id"]
+            ), reverse=ordering.startswith("-"))
+    collections = Counter(item["collection"] for item in records if item["collection"])
+    tags = Counter(tag for item in records for tag in item["_facet_tags"])
+    if values["health"]:
+        health_records = _search_document_records(workspace, {**values, "health": ""})[0]
+        health = Counter(record.health_status for record in health_records)
+        health.update(item["health_status"] for item in native_document_summaries(workspace, {**values, "health": ""}))
+    else:
+        health = Counter(item["health_status"] for item in records)
+    count = len(records)
+    start = (values["page"] - 1) * values["page_size"]
+    page_records = records[start:start + values["page_size"]]
+    legacy_page = [item["_legacy_record"] for item in page_records if "_legacy_record" in item]
+    serialized = {
+        str(item["content_id"]): item
+        for item in DocumentSearchHitSerializer(legacy_page, many=True, context=context).data
     }
-    return Response(DocumentSearchResultSerializer(payload, context=context).data)
+    results = []
+    for item in page_records:
+        excerpt = item.pop("matching_excerpt")
+        if "_legacy_record" in item:
+            item = dict(serialized[item["content_id"]])
+        else:
+            for internal in ("_search_markdown", "_facet_tags", "_rank"):
+                item.pop(internal)
+        item["matching_excerpt"] = excerpt
+        results.append(item)
+    return Response({
+        "results": results, "count": count, "page": values["page"], "page_size": values["page_size"],
+        "has_more": start + values["page_size"] < count,
+        "collections": [{"value": key, "count": count} for key, count in sorted(collections.items())],
+        "tags": [{"value": key, "count": count} for key, count in sorted(tags.items())],
+        "health": [{"value": key, "count": count} for key, count in sorted(health.items())],
+    })
 
 
 def _operations(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Request) -> Response:

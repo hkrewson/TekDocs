@@ -247,7 +247,7 @@ test-file-export-stabilization: test-frontend
 	docker compose run --rm migrate pytest apps/core/tests/test_documents.py apps/core/tests/test_attachment_security.py apps/accounts/tests/test_api_tokens.py apps/core/tests/test_permission_idor_matrix.py apps/core/tests/test_runtime_rls.py -q
 
 test-content-index:
-	docker compose run --rm migrate pytest apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_runtime_rls.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_document_discovery.py apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_runtime_rls.py -q
 
 test-content-composition:
 	docker compose run --rm migrate pytest apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_content_composition.py apps/core/tests/test_runtime_rls.py -q
@@ -259,11 +259,11 @@ test-content-read:
 	docker compose run --rm migrate pytest apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_content_composition.py apps/core/tests/test_content_read.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_migration_stabilization.py::test_entity_link_upgrade_rebuilds_from_accepted_git -q
 
 test-content-authoring:
-	docker compose run --rm migrate pytest apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_content_composition.py apps/core/tests/test_content_read.py apps/core/tests/test_content_authoring.py apps/core/tests/test_repository_source_validation.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_api_contracts.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_document_discovery.py apps/core/tests/test_content_profile.py apps/core/tests/test_content_index.py apps/core/tests/test_content_composition.py apps/core/tests/test_content_read.py apps/core/tests/test_content_authoring.py apps/core/tests/test_repository_source_validation.py apps/core/tests/test_runtime_rls.py apps/core/tests/test_api_contracts.py -q
 
 .PHONY: test-document-migration-inventory
 test-document-migration-inventory:
-	docker compose run --rm migrate pytest apps/core/tests/test_document_migration_inventory.py apps/core/tests/test_document_migration_publications.py apps/core/tests/test_document_publication_migration.py apps/core/tests/test_document_git_publications.py apps/core/tests/test_file_backed_publication_migration.py apps/core/tests/test_key_entity_publication_migration.py apps/core/tests/test_content_key_publication_migration.py apps/core/tests/test_diagram_publication_migration.py apps/core/tests/test_monitored_source_migration.py apps/core/tests/test_client_published_migration.py apps/core/tests/test_shared_block_publication_migration.py apps/core/tests/test_repeated_shared_block_migration.py apps/core/tests/test_template_enrollment_migration.py apps/core/tests/test_template_library_composition.py apps/core/tests/test_runtime_rls.py -q
+	docker compose run --rm migrate pytest apps/core/tests/test_document_migration_inventory.py apps/core/tests/test_document_migration_publications.py apps/core/tests/test_document_publication_migration.py apps/core/tests/test_document_git_publications.py apps/core/tests/test_file_backed_publication_migration.py apps/core/tests/test_key_entity_publication_migration.py apps/core/tests/test_content_key_publication_migration.py apps/core/tests/test_diagram_publication_migration.py apps/core/tests/test_monitored_source_migration.py apps/core/tests/test_client_published_migration.py apps/core/tests/test_shared_block_publication_migration.py apps/core/tests/test_repeated_shared_block_migration.py apps/core/tests/test_cross_workspace_reuse_migration.py apps/core/tests/test_template_enrollment_migration.py apps/core/tests/test_template_library_composition.py apps/core/tests/test_runtime_rls.py -q
 
 .PHONY: document-migration-upgrade-rehearsal
 document-migration-upgrade-rehearsal:

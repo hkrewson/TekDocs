@@ -27,7 +27,17 @@ class DocumentRemoteSource(TimestampedModel):
         null=True,
         blank=True,
     )
-    document = models.OneToOneField("core.Document", on_delete=models.PROTECT, related_name="remote_source")
+    document = models.OneToOneField(
+        "core.Document", on_delete=models.PROTECT, related_name="remote_source", null=True, blank=True
+    )
+    repository = models.ForeignKey(
+        "core.WorkspaceRepository",
+        on_delete=models.PROTECT,
+        related_name="native_remote_sources",
+        null=True,
+        blank=True,
+    )
+    content_id = models.UUIDField(null=True, blank=True)
     url = models.URLField(max_length=500)
     source_kind = models.CharField(max_length=12, choices=DocumentSourceKind.choices, default=DocumentSourceKind.AUTO)
     enabled = models.BooleanField(default=True)
@@ -59,11 +69,23 @@ class DocumentRemoteSource(TimestampedModel):
             models.CheckConstraint(
                 condition=models.Q(check_interval_minutes__gte=15, check_interval_minutes__lte=10080),
                 name="document_source_interval_bounded",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(document__isnull=False, repository__isnull=True, content_id__isnull=True)
+                    | models.Q(document__isnull=True, repository__isnull=False, content_id__isnull=False)
+                ),
+                name="document_source_owner_shape",
+            ),
+            models.UniqueConstraint(
+                fields=("repository", "content_id"),
+                condition=models.Q(repository__isnull=False),
+                name="document_source_native_owner_unique",
+            ),
         ]
 
     def __str__(self) -> str:
-        return f"Remote source for {self.document_id}"
+        return f"Remote source for {self.document_id or self.content_id}"
 
 
 class DocumentRemoteObservation(models.Model):

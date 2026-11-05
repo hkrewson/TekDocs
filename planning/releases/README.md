@@ -13,6 +13,105 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Native template enrollment for new documents
+
+The [bounded native-template slice](../git-native-templates.md) connects saved MSP
+Git sources to new client documents with independent copies, live/pinned sections,
+reviewed updates and detach. Evidence v4 retains selected source proof without
+changing older signed formats. Local combined Docker validation passes 796 cases;
+883 frontend cases with coverage, types, contracts and source review pass. All 15
+real browser/server journeys pass without retries. Exact-source hosted upgrade,
+independent encrypted recovery and security checks follow the authorized push.
+This is 0.9.18 development, with no deployment or existing-data transition.
+See [development notes](native-template-enrollment-notes.md) and
+[source review](native-template-source-review.md).
+
+## Native field/content keys and entity references
+
+The [bounded native-keys slice](../git-native-keys.md) connects new Git-only
+binding configuration and entity insertion to protected authoring. Evidence v3
+freezes exact field values, fragment source proof and entity cards while retaining
+older signed contracts. Migration 0220 adds validators and refuses populated
+rollback without rewriting existing records. Local validation passes 202 authoring cases,
+868 frontend cases, populated rollback/custody and all 14 browser/server journeys
+without retries. Both source reviews are clear; the legacy-fragment permission
+bypass is reproduced and fixed at discovery, authoring, runtime and SQL boundaries; exact-source hosted recovery and upgrade
+remain required after the authorized direct-main push. This is 0.9.18 development,
+not a release or deployment. No existing data is changed. Template and monitored
+configuration remain later slices; the six legacy migration gaps stay deferred.
+
+## Native primary-file version controls after publication
+
+The [bounded primary-file slice](../git-native-primary-files.md) connects the
+repository editor to existing scanned intake, immutable version history,
+compare-and-swap replacement and private retained downloads. Selected files and
+Markdown drafts survive errors and protected navigation; refresh requires
+explicit confirmation of a changed replacement target. File updates do not
+rewrite signed publications or their independently retained files/PDFs.
+The pre-existing history adapter also now shows the exact promoted legacy-owner
+chain; repository read/append refuse legacy-authoritative shadows. This is a
+bounded compatibility correction, not a migration or existing-data rewrite.
+Local frontend validation passed 849 tests, coverage, lint, types and bundles;
+privacy diagnostics passed ten cases. Both review axes are clear after the
+reproduced compatibility correction. The final combined authoring gate passed
+196 cases; all thirteen clean browser journeys passed without retries, followed
+by retained-byte/authority verification and artifact hygiene. Exact-source hosted
+Build, CodeQL, upgrade and independent encrypted restore remain required before
+closeout. Initial Build 41672338029 failed the existing core-b owner-validation
+contract; the exact Docker test reproduced the exception-type regression. Its
+bounded correction preserves validation compatibility, HTTP 409 and plain error
+messages. All 62 owner/authoring/file-migration cases and both final reviews passed;
+final-source hosted validation is still required. Version remains 0.9.18 development. No deployment,
+release/tag publication or existing-data change is authorized by this slice.
+
+## Native staff and client publication controls after discovery/export
+
+The [native publication slice](../git-native-publication-interface.md) connects
+new Git-only documents to retained snapshots, publishing, corrections, withdrawal,
+history and PDF downloads. Staff decisions use guarded append-only records;
+client delivery retains independent approval and exact-client authorization.
+Version remains 0.9.18 development. Local Docker validation passed the adapted
+170-case authoring gate, targeted scope/schema/concurrency checks, all 817 frontend
+tests and all twelve real browser journeys without retries, with server custody
+verification. Standards and Spec reviews each reported zero findings. Migration
+0219 remains unapplied to retained development data; no deployment occurred.
+Exact-source hosted Build, CodeQL, supported upgrade and independent encrypted
+recovery must pass after push. Primary-file controls and configuration are later
+bounded workflow slices; the six automatic-migration gaps remain deferred.
+
+## Cross-Workspace reuse and remaining-gap audit after 0.9.18
+
+The maintainer authorized the [remaining migration audit](../migrations/remaining-migration-audit.md),
+starting with [cross-Workspace reuse](../migrations/cross-workspace-reuse-migration.md),
+preserving signed publications, PDFs and file versions with isolation, rollback
+and recovery. [Development notes](cross-workspace-reuse-migration-notes.md) record
+the reproduced library/listing, compound publication, source projection and
+read/write isolation gaps. Implementation, both source-review axes, 704 combined
+Docker cases and nine final real browser/server journeys passed. Deliver this
+reviewed continuation directly to main; exact-source Build, CodeQL and Extended
+artifacts provide its hosted validation record. Version remains 0.9.18.
+Source-bound hosted upgrade and independent encrypted restore are required;
+historical release acceptance does not stand in for this development source.
+
+Follow-up source `b8afcca6` passed Build 41479545080 and CodeQL 41479558453.
+Extended 41479563043 passed its browser, performance, DAST and supported-upgrade
+jobs but failed supported recovery. The [recovery follow-up](cross-workspace-recovery-follow-up.md)
+records the reproduced baseline-timing defect and corrected-source validation
+requirements. The [immediate 1.0 plan](../1.0-closeout-plan.md) now orders recovery,
+document contract freeze, required migration completion and candidate acceptance;
+the distinct interface rework is the first post-1.0 priority.
+
+Corrected runtime `3e275779` passed CodeQL 41499022087 and all of Extended
+41499026415, including independent encrypted recovery and supported upgrades.
+Build 41499000231 repeated a core-a capacity cancellation and a live-browser
+loading assertion in attempts 1 and 2. The follow-up preserves both unsuccessful
+attempts and original timing uncertainty. Local corrections split the complete
+core-a test set under the same job/coverage limits and synchronize functional
+browser checks with completed scoped Git reads. All nine final browser/server
+journeys, privacy/selection checks, lint and types passed; corrected-source
+hosted validation follows the next authorized push. No production data or
+permission behavior changed.
+
 ## Repeated shared-block migration development after 0.9.18
 
 The maintainer authorized [#105/#106 repeated shared-block migration](../migrations/repeated-shared-block-migration.md),

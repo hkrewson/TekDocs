@@ -39,13 +39,15 @@ class PostgresShardPlanTests(unittest.TestCase):
                 return [line for line in result.stdout.splitlines() if line.endswith(".py")]
 
             original = modules("core-a")
-            first, second, third = (modules(name) for name in ("core-a-1", "core-a-2", "core-a-3"))
+            first, second, third, fourth = (
+                modules(name) for name in ("core-a-1", "core-a-2", "core-a-3", "core-a-4")
+            )
         self.assertTrue(first)
         self.assertTrue(second)
         self.assertTrue(third)
-        self.assertEqual(sorted(first + second + third), sorted(original))
-        self.assertEqual(len(first + second + third), len(set(first + second + third)))
-        self.assertLessEqual(abs(len(second) - len(third)), 1)
+        self.assertTrue(fourth)
+        self.assertEqual(sorted(first + second + third + fourth), sorted(original))
+        self.assertEqual(len(first + second + third + fourth), len(set(first + second + third + fourth)))
 
     def test_new_discovery_tests_do_not_redistribute_validated_core_modules(self) -> None:
         baseline = json.loads((ROOT / "scripts/tests/fixtures/postgres-core-baseline.json").read_text())
@@ -54,7 +56,7 @@ class PostgresShardPlanTests(unittest.TestCase):
             for group, expected in baseline["groups"].items():
                 with self.subTest(group=group):
                     actual = []
-                    names = ("core-a-2", "core-a-3") if group == "core-a-2" else (group,)
+                    names = ("core-a-2", "core-a-3", "core-a-4") if group == "core-a-2" else (group,)
                     for name in names:
                         result = subprocess.run([str(RUNNER), name], cwd=ROOT, check=True,
                                                 capture_output=True, text=True, env=environment)
@@ -65,20 +67,24 @@ class PostgresShardPlanTests(unittest.TestCase):
         baseline = json.loads((ROOT / "scripts/tests/fixtures/postgres-core-baseline.json").read_text())
         with plan_environment() as environment:
             groups = []
-            for name in ("core-a-2", "core-a-3"):
+            for name in ("core-a-2", "core-a-3", "core-a-4"):
                 result = subprocess.run([str(RUNNER), name], cwd=ROOT, check=True,
                                         capture_output=True, text=True, env=environment)
                 groups.append([line for line in result.stdout.splitlines() if line.endswith(".py")])
-        self.assertEqual(sorted(groups[0] + groups[1]), sorted(baseline["groups"]["core-a-2"]))
-        self.assertFalse(set(groups[0]) & set(groups[1]))
-        self.assertLessEqual(abs(len(groups[0]) - len(groups[1])), 1)
+        self.assertEqual(sorted(item for group in groups for item in group), sorted(baseline["groups"]["core-a-2"]))
+        self.assertEqual(sum(len(group) for group in groups), len(set(item for group in groups for item in group)))
+        allocations = {item: index for index, group in enumerate(groups) for item in group}
+        self.assertNotEqual(
+            allocations["apps/core/tests/test_content_composition.py"],
+            allocations["apps/core/tests/test_runtime_rls.py"],
+        )
 
     def test_combined_coverage_requires_every_split_core_a_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory, plan_environment() as environment:
             coverage = Path(directory)
             for shard in (
                 "route-access", "route-methods", "route-session", "accounts",
-                "core-a-1", "core-a-2", "core-a-3", "core-b", "core-c",
+                "core-a-1", "core-a-2", "core-a-3", "core-a-4", "core-b", "core-c",
                 "template-migration-a", "template-migration-b", "template-migration-c",
                 "migration-foundation", "migration-isolation", "migration-guards",
                 "key-entity-migration", "content-key-migration", "diagram-migration",
@@ -91,7 +97,7 @@ class PostgresShardPlanTests(unittest.TestCase):
                                       cwd=ROOT, capture_output=True, text=True, env=environment)
 
             self.assertEqual(combine().returncode, 0)
-            for shard in ("core-a-1", "core-a-2", "core-a-3"):
+            for shard in ("core-a-1", "core-a-2", "core-a-3", "core-a-4"):
                 with self.subTest(shard=shard):
                     artifact = coverage / f"coverage.{shard}"
                     artifact.unlink()
@@ -176,7 +182,7 @@ class PostgresShardPlanTests(unittest.TestCase):
     def test_all_shard_plans_override_inherited_production_settings(self) -> None:
         shards = (
             "route-access", "route-methods", "route-session", "accounts", "core",
-            "core-a", "core-a-1", "core-a-2", "core-a-3", "core-b", "core-c", "migration-foundation", "migration-isolation",
+            "core-a", "core-a-1", "core-a-2", "core-a-3", "core-a-4", "core-b", "core-c", "migration-foundation", "migration-isolation",
             "migration-guards", "runtime", "template-migration",
             "template-migration-a", "template-migration-b", "template-migration-c", "key-entity-migration", "content-key-migration", "diagram-migration", "monitored-migration", "client-publication-migration",
         )
@@ -199,7 +205,7 @@ class PostgresShardPlanTests(unittest.TestCase):
 
         self.assertIn(
             "shard: [route-access, route-methods, route-session, accounts, "
-            "core-a-1, core-a-2, core-a-3, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, "
+            "core-a-1, core-a-2, core-a-3, core-a-4, core-b, core-c, template-migration-a, template-migration-b, template-migration-c, key-entity-migration, content-key-migration, diagram-migration, monitored-migration, client-publication-migration, migration-foundation, migration-isolation, "
             "migration-guards]",
             workflow,
         )

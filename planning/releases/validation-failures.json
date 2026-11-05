@@ -1443,6 +1443,18 @@
       "next_action": "Confirm corrected exact source in hosted Build and Extended validation.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "42090309699",
+      "run_attempt": 1,
+      "job_id": "127467289601",
+      "job": "PostgreSQL shard (core-a-2)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The exact hosted shard continued normal passing progress through 71% before GitHub cancelled it at the unchanged 30-minute job deadline. The fast selector regression failed before core-a-4 existed, then proved the original nineteen-module family is complete and disjoint across core-a-2/core-a-3/core-a-4 and separates test_content_composition.py from test_runtime_rls.py.",
+      "cause": "The core-a-2 allocation no longer had hosted runtime headroom. test_content_composition.py consumed roughly sixteen minutes of the shard while the job still had later modules to run; cancellation occurred at the workflow deadline without an assertion failure or stalled-test signal.",
+      "next_action": "Divide only the timed-out core-a-2 allocation into disjoint five-module core-a-2/core-a-4 groups while preserving core-a-3. Require all four core-A coverage artifacts at the unchanged 80% aggregate threshold and unchanged 30-minute deadline. Preserve the failed run and require corrected-source hosted completion before accepting capacity.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

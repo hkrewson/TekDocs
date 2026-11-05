@@ -17,9 +17,9 @@ for shard in route-access route-methods route-session accounts migration-foundat
 done
 
 if [ ! -s "$coverage_directory/coverage.core" ]; then
-  # core-a is the complete legacy aggregate; current CI must supply all three groups.
+  # core-a is the complete legacy aggregate; current CI must supply all four groups.
   if [ ! -s "$coverage_directory/coverage.core-a" ]; then
-    for shard in core-a-1 core-a-2 core-a-3; do
+    for shard in core-a-1 core-a-2 core-a-3 core-a-4; do
       test -s "$coverage_directory/coverage.$shard" || {
         echo "Missing coverage data for PostgreSQL shard: $shard" >&2
         exit 1

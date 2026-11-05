@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "bandit>=1.8,<1.9",
+  "bandit>=1.8,<1.10",
   "django-stubs[compatible-mypy]>=5.2,<5.3",
   "factory-boy>=3.3,<3.4",
   "hypothesis>=6.130,<7",

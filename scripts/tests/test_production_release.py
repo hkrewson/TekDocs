@@ -44,6 +44,7 @@ class ProductionReleaseTests(unittest.TestCase):
         self.git('add', '.')
         self.git('commit', '-qm', 'release receipt')
         self.tooling_commit = self.git('rev-parse', 'HEAD').strip()
+        self.git('tag', 'receipts/v0.9.8')
         self.git('remote', 'add', 'origin', str(self.root))
         # This fixture stores only the directory path in .env, never key material.
         self.deployment_directory = Path(self.temp.name) / 'deployment-files'
@@ -98,6 +99,10 @@ elif args[0]!='pull': sys.exit(9)
                                '--recovery-key', str(self.key)], cwd=self.root, env=self.env,
                               text=True, capture_output=True)
 
+    def run_command(self, *args):
+        return subprocess.run(['bash', 'scripts/update-production.sh', *args], cwd=self.root, env=self.env,
+                              text=True, capture_output=True)
+
     def enable_mailpit_release(self):
         (self.root / 'compose.images.yml').write_text('services: {}\n# TEKDOCS_MAILPIT_IMAGE\n')
         self.git('add', '.')
@@ -115,7 +120,7 @@ elif args[0]!='pull': sys.exit(9)
 
     def enable_remote_receipt(self):
         self.enable_mailpit_release()
-        self.git('tag', 'receipts/v0.9.8')
+        self.git('tag', '-f', 'receipts/v0.9.8')
         saved = Path(self.temp.name) / 'verified.images'
         shutil.copyfile(self.root / 'scripts/releases/v0.9.8.images', saved)
         self.env['TEST_RECEIPT'] = str(saved)
@@ -242,6 +247,84 @@ elif args[0]!='pull': sys.exit(9)
         pulls = [call[1] for call in calls if call[0] == 'pull']
         self.assertEqual(len(pulls), 3)
         self.assertTrue(all(p.endswith(':sha-'+self.tooling_commit) for p in pulls))
+        self.assertIn('implicit upstream mode is deprecated', result.stderr)
+
+    def test_explicit_upstream_mode_is_supported(self):
+        branch = self.git('branch', '--show-current').strip()
+        self.git('config', f'branch.{branch}.remote', 'origin')
+        self.git('config', f'branch.{branch}.merge', f'refs/heads/{branch}')
+        self.git('fetch', 'origin', branch)
+        self.env['TEST_RELEASE_COMMIT'] = self.tooling_commit
+        result = self.run_command(
+            '--upstream', '--backup-root', str(Path(self.temp.name) / 'backups'),
+            '--recovery-key', str(self.key),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn('implicit upstream mode is deprecated', result.stderr)
+
+    def test_no_arguments_and_help_are_read_only_and_friendly(self):
+        config = self.root / '.tekdocs-update.env'
+        config.mkdir()
+        for args in ((), ('--help',), ('-h',)):
+            with self.subTest(args=args):
+                result = self.run_command(*args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn('--check', result.stdout)
+                self.assertIn('--latest', result.stdout)
+                self.assertFalse(self.events.exists())
+
+    def test_release_listing_is_semver_sorted_and_requires_both_tags(self):
+        self.git('tag', 'v0.10.0')
+        self.git('tag', 'receipts/v0.10.0')
+        self.git('tag', '-a', 'v1.0.0', '-m', 'Synthetic annotated release')
+        self.git('tag', 'receipts/v1.0.0')
+        self.git('tag', 'v2.0.0')
+        result = self.run_command('--list-releases')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertLess(result.stdout.index('v1.0.0'), result.stdout.index('v0.10.0'))
+        self.assertLess(result.stdout.index('v0.10.0'), result.stdout.index('v0.9.8'))
+        self.assertNotIn('v2.0.0', result.stdout)
+        self.assertFalse(self.events.exists())
+
+    def test_check_reports_recorded_and_latest_release_without_docker(self):
+        (self.root / '.env').write_text(
+            f'TEKDOCS_SECRET_DIRECTORY={self.deployment_directory}\n'
+            f'TEKDOCS_DEPLOYED_COMMIT={self.commit}\n'
+        )
+        result = self.run_command('--check')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Recorded deployed release: v0.9.8', result.stdout)
+        self.assertIn('Latest published release: v0.9.8', result.stdout)
+        self.assertIn('Status: up to date', result.stdout)
+        self.assertFalse(self.events.exists())
+
+    def test_latest_selects_and_validates_newest_published_release(self):
+        result = self.run_command(
+            '--latest', '--backup-root', str(Path(self.temp.name) / 'backups'),
+            '--recovery-key', str(self.key),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Selected latest published release: v0.9.8', result.stdout)
+        self.assertIn('TekDocs production update passed', result.stdout)
+
+    def test_latest_refuses_invalid_newest_receipt_without_falling_back(self):
+        self.git('tag', 'v0.9.9')
+        self.git('tag', 'receipts/v0.9.9')
+        result = self.run_command(
+            '--latest', '--backup-root', str(Path(self.temp.name) / 'backups'),
+            '--recovery-key', str(self.key),
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('release has no valid reviewed image receipt: v0.9.9', result.stderr)
+        self.assertFalse(self.events.exists())
+
+    def test_read_only_modes_reject_update_controls(self):
+        for mode in ('--check', '--list-releases'):
+            with self.subTest(mode=mode):
+                result = self.run_command(mode, '--skip-backup')
+                self.assertEqual(result.returncode, 2)
+                self.assertIn('read-only', result.stderr)
+                self.assertFalse(self.events.exists())
 
     def test_wrong_running_image_does_not_record_success(self):
         self.env['TEST_WRONG_RUNNING_IMAGE'] = '1'

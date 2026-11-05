@@ -34,6 +34,10 @@ REQUIRED_GATES = (
     "renderer SBOM and vulnerability scan",
 )
 
+PATCHED_KATEX = (0, 18, 2)
+PATCHED_MINIMATCH = (11, 0, 1)
+PATCHED_ZOD = (4, 6, 6)
+
 
 class ContractError(ValueError):
     """A renderer dependency contract invariant was not met."""
@@ -64,6 +68,37 @@ def exact_version(value: str, label: str) -> str:
     if not EXACT_VERSION.fullmatch(value):
         raise ContractError(f"{label} must use an exact semantic version; found {value!r}")
     return value
+
+
+def semantic_version(value: str, label: str) -> tuple[int, int, int]:
+    exact_version(value, label)
+    return tuple(int(part) for part in value.split("-", 1)[0].split("."))  # type: ignore[return-value]
+
+
+def patched_version(value: str, label: str, minimum: tuple[int, int, int]) -> str:
+    if "-" in value:
+        raise ContractError(f"{label} must use a stable release; found {value}")
+    if semantic_version(value, label) < minimum:
+        required = ".".join(str(part) for part in minimum)
+        raise ContractError(f"{label} must be at least {required}; found {value}")
+    return value
+
+
+def resolved_package_versions(lock: dict[str, Any], package_name: str, path: str) -> dict[str, str]:
+    packages = lock.get("packages")
+    if not isinstance(packages, dict):
+        raise ContractError(f"{path}: packages must be an object")
+    suffix = f"node_modules/{package_name}"
+    versions: dict[str, str] = {}
+    for package_path, entry in packages.items():
+        if package_path != suffix and not package_path.endswith(f"/{suffix}"):
+            continue
+        if not isinstance(entry, dict) or not isinstance(entry.get("version"), str):
+            raise ContractError(f"{path}: {package_path}.version must be a non-empty string")
+        versions[f"{path}:{package_path}"] = entry["version"]
+    if not versions:
+        raise ContractError(f"{path}: no {package_name} resolution found")
+    return versions
 
 
 def matching_versions(label: str, versions: dict[str, str]) -> str:
@@ -187,6 +222,71 @@ def build_contract(root: Path) -> dict[str, Any]:
             f"frontend={frontend_mermaid}, renderer={renderer_mermaid}"
         )
 
+    katex = matching_versions(
+        "KaTeX",
+        {
+            "frontend/package.json override": patched_version(
+                nested_string(frontend_package, "frontend/package.json", "overrides", "katex"),
+                "frontend KaTeX override",
+                PATCHED_KATEX,
+            ),
+            "renderer/package.json override": patched_version(
+                nested_string(renderer_package, "renderer/package.json", "overrides", "katex"),
+                "renderer KaTeX override",
+                PATCHED_KATEX,
+            ),
+            **{
+                source: patched_version(version, f"KaTeX resolution {source}", PATCHED_KATEX)
+                for source, version in resolved_package_versions(
+                    frontend_lock, "katex", "frontend/package-lock.json"
+                ).items()
+            },
+            **{
+                source: patched_version(version, f"KaTeX resolution {source}", PATCHED_KATEX)
+                for source, version in resolved_package_versions(
+                    renderer_lock, "katex", "renderer/package-lock.json"
+                ).items()
+            },
+        },
+    )
+    typescript_estree_minimatch = matching_versions(
+        "@typescript-eslint/typescript-estree minimatch",
+        {
+            "frontend/package.json override": patched_version(
+                nested_string(
+                    frontend_package,
+                    "frontend/package.json",
+                    "overrides",
+                    "@typescript-eslint/typescript-estree",
+                    "minimatch",
+                ),
+                "frontend typescript-estree minimatch override",
+                PATCHED_MINIMATCH,
+            ),
+            "frontend lock resolution": patched_version(
+                nested_string(
+                    frontend_lock,
+                    "frontend/package-lock.json",
+                    "packages",
+                    "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch",
+                    "version",
+                ),
+                "frontend typescript-estree minimatch resolution",
+                PATCHED_MINIMATCH,
+            ),
+        },
+    )
+    zod_resolutions = {
+        **resolved_package_versions(frontend_lock, "zod", "frontend/package-lock.json"),
+        **resolved_package_versions(renderer_lock, "zod", "renderer/package-lock.json"),
+    }
+    zod = sorted(
+        {
+            patched_version(version, f"Zod resolution {source}", PATCHED_ZOD)
+            for source, version in zod_resolutions.items()
+        }
+    )
+
     dockerfile_path = root / "renderer/Dockerfile"
     try:
         dockerfile = dockerfile_path.read_text(encoding="utf-8")
@@ -213,9 +313,12 @@ def build_contract(root: Path) -> dict[str, Any]:
         "versions": {
             "chromium_series": int(chromium_match.group(1)),
             "frontend_mermaid": frontend_mermaid,
+            "katex": katex,
             "mermaid_cli": cli,
             "renderer_mermaid": renderer_mermaid,
             "puppeteer": puppeteer,
+            "typescript_estree_minimatch": typescript_estree_minimatch,
+            "zod": zod,
         },
         "contract_file_sha256": checksums,
         "required_gates": list(REQUIRED_GATES),
@@ -241,6 +344,9 @@ def main() -> int:
         "Renderer dependency contract passed: "
         f"Mermaid {contract['versions']['frontend_mermaid']}, "
         f"CLI {contract['versions']['mermaid_cli']}, "
+        f"KaTeX {contract['versions']['katex']}, "
+        f"minimatch {contract['versions']['typescript_estree_minimatch']}, "
+        f"Zod {', '.join(contract['versions']['zod'])}, "
         f"Puppeteer {contract['versions']['puppeteer']}, "
         f"Chromium {contract['versions']['chromium_series']}.x."
     )

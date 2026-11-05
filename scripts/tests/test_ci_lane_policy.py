@@ -60,6 +60,8 @@ class CILanePolicyTests(unittest.TestCase):
         self.assertIn("name: Validation passed", build)
         self.assertIn("python3 scripts/ci_validation_gate.py", build)
         self.assertIn("if: ${{ always() }}", build)
+        release_codeql = build.split("  release-codeql:\n", 1)[1].split("\n  release-extended:\n", 1)[0]
+        self.assertIn("actions: read", release_codeql)
         self.assertNotIn("  pull_request:\n", codeql.split("permissions:", 1)[0])
         self.assertIn('cron: "17 7 * * 3"', codeql)
         self.assertIn("`main` is the development and integration authority", policy)

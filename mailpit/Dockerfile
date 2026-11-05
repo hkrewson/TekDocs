@@ -5,7 +5,7 @@ RUN mkdir /src && tar -xzf /source.tar.gz -C /src --strip-components=1
 WORKDIR /src
 RUN npm ci --no-audit --no-fund && npm run package && rm -rf node_modules /source.tar.gz
 
-FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS builder
+FROM golang:1.27.3-alpine@sha256:b8c9b82affbbb82a020bbcf998dad2ba9516944ac7e883524642a481a9505e9c AS builder
 ENV GOTOOLCHAIN=local CGO_ENABLED=0
 WORKDIR /src
 COPY --from=assets /src/ ./

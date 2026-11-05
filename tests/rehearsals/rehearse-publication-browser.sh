@@ -93,6 +93,15 @@ docker compose up -d --wait db diagram-renderer
 restore_services=true
 cp "$repository_root/frontend/publication-browser-budget.json" "$work_directory/browser-budget.json"
 chmod 0644 "$work_directory/browser-budget.json"
+startup_timeout=$(PYTHONPATH="$repository_root/backend" python3 - "$work_directory/browser-budget.json" <<'PY'
+import sys
+from pathlib import Path
+
+from apps.core.tests.publication_acceptance_protocol import startup_timeout_seconds
+
+print(int(startup_timeout_seconds(Path(sys.argv[1]))))
+PY
+)
 acceptance_compose up -d --no-deps --build migrate frontend
 # Linux bind mounts retain the controller's host UID. Keep that owner and grant
 # only the image's service group access; secret session inputs still use 0600.
@@ -108,7 +117,7 @@ acceptance_compose exec -T migrate sh -c \
   --liveserver=0.0.0.0:8081 --tb=short -q > "$work_directory/server.log" 2>&1 &
 pytest_pid=$!
 ready=false
-for attempt in $(seq 1 240); do
+for attempt in $(seq 1 "$startup_timeout"); do
   if [ -f "$work_directory/ready.json" ]; then ready=true; break; fi
   if ! kill -0 "$pytest_pid" 2>/dev/null; then break; fi
   sleep 1

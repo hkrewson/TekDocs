@@ -55,18 +55,30 @@ def validate_failure_report(report: Any) -> dict[str, Any]:
     return report
 
 
-def completion_timeout_seconds(path: Path) -> float:
-    """Allow the whole finite browser suite plus controller result handoff."""
+def _budget(path: Path) -> dict[str, int]:
     budget = json.loads(path.read_text())
-    fields = ("test_timeout_ms", "suite_timeout_ms", "controller_grace_ms")
+    fields = ("test_timeout_ms", "startup_timeout_ms", "suite_timeout_ms", "controller_grace_ms")
     if not isinstance(budget, dict) or any(
         type(budget.get(field)) is not int or budget[field] <= 0 for field in fields
     ):
         raise ValueError("Invalid publication browser budget")
     if not budget["test_timeout_ms"] < budget["suite_timeout_ms"] <= 900_000:
         raise ValueError("Invalid publication browser budget")
+    if not budget["test_timeout_ms"] < budget["startup_timeout_ms"] <= budget["suite_timeout_ms"]:
+        raise ValueError("Invalid publication browser budget")
     if budget["controller_grace_ms"] > 60_000:
         raise ValueError("Invalid publication browser budget")
+    return budget
+
+
+def startup_timeout_seconds(path: Path) -> float:
+    """Bound fixture construction without using a controller-only deadline."""
+    return _budget(path)["startup_timeout_ms"] / 1000
+
+
+def completion_timeout_seconds(path: Path) -> float:
+    """Allow the whole finite browser suite plus controller result handoff."""
+    budget = _budget(path)
     return (budget["suite_timeout_ms"] + budget["controller_grace_ms"]) / 1000
 
 

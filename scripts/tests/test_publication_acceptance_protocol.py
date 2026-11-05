@@ -64,14 +64,26 @@ class PublicationAcceptanceProtocolTests(unittest.TestCase):
         self.assertGreater(budget["suite_timeout_ms"], 7 * budget["test_timeout_ms"])
         self.assertEqual(protocol.completion_timeout_seconds(self.budget), 960)
 
+    def test_controller_readiness_uses_the_shared_bounded_startup_budget(self):
+        harness = (ROOT / "tests/rehearsals/rehearse-publication-browser.sh").read_text()
+        self.assertEqual(protocol.startup_timeout_seconds(self.budget), 600)
+        self.assertIn("startup_timeout_seconds", harness)
+        self.assertNotIn("seq 1 240", harness)
+
     def test_invalid_or_unbounded_budget_is_rejected(self):
         path = Path(self.directory.name) / "budget.json"
         for value in ([], {}, {
-            "test_timeout_ms": True, "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
+            "test_timeout_ms": True, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
         }, {
-            "test_timeout_ms": 120000, "suite_timeout_ms": 900000, "controller_grace_ms": 60001,
+            "test_timeout_ms": 120000, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60001,
         }, {
-            "test_timeout_ms": 120000, "suite_timeout_ms": 1800000, "controller_grace_ms": 60000,
+            "test_timeout_ms": 120000, "startup_timeout_ms": 600000,
+            "suite_timeout_ms": 1800000, "controller_grace_ms": 60000,
+        }, {
+            "test_timeout_ms": 120000, "startup_timeout_ms": 900001,
+            "suite_timeout_ms": 900000, "controller_grace_ms": 60000,
         }):
             with self.subTest(value=value):
                 path.write_text(json.dumps(value))

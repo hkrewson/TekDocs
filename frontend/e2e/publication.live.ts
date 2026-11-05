@@ -72,14 +72,22 @@ async function downloadPdf(page: Page) {
   } finally { await download.delete() }
 }
 
+async function saveRepositoryDraft(page: Page) {
+  const saved = page.waitForResponse(response =>
+    new URL(response.url()).pathname.endsWith('/content-graph/authoring')
+      && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  expect((await saved).status()).toBe(200)
+  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+}
+
 async function templateJourney(page: Page, state: State) {
   diagnostics.get(page)?.mark('template')
   const fixture = state.template
   const path = `/workspaces/organizations/${fixture.organization_id}/documentation`
   await page.goto(`/documentation?repository=${fixture.source_fragment_id}`)
   await page.getByLabel('Markdown body').fill('Browser template procedure updated.\n')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
-  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  await saveRepositoryDraft(page)
   for (const mode of ['copy', 'live', 'pinned'] as const) {
     await openRepositoryDocument(page, `${path}?document=${fixture.documents[mode]}`, `/api/v1/workspaces/organizations/${fixture.organization_id}/content-graph/documents/${fixture.content_ids[mode]}`)
     await expect(page.getByText(`Browser client ${mode} local introduction.`, { exact: true })).toBeVisible()
@@ -556,8 +564,7 @@ test('migrated signed history survives real publishing, correction, withdrawal a
   ] as const) {
     await page.goto(`/documentation?repository=${fragment}`)
     await page.getByLabel('Markdown body').fill(body)
-    await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
-    await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+    await saveRepositoryDraft(page)
   }
   await page.goto(path)
   await expect(page.getByText('Shared live browser updated.', { exact: true })).toBeVisible()
@@ -573,8 +580,7 @@ test('migrated signed history survives real publishing, correction, withdrawal a
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto(`/documentation?repository=${state.fragment_id}`)
   await page.getByLabel('Markdown body').fill('Browser-corrected Git instructions.\n')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
-  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  await saveRepositoryDraft(page)
   const current = await page.request.get(`/api/v1/workspaces/msp/content-graph/documents/${state.content_id}`)
   expect(current.status()).toBe(200)
   expect((await current.json() as RepositoryDocumentRead).sanitized_html).toContain('Browser-corrected Git instructions.')

@@ -41,7 +41,7 @@ dev = [
   "pytest>=9.0.3,<10",
   "pytest-cov>=6,<7",
   "pytest-django>=4.11,<5",
-  "ruff>=0.11,<0.12",
+  "ruff>=0.11,<0.18",
 ]
 
 [tool.setuptools.packages.find]

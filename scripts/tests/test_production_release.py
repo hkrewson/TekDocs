@@ -307,6 +307,16 @@ elif args[0]!='pull': sys.exit(9)
         self.assertIn('Selected latest published release: v0.9.8', result.stdout)
         self.assertIn('TekDocs production update passed', result.stdout)
 
+    def test_latest_is_a_read_only_noop_when_that_release_is_already_deployed(self):
+        (self.root / '.env').write_text(
+            f'TEKDOCS_SECRET_DIRECTORY={self.deployment_directory}\n'
+            f'TEKDOCS_DEPLOYED_COMMIT={self.commit}\n'
+        )
+        result = self.run_command('--latest')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Production is already on v0.9.8; nothing to update.', result.stdout)
+        self.assertFalse(self.events.exists())
+
     def test_latest_refuses_invalid_newest_receipt_without_falling_back(self):
         self.git('tag', 'v0.9.9')
         self.git('tag', 'receipts/v0.9.9')

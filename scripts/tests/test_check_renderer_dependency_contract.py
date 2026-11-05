@@ -26,20 +26,34 @@ class RendererDependencyContractTests(unittest.TestCase):
             (self.root / directory).mkdir(parents=True)
         self.write_json(
             "frontend/package.json",
-            {"dependencies": {"mermaid": "11.16.1"}},
+            {
+                "dependencies": {"mermaid": "11.16.1"},
+                "overrides": {
+                    "@typescript-eslint/typescript-estree": {"minimatch": "11.0.4"},
+                    "katex": "0.18.3",
+                },
+            },
         )
         self.write_json(
             "frontend/package-lock.json",
             {
                 "packages": {
                     "": {"dependencies": {"mermaid": "11.16.1"}},
+                    "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": {
+                        "version": "11.0.4"
+                    },
+                    "node_modules/katex": {"version": "0.18.3"},
                     "node_modules/mermaid": {"version": "11.16.1"},
+                    "node_modules/zod": {"version": "4.6.7"},
                 }
             },
         )
         self.write_json(
             "renderer/package.json",
-            {"dependencies": {"@mermaid-js/mermaid-cli": "11.16.0", "puppeteer": "25.7.0"}},
+            {
+                "dependencies": {"@mermaid-js/mermaid-cli": "11.16.0", "puppeteer": "25.7.0"},
+                "overrides": {"katex": "0.18.3"},
+            },
         )
         self.write_json(
             "renderer/package-lock.json",
@@ -52,8 +66,10 @@ class RendererDependencyContractTests(unittest.TestCase):
                         }
                     },
                     "node_modules/@mermaid-js/mermaid-cli": {"version": "11.16.0"},
+                    "node_modules/katex": {"version": "0.18.3"},
                     "node_modules/mermaid": {"version": "11.16.1"},
                     "node_modules/puppeteer": {"version": "25.7.0"},
+                    "node_modules/zod": {"version": "4.6.7"},
                 }
             },
         )
@@ -101,6 +117,9 @@ class RendererDependencyContractTests(unittest.TestCase):
         self.assertEqual(contract["schema_version"], "tekdocs-renderer-dependency-contract/v1")
         self.assertEqual(contract["versions"]["frontend_mermaid"], "11.16.1")
         self.assertEqual(contract["versions"]["renderer_mermaid"], "11.16.1")
+        self.assertEqual(contract["versions"]["katex"], "0.18.3")
+        self.assertEqual(contract["versions"]["typescript_estree_minimatch"], "11.0.4")
+        self.assertEqual(contract["versions"]["zod"], ["4.6.7"])
         self.assertEqual(contract["versions"]["chromium_series"], 152)
         self.assertEqual(set(contract["contract_file_sha256"]), set(MODULE.CONTRACT_FILES))
 
@@ -124,6 +143,39 @@ class RendererDependencyContractTests(unittest.TestCase):
         self.write_json("renderer/package-lock.json", lock)
         with self.assertRaisesRegex(MODULE.ContractError, "Preview and export Mermaid versions must match"):
             MODULE.build_contract(self.root)
+
+    def test_rejects_vulnerable_katex_resolution(self) -> None:
+        lock = self.read_json("frontend/package-lock.json")
+        lock["packages"]["node_modules/katex"]["version"] = "0.16.47"
+        self.write_json("frontend/package-lock.json", lock)
+        with self.assertRaisesRegex(MODULE.ContractError, "KaTeX"):
+            MODULE.build_contract(self.root)
+
+    def test_rejects_vulnerable_typescript_estree_minimatch(self) -> None:
+        lock = self.read_json("frontend/package-lock.json")
+        lock["packages"]["node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch"][
+            "version"
+        ] = "10.2.6"
+        self.write_json("frontend/package-lock.json", lock)
+        with self.assertRaisesRegex(MODULE.ContractError, "minimatch"):
+            MODULE.build_contract(self.root)
+
+    def test_rejects_vulnerable_zod_resolution(self) -> None:
+        lock = self.read_json("frontend/package-lock.json")
+        lock["packages"]["node_modules/zod"]["version"] = "4.4.3"
+        self.write_json("frontend/package-lock.json", lock)
+        with self.assertRaisesRegex(MODULE.ContractError, "Zod"):
+            MODULE.build_contract(self.root)
+
+    def test_rejects_prereleases_at_security_floor(self) -> None:
+        for value, minimum in (
+            ("0.18.2-rc.1", MODULE.PATCHED_KATEX),
+            ("11.0.1-beta.1", MODULE.PATCHED_MINIMATCH),
+            ("4.6.6-rc.1", MODULE.PATCHED_ZOD),
+        ):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(MODULE.ContractError, "stable release"):
+                    MODULE.patched_version(value, "security dependency", minimum)
 
     def test_rejects_missing_chromium_build_assertion(self) -> None:
         dockerfile = (self.root / "renderer/Dockerfile").read_text(encoding="utf-8")

@@ -439,24 +439,24 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await page.emulateMedia({ media: 'screen', forcedColors: 'none' })
 })
 
-test('Mermaid preview renders locally with an accessible description', async ({ page, baseURL }) => {
+test('Mermaid math preview renders locally with an accessible description', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
     json: {
-      html: '<pre><code class="language-mermaid">flowchart LR\naccTitle: Client path\naccDescr: User traffic crosses the firewall\nUser--&gt;Firewall</code></pre>',
+      html: '<pre><code class="language-mermaid">flowchart LR\naccTitle: Formula flow\naccDescr: A squared value moves to the result.\nInput[&quot;$$x^2$$&quot;] --&gt; Result</code></pre>',
     },
   }))
 
   await page.goto('/documentation')
   await openPrimaryBlockEditor(page)
   await page.getByRole('tab', { name: 'Markdown' }).click()
-  await page.getByLabel('Markdown source').fill('```mermaid\nflowchart LR\naccTitle: Client path\naccDescr: User traffic crosses the firewall\nUser-->Firewall\n```')
+  await page.getByLabel('Markdown source').fill('```mermaid\nflowchart LR\naccTitle: Formula flow\naccDescr: A squared value moves to the result.\nInput["$$x^2$$"] --> Result\n```')
   await page.getByRole('tab', { name: 'Preview' }).click()
 
-  const diagram = page.getByRole('figure', { name: 'Client path' })
-  await expect(diagram.getByRole('img', { name: 'Client path' })).toBeVisible()
-  await expect(diagram.locator(':scope > p').first()).toHaveText('User traffic crosses the firewall')
+  const diagram = page.getByRole('figure', { name: 'Formula flow' })
+  await expect(diagram.getByRole('img', { name: 'Formula flow' })).toBeVisible()
+  await expect(diagram.locator(':scope > p').first()).toHaveText('A squared value moves to the result.')
   await expect(page.getByText('Accessible diagram source')).toHaveCount(0)
 })
 

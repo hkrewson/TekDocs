@@ -339,6 +339,23 @@ def test_supported_diagram_families_render_when_runtime_is_requested(settings):
 
 
 @pytest.mark.renderer_runtime
+def test_math_label_renders_when_runtime_is_requested(settings):
+    if os.environ.get("TEKDOCS_RUN_DIAGRAM_RUNTIME") != "true":
+        pytest.skip("isolated renderer runtime not configured")
+    markdown = """```mermaid
+flowchart LR
+  accTitle: Formula flow
+  accDescr: A squared value moves to the result.
+  Input["$$x^2$$"] --> Result
+```
+"""
+    artifact = render_diagram_exports(markdown, required=True)[0]
+    assert artifact.state == "rendered"
+    assert artifact.svg and artifact.svg.startswith(b"<svg")
+    assert artifact.png and artifact.png.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+@pytest.mark.renderer_runtime
 def test_isolated_renderer_is_deterministic_when_runtime_is_requested(settings):
     if os.environ.get("TEKDOCS_RUN_DIAGRAM_RUNTIME") != "true":
         pytest.skip("isolated renderer runtime not configured")

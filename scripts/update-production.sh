@@ -258,6 +258,21 @@ if [[ "$mode" == release || "$mode" == latest ]]; then
   tekdocs_load_published_release "$repository_root" "$release" || argument_error "release has no valid reviewed image receipt: $release"
 fi
 
+if [[ "$mode" == latest ]]; then
+  comparison_environment_file=$environment_file
+  if [[ "$comparison_environment_file" != /* ]]; then
+    comparison_environment_file="$invocation_directory/$comparison_environment_file"
+  fi
+  recorded_deployed_commit=
+  if [[ -f "$comparison_environment_file" ]]; then
+    recorded_deployed_commit=$(sed -n 's/^TEKDOCS_DEPLOYED_COMMIT=//p' "$comparison_environment_file" | head -n 1)
+  fi
+  if [[ "$recorded_deployed_commit" == "$TEKDOCS_RELEASE_COMMIT" ]]; then
+    echo "Production is already on $release; nothing to update."
+    exit 0
+  fi
+fi
+
 saved_backup_root=
 saved_recovery_key=
 if [[ -e "$operator_config_file" ]]; then

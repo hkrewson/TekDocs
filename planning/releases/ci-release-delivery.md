@@ -13,6 +13,9 @@ writing, or operator reminder is part of the normal release path. Production
 deployment remains separate. This slice changes delivery tooling, not application
 behavior, database schema or API contracts.
 
+The [branch and production state](branch-and-production-state.md) defines why
+`main`, immutable release tags and the deployed production pointer are distinct.
+
 ## Release path
 
 1. Prepare validates version agreement and supply-chain/workflow contracts.

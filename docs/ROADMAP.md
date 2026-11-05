@@ -1,5 +1,17 @@
 # Release Roadmap
 
+## Prepared 0.9.19 checkpoint
+
+The [0.9.19 candidate](../planning/releases/0.9.19-candidate.md) consolidates the
+post-0.9.18 Git-backed document workflow, migrations 0213-0223, CI/release
+operations, and dependency-security remediation. Complete source/security review
+found no issues across 125 changed source files. The maintainer accepted the
+unchanged CSP inline-style and missing-COEP limitations for v0.9.19 only, with
+review or remediation due before the next runtime candidate or November 12, 2026,
+and authorized the versioned release push. Exact-candidate hosted acceptance is
+still mandatory. This is not production deployment, live-data migration, or
+aggregate 1.0 acceptance.
+
 ## Immediate route to 1.0
 
 The maintainer-authorized [closeout plan](../planning/1.0-closeout-plan.md) orders

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tekdocs-backend"
-version = "0.9.18"
+version = "0.9.19"
 description = "TekDocs API and background services"
 license = "AGPL-3.0-only"
 requires-python = ">=3.13,<3.14"
@@ -35,7 +35,9 @@ dev = [
   "bandit>=1.8,<1.9",
   "django-stubs[compatible-mypy]>=5.2,<5.3",
   "factory-boy>=3.3,<3.4",
+  "filelock>=4.2.1,<5",
   "hypothesis>=6.130,<7",
+  "msgpack>=1.2.3,<2",
   "mypy>=1.15,<2",
   "pip-audit>=2.8,<3",
   "pytest>=9.0.3,<10",

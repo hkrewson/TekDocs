@@ -13,6 +13,25 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
+## Prepared 0.9.19 candidate
+
+The [0.9.19 candidate](0.9.19-candidate.md) freezes the accumulated Git-backed
+document workflow, migrations 0213-0223, CI/release operations, and dependency
+security corrections after published v0.9.18. The
+[source/security review](0.9.19-source-review.md) covered all 125 changed source
+files in the exact release range with no findings. Supporting main Build
+42101197293 passed on attempt 2, including the corrected shard allocation,
+browser, production-container, SBOM, vulnerability, and final gates. It was not a
+versioned release run and is not relabeled as candidate acceptance.
+
+The maintainer accepted the unchanged medium inline-style CSP allowance and low
+missing-COEP limitation for v0.9.19 only, with review or remediation due before
+the next runtime candidate or November 12, 2026. The maintainer also authorized
+the versioned push and its single-push delivery pipeline. Exact-source CodeQL,
+Extended validation, upgrade/recovery, image publication, attestations, and
+application/receipt tags remain mandatory. Production deployment, existing-data
+promotion, Wiki publication, and final 1.0 acceptance remain separate.
+
 ## Native template enrollment for new documents
 
 The [bounded native-template slice](../git-native-templates.md) connects saved MSP

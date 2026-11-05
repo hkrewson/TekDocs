@@ -19,6 +19,17 @@ document-scope decisions, remaining migration work and final acceptance. A
 distinct TekDocs [interface rework](planning/post-1.0-interface-rework.md) is the
 first post-1.0 priority.
 
+## 0.9.19 release candidate
+
+The [0.9.19 candidate](planning/releases/0.9.19-candidate.md) consolidates the
+reviewed post-0.9.18 Git-backed document workflow, migration, CI scheduling,
+production-release discovery, and dependency-security work. The exact
+v0.9.18-to-preparation security diff covered all 125 changed source files with no
+findings. The maintainer accepted the unchanged inline-style CSP and missing-COEP
+limitations for v0.9.19 only, with review or remediation due before the next
+runtime candidate or November 12, 2026. No production deployment, live-data
+migration, or final 1.0 acceptance is included.
+
 ## Cross-Workspace reuse migration development
 
 The [remaining-gap audit](planning/migrations/remaining-migration-audit.md) starts

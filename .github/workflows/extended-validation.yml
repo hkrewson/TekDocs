@@ -15,9 +15,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  schedule-gate:
+    name: Check scheduled assurance freshness
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.decision.outputs.run }}
+      reason: ${{ steps.decision.outputs.reason }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Find the prior scheduled run
+        id: history
+        if: ${{ github.event_name == 'schedule' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if history="$(gh api --method GET "/repos/$GITHUB_REPOSITORY/actions/workflows/extended-validation.yml/runs" \
+            -f branch="$GITHUB_REF_NAME" -f event=schedule -f per_page=2 \
+            --jq '.workflow_runs | map(select(.id != (env.GITHUB_RUN_ID | tonumber))) | .[0] | [.head_sha, .conclusion] | @tsv')"; then
+            if [[ -n "$history" ]]; then
+              printf 'sha=%s\nconclusion=%s\n' "${history%%$'\t'*}" "${history#*$'\t'}" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo 'GitHub history lookup failed; running assurance as the safe fallback.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Decide whether assurance is due
+        id: decision
+        run: >-
+          python3 scripts/scheduled_assurance_gate.py
+          --event-name "$GITHUB_EVENT_NAME"
+          --current-sha "$GITHUB_SHA"
+          --prior-sha "${{ steps.history.outputs.sha }}"
+          --prior-conclusion "${{ steps.history.outputs.conclusion }}"
+          --github-output "$GITHUB_OUTPUT"
+      - name: Summarize decision
+        run: echo '${{ steps.decision.outputs.reason }}' >> "$GITHUB_STEP_SUMMARY"
+
   failure-triage:
     name: Assign validation failure follow-up
-    needs: [browser-matrix, browser-evidence, performance, dast, supported-upgrades, supported-recovery, diagram-upgrade-and-restore-evidence]
+    needs: [schedule-gate, browser-matrix, browser-evidence, performance, dast, supported-upgrades, supported-recovery, diagram-upgrade-and-restore-evidence]
     if: ${{ failure() }}
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +66,8 @@ jobs:
 
   browser-matrix:
     name: Browser (${{ matrix.project }})
+    needs: schedule-gate
+    if: ${{ needs.schedule-gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -72,6 +109,8 @@ jobs:
 
   performance:
     name: Public-beta performance reference
+    needs: schedule-gate
+    if: ${{ needs.schedule-gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -87,6 +126,8 @@ jobs:
 
   dast:
     name: Dynamic application security test
+    needs: schedule-gate
+    if: ${{ needs.schedule-gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -111,6 +152,8 @@ jobs:
 
   supported-upgrades:
     name: Supported upgrade matrix
+    needs: schedule-gate
+    if: ${{ needs.schedule-gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -141,6 +184,8 @@ jobs:
 
   supported-recovery:
     name: Supported backup and restore
+    needs: schedule-gate
+    if: ${{ needs.schedule-gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:

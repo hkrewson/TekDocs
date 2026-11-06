@@ -24,7 +24,7 @@ def summarize(run: dict, jobs: list[dict], ledger: dict) -> dict:
         matches = [
             entry
             for entry in ledger["failures"]
-            if entry["run_id"] == run["id"] and entry["job"] == job["name"]
+            if str(entry["run_id"]) == str(run["id"]) and entry["job"] == job["name"]
         ]
         tracked = bool(
             matches
@@ -55,6 +55,16 @@ def summarize(run: dict, jobs: list[dict], ledger: dict) -> dict:
     }
 
 
+def status_exit_code(result: dict, run: dict, *, report_only: bool) -> int:
+    if report_only:
+        return 0
+    return int(
+        bool(result["failures"])
+        or run["status"] != "completed"
+        or run.get("conclusion") != "success"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", type=int, required=True)
@@ -63,6 +73,11 @@ def main() -> int:
         "--ledger",
         type=Path,
         default=ROOT / "planning/releases/validation-failures.json",
+    )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="return success after a readable inventory, even when the inspected run failed",
     )
     args = parser.parse_args()
     try:
@@ -81,11 +96,7 @@ def main() -> int:
             page += 1
         result = summarize(run, jobs, json.loads(args.ledger.read_text()))
         print(json.dumps(result, indent=2))
-        return int(
-            bool(result["failures"])
-            or run["status"] != "completed"
-            or run.get("conclusion") != "success"
-        )
+        return status_exit_code(result, run, report_only=args.report_only)
     except (OSError, ValueError, KeyError, subprocess.TimeoutExpired):
         print("CI status unavailable; no successful result inferred.")
         return 1

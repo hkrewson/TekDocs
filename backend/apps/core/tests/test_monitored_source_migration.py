@@ -274,6 +274,26 @@ def test_monitored_files_publications_observations_and_local_edits_survive_full_
     assert len(exercise_monitored_source_fixture(installation.owner)) == 64
 
 
+def test_legacy_monitored_fingerprint_excludes_post_baseline_owner_columns() -> None:
+    from apps.core.tests.monitored_source_fixture import LEGACY_REMOTE_SOURCE_FIELDS, legacy_remote_source_state
+
+    baseline_fields = tuple(
+        field.attname
+        for field in DocumentRemoteSource._meta.concrete_fields
+        if field.attname not in {"repository_id", "content_id"}
+    )
+    source = SimpleNamespace(
+        **{field: field for field in LEGACY_REMOTE_SOURCE_FIELDS},
+        repository_id="post-baseline-repository",
+        content_id="post-baseline-content",
+    )
+    retained = legacy_remote_source_state(source)
+    assert baseline_fields == LEGACY_REMOTE_SOURCE_FIELDS
+    assert tuple(retained) == LEGACY_REMOTE_SOURCE_FIELDS
+    assert "repository_id" not in retained
+    assert "content_id" not in retained
+
+
 @pytest.mark.parametrize("mode", ["live", "pinned"])
 def test_monitored_shared_group_retains_settings_history_and_local_edits(retained_monitored_context, mode):
     from apps.core.document_authority_groups import prepare_authority_group, transition_authority_group

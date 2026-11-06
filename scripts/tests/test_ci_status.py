@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from ci_status import summarize
+from ci_status import status_exit_code, summarize
 
 
 class CompactCITests(unittest.TestCase):
@@ -28,7 +28,7 @@ class CompactCITests(unittest.TestCase):
         )
         ledger["failures"].append(
             dict(
-                run_id=12,
+                run_id="12",
                 job="Recovery",
                 owner="maintainer",
                 reproduction="make supported-recovery-rehearsal",
@@ -40,3 +40,9 @@ class CompactCITests(unittest.TestCase):
             summarize(run, jobs, ledger)["failures"][0]["triage"], "tracked"
         )
         self.assertEqual(summarize(run, jobs, ledger)["conclusion"], "failure")
+
+    def test_report_only_succeeds_after_inventorying_a_failed_in_progress_run(self):
+        run = dict(id=12, head_sha="a" * 40, status="in_progress", conclusion=None)
+        result = dict(failures=[dict(job="Recovery", conclusion="failure")])
+        self.assertEqual(status_exit_code(result, run, report_only=True), 0)
+        self.assertEqual(status_exit_code(result, run, report_only=False), 1)

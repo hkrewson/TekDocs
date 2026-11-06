@@ -1455,6 +1455,42 @@
       "next_action": "Divide only the timed-out core-a-2 allocation into disjoint five-module core-a-2/core-a-4 groups while preserving core-a-3. Require all four core-A coverage artifacts at the unchanged 80% aggregate threshold and unchanged 30-minute deadline. Preserve the failed run and require corrected-source hosted completion before accepting capacity.",
       "fix_commit": null,
       "retest_run": null
+    },
+    {
+      "run_id": "42130193781",
+      "run_attempt": 1,
+      "job_id": "127604957540",
+      "job": "release-extended / Supported upgrade matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The hosted 0.8.46 to 0.9.19 document-migration rehearsal passed addressed-key, content-key, diagram and earlier custody checks, then failed the monitored-source legacy fingerprint assertion after migrations 0213-0223. The focused existing-project Docker regression excludes repository_id/content_id from the historical serializer, and the original full monitored-source journey plus the complete monitored-source migration module pass.",
+      "cause": "The retained-state fixture dynamically serialized every current DocumentRemoteSource concrete field. Migration 0223 adds nullable repository_id and content_id columns that do not exist in the 0.8.46 baseline, so the post-upgrade schema shape changed the hash even though the legacy source values and related custody records were retained.",
+      "next_action": "Serialize the explicit 0.8.46 field boundary while retaining separate native ownership migration/constraint proofs. Require the exact corrected source to pass the hosted 0.8.46 upgrade rehearsal and complete release delivery; no custody assertion, supported baseline or migration was removed.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "42130193781",
+      "run_attempt": 1,
+      "job_id": "127624534942",
+      "job": "release-extended / Assign validation failure follow-up",
+      "owner": "TekDocs maintainer",
+      "reproduction": "python3 scripts/ci_status.py --repository hkrewson/TekDocs --run-id 42130193781 produced the compact failure inventory and exited 1 because the inspected parent run was still in progress and already contained a failed job.",
+      "cause": "The failure-triage workflow invoked the status command in its strict operator mode. That mode intentionally returns nonzero for failed or unfinished runs, so a job whose purpose is to summarize an already-known validation failure failed by construction after successfully producing its inventory.",
+      "next_action": "Use the report-only mode in failure triage so a successfully retrieved inventory returns zero while API, validation and file errors still fail the step. Retain strict nonzero behavior for operator status checks and require the corrected hosted failure path to complete without adding a second synthetic failure.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "42130193781",
+      "run_attempt": 1,
+      "job_id": "127629543788",
+      "job": "Validation passed",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The final ci_validation_gate.py evaluation reported release-extended=failure and publish-containers=skipped, then exited 1 after every independent build, database, browser, production-container and CodeQL dependency had succeeded.",
+      "cause": "Consequential expected failure: the stable gate correctly requires successful Extended validation before container publication and final release acceptance. The supported-upgrade failure made Extended validation fail, so publication was correctly skipped and the aggregate could not pass.",
+      "next_action": "Do not change the stable gate. Correct and rerun the supported upgrade proof on exact source; require Extended validation, publication and this aggregate gate all to pass before release delivery.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

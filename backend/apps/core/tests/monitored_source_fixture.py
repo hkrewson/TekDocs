@@ -32,11 +32,37 @@ ORIGINAL = "Original monitored recovery instructions."
 LOCAL = "Local recovery note must survive."
 CURRENT = "Current monitored recovery instructions."
 
+# This fixture is executed unchanged inside the 0.8.46 image and again after
+# upgrade. Keep its legacy custody proof independent of nullable ownership
+# columns added by later schema migrations. Native repository/content ownership
+# has separate migration, constraint and recovery proofs.
+LEGACY_REMOTE_SOURCE_FIELDS = (
+    "created_at",
+    "updated_at",
+    "id",
+    "tenant_id",
+    "organization_id",
+    "document_id",
+    "url",
+    "source_kind",
+    "enabled",
+    "check_interval_minutes",
+    "next_check_at",
+    "last_checked_at",
+    "last_applied_observation_id",
+    "created_by_id",
+    "archived_at",
+)
+
 
 def _document(owner):
     return Document.objects.select_related("entity__workspace", "organization__entity").get(
         tenant=require_installation_member(owner).tenant, entity__display_name=TITLE,
     )
+
+
+def legacy_remote_source_state(source: object) -> dict[str, object]:
+    return {field: getattr(source, field) for field in LEGACY_REMOTE_SOURCE_FIELDS}
 
 
 def _observe(source, markdown, *, state="changed", error_code=""):
@@ -106,7 +132,7 @@ def monitored_source_retained_state(owner):
     source = document.remote_source
     return {
         "id": str(document.id), "entity": str(document.entity_id),
-        "source": {field.attname: getattr(source, field.attname) for field in source._meta.concrete_fields},
+        "source": legacy_remote_source_state(source),
         "observations": list(source.observations.order_by("id").values()),
         "revisions": list(document.placements.get().block.revisions.order_by("revision_number").values()),
         "publications": [

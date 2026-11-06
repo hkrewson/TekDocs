@@ -62,7 +62,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo 'Owner: TekDocs maintainer. Track each failure in planning/releases/validation-failures.json; see planning/releases/README.md.' >> "$GITHUB_STEP_SUMMARY"
-          python3 scripts/ci_status.py --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          python3 scripts/ci_status.py --report-only --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
 
   browser-matrix:
     name: Browser (${{ matrix.project }})

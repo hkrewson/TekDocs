@@ -13,7 +13,11 @@ application tagging and durable updater receipt delivery part of CI for new
 versions on main. It replaces the manual tag/receipt handoff for future releases.
 Existing release records below remain historical evidence.
 
-## Prepared 0.9.19 candidate
+The [annotated release catalog](release-tag-catalog.md) adds reviewed two-line
+messages to future application tags without changing receipt or image authority.
+Historical lightweight tags, including v0.9.19, remain immutable.
+
+## Published 0.9.19; production update scheduled
 
 The [0.9.19 candidate](0.9.19-candidate.md) freezes the accumulated Git-backed
 document workflow, migrations 0213-0223, CI/release operations, and dependency
@@ -24,13 +28,20 @@ files in the exact release range with no findings. Supporting main Build
 browser, production-container, SBOM, vulnerability, and final gates. It was not a
 versioned release run and is not relabeled as candidate acceptance.
 
+Corrected exact-source Build
+[42148451278](https://github.com/hkrewson/TekDocs/actions/runs/42148451278)
+passed on attempt 2 after attempt 1's hosted-runner shutdown. It verified the
+supported upgrade and recovery paths, published four images, verified all eight
+attestations, delivered `v0.9.19` plus `receipts/v0.9.19`, and passed the final
+`Validation passed` job. Production remained on v0.9.18 at closeout; its existing
+Sunday 03:30 America/Chicago update window sees v0.9.19 available.
+
 The maintainer accepted the unchanged medium inline-style CSP allowance and low
 missing-COEP limitation for v0.9.19 only, with review or remediation due before
 the next runtime candidate or November 12, 2026. The maintainer also authorized
-the versioned push and its single-push delivery pipeline. Exact-source CodeQL,
-Extended validation, upgrade/recovery, image publication, attestations, and
-application/receipt tags remain mandatory. Production deployment, existing-data
-promotion, Wiki publication, and final 1.0 acceptance remain separate.
+the versioned push and its single-push delivery pipeline. Production deployment,
+existing-data promotion, Wiki publication, and final 1.0 acceptance remain
+separate.
 
 ## Native template enrollment for new documents
 

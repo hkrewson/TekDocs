@@ -28,6 +28,49 @@ def remote_tag(tag: str) -> str:
     return result.split()[0] if result else ""
 
 
+def remote_application_tag(tag: str) -> tuple[str, str]:
+    """Return the tag object and peeled application commit.
+
+    Historical releases use lightweight tags, while current releases use
+    annotated tags. The peeled commit is the immutable application identity in
+    both cases.
+    """
+    direct = remote_tag(tag)
+    peeled_result = run("git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}^{{}}")
+    peeled = peeled_result.split()[0] if peeled_result else direct
+    return direct, peeled
+
+
+def release_tag_message(tag: str) -> str:
+    path = Path("planning/releases/tag-messages") / (tag + ".txt")
+    if not path.is_file() or path.is_symlink():
+        raise ValueError("Missing reviewed release tag message: " + str(path))
+    text = path.read_text()
+    if "\r" in text or not text.endswith("\n"):
+        raise ValueError("Release tag message must use LF and end with a newline")
+    lines = text.splitlines()
+    if len(lines) != 2 or any(not line.strip() or line != line.strip() for line in lines):
+        raise ValueError("Release tag message must contain exactly two trimmed lines")
+    summary, breaking = lines
+    if len(summary) > 120 or len(breaking) > 240:
+        raise ValueError("Release tag message is too long")
+    if not breaking.startswith("Breaking changes: ") or not breaking.removeprefix("Breaking changes: ").strip():
+        raise ValueError("Release tag message must explicitly describe breaking changes")
+    if any(ord(character) < 32 for line in lines for character in line):
+        raise ValueError("Release tag message contains a control character")
+    return f"TekDocs {tag}: {summary}\n\n{breaking}\n"
+
+
+def create_annotated_tag(tag: str, sha: str, message: str) -> str:
+    env = dict(os.environ,
+               GIT_COMMITTER_NAME="github-actions[bot]",
+               GIT_COMMITTER_EMAIL="41898282+github-actions[bot]@users.noreply.github.com")
+    tagger = run("git", "var", "GIT_COMMITTER_IDENT", env=env)
+    body = (f"object {sha}\ntype commit\ntag {tag}\ntagger {tagger}\n\n"
+            + message)
+    return run("git", "mktag", input=body, env=env)
+
+
 def publish_commit_images() -> None:
     """Never replace a commit image on a full rerun with a different build."""
     sha = os.environ["GITHUB_SHA"]
@@ -62,8 +105,9 @@ def finalize() -> None:
             or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)):
         raise ValueError("Release requires a versioned trusted main push")
     tag = "v" + version
-    existing = remote_tag(tag)
-    if existing and existing != sha:
+    tag_message = release_tag_message(tag)
+    existing, existing_commit = remote_application_tag(tag)
+    if existing and existing_commit != sha:
         raise ValueError("Release version already belongs to another commit")
     output = Path("artifacts/release")
     output.mkdir(parents=True, exist_ok=True)
@@ -141,10 +185,11 @@ def finalize() -> None:
             tree = run("git", "write-tree", env=env)
             receipt_commit = run("git", "commit-tree", tree, "-p", sha,
                                  input="Verified release receipt for " + tag + "\n", env=env)
-    run("git", "push", "--atomic", "origin", sha + ":refs/tags/" + tag,
+    application_tag = existing or create_annotated_tag(tag, sha, tag_message)
+    run("git", "push", "--atomic", "origin", application_tag + ":refs/tags/" + tag,
         receipt_commit + ":refs/tags/" + companion)
     summary = {"release": tag, "candidate_commit": sha, "receipt_commit": receipt_commit,
-               "source_ref": ref, "images": verified,
+               "source_ref": ref, "tag_message": tag_message.strip(), "images": verified,
                "run": os.environ["GITHUB_SERVER_URL"] + "/" + os.environ["GITHUB_REPOSITORY"]
                       + "/actions/runs/" + os.environ["GITHUB_RUN_ID"]}
     (output / "release.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -157,7 +202,12 @@ def finalize() -> None:
 if __name__ == "__main__":
     if sys.argv[1:] == ["--publish-images"]:
         publish_commit_images()
+    elif sys.argv[1:] == ["--validate-tag-message"]:
+        version = Path("VERSION").read_text().strip()
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
+            raise SystemExit("VERSION is not a semantic version")
+        print(release_tag_message("v" + version), end="")
     elif not sys.argv[1:]:
         finalize()
     else:
-        raise SystemExit("usage: finalize_ci_release.py [--publish-images]")
+        raise SystemExit("usage: finalize_ci_release.py [--publish-images|--validate-tag-message]")

@@ -26,6 +26,10 @@ class FinalizeReleaseTests(unittest.TestCase):
         os.chdir(self.temp.name)
         self.addCleanup(os.chdir, old)
         Path('VERSION').write_text('0.9.12\n')
+        tag_messages = Path('planning/releases/tag-messages')
+        tag_messages.mkdir(parents=True)
+        (tag_messages / 'v0.9.12.txt').write_text(
+            'Synthetic release for delivery tests\nBreaking changes: none\n')
         env = dict(GITHUB_SHA=SHA, GITHUB_REF='refs/heads/main', GITHUB_EVENT_NAME='push',
                    GITHUB_REPOSITORY='hkrewson/TekDocs', GITHUB_SERVER_URL='https://github.com',
                    GITHUB_RUN_ID='123', GITHUB_STEP_SUMMARY=str(Path.cwd() / 'summary'))
@@ -34,6 +38,7 @@ class FinalizeReleaseTests(unittest.TestCase):
         self.calls = []
         self.bad_signature = False
         self.tag_sha = ''
+        self.tag_commit_sha = ''
         self.receipt_sha = ''
         self.receipt_text = ''
         self.enterContext(patch.object(release, 'run', side_effect=self.command))
@@ -49,7 +54,12 @@ class FinalizeReleaseTests(unittest.TestCase):
         if args[:4] == ('docker', 'buildx', 'imagetools', 'inspect'):
             return json.dumps(DIGEST)
         if args[:3] == ('git', 'ls-remote', '--tags'):
-            value = self.receipt_sha if 'receipts/' in args[-1] else self.tag_sha
+            if 'receipts/' in args[-1]:
+                value = self.receipt_sha
+            elif args[-1].endswith('^{}'):
+                value = self.tag_commit_sha
+            else:
+                value = self.tag_sha
             return value + '\t' + args[-1] if value else ''
         if args[:2] == ('git', 'show'):
             return self.receipt_text.strip()
@@ -65,7 +75,8 @@ class FinalizeReleaseTests(unittest.TestCase):
         pushes = [c for c in self.calls if c[:2] == ('git', 'push')]
         self.assertEqual(len(pushes), 1)
         self.assertIn('--atomic', pushes[0])
-        self.assertIn(SHA + ':refs/tags/v0.9.12', pushes[0])
+        self.assertTrue(any(ref.endswith(':refs/tags/v0.9.12') for ref in pushes[0]))
+        self.assertTrue(any(c[:2] == ('git', 'mktag') for c in self.calls))
         self.assertTrue(pushes[0][-1].endswith(':refs/tags/receipts/v0.9.12'))
         self.assertEqual(len(Path('artifacts/release/v0.9.12.images').read_text().splitlines()), 5)
 
@@ -80,6 +91,27 @@ class FinalizeReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             release.finalize()
         self.assertFalse(any(c[0] == 'docker' for c in self.calls))
+
+    def test_matching_annotated_release_is_accepted_without_rewriting_tag(self):
+        self.tag_sha = 'd' * 40
+        self.tag_commit_sha = SHA
+        release.finalize()
+        push = next(c for c in self.calls if c[:2] == ('git', 'push'))
+        self.assertIn(self.tag_sha + ':refs/tags/v0.9.12', push)
+        self.assertFalse(any(c[:2] == ('git', 'mktag') for c in self.calls))
+
+    def test_missing_reviewed_tag_message_stops_before_publication(self):
+        Path('planning/releases/tag-messages/v0.9.12.txt').unlink()
+        with self.assertRaisesRegex(ValueError, 'Missing reviewed release tag message'):
+            release.finalize()
+        self.assertFalse(any(c[0] in {'docker', 'gh'} for c in self.calls))
+
+    def test_tag_message_requires_explicit_breaking_change_line(self):
+        Path('planning/releases/tag-messages/v0.9.12.txt').write_text(
+            'Synthetic release for delivery tests\nNo operator action\n')
+        with self.assertRaisesRegex(ValueError, 'explicitly describe breaking changes'):
+            release.finalize()
+        self.assertFalse(any(c[0] in {'docker', 'gh'} for c in self.calls))
 
     def test_mismatched_existing_alias_is_never_overwritten(self):
         self.alias.return_value = subprocess.CompletedProcess([], 0, json.dumps('sha256:' + 'e'*64), '')
@@ -114,6 +146,7 @@ class FinalizeReleaseTests(unittest.TestCase):
         git('config', 'user.name', 'Synthetic Release Test')
         git('config', 'user.email', 'release@example.invalid')
         git('add', 'VERSION')
+        git('add', 'planning/releases/tag-messages/v0.9.12.txt')
         git('commit', '-qm', 'synthetic application')
         sha = git('rev-parse', 'HEAD')
         remote = Path(self.temp.name) / 'remote.git'
@@ -126,6 +159,9 @@ class FinalizeReleaseTests(unittest.TestCase):
         with patch.dict(os.environ, GITHUB_SHA=sha), patch.object(release, 'run', side_effect=command):
             release.finalize()
             first = git('ls-remote', '--tags', 'origin')
+            tag_object = git('ls-remote', '--tags', 'origin', 'refs/tags/v0.9.12').split()[0]
+            self.assertEqual(git('rev-parse', tag_object + '^{}'), sha)
+            self.assertIn('Breaking changes: none', git('cat-file', '-p', tag_object))
             release.finalize()
             self.assertEqual(git('ls-remote', '--tags', 'origin'), first)
         self.assertEqual(git('rev-parse', 'HEAD'), sha)
@@ -136,13 +172,17 @@ class FinalizeReleaseTests(unittest.TestCase):
 
     def test_workflow_requires_all_release_dependencies_and_receipt_step(self):
         workflow = (ROOT / '.github/workflows/build.yml').read_text()
+        version_check = (ROOT / 'scripts/check-version.sh').read_text()
         self.assertIn('needs: [prepare, production-containers, release-codeql, release-extended]', workflow)
         self.assertNotIn('tags: ["v*"]', workflow)
         self.assertIn('run: python3 scripts/finalize_ci_release.py', workflow)
+        self.assertIn('application_commit=${peeled:-$existing}', workflow)
+        self.assertIn('refs/tags/v$VERSION^{}', workflow)
         self.assertIn('make test-release-delivery', workflow)
         self.assertIn('uses: ./.github/workflows/codeql.yml', workflow)
         self.assertIn('uses: ./.github/workflows/extended-validation.yml', workflow)
         self.assertIn('name: build-playwright-chromium-summary', workflow)
+        self.assertIn('--validate-tag-message', version_check)
 
     def test_commit_image_rebuild_conflict_is_never_pushed(self):
         self.alias.return_value = subprocess.CompletedProcess([], 0,

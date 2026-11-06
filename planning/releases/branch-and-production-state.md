@@ -24,12 +24,16 @@ review surfaces and do not define an environment.
 
 A deployable release exists only when both immutable Git references exist:
 
-- `vMAJOR.MINOR.PATCH` identifies the reviewed application commit;
+- `vMAJOR.MINOR.PATCH` identifies the reviewed application commit. Future tags
+  are annotated with a short committed summary and explicit breaking-change
+  disposition; historical lightweight tags remain valid and immutable;
 - `receipts/vMAJOR.MINOR.PATCH` identifies the CI-created receipt commit whose
   sole parent is that application commit and whose only change is the reviewed
   image receipt.
 
 The receipt binds the backend, frontend, renderer and Mailpit image digests.
+Annotation text is an operator catalog aid, not deployment authority; the updater
+still peels the tag and validates the companion receipt and immutable images.
 Passing CI on a later `main` commit does not move or replace an existing release.
 There is no moving `production` branch and no rule that production stays one
 commit or one version behind. Commit distance is not a safety or soak measure.

@@ -35,7 +35,11 @@ The [branch and production state](branch-and-production-state.md) defines why
    Existing conflicting version aliases fail; registry/authentication failures
    are not treated as an absent alias. Version aliases are then published and
    checked against the verified digests.
-5. CI generates the five-line receipt and a separate receipt commit whose sole
+5. CI requires a reviewed two-line message at
+   `planning/releases/tag-messages/vVERSION.txt`: one concise summary followed by
+   an explicit `Breaking changes:` disposition. It creates an annotated
+   application tag from that committed text. CI generates the five-line receipt
+   and a separate receipt commit whose sole
    parent is the application SHA and whose only change is that receipt. One
    atomic Git push creates `vVERSION` and `receipts/vVERSION`. Neither tag is
    force-updated. The source branch is untouched. Matching retries retain the
@@ -45,18 +49,20 @@ The [branch and production state](branch-and-production-state.md) defines why
    evidence artifacts remain available for broader security review; green CI does
    not fabricate source-review findings or human risk acceptance.
 
-## Operator release catalog follow-up
+## Operator release catalog
 
-Application and receipt tags currently establish immutable identity, not a
-human-readable change summary. A future bounded delivery change should create an
-annotated application tag from reviewed repository-owned release metadata. Keep
-the annotation short and factual: one summary line, followed by an explicit
-`Breaking changes: none` or a concise operator action. CI must validate the text,
-derive it from the committed candidate packet rather than generated prose, and
-deliver the annotated application tag atomically with the existing receipt tag.
-The updater can then offer an optional detailed release list without trusting tag
-text for receipt, image, ancestry or migration decisions. Until that contract is
-implemented, release discovery shows version tags only.
+Future application tags are annotated from reviewed, repository-owned release
+metadata. The annotation is deliberately short and factual: one summary line,
+followed by `Breaking changes: none` or a concise operator action. Version
+validation rejects a missing, malformed or unbounded message before release
+work begins. The finalizer creates the tag object only after image and attestation
+verification and delivers it atomically with the existing receipt tag.
+
+Historical lightweight application tags remain valid and immutable. The updater
+peels annotated tags to the application commit but never trusts annotation text
+for receipt, image, ancestry or migration decisions. v0.9.19 remains a historical
+lightweight tag because this catalog contract was added after that release; it is
+not rewritten.
 
 The Build workflow no longer triggers on tag pushes. GitHub also documents that
 pushes made with its workflow token do not recursively start workflows:

@@ -14,4 +14,7 @@ for version_value in "$backend_version" "$frontend_version" "$frontend_lock_vers
   fi
 done
 
+cd "$repository_root"
+python3 scripts/finalize_ci_release.py --validate-tag-message >/dev/null
+
 echo "Version metadata agrees at $release_version"

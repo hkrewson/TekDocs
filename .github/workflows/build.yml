@@ -82,8 +82,11 @@ jobs:
           release=false
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/main ]]; then
             [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
-            existing=$(git ls-remote --tags origin "refs/tags/v$VERSION" | cut -f1)
-            if [[ -z "$existing" || "$existing" == "$GITHUB_SHA" ]]; then
+            references=$(git ls-remote --tags origin "refs/tags/v$VERSION" "refs/tags/v$VERSION^{}")
+            existing=$(awk -v ref="refs/tags/v$VERSION" '$2 == ref { print $1 }' <<< "$references")
+            peeled=$(awk -v ref="refs/tags/v$VERSION^{}" '$2 == ref { print $1 }' <<< "$references")
+            application_commit=${peeled:-$existing}
+            if [[ -z "$existing" || "$application_commit" == "$GITHUB_SHA" ]]; then
               release=true
             fi
           fi

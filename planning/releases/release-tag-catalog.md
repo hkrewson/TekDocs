@@ -45,3 +45,9 @@ runs `scripts/update-production.sh --latest` under `flock` each Sunday at 03:30
 America/Chicago, retains output in `.tekdocs-production-update.log`, and was
 cleanly recording v0.9.18 with verified v0.9.19 available. No deployment or
 remote mutation was performed by this inspection.
+
+The subsequent unattended-soak slice adds
+`TEKDOCS_MINIMUM_RELEASE_AGE_HOURS=48` to that scheduled command. The newest
+verified release remains the only candidate: a too-new release exits successfully
+before backup or Docker activity and never causes fallback to an older version.
+Explicit operator-selected releases remain available for urgent deployments.

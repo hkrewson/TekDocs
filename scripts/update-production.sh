@@ -11,6 +11,7 @@ environment_file="$repository_root/.env"
 operator_config_file="$repository_root/.tekdocs-update.env"
 backup_root=${TEKDOCS_BACKUP_ROOT:-}
 recovery_key=${TEKDOCS_RECOVERY_KEY_FILE:-}
+minimum_release_age_hours=${TEKDOCS_MINIMUM_RELEASE_AGE_HOURS:-0}
 secret_directory=
 use_traefik=true
 use_bootstrap_secret=false
@@ -94,6 +95,8 @@ image revisions and digests. It uses the release Compose files without changing
 the tooling checkout. Existing backup settings still apply.
 The first complete backup configuration is saved in ignored .tekdocs-update.env.
 TEKDOCS_BACKUP_ROOT and TEKDOCS_RECOVERY_KEY_FILE may supply those paths.
+TEKDOCS_MINIMUM_RELEASE_AGE_HOURS applies a fail-safe soak window to --latest
+only. A too-new release is retained as newest and skipped without falling back.
 Calling the updater with backup options but no selector preserves legacy upstream
 mode with a deprecation warning; use --upstream explicitly instead.
 EOF
@@ -250,6 +253,8 @@ if [[ "$mode" == list-releases || "$mode" == check ]]; then
 fi
 
 if [[ "$mode" == latest ]]; then
+  [[ "$minimum_release_age_hours" =~ ^[0-9]{1,5}$ ]] || fail "TEKDOCS_MINIMUM_RELEASE_AGE_HOURS must be a whole number"
+  ((10#$minimum_release_age_hours <= 8760)) || fail "TEKDOCS_MINIMUM_RELEASE_AGE_HOURS cannot exceed 8760"
   release=$(tekdocs_latest_published_release "$repository_root") || fail "the latest published release could not be determined from origin"
   echo "Selected latest published release: $release"
 fi
@@ -270,6 +275,18 @@ if [[ "$mode" == latest ]]; then
   if [[ "$recorded_deployed_commit" == "$TEKDOCS_RELEASE_COMMIT" ]]; then
     echo "Production is already on $release; nothing to update."
     exit 0
+  fi
+  if ((10#$minimum_release_age_hours > 0)); then
+    published_at=$(tekdocs_release_receipt_epoch "$repository_root" "$release") || fail "the release publication time could not be verified: $release"
+    current_time=$(date +%s)
+    minimum_age_seconds=$((10#$minimum_release_age_hours * 3600))
+    eligible_at=$((published_at + minimum_age_seconds))
+    if ((current_time < eligible_at)); then
+      eligible_display=$(date -r "$eligible_at" '+%Y-%m-%d %H:%M:%S %Z' 2>/dev/null || date -d "@$eligible_at" '+%Y-%m-%d %H:%M:%S %Z')
+      echo "$release is verified but has not completed the ${minimum_release_age_hours}-hour soak window."
+      echo "It becomes eligible at $eligible_display; production is unchanged."
+      exit 0
+    fi
   fi
 fi
 

@@ -48,9 +48,13 @@ tooling checkout may be a newer clean commit because release mode uses the tagge
 Compose files without moving the checkout during deployment.
 
 The supported unattended path is a fixed maintenance window running
-`scripts/update-production.sh --latest`. The updater must first validate the
+`TEKDOCS_MINIMUM_RELEASE_AGE_HOURS=48 scripts/update-production.sh --latest`.
+The updater must first validate the
 latest application/receipt pair and must exit without backup or Docker activity
-when that exact release is already recorded as deployed. Every real update keeps
+when that exact release is already recorded as deployed or has not completed the
+configured soak window. It never falls back to an older release. An explicit
+operator-directed `--release` is not delayed by the unattended soak policy.
+Every real update keeps
 the existing encrypted-backup, forward-ancestry, migration, readiness and image
 identity gates. A failed run remains failed and requires operator review; it does
 not fall back to an older or unverified release.

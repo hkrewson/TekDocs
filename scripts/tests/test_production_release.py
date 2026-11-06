@@ -307,6 +307,48 @@ elif args[0]!='pull': sys.exit(9)
         self.assertIn('Selected latest published release: v0.9.8', result.stdout)
         self.assertIn('TekDocs production update passed', result.stdout)
 
+    def test_latest_soak_window_skips_too_new_release_before_backup(self):
+        self.env['TEKDOCS_MINIMUM_RELEASE_AGE_HOURS'] = '48'
+        result = self.run_command('--latest')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('has not completed the 48-hour soak window', result.stdout)
+        self.assertFalse(self.events.exists())
+
+    def test_explicit_release_bypasses_unattended_soak_window(self):
+        self.env['TEKDOCS_MINIMUM_RELEASE_AGE_HOURS'] = '48'
+        result = self.run_update()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('TekDocs production update passed', result.stdout)
+
+    def test_latest_soak_window_allows_mature_release(self):
+        tree = self.git('rev-parse', self.tooling_commit + '^{tree}').strip()
+        old_environment = dict(self.env,
+            GIT_AUTHOR_NAME='Synthetic release test',
+            GIT_AUTHOR_EMAIL='release@example.invalid',
+            GIT_COMMITTER_NAME='Synthetic release test',
+            GIT_COMMITTER_EMAIL='release@example.invalid',
+            GIT_AUTHOR_DATE='2000-01-01T00:00:00+0000',
+            GIT_COMMITTER_DATE='2000-01-01T00:00:00+0000')
+        old_receipt = subprocess.check_output(
+            ['git', 'commit-tree', tree, '-p', self.commit], cwd=self.root,
+            env=old_environment, input='old receipt\n', text=True).strip()
+        self.git('tag', '-f', 'receipts/v0.9.8', old_receipt)
+        self.env['TEKDOCS_MINIMUM_RELEASE_AGE_HOURS'] = '48'
+        result = self.run_command(
+            '--latest', '--backup-root', str(Path(self.temp.name) / 'backups'),
+            '--recovery-key', str(self.key),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('TekDocs production update passed', result.stdout)
+
+    def test_latest_rejects_invalid_soak_window(self):
+        for value in ('-1', '1.5', '8761'):
+            with self.subTest(value=value):
+                self.env['TEKDOCS_MINIMUM_RELEASE_AGE_HOURS'] = value
+                result = self.run_command('--latest')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(self.events.exists())
+
     def test_latest_is_a_read_only_noop_when_that_release_is_already_deployed(self):
         (self.root / '.env').write_text(
             f'TEKDOCS_SECRET_DIRECTORY={self.deployment_directory}\n'

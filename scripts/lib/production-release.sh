@@ -75,6 +75,31 @@ tekdocs_latest_published_release() {
   printf '%s\n' "${first%%$'\t'*}"
 }
 
+# Use the CI-created receipt commit time as the publication clock for unattended
+# soak windows. This is scheduling metadata only; receipt contents and ancestry
+# are validated independently before any deployment activity.
+tekdocs_release_receipt_epoch() {
+  local root=$1 release=$2 receipt receipt_commit parent changed_path published_at expected
+  [[ "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  git -C "$root" fetch --quiet origin "refs/tags/receipts/$release" || return 1
+  receipt_commit=$(git -C "$root" rev-parse --verify 'FETCH_HEAD^{commit}') || return 1
+  parent=$(git -C "$root" show -s --format=%P "$receipt_commit") || return 1
+  [[ "$parent" == "$TEKDOCS_RELEASE_COMMIT" ]] || return 1
+  changed_path=$(git -C "$root" diff-tree --no-commit-id --name-only -r "$receipt_commit") || return 1
+  [[ "$changed_path" == "scripts/releases/$release.images" ]] || return 1
+  receipt=$(git -C "$root" show "$receipt_commit:scripts/releases/$release.images") || return 1
+  expected=$(printf 'commit=%s\nbackend=%s\nfrontend=%s\nrenderer=%s' \
+    "$TEKDOCS_RELEASE_COMMIT" "$TEKDOCS_RELEASE_BACKEND" \
+    "$TEKDOCS_RELEASE_FRONTEND" "$TEKDOCS_RELEASE_RENDERER")
+  if [[ -n "$TEKDOCS_RELEASE_MAILPIT" ]]; then
+    expected+=$(printf '\nmailpit=%s' "$TEKDOCS_RELEASE_MAILPIT")
+  fi
+  [[ "$receipt" == "$expected" ]] || return 1
+  published_at=$(git -C "$root" show -s --format=%ct "$receipt_commit") || return 1
+  [[ "$published_at" =~ ^[0-9]{1,12}$ ]] || return 1
+  printf '%s\n' "$published_at"
+}
+
 # Read reviewed release data as data, never as executable shell input.
 tekdocs_load_release_receipt() {
   local root=$1 release=$2 key value count=0

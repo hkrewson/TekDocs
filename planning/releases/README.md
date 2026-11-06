@@ -43,6 +43,15 @@ the versioned push and its single-push delivery pipeline. Production deployment,
 existing-data promotion, Wiki publication, and final 1.0 acceptance remain
 separate.
 
+Post-v0.9.19 development has implemented the bounded
+[CSP/COEP hardening slice](../csp-coep-hardening.md). The source policy now removes
+TekDocs-owned inline styles and adds `Cross-Origin-Embedder-Policy: require-corp`
+without claiming full cross-origin isolation. The header-level CSP allowance remains
+for identified Mermaid, Milkdown and Cytoscape runtime styling until those paths are
+isolated. The prior v0.9.19 acceptance remains historical; exact-source hosted build,
+browser, routing, and DAST evidence must pass before COEP closes, and the dependency
+work must finish before the CSP finding closes.
+
 ## Native template enrollment for new documents
 
 The [bounded native-template slice](../git-native-templates.md) connects saved MSP

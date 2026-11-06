@@ -10,7 +10,7 @@
     "api:generate": "openapi-typescript ../backend/openapi.yml -o src/generated/api-v1.ts --immutable",
     "api:check": "openapi-typescript ../backend/openapi.yml -o src/generated/api-v1.ts --immutable --check",
     "license:check": "node scripts/check-licenses.mjs",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint . --max-warnings 0 && node scripts/check-csp-source.mjs",
     "typecheck": "tsc -b --pretty false",
     "test": "vitest run --coverage",
     "test:watch": "vitest",

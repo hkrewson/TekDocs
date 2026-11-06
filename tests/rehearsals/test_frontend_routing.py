@@ -45,6 +45,16 @@ def supported_refresh_paths() -> list[str]:
 
 
 class FrontendRoutingTests(unittest.TestCase):
+    EXPECTED_CSP = (
+        "default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; "
+        "form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; "
+        "object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    )
+
+    def assert_security_headers(self, headers):
+        self.assertEqual(headers['Content-Security-Policy'], self.EXPECTED_CSP)
+        self.assertEqual(headers['Cross-Origin-Embedder-Policy'], 'require-corp')
+
     @classmethod
     def setUpClass(cls):
         image = os.environ.get('TEKDOCS_ROUTING_IMAGE', 'tekdocs-frontend-routing-check')
@@ -88,7 +98,7 @@ class FrontendRoutingTests(unittest.TestCase):
                     self.assertNotIn('Location', response_headers)
                     self.assertEqual(body, index)
                     self.assertIn('no-cache', response_headers.get('Cache-Control', ''))
-                    self.assertIn('Content-Security-Policy', response_headers)
+                    self.assert_security_headers(response_headers)
 
     def test_route_inventory_produces_unique_refresh_paths(self):
         paths = supported_refresh_paths()
@@ -121,7 +131,7 @@ class FrontendRoutingTests(unittest.TestCase):
                 self.assertIn(mime, headers['Content-Type'])
                 self.assertIn('max-age=31536000', headers['Cache-Control'])
                 self.assertEqual(headers['X-Content-Type-Options'], 'nosniff')
-                self.assertIn('Content-Security-Policy', headers)
+                self.assert_security_headers(headers)
                 self.assertTrue(body)
         self.assertEqual(self.request('/assets/nonexistent-pdf-worker.mjs')[0], 404)
 
@@ -154,7 +164,8 @@ class FrontendRoutingTests(unittest.TestCase):
                 self.assertEqual(gzip.decompress(compressed), identity)
                 self.assertLess(len(compressed), len(identity) / 2)
                 for header in ('Content-Type', 'Cache-Control', 'Content-Security-Policy',
-                               'X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy'):
+                               'Cross-Origin-Embedder-Policy', 'X-Content-Type-Options',
+                               'X-Frame-Options', 'Referrer-Policy'):
                     self.assertEqual(compressed_headers[header], identity_headers[header])
 
         # Compression is confined to public build files, not the SPA document.

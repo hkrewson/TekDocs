@@ -56,6 +56,13 @@ ZAP's rule documentation supplies the severity and purpose of
 The dispositions above are specific to the inspected candidate and do not waive
 new findings, broader authenticated scope, or expired follow-ups.
 
+Post-v0.9.19 remediation is tracked in
+[`planning/csp-coep-hardening.md`](../csp-coep-hardening.md). That implementation
+removes TekDocs-owned inline styling and adds `require-corp`. The header allowance
+remains for identified dependency runtime styling, so the CSP finding stays open.
+The COEP finding remains open until the exact-source hosted browser, routing and
+passive DAST checks named there pass.
+
 The comment check used Acorn 8.18.0 with module parsing and comment collection on
 the 458,183-byte production entry bundle. Its SHA-256 was
 `9f947a19cdc7bfb1771df7445b4117151920d29414cdf5f49011cc79dde5c9d0`.

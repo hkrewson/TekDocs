@@ -90,6 +90,10 @@ function downloadName(title: string) {
   return `${safe || 'diagram'}.svg`
 }
 
+function svgDataUrl(svg: string) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 export function MermaidDiagram({
   source,
   index,
@@ -151,7 +155,7 @@ export function MermaidDiagram({
         <button className="secondary-button diagram-download" type="button" onClick={downloadSvg}><Download size={15} aria-hidden="true" />{translate('diagrams.downloadSvg')}</button>
       </div>
       <div className="mermaid-graphic" role="region" tabIndex={0} aria-label={`Scrollable diagram: ${accessibleTitle}`}>
-        <div className="mermaid-graphic-size" style={{ width: `${zoom * 100}%` }} role="img" aria-label={accessibleTitle} aria-describedby={accessible.description ? descriptionId : undefined}><div aria-hidden="true" dangerouslySetInnerHTML={{ __html: state.svg }} /></div>
+        <div className={`mermaid-graphic-size mermaid-graphic-size-${Math.round(zoom * 100)}`} role="img" aria-label={accessibleTitle} aria-describedby={accessible.description ? descriptionId : undefined}><img src={svgDataUrl(state.svg)} alt="" aria-hidden="true" /></div>
       </div>
     </>}
     {state.phase === 'error' && <p role="status">The diagram could not be rendered. Its Mermaid source remains available below.</p>}

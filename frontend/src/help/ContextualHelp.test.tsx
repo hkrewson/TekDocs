@@ -4,7 +4,7 @@ import { afterEach, expect, it } from 'vitest'
 
 import { ContextualHelp } from './ContextualHelp'
 
-afterEach(() => { document.body.style.overflow = '' })
+afterEach(() => { document.body.removeAttribute('class') })
 
 it('opens focused route help and restores focus after Escape', async () => {
   const user = userEvent.setup()
@@ -16,13 +16,13 @@ it('opens focused route help and restores focus after Escape', async () => {
   const dialog = screen.getByRole('dialog', { name: 'System status help' })
   expect(dialog).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'System status' })).toHaveFocus()
-  expect(document.body.style.overflow).toBe('hidden')
+  expect(document.body).toHaveClass('tekdocs-scroll-locked')
   expect(screen.getByText(/database, and the isolated diagram renderer/)).toBeInTheDocument()
 
   await user.keyboard('{Escape}')
   expect(dialog).not.toBeInTheDocument()
   expect(trigger).toHaveFocus()
-  expect(document.body.style.overflow).toBe('')
+  expect(document.body).not.toHaveClass('tekdocs-scroll-locked')
 })
 
 it('closes from the explicit small-screen action', async () => {

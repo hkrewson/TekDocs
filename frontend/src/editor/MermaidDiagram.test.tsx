@@ -13,6 +13,12 @@ vi.mock('mermaid', () => ({ default: { initialize, render: renderDiagram } }))
 
 import { MermaidDiagram } from './MermaidDiagram'
 
+function renderedSvg(graphic: HTMLElement) {
+  const source = graphic.querySelector('img')?.getAttribute('src')
+  expect(source).toMatch(/^data:image\/svg\+xml;charset=utf-8,/)
+  return decodeURIComponent(source!.slice(source!.indexOf(',') + 1))
+}
+
 it('uses strict deterministic rendering and retains an accessible source fallback', async () => {
   const source = 'flowchart LR\naccTitle: Client data flow\naccDescr: Firewall traffic path\nA-->B'
   render(<MermaidDiagram source={source} index={0} showSource />)
@@ -21,8 +27,9 @@ it('uses strict deterministic rendering and retains an accessible source fallbac
   expect(screen.getByText('Firewall traffic path')).toBeVisible()
   expect(screen.getByText('Mermaid source')).toBeVisible()
   expect(document.querySelector('details code')?.textContent).toBe(source)
-  expect(document.querySelector('script')).not.toBeInTheDocument()
-  expect(document.querySelector('foreignObject')).not.toBeInTheDocument()
+  const svg = renderedSvg(screen.getByRole('img', { name: 'Client data flow' }))
+  expect(svg).not.toContain('<script')
+  expect(svg).not.toContain('<foreignObject')
   expect(initialize).toHaveBeenCalledWith(expect.objectContaining({
     securityLevel: 'strict',
     htmlLabels: false,
@@ -74,8 +81,9 @@ it('retains local fragment links and paint references', async () => {
   render(<MermaidDiagram source="flowchart LR\nA-->B" index={5} />)
 
   const graphic = await screen.findByRole('img')
-  expect(graphic.querySelector('a')).toHaveAttribute('href', '#label')
-  expect(graphic.querySelector('rect')).toHaveAttribute('fill', 'url(#ink)')
+  const svg = renderedSvg(graphic)
+  expect(svg).toContain('href="#label"')
+  expect(svg).toContain('fill="url(#ink)"')
   expect(screen.getByRole('button', { name: 'Download SVG' })).toBeEnabled()
 })
 
@@ -91,9 +99,9 @@ A-->B`
   expect(graphic).toHaveAttribute('aria-describedby')
   expect(screen.getByRole('region', { name: 'Scrollable diagram: Client path' })).toHaveAttribute('tabindex', '0')
   await user.click(screen.getByRole('button', { name: 'Zoom in' }))
-  expect(graphic).toHaveStyle({ width: '125%' })
+  expect(graphic).toHaveClass('mermaid-graphic-size-125')
   await user.click(screen.getByRole('button', { name: 'Reset zoom, currently 125%' }))
-  expect(graphic).toHaveStyle({ width: '100%' })
+  expect(graphic).toHaveClass('mermaid-graphic-size-100')
   const createObjectUrl = vi.fn().mockReturnValue('blob:diagram')
   const revokeObjectUrl = vi.fn()
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })

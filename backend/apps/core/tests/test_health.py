@@ -31,7 +31,8 @@ def test_liveness_contract(client):
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "backend", "version": VERSION}
     assert response.headers["X-Request-ID"]
-    assert response.headers["Content-Security-Policy"]
+    assert response.headers["Content-Security-Policy"].endswith("style-src 'self' 'unsafe-inline'")
+    assert response.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
 
 
 @pytest.mark.django_db

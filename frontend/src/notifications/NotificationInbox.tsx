@@ -1,6 +1,7 @@
 import { Bell, Check, Mail, X } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { formatDateTime, formatHour, runtimeTimeZone, translate } from '../i18n/localization'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import { trapOverlayFocus } from '../shell/focusTrap'
 import { useShellOverlay } from '../shell/useShellOverlay'
 
@@ -116,8 +117,7 @@ export function NotificationInbox({ client, onOpen }: {
 
   useEffect(() => {
     if (!open) return
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll()
     const close = (event: MouseEvent) => { if (!ref.current?.contains(event.target as Node)) requestDeparture('close') }
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !discardTarget) requestDeparture('close')
@@ -125,7 +125,7 @@ export function NotificationInbox({ client, onOpen }: {
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', escape)
     return () => {
-      document.body.style.overflow = overflow
+      releaseScroll()
       document.removeEventListener('mousedown', close)
       document.removeEventListener('keydown', escape)
     }

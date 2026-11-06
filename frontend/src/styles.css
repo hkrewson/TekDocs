@@ -47,6 +47,9 @@
   --shadow: var(--shadow-popover);
 }
 
+body.tekdocs-scroll-locked { overflow: hidden; }
+.break-anywhere { overflow-wrap: anywhere; }
+
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
 button, input, textarea { font: inherit; }
@@ -618,6 +621,38 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .audience-preview > span { color: var(--muted); font-size: 11px; }
 .document-content { margin: 0; padding: 0; list-style: none; }
 .document-content-item { position: relative; }
+.document-depth-0 { margin-inline-start: 0; }
+.document-depth-1 { margin-inline-start: 18px; }
+.document-depth-2 { margin-inline-start: 36px; }
+.document-depth-3 { margin-inline-start: 54px; }
+.document-depth-4 { margin-inline-start: 72px; }
+.document-depth-5 { margin-inline-start: 90px; }
+.document-depth-6 { margin-inline-start: 108px; }
+.document-depth-7 { margin-inline-start: 126px; }
+.document-depth-8 { margin-inline-start: 144px; }
+.document-depth-9 { margin-inline-start: 162px; }
+.document-depth-10 { margin-inline-start: 180px; }
+.document-depth-11 { margin-inline-start: 198px; }
+.document-depth-12 { margin-inline-start: 216px; }
+.document-depth-13 { margin-inline-start: 234px; }
+.document-depth-14 { margin-inline-start: 252px; }
+.document-depth-15 { margin-inline-start: 270px; }
+.document-depth-16 { margin-inline-start: 288px; }
+.document-depth-17 { margin-inline-start: 306px; }
+.document-depth-18 { margin-inline-start: 324px; }
+.document-depth-19 { margin-inline-start: 342px; }
+.document-depth-20 { margin-inline-start: 360px; }
+.document-depth-21 { margin-inline-start: 378px; }
+.document-depth-22 { margin-inline-start: 396px; }
+.document-depth-23 { margin-inline-start: 414px; }
+.document-depth-24 { margin-inline-start: 432px; }
+.document-depth-25 { margin-inline-start: 450px; }
+.document-depth-26 { margin-inline-start: 468px; }
+.document-depth-27 { margin-inline-start: 486px; }
+.document-depth-28 { margin-inline-start: 504px; }
+.document-depth-29 { margin-inline-start: 522px; }
+.document-depth-30 { margin-inline-start: 540px; }
+.document-depth-31 { margin-inline-start: 558px; }
 .document-content-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
 .document-content-body { min-width: 0; }
 .placement-audience { display: inline-block; margin-bottom: 8px; padding: 2px 6px; color: #575248; background: #f1efe9; border: 1px solid #d7d2c7; border-radius: 5px; font-size: 10px; font-weight: 700; }
@@ -763,6 +798,38 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .location-empty { margin: 13px 0 0 23px; color: var(--muted); font-size: 12px; }
 .location-tree { margin: 13px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
 .location-tree li { min-height: 43px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 7px; padding-right: 0; border-bottom: 1px solid var(--border); }
+.location-tree .location-depth-0 { padding-left: 10px; }
+.location-tree .location-depth-1 { padding-left: 32px; }
+.location-tree .location-depth-2 { padding-left: 54px; }
+.location-tree .location-depth-3 { padding-left: 76px; }
+.location-tree .location-depth-4 { padding-left: 98px; }
+.location-tree .location-depth-5 { padding-left: 120px; }
+.location-tree .location-depth-6 { padding-left: 142px; }
+.location-tree .location-depth-7 { padding-left: 164px; }
+.location-tree .location-depth-8 { padding-left: 186px; }
+.location-tree .location-depth-9 { padding-left: 208px; }
+.location-tree .location-depth-10 { padding-left: 230px; }
+.location-tree .location-depth-11 { padding-left: 252px; }
+.location-tree .location-depth-12 { padding-left: 274px; }
+.location-tree .location-depth-13 { padding-left: 296px; }
+.location-tree .location-depth-14 { padding-left: 318px; }
+.location-tree .location-depth-15 { padding-left: 340px; }
+.location-tree .location-depth-16 { padding-left: 362px; }
+.location-tree .location-depth-17 { padding-left: 384px; }
+.location-tree .location-depth-18 { padding-left: 406px; }
+.location-tree .location-depth-19 { padding-left: 428px; }
+.location-tree .location-depth-20 { padding-left: 450px; }
+.location-tree .location-depth-21 { padding-left: 472px; }
+.location-tree .location-depth-22 { padding-left: 494px; }
+.location-tree .location-depth-23 { padding-left: 516px; }
+.location-tree .location-depth-24 { padding-left: 538px; }
+.location-tree .location-depth-25 { padding-left: 560px; }
+.location-tree .location-depth-26 { padding-left: 582px; }
+.location-tree .location-depth-27 { padding-left: 604px; }
+.location-tree .location-depth-28 { padding-left: 626px; }
+.location-tree .location-depth-29 { padding-left: 648px; }
+.location-tree .location-depth-30 { padding-left: 670px; }
+.location-tree .location-depth-31 { padding-left: 692px; }
 .location-tree li:last-child { border-bottom: 0; }
 .location-tree li > span:first-child { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
 .location-tree strong { font-size: 13px; }
@@ -856,7 +923,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .mermaid-graphic { overflow: auto; padding: 12px; background: var(--surface); border: 1px solid transparent; border-radius: 6px; }
 .mermaid-graphic:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); outline-offset: 1px; }
 .mermaid-graphic-size { min-width: 100%; margin: auto; }
-.mermaid-graphic svg { display: block; width: 100%; max-width: none; height: auto; margin: auto; }
+.mermaid-graphic-size-50 { width: 50%; }
+.mermaid-graphic-size-75 { width: 75%; }
+.mermaid-graphic-size-100 { width: 100%; }
+.mermaid-graphic-size-125 { width: 125%; }
+.mermaid-graphic-size-150 { width: 150%; }
+.mermaid-graphic-size-175 { width: 175%; }
+.mermaid-graphic-size-200 { width: 200%; }
+.mermaid-graphic img { display: block; width: 100%; max-width: none; height: auto; margin: auto; }
+
+.collection-name.collection-value { font-weight: 400; }
 .mermaid-diagram details { margin-top: 10px; }
 .mermaid-diagram summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .mermaid-diagram pre { max-height: 280px; overflow: auto; white-space: pre-wrap; }

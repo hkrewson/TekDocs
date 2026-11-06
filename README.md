@@ -30,6 +30,14 @@ limitations for v0.9.19 only, with review or remediation due before the next
 runtime candidate or November 12, 2026. No production deployment, live-data
 migration, or final 1.0 acceptance is included.
 
+Post-release development now contains phase 1 of the bounded [CSP and COEP
+hardening slice](planning/csp-coep-hardening.md): TekDocs-owned inline styling and
+raw diagram DOM injection are removed, sanitized Mermaid output renders as an image
+resource, and browser responses require explicit cross-origin embedding permission.
+The CSP allowance remains temporarily for identified Mermaid, Milkdown and Cytoscape
+runtime styling. Exact-source hosted evidence is required for COEP, and dependency
+isolation is required before the CSP finding can close.
+
 ## Cross-Workspace reuse migration development
 
 The [remaining-gap audit](planning/migrations/remaining-migration-audit.md) starts

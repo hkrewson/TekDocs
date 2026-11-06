@@ -4,6 +4,7 @@ import { Copy, KeyRound, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { translate } from '../i18n/localization'
 import type { ApiToken, ApiTokenCatalog, AuthClient, AuthenticatedContext, IssuedApiToken, TokenOrganization } from './api'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 
 function readable(value: string): string {
   return value.replaceAll('_', ' ').replaceAll('.', ' · ')
@@ -54,9 +55,7 @@ export function ApiTokenSettings({ client, context }: { client: AuthClient; cont
 
   useEffect(() => {
     if (!creating) return
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = overflow }
+    return lockBodyScroll()
   }, [creating])
 
   const load = useCallback(async () => {

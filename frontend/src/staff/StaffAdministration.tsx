@@ -11,6 +11,7 @@ import type { MembershipWorkspaceScope } from '../access-control/api'
 import type { StaffAdministrationClient, StaffInvitation } from './api'
 import { RecordSections } from '../records/RecordNavigation'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import '../administration.css'
 
 type PendingAction = { kind: 'resend' | 'revoke'; invitation: StaffInvitation }
@@ -62,9 +63,7 @@ export function StaffAdministration({ client }: { client: StaffAdministrationCli
   useUnsavedChanges(inviting && (Boolean(email.trim()) || workspaceScope !== 'tenant') && !closingAfterSave, working && !closingAfterSave, () => { setEmail(''); setWorkspaceScope('tenant') }, inviting && !closingAfterSave)
   useEffect(() => {
     if (!inviting) return
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = overflow }
+    return lockBodyScroll()
   }, [inviting])
 
   const reload = async (signal?: AbortSignal) => {

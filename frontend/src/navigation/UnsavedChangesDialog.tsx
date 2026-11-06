@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { translate } from '../i18n/localization'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import './unsavedChanges.css'
 
 export default function UnsavedChangesDialog({ dirty, busy, onKeep, onDiscard }: { dirty: boolean; busy: boolean; onKeep: () => void; onDiscard: () => void }) {
@@ -7,12 +8,11 @@ export default function UnsavedChangesDialog({ dirty, busy, onKeep, onDiscard }:
   useEffect(() => {
     const dialog = dialogRef.current!
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll()
     dialog.showModal()
     return () => {
       dialog.close()
-      document.body.style.overflow = overflow
+      releaseScroll()
       if (previous?.isConnected) previous.focus({ preventScroll: true })
     }
   }, [])

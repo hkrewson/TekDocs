@@ -7,6 +7,7 @@ import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserCustomFieldsClient } from './api'
 import type { CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldEntityType, CustomFieldType, CustomFieldsClient, MigrationImpact } from './api'
@@ -58,9 +59,7 @@ function DefinitionForm({ definition, organization, saving, closingAfterSave, on
   const dirty = JSON.stringify(input) !== JSON.stringify(initial) || choiceText !== initial.options.join('\n')
   const attempt = useUnsavedChanges(dirty && !closingAfterSave, saving && !closingAfterSave, undefined, !closingAfterSave)
   useEffect(() => {
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = overflow }
+    return lockBodyScroll()
   }, [])
   const submit = (event: FormEvent) => {
     event.preventDefault()

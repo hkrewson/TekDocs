@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import { translate } from '../i18n/localization'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 
 export function QuickDrawer({ title, children, onClose, returnFocusId, returnHref, returnLabel, initialFocusSelector }: { title: string; children: ReactNode; onClose: () => void; returnFocusId?: string; returnHref: string; returnLabel: string; initialFocusSelector?: string }) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -10,13 +11,12 @@ export function QuickDrawer({ title, children, onClose, returnFocusId, returnHre
   useEffect(() => {
     const dialog = ref.current!
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll()
     dialog.showModal()
     const initialFocus = initialFocusSelector ? dialog.querySelector<HTMLElement>(initialFocusSelector) : null
     ;(initialFocus ?? heading.current)?.focus({ preventScroll: true })
     return () => {
-      dialog.close(); document.body.style.overflow = overflow
+      dialog.close(); releaseScroll()
       window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
         if (document.querySelector('dialog.collection-drawer[open]')) return
         if (returnFocusId) document.getElementById(returnFocusId)?.focus({ preventScroll: true })

@@ -7,6 +7,7 @@ import { FilterMenu } from '../FilterMenu'
 import { translate } from '../i18n/localization'
 import type { MessageId } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import type { TaxonomiesClient, Taxonomy, TaxonomyBinding, TaxonomyInput, TaxonomyTerm } from './api'
 
 const bindingOptions: { value: TaxonomyBinding; labelKey: MessageId }[] = [
@@ -35,9 +36,7 @@ function TaxonomyEditor({ taxonomy, saving, closingAfterSave, error, onCancel, o
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial)
   const attempt = useUnsavedChanges(dirty && !closingAfterSave, saving && !closingAfterSave, undefined, !closingAfterSave)
   useEffect(() => {
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = overflow }
+    return lockBodyScroll()
   }, [])
   const updateTerm = (index: number, patch: Partial<TermDraft>) => setDraft((current) => ({ ...current, terms: current.terms.map((term, position) => position === index ? { ...term, ...patch } : term) }))
   const moveTerm = (index: number, offset: -1 | 1) => setDraft((current) => {

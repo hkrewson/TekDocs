@@ -90,6 +90,7 @@ import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
 import { WorkspaceSwitcher } from './workspaces/WorkspaceSwitcher'
 import { ShellOverlayProvider } from './shell/ShellOverlayProvider'
+import { lockBodyScroll } from './shell/bodyScrollLock'
 import { trapOverlayFocus } from './shell/focusTrap'
 import { useShellOverlay } from './shell/useShellOverlay'
 const Overview = lazy(() => import('./workspaces/Overview'))
@@ -301,15 +302,14 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
 
   useEffect(() => {
     if (!mobileOpen) return
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll()
     closeRef.current?.focus()
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onMobileDismiss()
     }
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      document.body.style.overflow = overflow
+      releaseScroll()
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [mobileOpen, onMobileDismiss])

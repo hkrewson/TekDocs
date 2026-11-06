@@ -77,6 +77,9 @@ class SecurityHeadersMiddleware:
             "img-src 'self' data:",
             "object-src 'none'",
             "script-src 'self'",
+            # Mermaid, Milkdown and Cytoscape still create runtime styles. First-party
+            # inline styling is forbidden by the frontend source gate; dependency
+            # isolation is tracked before this compatibility allowance is removed.
             "style-src 'self' 'unsafe-inline'",
         )
     )
@@ -87,6 +90,7 @@ class SecurityHeadersMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         response = self.get_response(request)
         response.setdefault("Content-Security-Policy", self.POLICY)
+        response.setdefault("Cross-Origin-Embedder-Policy", "require-corp")
         response.setdefault("Permissions-Policy", "camera=(), geolocation=(), microphone=()")
         return response
 

@@ -346,7 +346,20 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
 
 test('guided diagrams remain portable Markdown inside the document', async ({ page, baseURL }) => {
   const pageErrors: string[] = []
+  const securityConsoleErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /(content security policy|cross-origin-embedder-policy|blocked by response)/i.test(message.text())) {
+      securityConsoleErrors.push(message.text())
+    }
+  })
+  await page.addInitScript(() => {
+    const global = window as typeof window & { __tekdocsSecurityPolicyViolations?: string[] }
+    global.__tekdocsSecurityPolicyViolations = []
+    window.addEventListener('securitypolicyviolation', (event) => {
+      global.__tekdocsSecurityPolicyViolations?.push(`${event.effectiveDirective}:${event.blockedURI}`)
+    })
+  })
   await mockAuthenticated(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route(`**/api/v1/documents/${document.id}/placements/${documentPlacementId}/reuse`, async (route) => {
@@ -437,6 +450,8 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await expect(page.getByRole('group', { name: 'Diagram view controls' })).toBeHidden()
   await expect(page.getByRole('img', { name: 'Network diagram' })).toBeVisible()
   await page.emulateMedia({ media: 'screen', forcedColors: 'none' })
+  expect(await page.evaluate(() => (window as typeof window & { __tekdocsSecurityPolicyViolations?: string[] }).__tekdocsSecurityPolicyViolations)).toEqual([])
+  expect(securityConsoleErrors).toEqual([])
 })
 
 test('Mermaid math preview renders locally with an accessible description', async ({ page, baseURL }) => {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleHelp, ExternalLink, X } from 'lucide-react'
 import { translate } from '../i18n/localization'
+import { lockBodyScroll } from '../shell/bodyScrollLock'
 import { trapOverlayFocus } from '../shell/focusTrap'
 import { useShellOverlay } from '../shell/useShellOverlay'
 import { helpTopicForPath, helpTopicUrl, WIKI_PUBLISHED } from './topics'
@@ -16,8 +17,7 @@ export function ContextualHelp({ pathname }: { pathname: string }) {
 
   useEffect(() => {
     if (!open) return
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const releaseScroll = lockBodyScroll()
     headingRef.current?.focus()
     const closeOutside = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) {
@@ -36,7 +36,7 @@ export function ContextualHelp({ pathname }: { pathname: string }) {
     document.addEventListener('mousedown', closeOutside)
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      document.body.style.overflow = overflow
+      releaseScroll()
       document.removeEventListener('mousedown', closeOutside)
       document.removeEventListener('keydown', closeOnEscape)
     }

@@ -22,7 +22,7 @@ const zoneConfig: ChildCollectionConfig<Omit<DNSZone, 'description'>, DNSZone> =
 const recordConfig: ChildCollectionConfig<Omit<DNSRecord, 'description'>, DNSRecord> = {
   key: 'dns_record', childSelectionKeys: ['dns_record_view', 'dns_record_history_page'], feature: 'dns-records', parentField: 'zone_id', columns: ['name', 'record_type', 'value', 'ttl'], labels: { name: t('dnsOwner'), record_type: t('dnsType'), value: t('dnsValue'), ttl: t('dnsTTL') },
   title: t('dnsRecords'), back: t('dnsRecordsBack'), create: t('dnsRecordNew'), search: t('dnsRecordSearch'), order: t('dnsRecordOrder'), failed: t('dnsRecordFailed'), empty: t('dnsRecordEmpty'), count: count => t('dnsRecordCount', { count }), statuses: [], association: { label: t('dnsType'), choices: types.map(value => ({ value, label: value })) },
-  identity: row => row.owner_name, value: (row, column) => column === 'value' ? <span className="collection-name" style={{ fontWeight: 400 }}>{row.value}</span> : row[column as 'record_type' | 'ttl'],
+  identity: row => row.owner_name, value: (row, column) => column === 'value' ? <span className="collection-name collection-value">{row.value}</span> : row[column as 'record_type' | 'ttl'],
   load: (client, workspace, query, signal) => client.dnsRecordCollection(workspace, query, signal), read: (client, workspace, id, signal) => client.dnsRecordDetail(workspace, id, signal),
 }
 type Context = { workspace: WorkspaceContext; client: NetworksClient; parentId: string }

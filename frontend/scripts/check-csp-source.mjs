@@ -4,13 +4,23 @@ import { fileURLToPath } from 'node:url'
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url))
 const sourceRoot = join(frontendRoot, 'src')
+const domStyleAccess = /\.style\s*(?:\.|\[|=(?!=))/
 const forbidden = [
   ['React style prop', /\bstyle\s*=\s*\{\s*\{/],
-  ['DOM style access', /\.style\s*(?:\.|\[|=)/],
+  ['DOM style access', domStyleAccess],
   ['DOM style attribute', /\bsetAttribute\s*\(\s*['"]style['"]/],
   ['CSS text mutation', /\.cssText\b|\binsertRule\s*\(/],
   ['raw HTML injection', /\bdangerouslySetInnerHTML\b/],
 ]
+
+for (const [label, source, expected] of [
+  ['domain equality', "item.style === 'wireless'", false],
+  ['direct assignment', 'element.style = replacement', true],
+  ['property mutation', "element.style.width = '10px'", true],
+  ['indexed mutation', "element.style['width'] = '10px'", true],
+]) {
+  if (domStyleAccess.test(source) !== expected) throw new Error(`Invalid DOM style check: ${label}`)
+}
 
 async function sourceFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })

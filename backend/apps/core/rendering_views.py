@@ -75,7 +75,7 @@ class DiagramPreviewView(APIView):
                 {"code": error.code, "detail": str(error)},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE if unavailable else status.HTTP_400_BAD_REQUEST,
             )
-        if len(artifacts) != 1 or artifacts[0].svg is None:
+        if len(artifacts) != 1:
             return Response(
                 {
                     "code": "diagram.renderer.invalid_response",
@@ -84,6 +84,14 @@ class DiagramPreviewView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         artifact = artifacts[0]
+        if artifact.svg is None:
+            return Response(
+                {
+                    "code": "diagram.renderer.invalid_response",
+                    "detail": "The isolated diagram renderer returned an invalid preview.",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         response = DiagramPreviewResponseSerializer(
             {
                 "svg": artifact.svg.decode("utf-8"),

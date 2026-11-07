@@ -60,6 +60,7 @@ AUTHENTICATED_ROUTE_PERMISSIONS = (
     route("api-token-rotate", ("POST",)),
     route("api-token-revoke", ("DELETE",)),
     route("markdown-render", ("POST",), PermissionKey.DOCUMENTS_VIEW),
+    route("diagram-preview", ("POST",)),
     route("document-topic-schemas", ("GET",)),
     route(
         "msp-taxonomy-list-create",

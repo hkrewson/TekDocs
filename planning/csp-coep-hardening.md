@@ -86,6 +86,12 @@ copies of the same inline-style assertion across six viewport widths. The follow
 uses the lock class plus computed overflow everywhere; exact-source hosted browser
 evidence remains pending.
 
+Build 42377423789 then cleared the Chromium regression and reached the production
+image gate. Its Mailpit scan discovered unsuppressed HIGH CVE-2026-78661 in
+`golang.org/x/net` v0.61.0, fixed in v0.62.0. The bounded follow-up retains the
+pinned Mailpit source, overlays only that fixed module version, and asserts the
+compiled dependency identity before hosted scanning.
+
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That
 sandbox is not available in this development checkout, and the repository rules

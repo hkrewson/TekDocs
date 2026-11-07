@@ -4,15 +4,19 @@ TekDocs 0.9.11 rebuilds unmodified Mailpit v1.31.6 source (commit
 `a028b01f4a24b4b36bdad95b8e09e070ebf2bad4`) with Go 1.27.3. The source archive
 is checksum-verified; Node, Go and Alpine build/runtime bases are digest-pinned.
 `GOTOOLCHAIN=local` prevents an implicit toolchain download. Upstream lockfiles,
-Go module checksums and embedded third-party license generation are retained.
-No forked Mailpit application behavior is introduced.
+Go module checksums and embedded third-party license generation are retained. The
+build applies one explicit module-manifest security overlay: `golang.org/x/net`
+v0.62.0. A build assertion verifies that exact version in the compiled binary. No
+forked Mailpit application behavior is introduced.
 
 ## Why this exists
 
 On October 21, 2026 both upstream v1.31.6 and edge images used Go 1.27.2 and
 failed the HIGH/CRITICAL scan for CVE-2026-111943. The rebuilt binary uses Go
-1.27.3 and x/net v0.61.0; neither the previous x/net exception nor a new Go
-exception is needed. The final image starts from Alpine without the old binary.
+1.27.3. On November 7, the scanner identified CVE-2026-78661 in the pinned
+x/net v0.61.0 dependency; the build now overlays the fixed v0.62.0 release.
+Neither finding is suppressed. The final image starts from Alpine without the old
+binary.
 
 Mailpit captures mail locally. It does **not** deliver to recipients' external
 mailboxes. It remains the existing default until the operator configures real

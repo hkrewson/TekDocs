@@ -9,11 +9,15 @@ FROM golang:1.27.3-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f
 ENV GOTOOLCHAIN=local CGO_ENABLED=0
 WORKDIR /src
 COPY --from=assets /src/ ./
-RUN go mod download && go mod verify \
+RUN go mod edit -require=golang.org/x/net@v0.62.0 \
+    && go mod download golang.org/x/net@v0.62.0 \
+    && go mod download && go mod verify \
     && go install github.com/google/go-licenses/v2@v2.0.1 \
     && go-licenses report ./... --template .github/third-party-licenses.tpl --ignore github.com/axllent/mailpit > internal/licenses/third-party.txt \
-    && go build -trimpath -ldflags "-s -w -X github.com/axllent/mailpit/config.Version=v1.31.6-tekdocs-go1.27.3" -o /mailpit . \
-    && go version -m /mailpit
+    && go build -trimpath -ldflags "-s -w -X github.com/axllent/mailpit/config.Version=v1.31.6-tekdocs-go1.27.3-xnet0.62.0" -o /mailpit . \
+    && go version -m /mailpit > /mailpit-build-info \
+    && grep -Eq '^[[:space:]]*dep[[:space:]]+golang.org/x/net[[:space:]]+v0\.62\.0([[:space:]]|$)' /mailpit-build-info \
+    && cat /mailpit-build-info
 
 # Match upstream runtime layout without carrying its vulnerable executable layer.
 FROM alpine:3.24.2@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6

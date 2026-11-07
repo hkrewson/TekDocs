@@ -35,12 +35,16 @@ indentation use bounded CSS classes. Mermaid renderer output is sanitized as bef
 and then encoded as an image resource instead of being injected into the application
 DOM.
 
-Static dependency review showed that Mermaid creates temporary style elements and
-attributes while producing SVG, Milkdown reads/writes editor presentation, and
-Cytoscape creates and sizes canvas layers with DOM styles. Enforcing
-`style-src 'self'` before those paths are isolated would break supported diagrams,
-editing, and relationship graphs. The compatibility allowance therefore remains in
-phase 1; this is a documented blocker, not closure of `TD-DAST-INLINE-STYLE`.
+An enforced browser reproduction refined the earlier static dependency inventory.
+The exercised Milkdown authoring path produced no strict-policy violation. Cytoscape
+produced one `style-src-elem` violation solely to add its private container
+`position: relative` rule; TekDocs now supplies that rule in external CSS and a
+checked document sentinel prevents the dependency injection. Mermaid remains the
+verified blocker: a real preview request creates temporary style elements and many
+style attributes while producing the SVG, even though only the sanitized result is
+later displayed as a `data:` image. Enforcing `style-src 'self'` before Mermaid is
+isolated would break supported diagrams. The compatibility allowance therefore
+remains; this is a documented blocker, not closure of `TD-DAST-INLINE-STYLE`.
 
 COEP uses `require-corp`. All application subresources inventoried in this slice
 are same-origin or `data:` resources; the latter are limited to diagram images and
@@ -91,6 +95,19 @@ image gate. Its Mailpit scan discovered unsuppressed HIGH CVE-2026-78661 in
 `golang.org/x/net` v0.61.0, fixed in v0.62.0. The bounded follow-up retains the
 pinned Mailpit source, overlays only that fixed module version, and asserts the
 compiled dependency identity before hosted scanning.
+
+Build 42382239045 passed the exact Mailpit follow-up, including Chromium,
+production images, the unsuppressed vulnerability scan and final validation.
+On November 7, a local enforced `style-src 'self'` reproduction then exercised
+actual Milkdown authoring, Mermaid preview and a two-node Cytoscape graph against
+the production-shaped frontend. Milkdown emitted no violation. Cytoscape emitted
+one inline style-element violation, traced to its fixed private container rule;
+the external-rule/sentinel correction removes that injection and its source gate
+fails closed if the dependency contract changes. A real Mermaid preview emitted
+both style-element and style-attribute violations. The production compatibility
+header was retained after reproduction. The next bounded implementation moves
+Mermaid preview rendering behind the existing isolated renderer boundary before
+the header can remove `unsafe-inline`.
 
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That

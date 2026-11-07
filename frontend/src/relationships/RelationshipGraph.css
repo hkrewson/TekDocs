@@ -1,4 +1,7 @@
 .relationship-graph { display: grid; gap: 14px; }
+/* Keep in external CSS. The index sentinel with the matching Cytoscape ID
+   prevents the dependency from injecting this rule as an inline style. */
+.__________cytoscape_container { position: relative; }
 .relationship-graph-heading { align-items: end; }
 .relationship-graph-controls { display: flex; align-items: end; gap: 8px; }
 .relationship-graph-controls label { display: grid; gap: 4px; color: var(--muted); font-size: .82rem; font-weight: 650; }

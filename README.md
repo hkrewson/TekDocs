@@ -34,9 +34,11 @@ Post-release development now contains phase 1 of the bounded [CSP and COEP
 hardening slice](planning/csp-coep-hardening.md): TekDocs-owned inline styling and
 raw diagram DOM injection are removed, sanitized Mermaid output renders as an image
 resource, and browser responses require explicit cross-origin embedding permission.
-The CSP allowance remains temporarily for identified Mermaid, Milkdown and Cytoscape
-runtime styling. Exact-source hosted evidence is required for COEP, and dependency
-isolation is required before the CSP finding can close.
+The CSP allowance remains temporarily for Mermaid's verified preview-time styling.
+Cytoscape's one injected container rule now has an external checked equivalent,
+while the exercised Milkdown path did not violate the strict candidate policy.
+Exact-source hosted evidence is required for COEP, and Mermaid isolation is required
+before the CSP finding can close.
 
 ## Cross-Workspace reuse migration development
 

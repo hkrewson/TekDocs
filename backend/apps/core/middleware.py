@@ -79,9 +79,9 @@ class SecurityHeadersMiddleware:
             "img-src 'self' data:",
             "object-src 'none'",
             "script-src 'self'",
-            # Mermaid, Milkdown and Cytoscape still create runtime styles. First-party
-            # inline styling is forbidden by the frontend source gate; dependency
-            # isolation is tracked before this compatibility allowance is removed.
+            # Mermaid still creates temporary runtime styles while producing its
+            # sanitized image output. The compatibility allowance remains until
+            # that dependency is isolated from the application document.
             "style-src 'self' 'unsafe-inline'",
         )
     )

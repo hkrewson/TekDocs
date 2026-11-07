@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const frontendRoot = fileURLToPath(new URL('..', import.meta.url))
 const sourceRoot = join(frontendRoot, 'src')
+const cytoscapeRenderer = join(frontendRoot, 'node_modules', 'cytoscape', 'src', 'extensions', 'renderer', 'base', 'index.mjs')
 const domStyleAccess = /\.style\s*(?:\.|\[|=(?!=))/
 const forbidden = [
   ['React style prop', /\bstyle\s*=\s*\{\s*\{/],
@@ -39,6 +40,20 @@ for (const path of await sourceFiles(sourceRoot)) {
   for (const [label, pattern] of forbidden) {
     if (pattern.test(source)) violations.push(`${relative(frontendRoot, path)}: ${label}`)
   }
+}
+
+const cytoscapeSource = await readFile(cytoscapeRenderer, 'utf8')
+const indexSource = await readFile(join(frontendRoot, 'index.html'), 'utf8')
+const relationshipStyles = await readFile(join(sourceRoot, 'relationships', 'RelationshipGraph.css'), 'utf8')
+if (!cytoscapeSource.includes("var stylesheetId = '__________cytoscape_stylesheet'")
+  || !cytoscapeSource.includes("'.'+className+' { position: relative; }'")) {
+  violations.push('cytoscape: inline-style compatibility contract changed')
+}
+if (!indexSource.includes('id="__________cytoscape_stylesheet"')) {
+  violations.push('index.html: Cytoscape inline-style sentinel missing')
+}
+if (!relationshipStyles.includes('.__________cytoscape_container { position: relative; }')) {
+  violations.push('src/relationships/RelationshipGraph.css: Cytoscape external compatibility rule missing')
 }
 
 if (violations.length > 0) {

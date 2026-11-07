@@ -78,6 +78,14 @@ Needs validation on the exact source commit:
   suppressed. Phase 1 is expected to retire 90004-2 only; 10055-6 remains open until
   the dependency isolation criterion is complete.
 
+Hosted Build 42326080728 reproduced 54 stale browser assertions that still inspected
+the removed inline scroll style and one Mermaid `font-src:data` violation. Build
+42342001747 confirmed those corrections: the font violation and the original 54
+failures were gone, 394 Chromium cases passed, and 18 cases exposed three remaining
+copies of the same inline-style assertion across six viewport widths. The follow-up
+uses the lock class plus computed overflow everywhere; exact-source hosted browser
+evidence remains pending.
+
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That
 sandbox is not available in this development checkout, and the repository rules

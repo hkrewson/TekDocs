@@ -39,7 +39,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
       return bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight
         && element.scrollWidth <= element.clientWidth
     })).toBe(true)
-    expect(await page.locator('body').evaluate((element) => element.style.overflow)).toBe('hidden')
+    await expect(page.locator('body')).toHaveClass(/\btekdocs-scroll-locked\b/)
+    expect(await page.locator('body').evaluate((element) => getComputedStyle(element).overflow)).toBe('hidden')
     expect((await new AxeBuilder({ page }).include('.unsaved-changes-dialog').analyze()).violations).toEqual([])
     await page.keyboard.press('Escape')
     await expect(dialog).toHaveCount(0)

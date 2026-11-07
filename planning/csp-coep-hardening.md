@@ -59,6 +59,8 @@ Verified statically:
   attributable to known dependency runtime behavior rather than first-party source.
 - application TypeScript/TSX contains no inline style property, DOM style mutation,
   or `dangerouslySetInnerHTML` use;
+- the first-party CSS needed to replace those runtime styles remains within a
+  narrowly rebased 25 KiB compressed shell budget;
 - PDF worker, fonts, API calls, downloads, and application bundles resolve from the
   application origin; and
 - the existing standalone export CSP remains unchanged.

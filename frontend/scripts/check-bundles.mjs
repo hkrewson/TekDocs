@@ -14,7 +14,11 @@ const lazyDependencyBudget = 176 * 1024
 const editorBudget = 400 * 1024
 const pdfViewerBudget = 144 * 1024
 const mermaidBudget = 36 * 1024
-const shellStyleBudget = 24 * 1024
+// CSP phase 1 moved bounded hierarchy, overlay and diagram presentation out of
+// runtime style attributes and into the application stylesheet. Rebase the shell
+// ceiling by 1 KiB for that reviewed security tradeoff while retaining a tight
+// compressed-payload guard for later changes.
+const shellStyleBudget = 25 * 1024
 const editorStyleBudget = 20 * 1024
 const assets = await readdir(assetDirectory)
 const measure = async (name) => {

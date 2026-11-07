@@ -110,7 +110,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Notifications' }).click()
     await expect(page.getByRole('dialog', { name: 'Notifications' })).toBeVisible()
     await expect(page.getByText('A deliberately long notification message remains readable without creating a second horizontal scrolling surface.')).toBeVisible()
-    await expect(page.evaluate(() => document.body.style.overflow)).resolves.toBe('hidden')
+    await expect(page.locator('body')).toHaveClass(/\btekdocs-scroll-locked\b/)
+    await expect(page.evaluate(() => getComputedStyle(document.body).overflow)).resolves.toBe('hidden')
     if (width < 768) {
       const bounds = await page.getByRole('dialog', { name: 'Notifications' }).boundingBox()
       expect(bounds?.x).toBe(0)

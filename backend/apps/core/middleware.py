@@ -71,7 +71,9 @@ class SecurityHeadersMiddleware:
             "default-src 'self'",
             "base-uri 'self'",
             "connect-src 'self'",
-            "font-src 'self'",
+            # Mermaid's isolated SVG image rendering requests its bundled font as
+            # a data resource. This does not permit data scripts, styles or frames.
+            "font-src 'self' data:",
             "form-action 'self'",
             "frame-ancestors 'none'",
             "img-src 'self' data:",

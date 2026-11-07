@@ -52,7 +52,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(guide).toBeVisible()
     await expect(guide).toHaveAttribute('href', 'https://github.com/hkrewson/TekDocs/wiki/Diagrams-in-documents')
     await expect(help.getByRole('heading', { name: 'System status', exact: true })).toBeFocused()
-    await expect(page.evaluate(() => document.body.style.overflow)).resolves.toBe('hidden')
+    await expect(page.locator('body')).toHaveClass(/\btekdocs-scroll-locked\b/)
+    await expect(page.evaluate(() => getComputedStyle(document.body).overflow)).resolves.toBe('hidden')
     if (width < 768) {
       const bounds = await help.boundingBox()
       expect(bounds?.x).toBe(0)

@@ -73,7 +73,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'New token' }).click()
     const tokenEditor = page.getByRole('dialog', { name: 'New token' })
     await expect(tokenEditor).toBeVisible()
-    await expect(page.evaluate(() => document.body.style.overflow)).resolves.toBe('hidden')
+    await expect(page.locator('body')).toHaveClass(/\btekdocs-scroll-locked\b/)
+    await expect(page.evaluate(() => getComputedStyle(document.body).overflow)).resolves.toBe('hidden')
     await tokenEditor.getByRole('button', { name: 'Cancel' }).click()
     await expect(tokenEditor).toHaveCount(0)
 
@@ -87,7 +88,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Invite staff' }).click()
     const inviteEditor = page.getByRole('dialog', { name: 'Invite staff' })
     await expect(inviteEditor).toBeVisible()
-    await expect(page.evaluate(() => document.body.style.overflow)).resolves.toBe('hidden')
+    await expect(page.locator('body')).toHaveClass(/\btekdocs-scroll-locked\b/)
+    await expect(page.evaluate(() => getComputedStyle(document.body).overflow)).resolves.toBe('hidden')
     await inviteEditor.getByRole('button', { name: 'Cancel' }).click()
     await expectContained(page)
 

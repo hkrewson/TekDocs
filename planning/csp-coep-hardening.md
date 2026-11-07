@@ -43,8 +43,9 @@ editing, and relationship graphs. The compatibility allowance therefore remains 
 phase 1; this is a documented blocker, not closure of `TD-DAST-INLINE-STYLE`.
 
 COEP uses `require-corp`. All application subresources inventoried in this slice
-are same-origin or `data:` resources; external documentation and integration links
-are top-level navigations rather than embedded resources. This slice does not add
+are same-origin or `data:` resources; the latter are limited to diagram images and
+their bundled font data. External documentation and integration links are top-level
+navigations rather than embedded resources. This slice does not add
 COOP and does not claim `crossOriginIsolated`; that would be a separate auth and
 window-lifecycle decision.
 

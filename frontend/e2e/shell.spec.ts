@@ -98,6 +98,23 @@ async function openPrimaryBlockEditor(page: Page) {
   if (await blockButton.isVisible()) await blockButton.click()
 }
 
+async function mockDiagramPreview(page: Page) {
+  await page.route('**/api/v1/diagrams/preview', async (route) => {
+    const body = await route.request().postDataJSON() as { source?: unknown }
+    const source = typeof body.source === 'string' ? body.source : ''
+    if (!source || source.startsWith('not-a-diagram')) {
+      await route.fulfill({ status: 400, json: { code: 'diagram.source.invalid', detail: 'The diagram source is invalid.' } })
+      return
+    }
+    await route.fulfill({ json: {
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40"><text x="8" y="24">Rendered diagram</text></svg>',
+      title: 'Technical diagram',
+      description: '',
+      renderer_version: '@mermaid-js/mermaid-cli@11.16.0',
+    } })
+  })
+}
+
 test('authenticated application shell exposes primary navigation and backend health', async ({ page, request }, testInfo) => {
   const health = await request.get('/api/v1/health/ready')
   expect(health.ok()).toBeTruthy()
@@ -361,6 +378,7 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
     })
   })
   await mockAuthenticated(page)
+  await mockDiagramPreview(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route(`**/api/v1/documents/${document.id}/placements/${documentPlacementId}/reuse`, async (route) => {
     if (route.request().method() === 'GET') {
@@ -456,6 +474,7 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
 
 test('Mermaid math preview renders locally with an accessible description', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
+  await mockDiagramPreview(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
     json: {
@@ -477,6 +496,7 @@ test('Mermaid math preview renders locally with an accessible description', asyn
 
 test('a failed Mermaid preview keeps source available without exposing it before failure', async ({ page, baseURL }) => {
   await mockAuthenticated(page)
+  await mockDiagramPreview(page)
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
   await page.route('**/api/v1/markdown/render', (route) => route.fulfill({
     json: {

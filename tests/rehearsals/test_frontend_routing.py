@@ -48,7 +48,7 @@ class FrontendRoutingTests(unittest.TestCase):
     EXPECTED_CSP = (
         "default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self' data:; "
         "form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; "
-        "object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+        "object-src 'none'; script-src 'self'; style-src 'self'"
     )
 
     def assert_security_headers(self, headers):

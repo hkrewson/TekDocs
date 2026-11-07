@@ -2,14 +2,16 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 
-const { initialize, renderDiagram } = vi.hoisted(() => ({
-  initialize: vi.fn(),
+const { renderDiagram } = vi.hoisted(() => ({
   renderDiagram: vi.fn().mockResolvedValue({
     svg: '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script><foreignObject>unsafe</foreignObject><text>Safe diagram</text></svg>',
+    title: 'Technical diagram',
+    description: '',
+    rendererVersion: '@mermaid-js/mermaid-cli@11.16.0',
   }),
 }))
 
-vi.mock('mermaid', () => ({ default: { initialize, render: renderDiagram } }))
+vi.mock('./api', () => ({ renderDiagramPreview: renderDiagram }))
 
 import { MermaidDiagram } from './MermaidDiagram'
 
@@ -19,7 +21,7 @@ function renderedSvg(graphic: HTMLElement) {
   return decodeURIComponent(source!.slice(source!.indexOf(',') + 1))
 }
 
-it('uses strict deterministic rendering and retains an accessible source fallback', async () => {
+it('uses isolated rendering and retains an accessible source fallback', async () => {
   const source = 'flowchart LR\naccTitle: Client data flow\naccDescr: Firewall traffic path\nA-->B'
   render(<MermaidDiagram source={source} index={0} showSource />)
 
@@ -30,18 +32,13 @@ it('uses strict deterministic rendering and retains an accessible source fallbac
   const svg = renderedSvg(screen.getByRole('img', { name: 'Client data flow' }))
   expect(svg).not.toContain('<script')
   expect(svg).not.toContain('<foreignObject')
-  expect(initialize).toHaveBeenCalledWith(expect.objectContaining({
-    securityLevel: 'strict',
-    htmlLabels: false,
-    deterministicIds: true,
-    maxTextSize: 50_000,
-  }))
-  expect(renderDiagram).toHaveBeenCalledWith(expect.stringMatching(/^tekdocs-mermaid-/), source)
+  expect(renderDiagram).toHaveBeenCalledWith(source)
 })
 
 it('refuses obfuscated external CSS references in renderer output', async () => {
   renderDiagram.mockResolvedValueOnce({
     svg: '<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:u\\72l(\\68ttps\\3a//example.invalid/x)"/></svg>',
+    title: 'Technical diagram', description: '', rendererVersion: '@mermaid-js/mermaid-cli@11.16.0',
   })
 
   render(<MermaidDiagram source="flowchart LR\nA-->B" index={1} showSource />)
@@ -66,6 +63,7 @@ it.each([
 ])('refuses non-fragment SVG references: %s', async (reference) => {
   renderDiagram.mockResolvedValueOnce({
     svg: `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${reference}</svg>`,
+    title: 'Technical diagram', description: '', rendererVersion: '@mermaid-js/mermaid-cli@11.16.0',
   })
   render(<MermaidDiagram source="flowchart LR\nA-->B" index={4} showSource />)
 
@@ -77,6 +75,7 @@ it.each([
 it('retains local fragment links and paint references', async () => {
   renderDiagram.mockResolvedValueOnce({
     svg: '<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="ink"/></defs><rect fill="url(#ink)"/><a href="#label"><text id="label">Local reference</text></a></svg>',
+    title: 'Technical diagram', description: '', rendererVersion: '@mermaid-js/mermaid-cli@11.16.0',
   })
   render(<MermaidDiagram source="flowchart LR\nA-->B" index={5} />)
 

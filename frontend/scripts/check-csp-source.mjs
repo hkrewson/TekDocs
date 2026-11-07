@@ -12,6 +12,7 @@ const forbidden = [
   ['DOM style attribute', /\bsetAttribute\s*\(\s*['"]style['"]/],
   ['CSS text mutation', /\.cssText\b|\binsertRule\s*\(/],
   ['raw HTML injection', /\bdangerouslySetInnerHTML\b/],
+  ['in-page Mermaid renderer', /\b(?:from\s+['"]mermaid['"]|import\s*\(\s*['"]mermaid['"]\s*\))/],
 ]
 
 for (const [label, source, expected] of [
@@ -60,5 +61,5 @@ if (violations.length > 0) {
   process.stderr.write(`CSP source check failed:\n${violations.map((item) => `- ${item}`).join('\n')}\n`)
   process.exitCode = 1
 } else {
-  process.stdout.write('CSP source check passed: no application inline-style or raw-HTML sinks.\n')
+  process.stdout.write('CSP source check passed: no application inline-style, raw-HTML, or in-page Mermaid sinks.\n')
 }

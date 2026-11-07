@@ -226,6 +226,7 @@ REST_FRAMEWORK = {
         "staff_invitations": "30/h",
         "inbound_webhook_sources": "600/m",
         "inbound_webhooks": "120/m",
+        "diagram_previews": "60/m",
     },
 }
 

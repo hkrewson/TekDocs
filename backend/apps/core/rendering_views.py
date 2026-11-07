@@ -1,11 +1,13 @@
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.policy import PermissionKey, require_installation_member, require_permission
 
+from .diagram_exports import DiagramRenderError, render_diagram_exports
 from .document_attachments import resolve_rendered_attachments
 from .document_key_freeze import expand_rendered_content_keys
 from .document_key_resolution import resolve_rendered_keys
@@ -23,6 +25,74 @@ class MarkdownRenderRequestSerializer(serializers.Serializer):
 
 class MarkdownRenderResponseSerializer(serializers.Serializer):
     html = serializers.CharField(allow_blank=True)
+
+
+class DiagramPreviewThrottle(UserRateThrottle):
+    scope = "diagram_previews"
+
+
+class DiagramPreviewRequestSerializer(serializers.Serializer):
+    source = serializers.CharField(allow_blank=False, max_length=50_000, trim_whitespace=False)
+
+
+class DiagramPreviewResponseSerializer(serializers.Serializer):
+    svg = serializers.CharField()
+    title = serializers.CharField()
+    description = serializers.CharField(allow_blank=True)
+    renderer_version = serializers.CharField()
+
+
+class DiagramPreviewView(APIView):
+    throttle_classes = [DiagramPreviewThrottle]
+
+    @extend_schema(
+        request=DiagramPreviewRequestSerializer,
+        responses={
+            200: DiagramPreviewResponseSerializer,
+            400: OpenApiResponse(description="Invalid or oversized Mermaid source"),
+            403: OpenApiResponse(description="Installation membership required"),
+            429: OpenApiResponse(description="Diagram preview rate exceeded"),
+            503: OpenApiResponse(description="Isolated diagram renderer unavailable"),
+        },
+    )
+    def post(self, request):  # type: ignore[no-untyped-def]
+        require_installation_member(request.user)
+        serializer = DiagramPreviewRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        source = serializer.validated_data["source"]
+        if "```" in source:
+            raise serializers.ValidationError({"source": ["Diagram source contains an invalid fence."]})
+        try:
+            artifacts = render_diagram_exports(f"```mermaid\n{source}\n```\n", required=True)
+        except DiagramRenderError as error:
+            unavailable = error.code in {
+                "diagram.renderer.busy",
+                "diagram.renderer.timeout",
+                "diagram.renderer.unavailable",
+                "diagram.renderer.invalid_response",
+            }
+            return Response(
+                {"code": error.code, "detail": str(error)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE if unavailable else status.HTTP_400_BAD_REQUEST,
+            )
+        if len(artifacts) != 1 or artifacts[0].svg is None:
+            return Response(
+                {
+                    "code": "diagram.renderer.invalid_response",
+                    "detail": "The isolated diagram renderer returned an invalid preview.",
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        artifact = artifacts[0]
+        response = DiagramPreviewResponseSerializer(
+            {
+                "svg": artifact.svg.decode("utf-8"),
+                "title": artifact.source.title,
+                "description": artifact.source.description,
+                "renderer_version": artifact.renderer_version,
+            }
+        )
+        return Response(response.data)
 
 
 class MarkdownRenderView(APIView):

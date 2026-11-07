@@ -469,6 +469,22 @@ export interface paths {
         readonly patch: operations["custom_fields_msp_version"];
         readonly trace?: never;
     };
+    readonly "/api/v1/diagrams/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly get?: never;
+        readonly put?: never;
+        readonly post: operations["diagrams_preview_create"];
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/documents": {
         readonly parameters: {
             readonly query?: never;
@@ -11141,6 +11157,15 @@ export interface components {
             readonly code: string;
             readonly occurred_at: number;
         };
+        readonly DiagramPreviewRequest: {
+            readonly source: string;
+        };
+        readonly DiagramPreviewResponse: {
+            readonly svg: string;
+            readonly title: string;
+            readonly description: string;
+            readonly renderer_version: string;
+        };
         readonly DiagramQueue: {
             readonly waiting: number;
             readonly processing: number;
@@ -19021,6 +19046,77 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["CustomFieldDefinitionVersionResult"];
+                };
+            };
+        };
+    };
+    readonly diagrams_preview_create: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        readonly requestBody: {
+            readonly content: {
+                readonly "application/json": components["schemas"]["DiagramPreviewRequest"];
+                readonly "application/x-www-form-urlencoded": components["schemas"]["DiagramPreviewRequest"];
+                readonly "multipart/form-data": components["schemas"]["DiagramPreviewRequest"];
+            };
+        };
+        readonly responses: {
+            readonly 200: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["DiagramPreviewResponse"];
+                };
+            };
+            /** @description Invalid or oversized Mermaid source */
+            readonly 400: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Installation membership required */
+            readonly 403: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Diagram preview rate exceeded */
+            readonly 429: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Isolated diagram renderer unavailable */
+            readonly 503: {
+                headers: {
+                    /** @description Server-generated request correlation UUID. */
+                    readonly "X-Request-ID"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
         };

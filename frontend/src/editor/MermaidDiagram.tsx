@@ -1,41 +1,16 @@
 import DOMPurify from 'dompurify'
 import { Download, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
-import mermaid from 'mermaid'
 import { useEffect, useId, useMemo, useState } from 'react'
 
 import { translate } from '../i18n/localization'
+import { renderDiagramPreview } from './api'
 
 type DiagramState =
   | { phase: 'loading' }
   | { phase: 'ready'; svg: string }
   | { phase: 'error' }
 
-let initialized = false
 let renderQueue = Promise.resolve()
-
-function initializeMermaid() {
-  if (initialized) return
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    htmlLabels: false,
-    deterministicIds: true,
-    deterministicIDSeed: 'tekdocs',
-    maxTextSize: 50_000,
-    suppressErrorRendering: true,
-    theme: 'neutral',
-  })
-  initialized = true
-}
-
-function stableId(source: string, index: number) {
-  let hash = 2166136261
-  for (let cursor = 0; cursor < source.length; cursor += 1) {
-    hash ^= source.charCodeAt(cursor)
-    hash = Math.imul(hash, 16777619)
-  }
-  return `tekdocs-mermaid-${(hash >>> 0).toString(16)}-${index}`
-}
 
 function accessibleText(source: string) {
   let title = ''
@@ -113,10 +88,9 @@ export function MermaidDiagram({
 
   useEffect(() => {
     let active = true
-    initializeMermaid()
     const render = async () => {
       try {
-        const result = await mermaid.render(stableId(source, index), source)
+        const result = await renderDiagramPreview(source)
         if (active) {
           setState({ phase: 'ready', svg: sanitizeSvg(result.svg) })
           setZoom(1)

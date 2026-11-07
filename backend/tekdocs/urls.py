@@ -461,7 +461,7 @@ from apps.core.reminder_views import (
     OrganizationReminderCalendarView,
     OrganizationReminderListCreateView,
 )
-from apps.core.rendering_views import MarkdownRenderView
+from apps.core.rendering_views import DiagramPreviewView, MarkdownRenderView
 from apps.core.repository_key_views import MSPRepositoryKeysView, OrganizationRepositoryKeysView
 from apps.core.repository_portal_views import (
     ClientPortalRepositoryPublicationAttachmentView,
@@ -1037,6 +1037,7 @@ urlpatterns = [
         name="client-invitation-list-create",
     ),
     path("api/v1/markdown/render", MarkdownRenderView.as_view(), name="markdown-render"),
+    path("api/v1/diagrams/preview", DiagramPreviewView.as_view(), name="diagram-preview"),
     path("api/v1/organizations", OrganizationListCreateView.as_view(), name="organization-list-create"),
     path("api/v1/organizations/<uuid:entity_id>", OrganizationDetailView.as_view(), name="organization-detail"),
     path("api/v1/documents", MSPDocumentListCreateView.as_view(), name="msp-document-list-create"),

@@ -1561,6 +1561,87 @@ paths:
               schema:
                 type: string
                 format: uuid
+  /api/v1/diagrams/preview:
+    post:
+      operationId: diagrams_preview_create
+      tags:
+      - diagrams
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiagramPreviewRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DiagramPreviewRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DiagramPreviewRequest'
+        required: true
+      security:
+      - TekDocsBearerToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagramPreviewResponse'
+          description: ''
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+        '400':
+          description: Invalid or oversized Mermaid source
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '403':
+          description: Installation membership required
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '429':
+          description: Diagram preview rate exceeded
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
+        '503':
+          description: Isolated diagram renderer unavailable
+          headers:
+            X-Request-ID:
+              description: Server-generated request correlation UUID.
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiErrorEnvelope'
   /api/v1/documents:
     get:
       operationId: documents_msp_list
@@ -40587,6 +40668,30 @@ components:
       required:
       - code
       - occurred_at
+    DiagramPreviewRequest:
+      type: object
+      properties:
+        source:
+          type: string
+          maxLength: 50000
+      required:
+      - source
+    DiagramPreviewResponse:
+      type: object
+      properties:
+        svg:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        renderer_version:
+          type: string
+      required:
+      - description
+      - renderer_version
+      - svg
+      - title
     DiagramQueue:
       type: object
       properties:

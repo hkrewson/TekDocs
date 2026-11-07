@@ -82,7 +82,7 @@ class SecurityHeadersMiddleware:
             # Mermaid still creates temporary runtime styles while producing its
             # sanitized image output. The compatibility allowance remains until
             # that dependency is isolated from the application document.
-            "style-src 'self' 'unsafe-inline'",
+            "style-src 'self'",
         )
     )
 

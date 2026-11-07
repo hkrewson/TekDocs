@@ -6,6 +6,7 @@ import pytest
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.core.diagram_exports import DiagramExportArtifact, DiagramRenderError, DiagramSource
 from apps.core.models import InstallationState
 from apps.core.rendering import render_markdown, render_pdf, split_markdown_sections
 from apps.core.repository_publication_render import render_repository_evidence_html
@@ -334,3 +335,73 @@ def test_markdown_preview_rejects_anonymous_and_oversized_requests(client) -> No
         content_type="application/json",
     )
     assert response.status_code == 400
+
+
+@pytest.mark.django_db(transaction=True)
+def test_diagram_preview_uses_isolated_sanitized_renderer(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Diagram Preview MSP",
+        owner_email="diagram-preview-owner@example.invalid",
+        owner_display_name="Diagram Preview Owner",
+        password="Preview-password-42!",
+    )
+    source = "flowchart LR\naccTitle: Network path\naccDescr: Trusted route\nA-->B"
+    diagram_source = DiagramSource(
+        index=1,
+        source=source,
+        source_checksum="a" * 64,
+        title="Network path",
+        description="Trusted route",
+        family="flowchart",
+    )
+    artifact = DiagramExportArtifact(
+        source=diagram_source,
+        state="rendered",
+        renderer_version="@mermaid-js/mermaid-cli@11.16.0",
+        svg=b'<svg xmlns="http://www.w3.org/2000/svg"><text>Safe</text></svg>',
+        png=b"png",
+    )
+    monkeypatch.setattr(
+        "apps.core.rendering_views.render_diagram_exports",
+        lambda markdown, *, required: (artifact,),
+    )
+    client.force_login(installation.owner)
+
+    response = client.post(reverse("diagram-preview"), {"source": source}, content_type="application/json")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "svg": '<svg xmlns="http://www.w3.org/2000/svg"><text>Safe</text></svg>',
+        "title": "Network path",
+        "description": "Trusted route",
+        "renderer_version": "@mermaid-js/mermaid-cli@11.16.0",
+    }
+
+
+@pytest.mark.django_db(transaction=True)
+def test_diagram_preview_rejects_anonymous_fenced_and_unavailable_requests(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    endpoint = reverse("diagram-preview")
+    assert client.post(endpoint, {"source": "flowchart LR\nA-->B"}, content_type="application/json").status_code == 403
+
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Rejected Diagram Preview MSP",
+        owner_email="rejected-diagram-preview-owner@example.invalid",
+        owner_display_name="Rejected Diagram Preview Owner",
+        password="Preview-password-42!",
+    )
+    client.force_login(installation.owner)
+    fenced = client.post(endpoint, {"source": "```mermaid\nA-->B\n```"}, content_type="application/json")
+    assert fenced.status_code == 400
+
+    def unavailable(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise DiagramRenderError("The isolated diagram renderer is unavailable.", code="diagram.renderer.unavailable")
+
+    monkeypatch.setattr("apps.core.rendering_views.render_diagram_exports", unavailable)
+    failed = client.post(endpoint, {"source": "flowchart LR\nA-->B"}, content_type="application/json")
+    assert failed.status_code == 503
+    assert failed.json() == {
+        "code": "diagram.renderer.unavailable",
+        "detail": "The isolated diagram renderer is unavailable.",
+    }

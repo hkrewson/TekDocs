@@ -1,14 +1,13 @@
 # CSP and COEP hardening
 
-Status: phase 1 implemented; runtime validation pending. Owner: maintainer / #38.
+Status: phase 2 implemented; hosted validation pending. Owner: maintainer / #38.
 This is the post-v0.9.19 security slice that begins remediation of the
 release-bounded `TD-DAST-INLINE-STYLE` and `TD-DAST-COEP` exceptions. It does not change
 authentication, authorization, database policy, publication formats, or production.
 
 ## Acceptance criteria
 
-- The browser application CSP is identical at Nginx and Django. Phase 1 keeps the
-  dependency compatibility allowance explicit; final acceptance requires
+- The browser application CSP is identical at Nginx and Django and enforces
   `style-src 'self'` without `unsafe-inline`.
 - Application source has no React style properties, DOM style mutation, or raw HTML
   injection. CI rejects their reintroduction.
@@ -23,8 +22,8 @@ authentication, authorization, database policy, publication formats, or producti
   COEP console violations.
 - Offline HTML exports retain their separate sandbox policy. Their inline export
   styles do not weaken the web application's policy.
-- Mermaid, Milkdown and Cytoscape runtime styling is isolated, replaced, or removed
-  before the application header drops `unsafe-inline`.
+- Mermaid, Milkdown and Cytoscape runtime styling remains isolated, replaced, or
+  absent while the strict application header is enforced.
 
 ## Source disposition
 
@@ -39,12 +38,13 @@ An enforced browser reproduction refined the earlier static dependency inventory
 The exercised Milkdown authoring path produced no strict-policy violation. Cytoscape
 produced one `style-src-elem` violation solely to add its private container
 `position: relative` rule; TekDocs now supplies that rule in external CSS and a
-checked document sentinel prevents the dependency injection. Mermaid remains the
-verified blocker: a real preview request creates temporary style elements and many
-style attributes while producing the SVG, even though only the sanitized result is
-later displayed as a `data:` image. Enforcing `style-src 'self'` before Mermaid is
-isolated would break supported diagrams. The compatibility allowance therefore
-remains; this is a documented blocker, not closure of `TD-DAST-INLINE-STYLE`.
+checked document sentinel prevents the dependency injection. Mermaid was the
+remaining verified blocker: a real in-page preview request created temporary style
+elements and many style attributes while producing the SVG. Phase 2 moves preview
+generation behind the existing isolated renderer boundary. The browser receives
+sanitized SVG and displays it only as a `data:` image, with client-side sanitization
+retained as defense in depth. The application policy now enforces `style-src 'self'`
+without an inline-style exception.
 
 COEP uses `require-corp`. All application subresources inventoried in this slice
 are same-origin or `data:` resources; the latter are limited to diagram images and
@@ -60,8 +60,8 @@ The behavior follows [CSP Level 3](https://www.w3.org/TR/CSP3/) and the
 
 Verified statically:
 
-- Nginx and Django policies agree, and the remaining `unsafe-inline` allowance is
-  attributable to known dependency runtime behavior rather than first-party source.
+- Nginx and Django policies agree on `style-src 'self'` without an inline-style
+  exception.
 - application TypeScript/TSX contains no inline style property, DOM style mutation,
   or `dangerouslySetInnerHTML` use;
 - the first-party CSS needed to replace those runtime styles remains within a
@@ -70,17 +70,26 @@ Verified statically:
   application origin; and
 - the existing standalone export CSP remains unchanged.
 
-Needs validation on the exact source commit:
+Verified locally on the phase 2 candidate:
 
-- frontend lint, typecheck, unit coverage, and production build;
-- backend health/security-header tests;
-- production-image routing/header rehearsal, including the proxied API path;
+- frontend typecheck and production build, including bundle budgets;
+- focused Mermaid component/API unit tests, lint, and the fail-closed CSP source
+  check;
+- focused backend diagram-preview and security-header tests;
+- production-image headers for the application and proxied API paths; and
+- the real guided/saved Mermaid diagram path in Chrome under enforced
+  `style-src 'self'`, with no CSP or COEP console violations.
+
+Needs hosted validation on the exact source commit:
+
+- full frontend lint, unit coverage, and browser matrix;
+- full backend gates and the production-image routing/header rehearsal, including
+  the proxied API path;
 - Chromium, Firefox, WebKit, mobile Chromium, and mobile WebKit browser acceptance;
 - guided/saved Mermaid diagrams, SVG download, PDF worker rendering, authentication
   navigation, fonts, and a check for CSP/COEP console violations; and
 - passive DAST confirming that ZAP 10055-6 and 90004-2 are retired rather than
-  suppressed. Phase 1 is expected to retire 90004-2 only; 10055-6 remains open until
-  the dependency isolation criterion is complete.
+  suppressed.
 
 Hosted Build 42326080728 reproduced 54 stale browser assertions that still inspected
 the removed inline scroll style and one Mermaid `font-src:data` violation. Build
@@ -104,10 +113,11 @@ the production-shaped frontend. Milkdown emitted no violation. Cytoscape emitted
 one inline style-element violation, traced to its fixed private container rule;
 the external-rule/sentinel correction removes that injection and its source gate
 fails closed if the dependency contract changes. A real Mermaid preview emitted
-both style-element and style-attribute violations. The production compatibility
-header was retained after reproduction. The next bounded implementation moves
-Mermaid preview rendering behind the existing isolated renderer boundary before
-the header can remove `unsafe-inline`.
+both style-element and style-attribute violations. Phase 2 moves Mermaid preview
+rendering behind the existing isolated renderer boundary and removes `unsafe-inline`
+from both application policies. The repeated production-image Chrome path completed
+without a CSP or COEP violation. The hosted browser matrix and passive DAST must
+still confirm the stricter policy.
 
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That

@@ -1,4 +1,4 @@
-# Dependency update policy — October 24, 2026
+# Dependency update policy — November 8, 2026
 
 Scope: triage the dependency PR failures after the 0.9.12 main push. Keep routine
 updates useful without treating a major toolchain change as an automatic patch.
@@ -36,6 +36,15 @@ at the next runtime candidate or November 12, 2026, whichever is earlier. Do not
 use force/legacy peer installation or weaken version assertions to merge a PR.
 Existing PRs may need replacement after the policy is published; unchanged old
 red runs remain historical evidence.
+
+## November 8 coordinated maintenance tranche
+
+Node 24.22.2 advances frontend, renderer, Mailpit assets, the browser image, local
+gate fallback, hosted workflow, exact runtime assertion and operator documentation
+together. The same tranche refreshes the pinned Mailpit Go builder digest without
+changing Go 1.27.3 and advances only its final Alpine runtime from 3.24.2 to 3.24.3.
+It replaces Dependabot PRs #142, #143 and #146–#148 as one validation unit; it does
+not accept the separate major frontend, renderer or development-tool proposals.
 
 Reference: [GitHub Dependabot options](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 

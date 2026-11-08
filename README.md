@@ -343,7 +343,7 @@ Owners and administrators must enroll TOTP before TekDocs permits privileged act
 Requirements:
 
 - Docker Engine with Docker Compose
-- Node.js 24.22.1 (security-patched LTS toolchain)
+- Node.js 24.22.2 (security-patched LTS toolchain)
 - npm 11
 - OpenSSL
 

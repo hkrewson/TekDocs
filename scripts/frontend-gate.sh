@@ -32,23 +32,23 @@ node_version=""
 if command -v node >/dev/null 2>&1; then
   node_version=$(node -p 'process.versions.node' 2>/dev/null || true)
 fi
-if [ "$node_version" = "24.22.1" ] && command -v npm >/dev/null 2>&1; then
+if [ "$node_version" = "24.22.2" ] && command -v npm >/dev/null 2>&1; then
   run_gate
   exit 0
 fi
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "Frontend gates require Node 24.22.1 with npm, or Docker for the isolated Node 24.22.1 fallback." >&2
+  echo "Frontend gates require Node 24.22.2 with npm, or Docker for the isolated Node 24.22.2 fallback." >&2
   exit 1
 fi
 
-echo "Host Node ${node_version:-unavailable} is unsupported; running the frontend $mode gate in isolated Node 24.22.1."
+echo "Host Node ${node_version:-unavailable} is unsupported; running the frontend $mode gate in isolated Node 24.22.2."
 docker run --rm \
   -e FRONTEND_GATE_MODE="$mode" \
   -v "$repository_root/frontend:/src:ro" \
   -v "$repository_root/backend/openapi.yml:/backend/openapi.yml:ro" \
   -w /work \
-  node:24.22.1-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d sh -ec '
+  node:24.22.2-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 sh -ec '
     tar -C /src --exclude=node_modules --exclude=dist --exclude=coverage --exclude=playwright-report --exclude=test-results -cf - . | tar -C /work -xf -
     npm ci --no-audit --no-fund
     case "$FRONTEND_GATE_MODE" in

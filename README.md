@@ -37,8 +37,10 @@ boundary, sanitized output renders as an image resource, and browser responses
 require explicit cross-origin embedding permission. Cytoscape's injected rule and
 Milkdown's optional inline-style cursor helpers are removed. The application now
 enforces `style-src 'self'`; browser diagnostics narrowly identify WebKit's blocked
-transient editor attempts without permitting inline styles. Exact-source hosted
-browser and DAST evidence must confirm the finding is closed.
+transient editor attempts without permitting inline styles. Exact-source Build,
+CodeQL, desktop/mobile browser acceptance and passive DAST passed for `286e84a3`.
+The release-bounded inline-style CSP and missing-COEP findings are retired; TekDocs
+does not claim full cross-origin isolation because COOP remains outside this slice.
 
 ## Cross-Workspace reuse migration development
 

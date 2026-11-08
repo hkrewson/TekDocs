@@ -46,11 +46,14 @@ separate.
 Post-v0.9.19 development has implemented the bounded
 [CSP/COEP hardening slice](../csp-coep-hardening.md). The source policy now removes
 TekDocs-owned inline styles and adds `Cross-Origin-Embedder-Policy: require-corp`
-without claiming full cross-origin isolation. The header-level CSP allowance remains
-for identified Mermaid, Milkdown and Cytoscape runtime styling until those paths are
-isolated. The prior v0.9.19 acceptance remains historical; exact-source hosted build,
-browser, routing, and DAST evidence must pass before COEP closes, and the dependency
-work must finish before the CSP finding closes.
+without claiming full cross-origin isolation. Mermaid rendering is isolated,
+Cytoscape's injected rule has an external checked replacement, and Milkdown's
+optional inline-style cursor helpers are disabled. Exact-source Build 42439813889,
+CodeQL 42449387473 and Extended validation 42449370137 passed, including all five
+browser configurations and production-shaped passive DAST. The release-bounded
+inline-style CSP and missing-COEP findings are retired as of November 8, 2026. ZAP's
+distinct missing-COOP warning remains outside this slice; no full cross-origin
+isolation claim is made. The prior v0.9.19 acceptance remains historical.
 
 ## Native template enrollment for new documents
 

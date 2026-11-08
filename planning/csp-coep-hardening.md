@@ -1,7 +1,7 @@
 # CSP and COEP hardening
 
-Status: phase 2 implemented; hosted validation pending. Owner: maintainer / #38.
-This is the post-v0.9.19 security slice that begins remediation of the
+Status: complete; exact-source hosted validation passed. Owner: maintainer / #38.
+This post-v0.9.19 security slice completes remediation of the
 release-bounded `TD-DAST-INLINE-STYLE` and `TD-DAST-COEP` exceptions. It does not change
 authentication, authorization, database policy, publication formats, or production.
 
@@ -95,16 +95,27 @@ Verified locally on the phase 2 candidate:
 - the production-shaped Nginx response, which retains strict style blocking and
   emits `Cross-Origin-Embedder-Policy: require-corp`.
 
-Needs hosted validation on the exact source commit:
+Verified in hosted validation on exact source `286e84a309098dae19c50fc45511dcf3bf39678b`:
 
-- full frontend lint, unit coverage, and browser matrix;
-- full backend gates and the production-image routing/header rehearsal, including
-  the proxied API path;
-- Chromium, Firefox, WebKit, mobile Chromium, and mobile WebKit browser acceptance;
-- guided/saved Mermaid diagrams, SVG download, PDF worker rendering, authentication
-  navigation, fonts, and a check for CSP/COEP console violations; and
-- passive DAST confirming that ZAP 10055-6 and 90004-2 are retired rather than
-  suppressed.
+- Build [42439813889](https://github.com/hkrewson/TekDocs/actions/runs/42439813889)
+  passed the complete source, production-image, routing, dependency, license, secret,
+  vulnerability and final validation gates;
+- CodeQL [42449387473](https://github.com/hkrewson/TekDocs/actions/runs/42449387473)
+  passed the Python and JavaScript/TypeScript extended security-and-quality queries
+  and published commit-bound evidence;
+- Extended validation
+  [42449370137](https://github.com/hkrewson/TekDocs/actions/runs/42449370137)
+  passed Chromium, Firefox, WebKit, mobile Chromium and mobile WebKit, supported
+  upgrades, encrypted recovery, performance and commit-bound evidence delivery; and
+- the same Extended run's production-shaped passive DAST passed CSP rule 10055 with
+  no inline-style finding and no missing-COEP subfinding. ZAP still reports its
+  distinct missing-COOP warning under rule 90004; COOP and a claim of full
+  cross-origin isolation are explicitly outside this slice.
+
+`TD-DAST-INLINE-STYLE` and `TD-DAST-COEP` are therefore retired on November 8,
+2026. Historical candidate records remain unchanged because they accurately record
+the policy shipped in those releases. Issue #38 remains open for the broader 1.0
+automated-security-assurance acceptance criteria.
 
 Hosted Build 42326080728 reproduced 54 stale browser assertions that still inspected
 the removed inline scroll style and one Mermaid `font-src:data` violation. Build
@@ -141,7 +152,7 @@ Disabling Milkdown's optional cursor feature removed its persistent inline-style
 helpers. CSP `report-sample` identified the remaining transient browser attempts as
 `text-overflow:inherit`; they are blocked by the strict policy and leave no style
 attribute in the document. The focused three-browser regression now passes locally.
-Hosted Extended CI and passive DAST remain the exact-source closure gates.
+Hosted Extended CI and passive DAST subsequently passed as recorded above.
 
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That

@@ -66,10 +66,11 @@ contract review, and exact-source hosted CodeQL is the final alert authority.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the
-pinned Syft checksum asset. The bounded [Syft download resilience
-follow-up](2026-11-08-syft-download-resilience.md) adds three fail-closed,
-immutable-version tool-cache attempts without changing SBOM or vulnerability
-policy. Corrected-source hosted acceptance remains pending.
+pinned Syft checksum asset. The bounded retries then exhausted against the same
+provider endpoint. The [Syft delivery resilience
+follow-up](2026-11-08-syft-download-resilience.md) now uses Anchore's official,
+digest-pinned Syft container without changing SBOM or vulnerability policy.
+Corrected-source hosted acceptance remains pending.
 
 ## Native template enrollment for new documents
 

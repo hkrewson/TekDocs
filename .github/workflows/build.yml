@@ -461,6 +461,24 @@ jobs:
         run: sh ./tests/rehearsals/rehearse-production-image.sh
       - name: Validate Python production licenses
         run: docker run --rm -v "$PWD/scripts/check-python-licenses.py:/check-python-licenses.py:ro" "${BACKEND_IMAGE}:${COMMIT_TAG}" python /check-python-licenses.py
+      - name: Cache Syft (attempt 1)
+        id: syft-download-1
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.0
+      - name: Cache Syft (attempt 2)
+        id: syft-download-2
+        if: steps.syft-download-1.outcome == 'failure'
+        continue-on-error: true
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.0
+      - name: Cache Syft (attempt 3)
+        if: steps.syft-download-1.outcome == 'failure' && steps.syft-download-2.outcome == 'failure'
+        uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          syft-version: v1.54.0
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.BACKEND_IMAGE }}:${{ env.COMMIT_TAG }}

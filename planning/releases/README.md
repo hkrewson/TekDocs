@@ -64,6 +64,13 @@ their established semantics. Historical v1 observations remain readable. The
 127 shipped-code stack-trace-exposure alerts remain a separate pre-1.0 API error
 contract review, and exact-source hosted CodeQL is the final alert authority.
 
+The first exact-source Build for that slice passed all source, database, browser
+and coverage work but its SBOM job twice received HTTP 504 while downloading the
+pinned Syft checksum asset. The bounded [Syft download resilience
+follow-up](2026-11-08-syft-download-resilience.md) adds three fail-closed,
+immutable-version tool-cache attempts without changing SBOM or vulnerability
+policy. Corrected-source hosted acceptance remains pending.
+
 ## Native template enrollment for new documents
 
 The [bounded native-template slice](../git-native-templates.md) connects saved MSP

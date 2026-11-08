@@ -24,6 +24,8 @@ grep -q 'TEKDOCS_MAILPIT_IMAGE' compose.images.yml
 grep -q 'MAILPIT_IMAGE: ghcr.io/hkrewson/tekdocs-mailpit' .github/workflows/build.yml
 grep -q 'tekdocs-mailpit-security ./mailpit' Makefile
 grep -q 'ADD --checksum=sha256:[0-9a-f]\{64\}' mailpit/Dockerfile
+test "$(grep -c 'uses: anchore/sbom-action/download-syft@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c' .github/workflows/build.yml)" -eq 3
+test "$(grep -c 'syft-version: v1.54.0' .github/workflows/build.yml)" -eq 3
 
 unpinned_actions=$(grep -REn 'uses:[[:space:]]+[^[:space:]]+@' .github/workflows \
   | grep -Ev '@[0-9a-f]{40}([[:space:]]|$)' || true)

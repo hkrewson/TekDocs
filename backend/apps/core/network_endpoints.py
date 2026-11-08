@@ -27,7 +27,9 @@ from .scoping import DataScope
 
 
 class NetworkEndpointError(ValueError):
-    pass
+    def __init__(self, public_detail: str) -> None:
+        self.public_detail = public_detail
+        super().__init__(public_detail)
 
 
 def canonical_host(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:

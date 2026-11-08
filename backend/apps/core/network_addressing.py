@@ -23,7 +23,9 @@ from .scoping import DataScope
 
 
 class NetworkAddressingError(ValueError):
-    pass
+    def __init__(self, public_detail: str) -> None:
+        self.public_detail = public_detail
+        super().__init__(public_detail)
 
 
 def canonical_network(value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:

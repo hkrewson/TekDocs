@@ -139,12 +139,12 @@ def _page(
 
 
 def _error(exc: Exception) -> serializers.ValidationError:
-    if isinstance(exc, DjangoValidationError):
-        detail = "; ".join(exc.messages)
-    elif isinstance(exc, IntegrityError):
+    if isinstance(exc, IntegrityError):
         detail = "That value conflicts with an existing network record in this Workspace."
+    elif isinstance(exc, NetworkAddressingError):
+        detail = exc.public_detail
     else:
-        detail = str(exc)
+        detail = "The network address request is invalid."
     return serializers.ValidationError({"detail": detail})
 
 

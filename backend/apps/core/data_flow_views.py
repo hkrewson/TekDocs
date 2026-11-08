@@ -165,8 +165,9 @@ def _input(payload: dict[str, object]) -> DataFlowInput:
     return DataFlowInput(**payload)  # type: ignore[arg-type]
 
 
-def _refuse(error: Exception) -> serializers.ValidationError:
-    return serializers.ValidationError({"detail": str(error)})
+def _refuse(error: DataFlowError | DjangoValidationError) -> serializers.ValidationError:
+    detail = error.public_detail if isinstance(error, DataFlowError) else "The data flow request is invalid."
+    return serializers.ValidationError({"detail": detail})
 
 
 class DataFlowListCreateView(APIView):

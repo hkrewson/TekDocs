@@ -17,7 +17,7 @@ The [annotated release catalog](release-tag-catalog.md) adds reviewed two-line
 messages to future application tags without changing receipt or image authority.
 Historical lightweight tags, including v0.9.19, remain immutable.
 
-## Published 0.9.19; production update scheduled
+## Published and deployed 0.9.19
 
 The [0.9.19 candidate](0.9.19-candidate.md) freezes the accumulated Git-backed
 document workflow, migrations 0213-0223, CI/release operations, and dependency
@@ -33,8 +33,11 @@ Corrected exact-source Build
 passed on attempt 2 after attempt 1's hosted-runner shutdown. It verified the
 supported upgrade and recovery paths, published four images, verified all eight
 attestations, delivered `v0.9.19` plus `receipts/v0.9.19`, and passed the final
-`Validation passed` job. Production remained on v0.9.18 at closeout; its existing
-Sunday 03:30 America/Chicago update window sees v0.9.19 available.
+`Validation passed` job. Production deployed v0.9.19 on November 8, 2026 through
+the verified updater, completed migrations 0213-0223, and passed its service,
+readiness, release-identity, and immutable-image checks. The Sunday 03:30
+America/Chicago updater remains configured with a host-level lock and a 48-hour
+minimum release age.
 
 The maintainer accepted the unchanged medium inline-style CSP allowance and low
 missing-COEP limitation for v0.9.19 only, with review or remediation due before
@@ -63,6 +66,15 @@ rejects mismatched digests before persistence; provider identity keys retain
 their established semantics. Historical v1 observations remain readable. The
 127 shipped-code stack-trace-exposure alerts remain a separate pre-1.0 API error
 contract review, and exact-source hosted CodeQL is the final alert authority.
+
+The first bounded [exception-response hardening
+slice](../exception-response-hardening.md) removes caught-exception text from 19
+ambiguous sites across eleven response families while retaining established
+400/409 statuses, response shapes, audit behavior, and fixed conflict messages.
+Regression tests inject private diagnostics and the guard is part of the backend
+image security gates. The other 108 shipped-code alerts remain open for
+handler-by-handler review; exact-source hosted CodeQL is required before this
+slice is closed.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

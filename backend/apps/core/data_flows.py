@@ -38,7 +38,11 @@ from .workspaces import ResolvedWorkspace
 
 
 class DataFlowError(ValueError):
-    pass
+    """A bounded domain refusal whose public detail is part of the API contract."""
+
+    def __init__(self, public_detail: str) -> None:
+        self.public_detail = public_detail
+        super().__init__("The data flow operation was refused.")
 
 
 @dataclass(frozen=True, slots=True)

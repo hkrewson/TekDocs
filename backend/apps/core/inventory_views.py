@@ -629,7 +629,7 @@ class ClientAssetMACAddressListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (NetworkEndpointError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The asset network record is invalid."}) from exc
         return Response(AssetMACAddressSerializer(record).data, status=201)
 
 
@@ -653,7 +653,7 @@ class ClientAssetMACAddressDetailView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (NetworkEndpointError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The asset network record is invalid."}) from exc
         return Response(AssetMACAddressSerializer(updated).data)
 
 
@@ -695,7 +695,7 @@ class ClientAssetIPAddressListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (NetworkEndpointError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The asset network record is invalid."}) from exc
         return Response(AssetIPAddressSerializer(record).data, status=201)
 
 
@@ -721,7 +721,7 @@ class ClientAssetIPAddressDetailView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (NetworkEndpointError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The asset network record is invalid."}) from exc
         return Response(AssetIPAddressSerializer(updated).data)
 
 

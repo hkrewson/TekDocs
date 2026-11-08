@@ -58,7 +58,7 @@ def _post(resolved, request) -> Response:  # type: ignore[no-untyped-def]
     except ContentIndexValidationError as exc:
         raise serializers.ValidationError({"diagnostics": list(exc.diagnostics)}) from exc
     except ContentIndexError as exc:
-        raise serializers.ValidationError({"detail": str(exc)}) from exc
+        raise serializers.ValidationError({"detail": "Repository content could not be indexed."}) from exc
     return _get(resolved, request)
 
 

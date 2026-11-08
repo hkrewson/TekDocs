@@ -251,12 +251,12 @@ def _data(record: NetworkCircuit, workspace: ResolvedWorkspace):  # type: ignore
 
 
 def _error(exc: Exception) -> serializers.ValidationError:
-    if isinstance(exc, DjangoValidationError):
-        detail = "; ".join(exc.messages)
-    elif isinstance(exc, IntegrityError):
+    if isinstance(exc, IntegrityError):
         detail = "That circuit or handoff conflicts with an existing record in this Workspace."
+    elif isinstance(exc, NetworkCircuitError):
+        detail = exc.public_detail
     else:
-        detail = str(exc)
+        detail = "The network circuit request is invalid."
     return serializers.ValidationError({"detail": detail})
 
 

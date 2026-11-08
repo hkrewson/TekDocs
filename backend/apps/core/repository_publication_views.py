@@ -426,8 +426,11 @@ def _collection(request, workspace: ResolvedWorkspace) -> Response:  # type: ign
             actor=request.user,
             expected_commit=serializer.validated_data.get("expected_commit"),
         )
-    except (ContentPublicationSourceError, RepositoryPublicationEvidenceError, RepositoryServiceError) as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+    except (ContentPublicationSourceError, RepositoryPublicationEvidenceError, RepositoryServiceError):
+        return Response(
+            {"detail": "Repository publication evidence is unavailable for the current source state."},
+            status=status.HTTP_409_CONFLICT,
+        )
     return Response(_summary(evidence, verify=True), status=status.HTTP_201_CREATED)
 
 

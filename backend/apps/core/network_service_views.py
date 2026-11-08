@@ -155,15 +155,23 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
 
 
 def _error(exc: Exception) -> serializers.ValidationError:
-    detail = (
-        "; ".join(exc.messages)
-        if isinstance(exc, DjangoValidationError)
-        else (
-            "That value conflicts with an existing record in this Workspace."
-            if isinstance(exc, IntegrityError)
-            else str(exc)
-        )
-    )
+    if isinstance(exc, IntegrityError):
+        detail = "That value conflicts with an existing record in this Workspace."
+    elif isinstance(exc, NetworkServiceError):
+        detail = exc.public_detail
+    elif isinstance(exc, DjangoValidationError):
+        errors = list(getattr(exc, "error_list", ()))
+        for field_errors in getattr(exc, "error_dict", {}).values():
+            errors.extend(field_errors)
+        codes = {error.code for error in errors}
+        if "wireless_ssid_byte_length" in codes:
+            detail = "SSID must contain between 1 and 32 UTF-8 bytes"
+        elif "wireless_subnet_vlan_mismatch" in codes:
+            detail = "Wireless network subnet must belong to the selected VLAN"
+        else:
+            detail = "The network service request is invalid."
+    else:
+        detail = "The network service request is invalid."
     return serializers.ValidationError({"detail": detail})
 
 

@@ -32,14 +32,16 @@ from .sites import locations_for_scope, sites_for_scope
 
 
 class NetworkCircuitError(ValueError):
-    pass
+    def __init__(self, public_detail: str) -> None:
+        self.public_detail = public_detail
+        super().__init__(public_detail)
 
 
 def _validate(record) -> None:  # type: ignore[no-untyped-def]
     try:
         record.full_clean()
     except ValidationError as exc:
-        raise NetworkCircuitError(" ".join(exc.messages)) from exc
+        raise NetworkCircuitError("The network circuit record is invalid.") from exc
 
 
 def _scope(tenant: Tenant, organization: Organization | None) -> DataScope:

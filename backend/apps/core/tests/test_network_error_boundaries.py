@@ -18,31 +18,37 @@ from apps.core.network_endpoints import NetworkEndpointError
 from apps.core.network_services import NetworkServiceError
 
 
-@pytest.mark.parametrize("view,domain_error,safe_message", (
+@pytest.mark.parametrize("view,domain_error,conflict_message,invalid_message", (
     (netbox_reconciliation_views, NetBoxReferenceError,
-     "That NetBox identity conflicts with another record in this Workspace."),
+     "That NetBox identity conflicts with another record in this Workspace.",
+     "The NetBox reference request is invalid."),
     (network_addressing_views, NetworkAddressingError,
-     "That value conflicts with an existing network record in this Workspace."),
+     "That value conflicts with an existing network record in this Workspace.",
+     "The network address request is invalid."),
     (network_circuit_views, NetworkCircuitError,
-     "That circuit or handoff conflicts with an existing record in this Workspace."),
+     "That circuit or handoff conflicts with an existing record in this Workspace.",
+     "The network circuit request is invalid."),
     (network_endpoint_views, NetworkEndpointError,
-     "That value conflicts with an existing network record in this Workspace."),
+     "That value conflicts with an existing network record in this Workspace.",
+     "The network endpoint request is invalid."),
     (network_service_views, NetworkServiceError,
-     "That value conflicts with an existing record in this Workspace."),
+     "That value conflicts with an existing record in this Workspace.",
+     "The network service request is invalid."),
 ))
 @pytest.mark.parametrize("kind", ("database", "validation", "domain"))
-def test_network_error_translation_does_not_expose_database_diagnostics(view, domain_error, safe_message, kind):
+def test_network_error_translation_does_not_expose_exception_diagnostics(
+    view, domain_error, conflict_message, invalid_message, kind
+):
     diagnostic = "synthetic private row and database constraint"
-    public_message = "Choose a valid record in this Workspace."
     if kind == "database":
         error = IntegrityError(diagnostic)
-        expected = safe_message
+        expected = conflict_message
     elif kind == "validation":
-        error = ValidationError(public_message)
-        expected = public_message
+        error = ValidationError(diagnostic)
+        expected = invalid_message
     else:
-        error = domain_error(public_message)
-        expected = public_message
+        expected = "Choose a valid record in this Workspace."
+        error = domain_error(expected)
     translated = view._error(error)
     assert translated.status_code == 400
     assert diagnostic not in str(translated.detail)

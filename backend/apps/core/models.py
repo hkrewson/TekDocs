@@ -4041,7 +4041,10 @@ class WirelessNetwork(TimestampedModel):
         ):
             raise ValidationError("Wireless network and entity scopes must match")
         if not self.ssid or len(self.ssid.encode("utf-8")) > 32:
-            raise ValidationError("SSID must contain between 1 and 32 UTF-8 bytes")
+            raise ValidationError(
+                "SSID must contain between 1 and 32 UTF-8 bytes",
+                code="wireless_ssid_byte_length",
+            )
         for related, label in (
             (self.site if self.site_id else None, "site"),
             (self.vlan if self.vlan_id else None, "VLAN"),
@@ -4052,7 +4055,10 @@ class WirelessNetwork(TimestampedModel):
             ):
                 raise ValidationError(f"Wireless network {label} must use its Workspace scope")
         if self.vlan_id and self.subnet_id and self.subnet is not None and self.subnet.vlan_id != self.vlan_id:
-            raise ValidationError("Wireless network subnet must belong to the selected VLAN")
+            raise ValidationError(
+                "Wireless network subnet must belong to the selected VLAN",
+                code="wireless_subnet_vlan_mismatch",
+            )
 
 
 class DNSZone(TimestampedModel):

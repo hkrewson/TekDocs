@@ -231,7 +231,7 @@ class StockItemListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (StockError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The stock request is invalid."}) from exc
         return Response(StockItemSerializer(record).data, status=201)
 
 
@@ -261,7 +261,7 @@ class StockItemDetailView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (StockError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The stock request is invalid."}) from exc
         return Response(StockItemSerializer(_query(workspace).get(pk=record.pk)).data)
 
     @extend_schema(request=None, responses={204: None})
@@ -294,5 +294,5 @@ class StockMovementCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (StockError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The stock request is invalid."}) from exc
         return Response(StockItemSerializer(_query(workspace).get(id=item_id)).data, status=201)

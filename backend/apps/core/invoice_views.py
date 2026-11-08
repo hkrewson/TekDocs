@@ -959,7 +959,7 @@ class InvoiceLifecycleEventView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except (InvoiceError, DjangoValidationError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The invoice event request is invalid."}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data, status=201)
 
 
@@ -980,7 +980,7 @@ class InvoiceDeliveryView(APIView):
         except (InvoiceError, DjangoValidationError) as exc:
             if invoice.state == InvoiceState.ISSUED:
                 record_delivery_failure(invoice=invoice, actor_id=request.user.pk, note="Delivery was not confirmed.")
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "Invoice delivery failed; retry is safe."}) from exc
         except Exception as exc:
             if invoice.state == InvoiceState.ISSUED:
                 record_delivery_failure(invoice=invoice, actor_id=request.user.pk, note="Delivery was not confirmed.")
@@ -1196,7 +1196,7 @@ class ServiceRateListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except DjangoValidationError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The service rate is invalid."}) from exc
         return Response(ServiceRateSerializer(record).data, status=201)
 
 
@@ -1225,7 +1225,7 @@ class ServiceRateDetailView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except DjangoValidationError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": "The service rate is invalid."}) from exc
         return Response(ServiceRateSerializer(record).data)
 
     @extend_schema(request=None, responses={204: OpenApiResponse(description="Service rate archived")})

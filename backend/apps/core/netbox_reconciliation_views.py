@@ -138,12 +138,12 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
 
 
 def _error(exc: Exception) -> serializers.ValidationError:
-    if isinstance(exc, DjangoValidationError):
-        detail = "; ".join(exc.messages)
-    elif isinstance(exc, IntegrityError):
+    if isinstance(exc, IntegrityError):
         detail = "That NetBox identity conflicts with another record in this Workspace."
+    elif isinstance(exc, NetBoxReferenceError):
+        detail = exc.public_detail
     else:
-        detail = str(exc)
+        detail = "The NetBox reference request is invalid."
     return serializers.ValidationError({"detail": detail})
 
 

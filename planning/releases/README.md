@@ -55,6 +55,15 @@ inline-style CSP and missing-COEP findings are retired as of November 8, 2026. Z
 distinct missing-COOP warning remains outside this slice; no full cross-origin
 isolation claim is made. The prior v0.9.19 acceptance remains historical.
 
+The [CodeQL alert triage and provider fingerprint hardening
+slice](../codeql-alert-triage.md) narrows code scanning to shipped source without
+hiding the remaining shipped-code queue. Provider observation schema v2 now
+derives retained fingerprints only from the allowlisted safe projection and
+rejects mismatched digests before persistence; provider identity keys retain
+their established semantics. Historical v1 observations remain readable. The
+127 shipped-code stack-trace-exposure alerts remain a separate pre-1.0 API error
+contract review, and exact-source hosted CodeQL is the final alert authority.
+
 ## Native template enrollment for new documents
 
 The [bounded native-template slice](../git-native-templates.md) connects saved MSP

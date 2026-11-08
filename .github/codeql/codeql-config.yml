@@ -1,0 +1,11 @@
+name: TekDocs shipped-source CodeQL policy
+
+paths-ignore:
+  - backend/**/tests/**
+  - frontend/e2e/**
+  - frontend/**/*.test.ts
+  - frontend/**/*.test.tsx
+  - frontend/**/*.spec.ts
+  - frontend/**/*.spec.tsx
+  - scripts/tests/**
+  - tests/**

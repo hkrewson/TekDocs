@@ -13,7 +13,12 @@ from django.utils import timezone
 from apps.accounts.bootstrap import bootstrap_owner
 from apps.accounts.models import BuiltInRole, TenantMembership, User
 from apps.core.halopsa import halo_ticket_summaries
-from apps.core.integration_providers import HaloPSAProvider, ProviderObservation, ProviderPage
+from apps.core.integration_providers import (
+    HaloPSAProvider,
+    ProviderObservation,
+    ProviderPage,
+    provider_observation_fingerprint,
+)
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import process_sync_job
 from apps.core.models import (
@@ -174,13 +179,14 @@ class HaloClientAdapter:
         self.name = name
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+        projection = {"id": 24, "name": self.name}
         return ProviderPage(
             (
                 ProviderObservation(
                     "client",
                     "24",
-                    ("a" if self.name == "Mapped client" else "c") * 64,
-                    {"id": 24, "name": self.name},
+                    provider_observation_fingerprint(projection),
+                    projection,
                 ),
             ),
             "",
@@ -217,7 +223,9 @@ def test_exact_client_reconciliation_is_idempotent_across_provider_rename(instal
 
     mapping.refresh_from_db()
     assert mapping.local_entity_id == selected.entity_id
-    assert mapping.observed_fingerprint == "c" * 64
+    assert mapping.observed_fingerprint == provider_observation_fingerprint(
+        {"id": 24, "name": "Mapped client renamed in Halo"}
+    )
     assert IntegrationEntityMapping.objects.filter(connection=connection, remote_id="24").count() == 1
 
 

@@ -33,7 +33,9 @@ from apps.core.integration_providers import (
     ProviderPage,
     netbox_authorization,
     provider_catalog,
+    provider_observation_fingerprint,
     validate_provider_adapter,
+    validate_provider_page,
 )
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import enqueue_sync, process_sync_job
@@ -521,6 +523,10 @@ def test_netbox_provider_retains_only_supported_prefix_and_device_facts(installa
         "position": 12.0,
         "height": 1,
     }
+    original_fingerprint = prefix.observations[0].fingerprint
+    pages["ipam/prefixes/"]["results"][0]["tenant"] = {"id": 10, "name": "Another private value"}
+    repeated = NetBoxProvider(fetcher=fetcher).fetch_page(source, secret=TEST_PROVIDER_TOKEN, cursor="")
+    assert repeated.observations[0].fingerprint == original_fingerprint
 
 
 @pytest.mark.django_db
@@ -982,8 +988,13 @@ class SuccessfulAdapter:
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
         assert secret == TEST_PROVIDER_TOKEN
         assert cursor == ""
+        projection = {"id": 42, "prefix": "10.42.0.0/24"}
         return ProviderPage(
-            observations=(ProviderObservation("ipam.prefix", "42", "a" * 64, {"id": 42, "prefix": "10.42.0.0/24"}),),
+            observations=(
+                ProviderObservation(
+                    "ipam.prefix", "42", provider_observation_fingerprint(projection), projection
+                ),
+            ),
             next_cursor="",
             complete_types=("ipam.prefix",),
         )
@@ -1003,13 +1014,88 @@ def test_every_registered_and_fake_provider_obeys_the_reusable_contract(adapter)
     validate_provider_adapter(adapter)
 
 
+def test_provider_page_rejects_a_digest_not_derived_from_the_safe_projection():
+    projection = {"id": 42, "prefix": "10.42.0.0/24"}
+    page = ProviderPage((ProviderObservation("ipam.prefix", "42", "a" * 64, projection),), "")
+
+    with pytest.raises(ValueError, match="provider_response_invalid"):
+        validate_provider_page(SuccessfulAdapter(), page)
+
+
+@pytest.mark.django_db
+def test_unchanged_netbox_reference_transitions_from_v1_raw_digest_without_a_conflict(installation):
+    record = organization(installation, "NetBox fingerprint transition client")
+    source = connection(installation, record)
+    subnet = create_subnet(
+        tenant=installation.tenant,
+        organization=record,
+        actor_id=installation.owner.id,
+        name="Users subnet",
+        cidr="10.91.0.0/24",
+        vrf_entity_id=None,
+        vlan_entity_id=None,
+        description="",
+    )
+    projection = {"id": 91, "prefix": "10.91.0.0/24", "description": ""}
+    historical_fingerprint = hashlib.sha256(
+        json.dumps(
+            {**projection, "provider_private_field": "excluded-v1-value"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    historical_job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:v1-observation")
+    IntegrationObservation.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        job=historical_job,
+        remote_type="ipam.prefix",
+        remote_id="91",
+        fingerprint=historical_fingerprint,
+        schema_version=1,
+        safe_projection=projection,
+    )
+    reference = NetBoxReference.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=source.organization,
+        entity=subnet.entity,
+        object_type="ipam.prefix",
+        object_id=91,
+        observed_fingerprint=historical_fingerprint,
+    )
+
+    class V2PrefixAdapter(SuccessfulAdapter):
+        def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
+            return ProviderPage(
+                (
+                    ProviderObservation(
+                            "ipam.prefix",
+                        "91",
+                        provider_observation_fingerprint(projection),
+                        projection,
+                    ),
+                ),
+                "",
+            )
+
+    current_job = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:v2-observation")
+    completed = process_sync_job(job_id=current_job.id, adapter=V2PrefixAdapter())
+
+    reference.refresh_from_db()
+    assert completed.state == IntegrationJobState.SUCCEEDED, completed.last_error_code
+    assert reference.observed_fingerprint == provider_observation_fingerprint(projection)
+    assert not IntegrationConflict.objects.filter(connection=source, remote_id="91").exists()
+
+
 def test_provider_catalog_is_a_complete_versioned_contract():
     contract = provider_catalog()[0]
     assert contract["key"] == "netbox"
     assert contract["version"] == "1.0"
     assert contract["direction"] == "read_write_reviewed"
     assert contract["pagination"] == "opaque_cursor"
-    assert contract["observation_schema_version"] == 1
+    assert contract["observation_schema_version"] == 2
     assert contract["credential_fields"] == [
         {
             "key": "api_token",
@@ -1030,14 +1116,17 @@ def test_duplicate_provider_objects_are_idempotent_and_safe(installation):
 
     class DuplicateAdapter(SuccessfulAdapter):
         def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
-            item = ProviderObservation("ipam.prefix", "42", "a" * 64, {"id": 42, "prefix": "10.42.0.0/24"})
+            projection = {"id": 42, "prefix": "10.42.0.0/24"}
+            item = ProviderObservation(
+                "ipam.prefix", "42", provider_observation_fingerprint(projection), projection
+            )
             return ProviderPage((item, item), "")
 
     completed = process_sync_job(job_id=job.id, adapter=DuplicateAdapter())
     observation = IntegrationObservation.objects.get(job=completed)
     assert completed.state == IntegrationJobState.SUCCEEDED
     assert observation.safe_projection == {"id": 42, "prefix": "10.42.0.0/24"}
-    assert observation.schema_version == 1
+    assert observation.schema_version == 2
     assert source.__class__.objects.get(pk=source.pk).health_status == "healthy"
 
 
@@ -1067,7 +1156,7 @@ def test_sync_job_is_idempotent_value_minimized_and_retryable(installation):
     assert (observation.remote_type, observation.remote_id, observation.fingerprint) == (
         "ipam.prefix",
         "42",
-        "a" * 64,
+        provider_observation_fingerprint({"id": 42, "prefix": "10.42.0.0/24"}),
     )
     assert NetworkSubnet.objects.filter(cidr="10.42.0.0/24").exists()
     assert not IntegrationConflict.objects.exists()
@@ -1095,24 +1184,25 @@ def test_netbox_sync_automatically_creates_asset_backed_device(installation):
         contract = PROVIDERS["netbox"].contract
 
         def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            projection = {
+                "id": 23,
+                "name": "arrakis",
+                "serial": "ARR-1",
+                "manufacturer": "Cisco",
+                "model": "C9300",
+                "role": "switch",
+                "status": "active",
+                "rack": "Core rack",
+                "position": 12.0,
+                "height": 1,
+            }
             return ProviderPage(
                 observations=(
                     ProviderObservation(
                         "dcim.device",
                         "23",
-                        "d" * 64,
-                        {
-                            "id": 23,
-                            "name": "arrakis",
-                            "serial": "ARR-1",
-                            "manufacturer": "Cisco",
-                            "model": "C9300",
-                            "role": "switch",
-                            "status": "active",
-                            "rack": "Core rack",
-                            "position": 12.0,
-                            "height": 1,
-                        },
+                        provider_observation_fingerprint(projection),
+                        projection,
                     ),
                 ),
                 next_cursor="",

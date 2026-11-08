@@ -28,7 +28,7 @@ class ProviderObservation:
     safe_projection: dict[str, object] = field(default_factory=dict)
     source_timestamp: str | None = None
     provenance: str = "provider_api"
-    schema_version: int = 1
+    schema_version: int = 2
     state: str = "observed"
 
 
@@ -64,7 +64,7 @@ class ProviderContract:
     minimum_sync_interval_minutes: int
     maximum_sync_interval_minutes: int
     health_states: tuple[str, ...] = ("unknown", "healthy", "degraded", "failing", "paused")
-    observation_schema_version: int = 1
+    observation_schema_version: int = 2
     default_base_url: str = ""
     base_url_editable: bool = True
     setup_help_url: str = ""
@@ -101,9 +101,15 @@ def netbox_authorization(secret: str) -> str:
     return f"{scheme} {secret}"
 
 
-def _fingerprint(value: object) -> str:
+def _stable_identity_fingerprint(value: object) -> str:
     serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     return hashlib.sha256(serialized).hexdigest()
+
+
+def provider_observation_fingerprint(safe_projection: dict[str, object]) -> str:
+    """Fingerprint only the allowlisted values that TekDocs is permitted to retain."""
+
+    return _stable_identity_fingerprint(safe_projection)
 
 
 class NetBoxProvider:
@@ -151,10 +157,15 @@ class NetBoxProvider:
             if not isinstance(record, dict) or not isinstance(record.get("id"), int):
                 raise ValueError("provider_response_invalid")
             # Keep only the facts used by the TekDocs Networks and Assets projections.
-            # The full provider response contributes to the digest but never crosses this boundary.
+            # Excluded provider fields must not influence retained state, including its digest.
             projection = _netbox_projection(str(remote_type), record)
             observations.append(
-                ProviderObservation(str(remote_type), str(record["id"]), _fingerprint(record), projection)
+                ProviderObservation(
+                    str(remote_type),
+                    str(record["id"]),
+                    provider_observation_fingerprint(projection),
+                    projection,
+                )
             )
         next_value = payload.get("next")
         if next_value is not None and not isinstance(next_value, str):
@@ -441,7 +452,7 @@ class UniFiProvider:
                 ProviderObservation(
                     remote_type,
                     remote_id,
-                    _fingerprint(record),
+                    provider_observation_fingerprint(projection),
                     projection,
                     source_timestamp=str(summary.get("connectedAt"))
                     if remote_type == "unifi.client" and isinstance(summary.get("connectedAt"), str)
@@ -623,7 +634,7 @@ class MicrosoftGraphProvider:
             raise ValueError("provider_permissions_missing")
         if any(marker in role.casefold() for role in role_set for marker in GRAPH_FORBIDDEN_ROLE_MARKERS):
             raise ValueError("provider_permissions_excessive")
-        fingerprint = _fingerprint(sorted(role_set))
+        fingerprint = _stable_identity_fingerprint(sorted(role_set))
         existing = connection.configuration.get("scope_fingerprint")
         if existing and existing != fingerprint:
             raise ValueError("provider_permission_drift")
@@ -651,10 +662,9 @@ class MicrosoftGraphProvider:
             record = values[0]
             if record["id"] != connection.configuration.get("tenant_id"):
                 raise ValueError("provider_tenant_validation_failed")
+            projection = _scalar_projection(record, ("id", "displayName"))
             observations.append(
-                ProviderObservation(
-                    "tenant", record["id"], _fingerprint(record), _scalar_projection(record, ("id", "displayName"))
-                )
+                ProviderObservation("tenant", record["id"], provider_observation_fingerprint(projection), projection)
             )
             domains = record.get("verifiedDomains", [])
             if not isinstance(domains, list):
@@ -662,7 +672,11 @@ class MicrosoftGraphProvider:
             for domain in domains:
                 if isinstance(domain, dict) and isinstance(domain.get("name"), str):
                     projection = _scalar_projection(domain, ("name", "isDefault", "isInitial", "type"))
-                    observations.append(ProviderObservation("domain", domain["name"], _fingerprint(domain), projection))
+                    observations.append(
+                        ProviderObservation(
+                            "domain", domain["name"], provider_observation_fingerprint(projection), projection
+                        )
+                    )
             complete = ("tenant", "domain")
             next_cursor = _encode_cursor(
                 {
@@ -698,7 +712,7 @@ class MicrosoftGraphProvider:
                             ProviderObservation(
                                 "user_license_assignment",
                                 f"{record['id']}:{license_record['skuId']}",
-                                _fingerprint(license_projection),
+                                provider_observation_fingerprint(license_projection),
                                 license_projection,
                                 state="retired" if retired else "observed",
                             )
@@ -707,7 +721,7 @@ class MicrosoftGraphProvider:
                     ProviderObservation(
                         "user",
                         record["id"],
-                        _fingerprint(record),
+                        provider_observation_fingerprint(projection),
                         projection,
                         state="retired" if retired else "observed",
                     )
@@ -729,12 +743,10 @@ class MicrosoftGraphProvider:
                 if not isinstance(record, dict) or not isinstance(record.get("id"), str):
                     raise ValueError("provider_response_invalid")
                 group_ids.append(record["id"])
+                projection = _scalar_projection(record, ("id", "displayName", "securityEnabled", "mailEnabled"))
                 observations.append(
                     ProviderObservation(
-                        "group",
-                        record["id"],
-                        _fingerprint(record),
-                        _scalar_projection(record, ("id", "displayName", "securityEnabled", "mailEnabled")),
+                        "group", record["id"], provider_observation_fingerprint(projection), projection
                     )
                 )
             if group_ids:
@@ -774,7 +786,9 @@ class MicrosoftGraphProvider:
                 identity = f"{group_id}:{record['id']}"
                 projection = {"groupId": group_id, "memberId": record["id"]}
                 observations.append(
-                    ProviderObservation("group_membership", identity, _fingerprint(projection), projection)
+                    ProviderObservation(
+                        "group_membership", identity, provider_observation_fingerprint(projection), projection
+                    )
                 )
             if next_path:
                 next_cursor = _encode_cursor({**state, "path": next_path})
@@ -822,7 +836,11 @@ class MicrosoftGraphProvider:
                     enabled = record["prepaidUnits"].get("enabled")
                     if isinstance(enabled, int):
                         projection["enabledUnits"] = enabled
-                observations.append(ProviderObservation(remote_type, record["id"], _fingerprint(record), projection))
+                observations.append(
+                    ProviderObservation(
+                        remote_type, record["id"], provider_observation_fingerprint(projection), projection
+                    )
+                )
             if next_path:
                 next_cursor = _encode_cursor({"stage": stage, "path": next_path})
             elif stage == "skus":
@@ -1033,7 +1051,7 @@ class HaloPSAProvider:
                 ProviderObservation(
                     remote_type,
                     remote_id,
-                    _fingerprint(record),
+                    provider_observation_fingerprint(projection),
                     projection,
                     _halo_timestamp(record, "last_modified", "lastactiondate", "dateoccurred"),
                 )
@@ -1113,7 +1131,9 @@ def _ninja_software_id(record: dict[str, object]) -> str:
     device_id = record.get("deviceId")
     if not isinstance(device_id, int | str):
         raise ValueError("provider_response_invalid")
-    product_identity = _fingerprint({"name": record.get("name"), "publisher": record.get("publisher")})[:24]
+    product_identity = _stable_identity_fingerprint(
+        {"name": record.get("name"), "publisher": record.get("publisher")}
+    )[:24]
     return f"{device_id}:{product_identity}"[:160]
 
 
@@ -1276,7 +1296,7 @@ class NinjaOneProvider:
                 ProviderObservation(
                     remote_type,
                     remote_id,
-                    _fingerprint(projection),
+                    provider_observation_fingerprint(projection),
                     projection,
                     _ninja_source_timestamp(
                         record.get("timestamp") or record.get("lastUpdate") or record.get("lastContact")
@@ -1378,6 +1398,7 @@ def validate_provider_page(adapter: ProviderAdapter, page: ProviderPage) -> None
                 not isinstance(value, str | int | float | bool | type(None))
                 for value in observation.safe_projection.values()
             )
+            or observation.fingerprint != provider_observation_fingerprint(observation.safe_projection)
         ):
             raise ValueError("provider_response_invalid")
         identities[identity] = observation.fingerprint

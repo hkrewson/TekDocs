@@ -11,6 +11,7 @@ from apps.core.integration_providers import (
     ProviderPage,
     UniFiProvider,
     _unifi_cursor,
+    provider_observation_fingerprint,
     unifi_api_base_url,
     validate_provider_page,
 )
@@ -30,6 +31,16 @@ from apps.core.tests.test_integrations import organization
 
 pytest_plugins = ("apps.core.tests.test_integrations",)
 UNIFI_TEST_CREDENTIAL = "private-unifi-key"  # noqa: S105
+
+
+def observation(remote_type, remote_id, _legacy_fingerprint, safe_projection, **kwargs):  # type: ignore[no-untyped-def]
+    return ProviderObservation(
+        remote_type,
+        remote_id,
+        provider_observation_fingerprint(safe_projection),
+        safe_projection,
+        **kwargs,
+    )
 
 
 @pytest.mark.django_db
@@ -114,6 +125,8 @@ def test_unifi_provider_discovers_sites_before_bounded_resources():
 
 
 def test_unifi_provider_reads_network_detail_and_keeps_only_supported_facts():
+    excluded = {"value": "private-provider-value-one"}
+
     def fetcher(**kwargs):  # type: ignore[no-untyped-def]
         path = kwargs["relative_path"]
         if path.endswith("/networks?offset=0&limit=25"):
@@ -148,7 +161,8 @@ def test_unifi_provider_reads_network_detail_and_keeps_only_supported_facts():
                     "ipAddressRange": {"start": "10.42.0.20", "stop": "10.42.0.200"},
                 },
             },
-            "firewallZone": {"name": "Private provider detail"},
+            "firewallZone": {"name": excluded["value"]},
+            "wifiPassword": excluded["value"],
         }
 
     provider = UniFiProvider(fetcher=fetcher)
@@ -176,6 +190,13 @@ def test_unifi_provider_reads_network_detail_and_keeps_only_supported_facts():
     }
     assert page.complete_types == ("unifi.network",)
     validate_provider_page(provider, page)
+    excluded["value"] = "private-provider-value-two"
+    repeated = provider.fetch_page(
+        SimpleNamespace(base_url="https://console.example.test/proxy/network/integration/"),
+        secret="private-api-key",
+        cursor=cursor,
+    )
+    assert repeated.observations[0].fingerprint == page.observations[0].fingerprint
 
 
 @pytest.mark.parametrize(
@@ -277,7 +298,7 @@ def test_unifi_sync_creates_supported_network_asset_ip_and_wireless_records(inst
             assert cursor == ""
             return ProviderPage(
                 (
-                    ProviderObservation(
+                    observation(
                         "unifi.network",
                         "network-1",
                         "1" * 64,
@@ -291,7 +312,7 @@ def test_unifi_sync_creates_supported_network_asset_ip_and_wireless_records(inst
                             "dns_server_2": "1.1.1.1",
                         },
                     ),
-                    ProviderObservation(
+                    observation(
                         "unifi.device",
                         "device-1",
                         "2" * 64,
@@ -304,7 +325,7 @@ def test_unifi_sync_creates_supported_network_asset_ip_and_wireless_records(inst
                             "features": "accessPoint",
                         },
                     ),
-                    ProviderObservation(
+                    observation(
                         "unifi.client",
                         "client-1",
                         "3" * 64,
@@ -316,7 +337,7 @@ def test_unifi_sync_creates_supported_network_asset_ip_and_wireless_records(inst
                             "ip_address": "10.42.0.20",
                         },
                     ),
-                    ProviderObservation(
+                    observation(
                         "unifi.wifi",
                         "wifi-1",
                         "4" * 64,

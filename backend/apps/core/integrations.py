@@ -20,6 +20,7 @@ from .integration_providers import (
     PROVIDERS,
     ProviderAdapter,
     netbox_api_base_url,
+    provider_observation_fingerprint,
     unifi_api_base_url,
     validate_provider_adapter,
     validate_provider_page,
@@ -783,6 +784,8 @@ def _retired_observations(job: IntegrationSyncJob, complete_types: tuple[str, ..
         .order_by("remote_type", "remote_id", "-observed_at")
         .distinct("remote_type", "remote_id")
     )
+    schema_version = PROVIDERS[job.connection.provider].contract.observation_schema_version
+    retired_fingerprint = provider_observation_fingerprint({})
     return [
         IntegrationObservation(
             tenant=job.tenant,
@@ -791,8 +794,8 @@ def _retired_observations(job: IntegrationSyncJob, complete_types: tuple[str, ..
             job=job,
             remote_type=item.remote_type,
             remote_id=item.remote_id,
-            fingerprint=item.fingerprint,
-            schema_version=item.schema_version,
+            fingerprint=retired_fingerprint,
+            schema_version=schema_version,
             safe_projection={},
             provenance="provider_absence",
             state="retired",
@@ -806,6 +809,8 @@ def _retired_prefix_observations(
     job: IntegrationSyncJob, complete_id_prefixes: tuple[tuple[str, str], ...]
 ) -> list[IntegrationObservation]:
     retired: list[IntegrationObservation] = []
+    schema_version = PROVIDERS[job.connection.provider].contract.observation_schema_version
+    retired_fingerprint = provider_observation_fingerprint({})
     for remote_type, prefix in complete_id_prefixes:
         current_keys = set(
             IntegrationObservation.objects.filter(
@@ -833,8 +838,8 @@ def _retired_prefix_observations(
                 job=job,
                 remote_type=item.remote_type,
                 remote_id=item.remote_id,
-                fingerprint=item.fingerprint,
-                schema_version=item.schema_version,
+                fingerprint=retired_fingerprint,
+                schema_version=schema_version,
                 safe_projection={},
                 provenance="provider_delta_absence",
                 state="retired",

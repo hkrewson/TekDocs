@@ -9,7 +9,7 @@ from django.test import Client
 from django.urls import reverse
 
 from apps.accounts.bootstrap import bootstrap_owner
-from apps.core.integration_providers import ProviderObservation, ProviderPage
+from apps.core.integration_providers import ProviderObservation, ProviderPage, provider_observation_fingerprint
 from apps.core.integration_secrets import decrypt_integration_secret, encrypt_integration_secret
 from apps.core.integrations import process_sync_job, resolve_conflict
 from apps.core.models import (
@@ -26,6 +26,16 @@ from apps.core.models import (
 from apps.core.organizations import create_organization
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
 from apps.core.workspaces import resolve_msp_workspace
+
+
+def observation(remote_type, remote_id, _legacy_fingerprint, safe_projection, **kwargs):  # type: ignore[no-untyped-def]
+    return ProviderObservation(
+        remote_type,
+        remote_id,
+        provider_observation_fingerprint(safe_projection),
+        safe_projection,
+        **kwargs,
+    )
 
 
 @pytest.fixture
@@ -155,7 +165,7 @@ def test_device_requires_accepted_organization_then_previews_serial_manufacturer
     sync(
         installation,
         connection,
-        [ProviderObservation("organization", "8", "a" * 64, {"id": 8, "name": "Mapped client"})],
+        [observation("organization", "8", "a" * 64, {"id": 8, "name": "Mapped client"})],
     )
     organization_conflict = connection.conflicts.get(remote_type="organization", remote_id="8", status="open")
     assert organization_conflict.suggested_local_entity_id == selected.entity_id
@@ -166,13 +176,13 @@ def test_device_requires_accepted_organization_then_previews_serial_manufacturer
         installation,
         connection,
         [
-            ProviderObservation(
+            observation(
                 "device_status",
                 "42",
                 "b" * 64,
                 {"id": 42, "organizationId": 8, "displayName": "RENAMED-HOST"},
             ),
-            ProviderObservation(
+            observation(
                 "device",
                 "42",
                 "c" * 64,
@@ -193,7 +203,7 @@ def test_device_requires_accepted_organization_then_previews_serial_manufacturer
         installation,
         connection,
         [
-            ProviderObservation(
+            observation(
                 "device",
                 "42",
                 "d" * 64,
@@ -206,7 +216,9 @@ def test_device_requires_accepted_organization_then_previews_serial_manufacturer
     assert asset.entity.display_name == "Original asset name"
     accept(installation, rename_conflict)
     mapping.refresh_from_db()
-    assert mapping.observed_fingerprint == "d" * 64
+    assert mapping.observed_fingerprint == provider_observation_fingerprint(
+        {"deviceId": 42, "name": "RENAMED-AGAIN", "manufacturer": manufacturer, "serialNumber": "SERIAL-42"}
+    )
 
 
 @pytest.mark.django_db
@@ -248,7 +260,7 @@ def test_hostname_only_and_second_remote_device_for_same_asset_are_not_auto_link
     sync(
         installation,
         connection,
-        [ProviderObservation("device", "43", "c" * 64, {"deviceId": 43, "name": "SHARED-HOST"})],
+        [observation("device", "43", "c" * 64, {"deviceId": 43, "name": "SHARED-HOST"})],
     )
     assert connection.conflicts.get(remote_type="device", remote_id="43", status="open").local_entity_id is None
 
@@ -267,7 +279,7 @@ def test_hostname_only_and_second_remote_device_for_same_asset_are_not_auto_link
         installation,
         connection,
         [
-            ProviderObservation(
+            observation(
                 "device",
                 "43",
                 "e" * 64,
@@ -289,15 +301,15 @@ def test_observation_api_labels_link_review_acceptance_and_staleness(installatio
     sync(
         installation,
         connection,
-        [ProviderObservation("organization", "18", "a" * 64, {"id": 18, "name": "API state client"})],
+        [observation("organization", "18", "a" * 64, {"id": 18, "name": "API state client"})],
     )
     accept(installation, connection.conflicts.get(remote_type="organization", remote_id="18", status="open"))
     sync(
         installation,
         connection,
         [
-            ProviderObservation("device_status", "82", "b" * 64, {"id": 82, "organizationId": 18}),
-            ProviderObservation(
+            observation("device_status", "82", "b" * 64, {"id": 82, "organizationId": 18}),
+            observation(
                 "device",
                 "82",
                 "c" * 64,
@@ -360,7 +372,7 @@ def test_removed_device_creates_review_without_archiving_local_inventory(install
     sync(
         installation,
         connection,
-        [ProviderObservation("device", "77", "a" * 64, {}, state="retired")],
+        [observation("device", "77", "a" * 64, {}, state="retired")],
     )
 
     conflict = connection.conflicts.get(remote_type="device", remote_id="77", status="open")

@@ -80,6 +80,32 @@ def test_halopsa_authenticates_with_client_credentials_and_minimizes_ticket_proj
     assert page.complete_types == ("ticket",)
 
 
+def test_halopsa_excluded_ticket_secrets_do_not_affect_the_retained_fingerprint():
+    def fetch(excluded_value):
+        provider = HaloPSAProvider(
+            getter=lambda **_kwargs: {
+                "tickets": [
+                    {
+                        "id": 1042,
+                        "summary": "Printer queue unavailable",
+                        "details": excluded_value,
+                        "private_notes": [{"note": excluded_value}],
+                        "customfields": [{"name": "password", "value": excluded_value}],
+                    }
+                ],
+                "record_count": 1,
+            },
+            poster=lambda **_kwargs: {"access_token": "safe-access-token-value"},
+        )
+        return provider.fetch_page(connection(), secret="client-secret", cursor=_halo_encode_cursor(4, 1))
+
+    first = fetch("excluded-secret-one")
+    second = fetch("excluded-secret-two")
+
+    assert first.observations[0].safe_projection == second.observations[0].safe_projection
+    assert first.observations[0].fingerprint == second.observations[0].fingerprint
+
+
 def test_halopsa_pagination_is_opaque_and_advances_between_collections():
     full_page = [{"id": number, "name": f"Client {number}"} for number in range(100)]
     provider = HaloPSAProvider(

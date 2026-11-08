@@ -6473,7 +6473,7 @@ class IntegrationObservation(models.Model):
     remote_type = models.CharField(max_length=64)
     remote_id = models.CharField(max_length=160)
     fingerprint = models.CharField(max_length=64)
-    schema_version = models.PositiveSmallIntegerField(default=1)
+    schema_version = models.PositiveSmallIntegerField(default=2)
     safe_projection = models.JSONField(default=dict, blank=True)
     source_timestamp = models.DateTimeField(null=True, blank=True)
     provenance = models.CharField(max_length=32, default="provider_api")

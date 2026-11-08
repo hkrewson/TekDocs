@@ -65,9 +65,39 @@ def test_graph_provider_validates_tenant_permissions_and_projects_only_safe_fiel
     assert page.observations[0].safe_projection == {"id": TENANT_ID, "displayName": "Example tenant"}
     assert "unsafeProviderValue" not in json.dumps(page.observations[0].safe_projection)
     assert page.configuration_updates["validated_tenant_id"] == TENANT_ID
-    assert len(page.configuration_updates["scope_fingerprint"]) == 64
+    assert page.configuration_updates["scope_fingerprint"] == (
+        "5dd2a3fabd483398792a885aee2d9e6a1fe30c0ea1ba7631e1a3d25fa4c274c1"
+    )
     assert requests[0]["fields"]["scope"] == "https://graph.microsoft.com/.default"
     assert requests[1]["authorization"].startswith("Bearer ")
+    changed_excluded_value = MicrosoftGraphProvider(
+        getter=lambda **_kwargs: {
+            "value": [
+                {
+                    "id": TENANT_ID,
+                    "displayName": "Example tenant",
+                    "verifiedDomains": [],
+                    "unsafeProviderValue": "another excluded value",
+                }
+            ]
+        },
+        poster=lambda **_kwargs: {"access_token": token()},
+    ).fetch_page(connection(), secret="client-secret-value", cursor="")
+    assert changed_excluded_value.observations[0].fingerprint == page.observations[0].fingerprint
+    changed_allowlisted_value = MicrosoftGraphProvider(
+        getter=lambda **_kwargs: {
+            "value": [
+                {
+                    "id": TENANT_ID,
+                    "displayName": "Renamed tenant",
+                    "verifiedDomains": [],
+                    "unsafeProviderValue": "must not leave boundary",
+                }
+            ]
+        },
+        poster=lambda **_kwargs: {"access_token": token()},
+    ).fetch_page(connection(), secret="client-secret-value", cursor="")
+    assert changed_allowlisted_value.observations[0].fingerprint != page.observations[0].fingerprint
 
 
 @pytest.mark.parametrize(

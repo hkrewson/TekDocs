@@ -18,7 +18,7 @@ from apps.core.integration_egress import (
     get_provider_json,
     get_provider_json_api_key,
 )
-from apps.core.integration_providers import ProviderObservation, ProviderPage
+from apps.core.integration_providers import ProviderObservation, ProviderPage, provider_observation_fingerprint
 from apps.core.integrations import JOB_LEASE, cancel_sync_job, enqueue_sync, process_sync_job
 from apps.core.models import IntegrationConflict, IntegrationJobState, IntegrationObservation
 from apps.core.webhook_egress import WebhookEgressError, WebhookTarget
@@ -182,7 +182,9 @@ class FinalizationFailureAdapter:
     contract = SuccessfulAdapter.contract
 
     def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
-        return ProviderPage((ProviderObservation("ipam.vlan", "91", "f" * 64),), "")
+        return ProviderPage(
+            (ProviderObservation("ipam.vlan", "91", provider_observation_fingerprint({})),), ""
+        )
 
 
 @pytest.mark.django_db
@@ -234,24 +236,44 @@ def test_pending_job_can_be_cancelled_and_cannot_be_replayed(installation):
     assert IntegrationObservation.objects.filter(job=job).count() == 0
 
 
+@pytest.mark.parametrize("prefix_completion", (False, True))
 @pytest.mark.django_db
-def test_missing_remote_identity_becomes_reviewable_retirement_without_local_delete(installation):
+def test_missing_v1_remote_identity_retires_with_projection_only_v2_fingerprint(installation, prefix_completion):
     record = organization(installation, "Retirement client")
     source = connection(installation, record)
     first = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:present")
-    process_sync_job(job_id=first.id, adapter=SuccessfulAdapter())
+    historical_fingerprint = "a" * 64
+    IntegrationObservation.objects.create(
+        tenant=first.tenant,
+        workspace=first.workspace,
+        organization=first.organization,
+        job=first,
+        remote_type="ipam.prefix",
+        remote_id="42",
+        fingerprint=historical_fingerprint,
+        schema_version=1,
+        safe_projection={"id": 42, "prefix": "10.42.0.0/24"},
+    )
     second = enqueue_sync(connection=source, trigger="manual", idempotency_key="request:missing")
 
     class EmptyAdapter(SuccessfulAdapter):
         def fetch_page(self, connection, *, secret, cursor):  # type: ignore[no-untyped-def]
-            return ProviderPage((), "", complete_types=("ipam.prefix",))
+            return ProviderPage(
+                (),
+                "",
+                complete_types=() if prefix_completion else ("ipam.prefix",),
+                complete_id_prefixes=(("ipam.prefix", "4"),) if prefix_completion else (),
+            )
 
     process_sync_job(job_id=second.id, adapter=EmptyAdapter())
 
     retired = IntegrationObservation.objects.get(job=second)
     assert retired.state == "retired"
-    assert retired.provenance == "provider_absence"
+    assert retired.provenance == ("provider_delta_absence" if prefix_completion else "provider_absence")
     assert retired.safe_projection == {}
+    assert retired.schema_version == 2
+    assert retired.fingerprint == provider_observation_fingerprint({})
+    assert retired.fingerprint != historical_fingerprint
     assert IntegrationConflict.objects.get(connection=source, remote_id="42").difference == "retired_remote"
 
 

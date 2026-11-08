@@ -108,7 +108,7 @@ def test_ninjaone_software_projection_excludes_paths_sizes_codes_and_system_flag
         poster=token,
     ).fetch_page(connection(), secret="secret-value", cursor=_ninja_encode_cursor(6))
 
-    assert page.observations[0].remote_id.startswith("7:")
+    assert page.observations[0].remote_id == "7:3bd341ae038a24d813dd2bd1"
     assert "stable-product-code" not in page.observations[0].remote_id
     assert page.observations[0].safe_projection == {
         "deviceId": 7,

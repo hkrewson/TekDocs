@@ -46,6 +46,14 @@ changing Go 1.27.3 and advances only its final Alpine runtime from 3.24.2 to 3.2
 It replaces Dependabot PRs #142, #143 and #146–#148 as one validation unit; it does
 not accept the separate major frontend, renderer or development-tool proposals.
 
+The follow-on supply-chain tranche replaces Dependabot PR #119. It refreshes the
+fully pinned GitHub Actions used for language setup, artifact transfer, SBOM
+generation, attestations and CodeQL while keeping their workflow interfaces and
+permissions unchanged. Recorded CodeQL and attestation tool identifiers advance
+with the executable pins so release evidence continues to describe the tools that
+actually ran. Hosted Build and CodeQL are the acceptance authorities for this
+workflow-only tranche.
+
 Reference: [GitHub Dependabot options](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference).
 
 ## Coupled tools and size review follow-up

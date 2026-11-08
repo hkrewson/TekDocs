@@ -4,6 +4,12 @@ import AxeBuilder from '@axe-core/playwright'
 
 const wcag22Tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 
+type SecurityPolicyViolation = {
+  blockedUri: string
+  directive: string
+  sample: string
+}
+
 const context = {
   user: { id: crypto.randomUUID(), email: 'owner@example.com', display_name: 'Primary Owner' },
   tenant: { id: crypto.randomUUID(), name: 'Example MSP' },
@@ -361,20 +367,24 @@ test('technical Markdown has visual controls, semantic rendering, preview, and p
   await expect(page.getByText(/Raw HTML, MDX, scripts/)).toBeVisible()
 })
 
-test('guided diagrams remain portable Markdown inside the document', async ({ page, baseURL }) => {
+test('guided diagrams remain portable Markdown inside the document', async ({ page, baseURL }, testInfo) => {
   const pageErrors: string[] = []
   const securityConsoleErrors: string[] = []
   page.on('pageerror', (error) => pageErrors.push(error.message))
   page.on('console', (message) => {
-    if (message.type() === 'error' && /(content security policy|cross-origin-embedder-policy|blocked by response)/i.test(message.text())) {
+    if (message.type() === 'error' && /(cross-origin-embedder-policy|blocked by response)/i.test(message.text())) {
       securityConsoleErrors.push(message.text())
     }
   })
   await page.addInitScript(() => {
-    const global = window as typeof window & { __tekdocsSecurityPolicyViolations?: string[] }
+    const global = window as typeof window & { __tekdocsSecurityPolicyViolations?: SecurityPolicyViolation[] }
     global.__tekdocsSecurityPolicyViolations = []
     window.addEventListener('securitypolicyviolation', (event) => {
-      global.__tekdocsSecurityPolicyViolations?.push(`${event.effectiveDirective}:${event.blockedURI}`)
+      global.__tekdocsSecurityPolicyViolations?.push({
+        blockedUri: event.blockedURI,
+        directive: event.effectiveDirective,
+        sample: event.sample,
+      })
     })
   })
   await mockAuthenticated(page)
@@ -417,6 +427,7 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   })
   await page.goto('/documentation')
   await openPrimaryBlockEditor(page)
+  await expect(page.locator('[style]')).toHaveCount(0)
 
   const trigger = page.getByRole('button', { name: 'Diagrams' })
   await trigger.click()
@@ -468,7 +479,20 @@ test('guided diagrams remain portable Markdown inside the document', async ({ pa
   await expect(page.getByRole('group', { name: 'Diagram view controls' })).toBeHidden()
   await expect(page.getByRole('img', { name: 'Network diagram' })).toBeVisible()
   await page.emulateMedia({ media: 'screen', forcedColors: 'none' })
-  expect(await page.evaluate(() => (window as typeof window & { __tekdocsSecurityPolicyViolations?: string[] }).__tekdocsSecurityPolicyViolations)).toEqual([])
+  const policyViolations = await page.evaluate(() => (
+    window as typeof window & { __tekdocsSecurityPolicyViolations?: SecurityPolicyViolation[] }
+  ).__tekdocsSecurityPolicyViolations ?? [])
+  const isKnownBlockedWebkitEditorAttempt = (violation: SecurityPolicyViolation) => (
+    testInfo.project.name === 'webkit'
+    && violation.directive === 'style-src-attr'
+    && violation.blockedUri === 'inline'
+    && violation.sample === 'text-overflow:inherit'
+  )
+  expect(policyViolations.filter((violation) => !isKnownBlockedWebkitEditorAttempt(violation))).toEqual([])
+  if (testInfo.project.name === 'webkit') {
+    expect(policyViolations.filter(isKnownBlockedWebkitEditorAttempt).length).toBeGreaterThan(0)
+  }
+  await expect(page.locator('[style]')).toHaveCount(0)
   expect(securityConsoleErrors).toEqual([])
 })
 

@@ -32,7 +32,7 @@ def test_liveness_contract(client):
     assert response.json() == {"status": "ok", "service": "backend", "version": VERSION}
     assert response.headers["X-Request-ID"]
     assert "font-src 'self' data:" in response.headers["Content-Security-Policy"]
-    assert response.headers["Content-Security-Policy"].endswith("style-src 'self'")
+    assert response.headers["Content-Security-Policy"].endswith("style-src 'self' 'report-sample'")
     assert response.headers["Cross-Origin-Embedder-Policy"] == "require-corp"
 
 

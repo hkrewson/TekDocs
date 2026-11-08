@@ -79,10 +79,9 @@ class SecurityHeadersMiddleware:
             "img-src 'self' data:",
             "object-src 'none'",
             "script-src 'self'",
-            # Mermaid still creates temporary runtime styles while producing its
-            # sanitized image output. The compatibility allowance remains until
-            # that dependency is isolated from the application document.
-            "style-src 'self'",
+            # Inline application styling remains blocked. Report rejected style
+            # samples so browser acceptance can identify the exact source.
+            "style-src 'self' 'report-sample'",
         )
     )
 

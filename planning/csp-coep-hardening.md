@@ -18,8 +18,9 @@ authentication, authorization, database policy, publication formats, or producti
   `Cross-Origin-Embedder-Policy: require-corp` value. Nginx hides the upstream copy
   before applying its edge policy because duplicate COEP fields fail open.
 - Login/navigation, bundled fonts, the same-origin PDF worker, diagram rendering,
-  downloads, desktop browsers, and maintained mobile browsers pass without CSP or
-  COEP console violations.
+  downloads, desktop browsers, and maintained mobile browsers pass without
+  unexpected CSP or COEP violations. WebKit's exact blocked transient editor
+  attempt remains observable and bounded until the browser no longer emits it.
 - Offline HTML exports retain their separate sandbox policy. Their inline export
   styles do not weaken the web application's policy.
 - Mermaid, Milkdown and Cytoscape runtime styling remains isolated, replaced, or
@@ -34,17 +35,24 @@ indentation use bounded CSS classes. Mermaid renderer output is sanitized as bef
 and then encoded as an image resource instead of being injected into the application
 DOM.
 
-An enforced browser reproduction refined the earlier static dependency inventory.
-The exercised Milkdown authoring path produced no strict-policy violation. Cytoscape
-produced one `style-src-elem` violation solely to add its private container
-`position: relative` rule; TekDocs now supplies that rule in external CSS and a
-checked document sentinel prevents the dependency injection. Mermaid was the
-remaining verified blocker: a real in-page preview request created temporary style
-elements and many style attributes while producing the SVG. Phase 2 moves preview
-generation behind the existing isolated renderer boundary. The browser receives
-sanitized SVG and displays it only as a `data:` image, with client-side sanitization
-retained as defense in depth. The application policy now enforces `style-src 'self'`
-without an inline-style exception.
+Enforced browser reproductions refined the earlier static dependency inventory.
+Cytoscape produced one `style-src-elem` violation solely to add its private
+container `position: relative` rule; TekDocs now supplies that rule in external CSS
+and a checked document sentinel prevents the dependency injection. Mermaid was the
+remaining verified renderer blocker: a real in-page preview request created
+temporary style elements and many style attributes while producing the SVG. Phase 2
+moves preview generation behind the existing isolated renderer boundary. The browser
+receives sanitized SVG and displays it only as a `data:` image, with client-side
+sanitization retained as defense in depth.
+
+Hosted WebKit then exposed a separate Milkdown mount behavior. Its optional cursor
+feature left inline-style helpers in the document, so TekDocs disables that feature.
+WebKit's editor engine also attempts `text-overflow:inherit` on transient internal
+nodes. The enforced policy blocks those attempts and no inline style reaches the
+document. `report-sample` makes the exact blocked declaration observable; acceptance
+allows only that exact WebKit event and continues to fail on every other CSP event or
+persisted style attribute. The application policy remains `style-src 'self'` without
+an inline-style exception.
 
 COEP uses `require-corp`. All application subresources inventoried in this slice
 are same-origin or `data:` resources; the latter are limited to diagram images and
@@ -61,7 +69,7 @@ The behavior follows [CSP Level 3](https://www.w3.org/TR/CSP3/) and the
 Verified statically:
 
 - Nginx and Django policies agree on `style-src 'self'` without an inline-style
-  exception.
+  exception and include `report-sample` for rejected style diagnostics.
 - application TypeScript/TSX contains no inline style property, DOM style mutation,
   or `dangerouslySetInnerHTML` use;
 - the first-party CSS needed to replace those runtime styles remains within a
@@ -78,7 +86,14 @@ Verified locally on the phase 2 candidate:
 - focused backend diagram-preview and security-header tests;
 - production-image headers for the application and proxied API paths; and
 - the real guided/saved Mermaid diagram path in Chrome under enforced
-  `style-src 'self'`, with no CSP or COEP console violations.
+  `style-src 'self'`, with no CSP or COEP console violations;
+- the exact guided/saved diagram regression in Chromium, Firefox and WebKit; WebKit
+  reports only its blocked `text-overflow:inherit` editor attempts, while the page
+  retains no inline style attributes;
+- the Django liveness security-header contract against the retained isolated test
+  database; and
+- the production-shaped Nginx response, which retains strict style blocking and
+  emits `Cross-Origin-Embedder-Policy: require-corp`.
 
 Needs hosted validation on the exact source commit:
 
@@ -118,6 +133,15 @@ rendering behind the existing isolated renderer boundary and removes `unsafe-inl
 from both application policies. The repeated production-image Chrome path completed
 without a CSP or COEP violation. The hosted browser matrix and passive DAST must
 still confirm the stricter policy.
+
+Exact-source Extended CI run 42428229995 passed Chromium and Firefox but WebKit
+reported sixteen blocked `style-src-attr` events while opening the Milkdown editor.
+The failure was reproduced locally under WebKit with the production-shaped header.
+Disabling Milkdown's optional cursor feature removed its persistent inline-style
+helpers. CSP `report-sample` identified the remaining transient browser attempts as
+`text-overflow:inherit`; they are blocked by the strict policy and leave no style
+attribute in the document. The focused three-browser regression now passes locally.
+Hosted Extended CI and passive DAST remain the exact-source closure gates.
 
 The requested security-audit workflow requires target-controlled execution to run
 with OS-enforced network, environment, filesystem, and resource isolation. That

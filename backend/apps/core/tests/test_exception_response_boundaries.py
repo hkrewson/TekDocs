@@ -4,11 +4,23 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.test import APIRequestFactory, force_authenticate
 
-from apps.core import asset_csv, data_flow_views, document_views, inventory, invoicing, software_inventory, stock
+from apps.core import (
+    asset_csv,
+    data_flow_views,
+    document_views,
+    inventory,
+    invoicing,
+    software_inventory,
+    software_inventory_views,
+    stock,
+)
 from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
 from apps.core.data_flows import DataFlowError
@@ -57,6 +69,7 @@ RISKY_HANDLERS = {
     "network_circuits.py": {"ValidationError"},
     "repository_publication_views.py": {"RepositoryServiceError"},
     "stock_views.py": {"DjangoValidationError", "StockError"},
+    "software_inventory_views.py": {"InventoryError", "SoftwareInventoryError"},
 }
 
 
@@ -216,6 +229,65 @@ def test_software_inventory_model_validation_does_not_become_public():
 def test_inventory_domain_errors_separate_internal_and_public_details(error):
     assert str(error).startswith("private")
     assert "private" not in error.public_detail
+
+
+def test_software_inventory_domain_refusal_retains_its_public_message():
+    error = SoftwareInventoryError("No seats are available on this license.")
+    assert str(error) == "No seats are available on this license."
+    assert error.public_detail == "No seats are available on this license."
+
+
+def test_software_inventory_response_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace()
+    monkeypatch.setattr(software_inventory_views, "_workspace", lambda *args, **kwargs: workspace)
+    monkeypatch.setattr(software_inventory_views, "_asset", lambda *args, **kwargs: object())
+
+    def refuse_update(**kwargs):
+        raise SoftwareInventoryError(
+            "private software database diagnostic",
+            public_detail="The software inventory request is invalid.",
+        )
+
+    monkeypatch.setattr(software_inventory_views, "update_installation", refuse_update)
+    request = APIRequestFactory().patch("/software/", {"status": "installed"}, format="json")
+    force_authenticate(request, user=SimpleNamespace(pk=uuid4(), is_authenticated=True))
+    response = software_inventory_views.ClientSoftwareInstallationDetailView.as_view()(
+        request,
+        organization_entity_id=uuid4(),
+        asset_entity_id=uuid4(),
+    )
+
+    assert response.status_code == 400
+    assert str(response.data["error"]["detail"]["detail"]) == "The software inventory request is invalid."
+    assert "private software database diagnostic" not in str(response.data)
+
+
+def test_software_inventory_workspace_denial_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace(organization=object())
+    monkeypatch.setattr(
+        software_inventory_views,
+        "resolve_organization_workspace",
+        lambda *args, **kwargs: workspace,
+    )
+    monkeypatch.setattr(software_inventory_views, "require_permission", lambda *args, **kwargs: None)
+
+    def refuse_owner(organization):
+        raise InventoryError(
+            "private ownership database diagnostic",
+            public_detail="This workspace cannot own inventory.",
+        )
+
+    monkeypatch.setattr(software_inventory_views, "require_operational_owner", refuse_owner)
+    request = APIRequestFactory().get("/software-licenses/")
+    force_authenticate(request, user=SimpleNamespace(pk=uuid4(), is_authenticated=True))
+    response = software_inventory_views.SoftwareLicenseListCreateView.as_view()(
+        request,
+        organization_entity_id=uuid4(),
+    )
+
+    assert response.status_code == 403
+    assert str(response.data["error"]["detail"]["detail"]) == "This workspace cannot own inventory."
+    assert "private ownership database diagnostic" not in str(response.data)
 
 
 def test_asset_csv_row_wrapper_propagates_only_the_nested_public_detail():

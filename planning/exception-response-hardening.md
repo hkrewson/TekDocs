@@ -1,8 +1,10 @@
 # Exception response hardening
 
 Status: the first four bounded slices are confirmed by exact-source Build and
-CodeQL; the catalog-handler slice is locally complete and awaits exact-source
-hosted validation. Owner: maintainer / pre-1.0 security closeout.
+CodeQL. Exact-source CodeQL confirms the catalog-handler slice; its Build rerun
+was inconclusive after an unrelated template-migration shard reached its runner
+time limit. The software-inventory handler slice is locally complete and awaits
+exact-source hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -96,6 +98,21 @@ the previously reviewed inventory error contract. Existing schema-validation
 feedback remains an intentional catalog-domain message; database conflicts keep
 their fixed response.
 
+Exact-source CodeQL run 42671675386 passed on attempt 2 and reduced the queue
+from 76 to 68, closing exactly the eight catalog paths. Build run 42671601875
+executed the source, security, browser and database work on attempt 2, but the
+unrelated `template-migration-a` shard reached its 30-minute runner limit and
+the final gate failed closed. That run is retained as incomplete Build evidence,
+not catalog acceptance.
+
+The sixth bounded slice selects all seven results in
+`software_inventory_views.py`: the workspace ownership denial and six software
+installation/license mutation handlers. Both established domain exception types
+already separate internal diagnostics from `public_detail`; the view now uses
+that contract consistently. Existing controlled messages such as exhausted-seat
+and inactive-license refusals remain public, with their established 400/403
+statuses and error envelope unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -154,6 +171,18 @@ caught-exception reads before the change. The endpoint regression injects a
 private catalog diagnostic and proves only the explicit domain detail reaches
 the 400 response. The stale-revision test preserves its 409 status, fixed detail
 and current-revision payload. The boundary, complete catalog and complete
-inventory suites pass against retained PostgreSQL. Exact-source Build and
-CodeQL remain required after push; no alert is dismissed or counted closed
-before that evidence exists.
+inventory suites pass against retained PostgreSQL. Exact-source CodeQL
+42671675386 confirms the expected eight-result reduction to 68. Build
+42671601875 attempt 2 remains incomplete because the unrelated
+template-migration shard was cancelled at its runner time limit; it is not
+represented as passing acceptance.
+
+For the software-inventory handler slice, the exact analysis reproduced all
+seven direct caught-exception reads before the change. The static boundary guard
+first failed on the module, then passed after every handler used
+`public_detail`. Direct DRF response tests inject distinct private software and
+workspace diagnostics and prove neither reaches the public error envelope. A
+control retains the existing exhausted-seat domain message. The complete
+exception-response boundary suite passes locally. Exact-source Build and CodeQL
+remain required after push; the expected CodeQL queue is 61 and no alert is
+dismissed in advance.

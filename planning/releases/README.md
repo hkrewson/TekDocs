@@ -112,8 +112,19 @@ The catalog-handler follow-up selects all eight `catalog_views.py` results.
 Catalog exceptions now carry explicit public details, stale revisions preserve
 their fixed 409 detail and current-revision payload, and catalog-document
 associations reuse the reviewed inventory contract. Complete catalog/inventory
-and boundary validation passes locally; exact-source hosted Build and CodeQL
-remain required after push.
+and boundary validation passes locally. Exact-source CodeQL 42671675386 passed
+on attempt 2 and reduced the stack-trace queue from 76 to 68. Build 42671601875
+attempt 2 ran the source, security, browser and database work but remains
+incomplete because the unrelated `template-migration-a` shard reached its
+30-minute runner limit; the final gate correctly failed closed.
+
+The software-inventory handler follow-up selects all seven
+`software_inventory_views.py` results. The workspace ownership denial and six
+software installation/license mutation handlers now expose only their explicit
+public detail. Existing controlled seat, license and installation refusals keep
+their established messages, error envelope and 400/403 behavior. The boundary
+guard and direct DRF regressions pass locally; exact-source Build and CodeQL
+remain required after push, with an expected stack-trace queue of 61.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

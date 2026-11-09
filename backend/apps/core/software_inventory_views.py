@@ -181,7 +181,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -206,7 +206,7 @@ class ClientSoftwareInstallationDetailView(APIView):
                 values=dict(serializer.validated_data),
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareInstallationSerializer(result).data)
 
 
@@ -276,7 +276,7 @@ class SoftwareLicenseListCreateView(APIView):
                 values=values,
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareLicenseSerializer(record).data, status=201)
 
 
@@ -304,7 +304,7 @@ class SoftwareLicenseDetailView(APIView):
                 values=dict(serializer.validated_data),
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareLicenseSerializer(record).data)
 
 
@@ -334,7 +334,7 @@ class SoftwareLicenseInstallationView(APIView):
                 actor_id=request.user.pk,
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareLicenseSerializer(record).data)
 
 
@@ -351,7 +351,7 @@ class SoftwareLicenseSeatView(APIView):
                 **serializer.validated_data,
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareLicenseSerializer(record).data)
 
 
@@ -366,5 +366,5 @@ class SoftwareLicenseSeatDetailView(APIView):
                 actor_id=request.user.pk,
             )
         except SoftwareInventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SoftwareLicenseSerializer(record).data)

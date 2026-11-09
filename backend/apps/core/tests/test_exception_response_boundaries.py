@@ -8,10 +8,17 @@ from pathlib import Path
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from apps.core import data_flow_views, invoicing, stock
+from apps.core import data_flow_views, document_views, invoicing, stock
 from apps.core.data_flows import DataFlowError
+from apps.core.diagram_exports import DiagramRenderError
+from apps.core.document_exports import ExportConflict
+from apps.core.document_key_freeze import KeyFreezeConflict
+from apps.core.document_operations import DocumentOperationsError
+from apps.core.documents import PlacementConflict
 from apps.core.invoicing import InvoiceError
+from apps.core.publications import PublicationConflict
 from apps.core.stock import StockError
+from apps.core.taxonomies import TaxonomyError
 
 VIEW_ROOT = Path(__file__).parents[1]
 
@@ -26,6 +33,13 @@ GENERIC_TRANSLATORS = (
 
 RISKY_HANDLERS = {
     "content_graph_views.py": {"ContentIndexError"},
+    "document_views.py": {
+        "DocumentOperationsError",
+        "ExportConflict",
+        "PlacementConflict",
+        "PublicationConflict",
+        "RevisionConflict",
+    },
     "inventory_views.py": {"DjangoValidationError"},
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
@@ -151,3 +165,77 @@ def test_stock_model_validation_does_not_become_public():
 
     assert caught.value.public_detail == "The stock record is invalid."
     assert "private" not in caught.value.public_detail
+
+
+@pytest.mark.parametrize(
+    ("error_type", "message"),
+    (
+        (DocumentOperationsError, "The selected person is unavailable."),
+        (PlacementConflict, "The selected placement is unavailable."),
+        (ExportConflict, "The document cannot be exported."),
+        (KeyFreezeConflict, "A referenced key is unavailable."),
+        (PublicationConflict, "The document cannot be published."),
+        (TaxonomyError, "The selected taxonomy term is invalid."),
+    ),
+)
+def test_document_domain_errors_expose_only_their_explicit_public_contract(error_type, message):
+    error = error_type("private diagnostic", public_detail=message)
+    assert str(error) == "private diagnostic"
+    assert error.public_detail == message
+
+
+def test_diagram_render_error_message_is_an_explicit_safe_public_contract():
+    error = DiagramRenderError(
+        "The isolated diagram renderer timed out.",
+        code="diagram.renderer.timeout",
+    )
+    assert error.public_detail == "The isolated diagram renderer timed out."
+
+
+def test_document_conflict_response_uses_only_the_explicit_public_contract():
+    translated = document_views._placement_conflict(
+        PlacementConflict("private composition diagnostic", public_detail="The composition is unavailable.")
+    )
+    assert translated.status_code == 409
+    assert translated.data["detail"] == "The composition is unavailable."
+    assert "private" not in str(translated.data)
+
+
+@pytest.mark.parametrize(
+    ("filename", "function_name"),
+    (
+        ("publications.py", "publish_document"),
+        ("document_git_publications.py", "_validated_git_publication_content"),
+    ),
+)
+def test_publication_renderer_translates_only_its_explicit_safe_error(filename, function_name):
+    functions = [
+        node
+        for node in ast.walk(_tree(filename))
+        if isinstance(node, ast.FunctionDef) and node.name == function_name
+    ]
+    assert len(functions) == 1
+    renderer_guards = [
+        node
+        for node in ast.walk(functions[0])
+        if isinstance(node, ast.Try)
+        and any(
+            isinstance(statement, ast.Assign)
+            and any(
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "render_diagram_exports"
+                for call in ast.walk(statement)
+            )
+            for statement in node.body
+        )
+    ]
+    assert len(renderer_guards) == 1
+    caught_names = {
+        name.id
+        for handler in renderer_guards[0].handlers
+        if handler.type is not None
+        for name in ast.walk(handler.type)
+        if isinstance(name, ast.Name)
+    }
+    assert caught_names == {"DiagramRenderError"}

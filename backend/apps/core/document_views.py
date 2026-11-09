@@ -574,7 +574,7 @@ def _operations(workspace: ResolvedWorkspace, document_entity_id: UUID, request:
             **serializer.validated_data,
         )
     except DocumentOperationsError as exc:
-        raise serializers.ValidationError({"detail": str(exc)}) from exc
+        raise serializers.ValidationError({"detail": exc.public_detail}) from exc
     return _retrieve(workspace, document_entity_id)
 
 
@@ -591,7 +591,7 @@ def _request_review(workspace: ResolvedWorkspace, document_entity_id: UUID, requ
             **serializer.validated_data,
         )
     except DocumentOperationsError as exc:
-        raise serializers.ValidationError({"detail": str(exc)}) from exc
+        raise serializers.ValidationError({"detail": exc.public_detail}) from exc
     return _retrieve(workspace, document_entity_id)
 
 
@@ -607,7 +607,7 @@ def _decide_review(workspace: ResolvedWorkspace, document_entity_id: UUID, reque
             **serializer.validated_data,
         )
     except DocumentOperationsError as exc:
-        raise serializers.ValidationError({"detail": str(exc)}) from exc
+        raise serializers.ValidationError({"detail": exc.public_detail}) from exc
     return _retrieve(workspace, document_entity_id)
 
 
@@ -710,7 +710,7 @@ def _preflight(workspace: ResolvedWorkspace, document_entity_id: UUID, request: 
     try:
         resolved = resolve_document(document, audience=serializer.validated_data["audience"])
     except PlacementConflict as conflict:
-        return Response({"code": "composition.invalid", "detail": str(conflict)}, status=409)
+        return Response({"code": "composition.invalid", "detail": conflict.public_detail}, status=409)
     return Response(
         run_document_preflight(
             workspace=workspace, document=document, resolved=resolved, audience=serializer.validated_data["audience"]
@@ -1127,7 +1127,7 @@ def _export_document(workspace: ResolvedWorkspace, document_entity_id: UUID, req
             include_primary_files=format_name == "bundle",
         )
     except ExportConflict as conflict:
-        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+        return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
     AuditEvent.objects.create(
         tenant=workspace.member.tenant,
         actor=request.user,
@@ -1329,7 +1329,7 @@ def _publish(workspace: ResolvedWorkspace, document_entity_id: UUID, request: Re
             supersedes_entity_id=serializer.validated_data.get("supersedes_id"),
         )
     except PublicationConflict as conflict:
-        return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
+        return Response({"code": "publication_conflict", "detail": conflict.public_detail}, status=409)
     return Response(DocumentPublicationDetailSerializer(publication).data, status=201)
 
 
@@ -1359,7 +1359,7 @@ def _control_publication(
                 reason=serializer.validated_data["reason"],
             )
     except PublicationConflict as conflict:
-        return Response({"code": "publication_conflict", "detail": str(conflict)}, status=409)
+        return Response({"code": "publication_conflict", "detail": conflict.public_detail}, status=409)
     refreshed = _publication(workspace, document_entity_id, publication_entity_id)
     return Response(DocumentPublicationDetailSerializer(refreshed).data)
 
@@ -1387,7 +1387,7 @@ def _publication_artifact_download(
     try:
         content = read_publication_artifact(artifact)
     except PublicationConflict as conflict:
-        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+        return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
     response = HttpResponse(content, content_type=artifact.media_type)
     content_disposition = content_disposition_header(True, artifact.original_filename)
     if content_disposition is not None:
@@ -1440,7 +1440,7 @@ def _publication_export(
         try:
             content = read_publication_artifact(artifact)
         except PublicationConflict as conflict:
-            return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+            return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
         response = HttpResponse(content, content_type="application/pdf")
         filename = f"{slugify(publication.title) or 'publication'}-static.pdf"
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -1452,7 +1452,7 @@ def _publication_export(
     try:
         diagrams = retained_publication_diagrams(publication) if format_name == "docx" else ()
     except PublicationConflict as conflict:
-        return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+        return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
     return _export_response(
         title=f"{publication.title} STATIC",
         markdown=publication.canonical_markdown,
@@ -1535,7 +1535,7 @@ def _archive(workspace: ResolvedWorkspace, document_entity_id: UUID, request) ->
 
 
 def _placement_conflict(conflict: PlacementConflict) -> Response:
-    return Response({"code": "placement_conflict", "detail": str(conflict)}, status=409)
+    return Response({"code": "placement_conflict", "detail": conflict.public_detail}, status=409)
 
 
 def _revision_conflict_response(conflict: RevisionConflict) -> Response:
@@ -1543,7 +1543,7 @@ def _revision_conflict_response(conflict: RevisionConflict) -> Response:
     return Response(
         {
             "code": "revision_conflict",
-            "detail": str(conflict),
+            "detail": conflict.public_detail,
             "submitted_base_revision_id": conflict.submitted_base_revision_id,
             "current_revision": BlockRevisionDetailSerializer(
                 current,

@@ -82,8 +82,16 @@ domain-error contracts and fixed framework-validation translations. CodeQL
 passed every other executed job but failed one `core-c` compatibility assertion:
 the initial boundary also replaced the internal `StockError` string. The
 reproduced correction separates that retained bounded diagnostic from the fixed
-public detail; its failed test, boundary suite, and stock/invoice suites pass
-locally. Corrected-source Build remains required.
+public detail. Corrected-source Build 42559060835 passed its final validation
+job, and CodeQL 42559099854 passed both language analyses and evidence delivery.
+
+The next bounded slice selects all twelve exact results in `document_views.py`.
+Document operations, composition, export and publication conflicts now expose
+only explicit public details, including through taxonomy, content-key and
+diagram-renderer wrappers. Unexpected renderer `ValueError` instances are no
+longer translated into public conflict text. Focused Docker validation and the
+backend static/security checks pass locally; exact-source Build and CodeQL are
+required after push before these twelve paths are counted closed.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

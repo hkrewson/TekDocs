@@ -25,7 +25,9 @@ from .workspaces import ResolvedWorkspace
 
 
 class DocumentOperationsError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def _reviewed_markdown(document: Document) -> str:
@@ -169,7 +171,7 @@ def update_document_operations(
         try:
             assign_document_terms(document=locked, term_ids=taxonomy_term_ids, actor_id=actor_id)
         except TaxonomyError as exc:
-            raise DocumentOperationsError(str(exc)) from exc
+            raise DocumentOperationsError(str(exc), public_detail=exc.public_detail) from exc
         if locked.is_template and locked.organization_id is None:
             from .documents import ensure_template_revision
 

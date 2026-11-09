@@ -50,14 +50,18 @@ class RevisionConflict(Exception):
         current_revision: BlockRevision,
         base_revision: BlockRevision | None,
     ) -> None:
-        super().__init__("The document changed after this editor loaded.")
+        message = "The document changed after this editor loaded."
+        super().__init__(message)
+        self.public_detail = message
         self.submitted_base_revision_id = submitted_base_revision_id
         self.current_revision = current_revision
         self.base_revision = base_revision
 
 
 class PlacementConflict(Exception):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def _ensure_legacy_content_authority(document: Document) -> None:

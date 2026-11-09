@@ -25,6 +25,10 @@ MAXIMUM_CONTENT_KEY_DEPTH = 32
 class KeyFreezeConflict(ValueError):
     """A key could not be frozen for the intended output audience."""
 
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
 
 @dataclass(frozen=True, slots=True)
 class FrozenKeyDocument:

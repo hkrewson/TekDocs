@@ -27,6 +27,7 @@ from apps.accounts.policy import DataAudience
 from .data_flows import data_flow_projection
 from .diagram_exports import (
     DiagramExportArtifact,
+    DiagramRenderError,
     diagram_manifest,
     diagram_sources,
     embed_diagrams_in_html,
@@ -72,7 +73,9 @@ MAX_RETAINED_ATTACHMENT_BYTES = 50 * 1024 * 1024
 
 
 class PublicationConflict(Exception):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,14 +263,17 @@ def publish_document(
                 supersedes_entity_id=supersedes_entity_id,
             )
         except PublicationConflict as exc:
-            raise PublicationConflict(f"Static publication parity: {exc}") from exc
+            raise PublicationConflict(
+                f"Static publication parity: {exc}",
+                public_detail=f"Static publication parity: {exc.public_detail}",
+            ) from exc
     stored_artifacts: list[tuple[object, str]] = []
     try:
         with transaction.atomic():
             try:
                 locked_document, resolved = lock_document_composition(document, audience=audience)
             except PlacementConflict as exc:
-                raise PublicationConflict(str(exc)) from exc
+                raise PublicationConflict(str(exc), public_detail=exc.public_detail) from exc
             if DocumentAuthority.objects.filter(
                 workspace_id=locked_document.entity.workspace_id,
                 content_id=locked_document.id,
@@ -294,7 +300,7 @@ def publish_document(
             except KeyFreezeConflict as exc:
                 # Publication callers need the precise, safe conflict so an
                 # author can correct cycles, placement, audience, or limits.
-                raise PublicationConflict(str(exc)) from exc
+                raise PublicationConflict(str(exc), public_detail=exc.public_detail) from exc
             preflight = run_document_preflight(
                 workspace=workspace, document=locked_document, resolved=resolved, audience=audience
             )
@@ -336,11 +342,11 @@ def publish_document(
             rendered_entities = {record["id"]: record for record in entity_projections}
             try:
                 diagrams = render_diagram_exports(frozen_markdown, required=True)
-            except ValueError as exc:
+            except DiagramRenderError as exc:
                 # `render_diagram_exports` now names which of its failures occurred;
                 # repeating that is what lets an author tell a renderer timeout from a
                 # diagram the sanitizer refused.
-                raise PublicationConflict(str(exc)) from exc
+                raise PublicationConflict(str(exc), public_detail=exc.public_detail) from exc
             sanitized_html = render_markdown(
                 frozen_markdown,
                 entity_mentions=rendered_entities,  # type: ignore[arg-type]

@@ -27,7 +27,9 @@ KEY_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
 class TaxonomyError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def _plain(value: str, *, name: str, maximum: int, required: bool = True) -> str:

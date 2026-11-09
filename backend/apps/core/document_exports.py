@@ -71,7 +71,9 @@ _SAFE_EXTENSION = re.compile(r"^\.[A-Za-z0-9]{1,12}$")
 
 
 class ExportConflict(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,7 +292,7 @@ def resolve_export_snapshot(
             content_repository=repository if repository_owned else None,
         )
     except KeyFreezeConflict as exc:
-        raise ExportConflict(str(exc)) from exc
+        raise ExportConflict(str(exc), public_detail=exc.public_detail) from exc
     frozen_markdown = frozen_keys.markdown
     requested_entities = entity_ids_in_markdown(frozen_markdown)
     entity_mentions = resolve_entity_mentions(workspace=workspace, markdown=frozen_markdown, lock=True)

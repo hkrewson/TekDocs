@@ -1,8 +1,9 @@
 # Exception response hardening
 
-Status: both bounded slices confirmed by exact-source CodeQL; the invoice and
-stock follow-up Build correction awaits hosted validation. Owner: maintainer /
-pre-1.0 security closeout.
+Status: the first two bounded slices are confirmed by exact-source Build and
+CodeQL; the document-operation and publication slice is locally complete and
+awaits exact-source hosted validation. Owner: maintainer / pre-1.0 security
+closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -15,7 +16,8 @@ or redefine intentional domain conflict messages.
   `str(exception)`, exception arguments, or framework message collections.
   An intentional domain message must use a dedicated public-detail contract.
 - The selected inventory, invoicing, stock, content-index, data-flow, network,
-  and repository-publication handlers return fixed, operation-specific text.
+  repository-publication, document-operation, export, composition and static
+  publication handlers use explicit public response contracts.
 - Existing HTTP 400 and 409 behavior, response shapes, delivery-failure audit
   recording, and database-conflict messages remain intact.
 - Regression tests inject private diagnostic strings and prove they do not reach
@@ -57,6 +59,16 @@ business refusals such as insufficient on-hand quantity remain useful. This
 follow-up reduced the exact queue from 112 to 97 in CodeQL run 42552963371,
 closing exactly those fifteen selected paths without dismissals.
 
+The third bounded slice selects the largest remaining single handler family:
+all twelve results in `document_views.py`. Document operations, composition,
+exports and static publication conflicts now separate their internal exception
+string from an explicit `public_detail`. Taxonomy, content-key and isolated
+diagram-renderer refusals propagate only their reviewed domain detail through
+nested exceptions. Both publication implementations catch the renderer's
+specific safe error type; an unexpected `ValueError` is no longer translated
+into a public 409 response. Established conflict text, response shapes and
+status codes remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in either slice. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -85,4 +97,16 @@ Build 42552901893 failed only the existing business-error compatibility assertio
 because the first implementation also replaced `StockError`'s internal string.
 The reproduced correction retains the bounded internal field-validation message
 while keeping `public_detail` fixed. The exact failed test, boundary suite, and
-stock/invoice suites pass locally; corrected-source Build remains required.
+stock/invoice suites passed locally. Corrected-source Build 42559060835 passed
+the final validation job, and exact-source CodeQL 42559099854 passed both
+languages and retained the expected 97-result queue.
+
+For the document/publication slice, the exact CodeQL results reproduced all
+twelve direct caught-exception reads before the change. The boundary suite and
+the complete focused document, key-resolution, diagram-publication,
+Git-publication and migration-inventory suites pass against the retained
+development PostgreSQL service. Ruff, full backend mypy, Bandit, Django system
+checks and migration-drift checks pass. The self-review covered every direct
+constructor and dynamic nested-exception wrapper for the affected domain types.
+Exact-source Build and CodeQL remain required after push; no alert is dismissed
+or counted closed before that evidence exists.

@@ -19,7 +19,7 @@ from apps.accounts.models import User
 from apps.accounts.policy import PermissionKey, require_permission
 
 from .content_publication_sources import ContentPublicationSourceError, pinned_git_document_dependencies
-from .diagram_exports import DiagramExportArtifact, embed_diagrams_in_html, render_diagram_exports
+from .diagram_exports import DiagramExportArtifact, DiagramRenderError, embed_diagrams_in_html, render_diagram_exports
 from .document_addressed_publications import ADDRESSED_GIT_STATIC_FORMAT, verify_addressed_publication_manifest
 from .document_content_key_publications import CONTENT_KEY_GIT_STATIC_FORMAT
 from .document_diagram_publications import (
@@ -264,8 +264,8 @@ def _validated_git_publication_content(
         raise PublicationConflict("Managed file custody is unavailable") from exc
     try:
         diagrams = render_diagram_exports(frozen_markdown, required=True)
-    except ValueError as exc:
-        raise PublicationConflict(str(exc)) from exc
+    except DiagramRenderError as exc:
+        raise PublicationConflict(str(exc), public_detail=exc.public_detail) from exc
     preflight = repository_publication_preflight(
         markdown=frozen_markdown, audience=audience, topic_type=node.topic_type or "unstructured",
         frozen_attachment_ids={uuid.UUID(item.descriptor["id"]) for item in files},

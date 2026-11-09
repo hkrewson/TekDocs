@@ -31,7 +31,6 @@ RISKY_HANDLERS = {
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
     "repository_publication_views.py": {"RepositoryServiceError"},
-    "stock.py": {"ValidationError"},
     "stock_views.py": {"DjangoValidationError", "StockError"},
 }
 

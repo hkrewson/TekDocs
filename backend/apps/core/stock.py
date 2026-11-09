@@ -13,16 +13,20 @@ from .models import AuditEvent, Organization, StockItem, StockMovement, StockMov
 class StockError(ValueError):
     """A bounded stock refusal whose detail is safe for API clients."""
 
-    def __init__(self, public_detail: str) -> None:
-        self.public_detail = public_detail
-        super().__init__(public_detail)
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        self.public_detail = public_detail or message
+        super().__init__(message)
 
 
 def _validate(record) -> None:  # type: ignore[no-untyped-def]
     try:
         record.full_clean()
     except ValidationError as exc:
-        raise StockError("The stock record is invalid.") from exc
+        if hasattr(exc, "message_dict"):
+            message = " ".join(message for messages in exc.message_dict.values() for message in messages)
+        else:
+            message = " ".join(exc.messages)
+        raise StockError(message, public_detail="The stock record is invalid.") from exc
 
 
 @transaction.atomic

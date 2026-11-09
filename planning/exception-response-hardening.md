@@ -1,8 +1,8 @@
 # Exception response hardening
 
-Status: first slice confirmed by exact-source CodeQL; invoice and stock follow-up
-implemented locally with hosted verification pending. Owner: maintainer / pre-1.0
-security closeout.
+Status: both bounded slices confirmed by exact-source CodeQL; the invoice and
+stock follow-up Build correction awaits hosted validation. Owner: maintainer /
+pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -54,8 +54,8 @@ the directly connected stock-view result. `InvoiceError` and `StockError` now
 carry explicit public details. Framework validation is translated to fixed
 invoice or stock text before those exceptions are created, while established
 business refusals such as insufficient on-hand quantity remain useful. This
-follow-up is expected to reduce the exact queue from 112 to 97; hosted CodeQL is
-required before recording that reduction as verified.
+follow-up reduced the exact queue from 112 to 97 in CodeQL run 42552963371,
+closing exactly those fifteen selected paths without dismissals.
 
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in either slice. The remaining exact results
@@ -80,4 +80,9 @@ quantity response; the final public-detail boundary preserves that response.
 The boundary suite and the complete targeted invoice-draft, issue, delivery,
 stock-inventory, and recurring-invoice files pass against retained PostgreSQL.
 Ruff, targeted mypy, Bandit, Django checks, and migration-drift checks pass.
-Exact-source Build and CodeQL remain required for this follow-up.
+Exact-source CodeQL 42552963371 confirms the expected fifteen-result reduction.
+Build 42552901893 failed only the existing business-error compatibility assertion
+because the first implementation also replaced `StockError`'s internal string.
+The reproduced correction retains the bounded internal field-validation message
+while keeping `public_detail` fixed. The exact failed test, boundary suite, and
+stock/invoice suites pass locally; corrected-source Build remains required.

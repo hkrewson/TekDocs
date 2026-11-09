@@ -77,9 +77,13 @@ image security gates. Build 42544014776 passed every selected job and final
 validation. Exact-source CodeQL 42551427527 passed both languages and evidence,
 reducing Python stack-trace results from 131 to 112: exactly the selected 19.
 The invoice/stock follow-up covers another fifteen results with explicit public
-domain-error contracts and fixed framework-validation translations; its local
-boundary, invoice, stock, lint, type, security and Django checks pass. Hosted
-Build and CodeQL remain required before recording the expected 97-result queue.
+domain-error contracts and fixed framework-validation translations. CodeQL
+42552963371 passed and reduced the exact queue from 112 to 97. Build 42552901893
+passed every other executed job but failed one `core-c` compatibility assertion:
+the initial boundary also replaced the internal `StockError` string. The
+reproduced correction separates that retained bounded diagnostic from the fixed
+public detail; its failed test, boundary suite, and stock/invoice suites pass
+locally. Corrected-source Build remains required.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

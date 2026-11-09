@@ -66,6 +66,7 @@ case "$shard" in
     core_files=$(find "$repository_root/backend/apps/core/tests" -name 'test_*.py' -type f \
       ! -name 'test_migration_stabilization.py' \
       ! -name 'test_document_discovery.py' \
+      ! -name 'test_exception_response_boundaries.py' \
       ! -name 'test_permission_idor_matrix.py' \
       ! -name 'test_key_entity_publication_migration.py' \
       ! -name 'test_content_key_publication_migration.py' \
@@ -104,7 +105,9 @@ case "$shard" in
     # round-robin inventory otherwise redistributes every later legacy module.
     case "$shard" in
       core-a|core-a-1)
-        core_files=$(printf '%s\n%s\n' "$core_files" 'apps/core/tests/test_document_discovery.py')
+        core_files=$(printf '%s\n%s\n%s\n' "$core_files" \
+          'apps/core/tests/test_document_discovery.py' \
+          'apps/core/tests/test_exception_response_boundaries.py')
         ;;
     esac
     # shellcheck disable=SC2086

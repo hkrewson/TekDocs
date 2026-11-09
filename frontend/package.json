@@ -27,7 +27,7 @@
     "cytoscape": "^3.33.1",
     "dompurify": "3.4.17",
     "lucide-react": "^1.29.0",
-    "mermaid": "11.16.1",
+    "mermaid": "12.3.0",
     "openapi-fetch": "^0.17.0",
     "pdfjs-dist": "^6.2.108",
     "qrcode.react": "^4.2.0",

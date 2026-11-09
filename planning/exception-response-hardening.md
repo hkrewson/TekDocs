@@ -1,7 +1,7 @@
 # Exception response hardening
 
-Status: the first three bounded slices are confirmed by exact-source Build and
-CodeQL; the inventory-handler slice is locally complete and awaits exact-source
+Status: the first four bounded slices are confirmed by exact-source Build and
+CodeQL; the catalog-handler slice is locally complete and awaits exact-source
 hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
@@ -79,6 +79,23 @@ inventory business refusals remain the default public detail. Retained
 publication downloads reuse the previously reviewed publication conflict
 contract.
 
+Exact-source CodeQL run 42628004806 reduced the queue from 85 to 76, closing
+exactly the nine selected inventory paths; Build 42627936205 passed its final
+validation job. GitHub's repository-wide open-alert view reports 464 alerts,
+but 127 belong to the retired `.github/workflows/build.yml:analyze`
+configuration at `ef6c57c`. The current standalone configuration contributes
+337 alerts across all rules, led by 161 cyclic-import and 72 unused-import
+results. This work queue intentionally tracks the 76 current
+`py/stack-trace-exposure` SARIF results rather than conflating those categories.
+
+The fifth bounded slice selects all eight results in `catalog_views.py`.
+`CatalogError` now separates its internal diagnostic from an explicit public
+detail. The fixed stale-revision response exposes the same bounded message and
+current-revision payload as before, and the catalog-document association reuses
+the previously reviewed inventory error contract. Existing schema-validation
+feedback remains an intentional catalog-domain message; database conflicts keep
+their fixed response.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -128,6 +145,15 @@ software model diagnostics, verify the internal string remains available to the
 server, and prove only fixed public details cross the response contract. A CSV
 row-wrapper regression proves nested internal text does not become its public
 detail. The boundary/business-error suites and the complete inventory suite pass
-against the retained development PostgreSQL service. Exact-source Build and
+against the retained development PostgreSQL service. Build 42627936205 passed
+its final validation job. CodeQL 42628004806 passed both languages and evidence
+delivery and confirmed the expected nine-result reduction to 76.
+
+For the catalog-handler slice, the exact SARIF reproduced all eight direct
+caught-exception reads before the change. The endpoint regression injects a
+private catalog diagnostic and proves only the explicit domain detail reaches
+the 400 response. The stale-revision test preserves its 409 status, fixed detail
+and current-revision payload. The boundary, complete catalog and complete
+inventory suites pass against retained PostgreSQL. Exact-source Build and
 CodeQL remain required after push; no alert is dismissed or counted closed
 before that evidence exists.

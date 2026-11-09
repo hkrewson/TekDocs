@@ -69,7 +69,7 @@ def test_catalog_creation_does_not_expose_database_diagnostics(client, supplier,
     def fail_create(**kwargs):
         if database_failure:
             raise IntegrityError(diagnostic)
-        raise CatalogError(public_message)
+        raise CatalogError(diagnostic, public_detail=public_message)
 
     monkeypatch.setattr("apps.core.catalog_views.create_product", fail_create)
     response = client.post(
@@ -175,6 +175,7 @@ def test_supplier_catalog_versions_specs_and_rejects_stale_model_write(client, i
     assert len(revised.json()["revisions"]) == 2
     stale = client.patch(detail, data=revision_payload, content_type="application/json")
     assert stale.status_code == 409
+    assert stale.json()["detail"] == "The model changed after this edit began."
     assert stale.json()["current_revision"]["revision"] == 2
 
 

@@ -99,8 +99,21 @@ now carry explicit public details; framework model diagnostics receive fixed
 hardware/software explanations, CSV row wrappers propagate only nested public
 details, and retained publication downloads reuse the reviewed publication
 contract. Existing controlled business refusals and HTTP behavior remain
-unchanged. Focused Docker validation passes locally; exact-source hosted Build
-and CodeQL remain required after push.
+unchanged. Build 42627936205 passed its final validation job; CodeQL 42628004806
+passed both languages and reduced the exact stack-trace queue from 85 to 76.
+
+GitHub's open-alert total is larger because it spans every CodeQL rule and two
+analysis configurations: 337 current standalone alerts plus 127 retained from
+the retired Build configuration at `ef6c57c`. The current exact stack-trace
+queue remains 76; cyclic-import and unused-import results are separate review
+queues and are not represented as stack-trace remediation progress.
+
+The catalog-handler follow-up selects all eight `catalog_views.py` results.
+Catalog exceptions now carry explicit public details, stale revisions preserve
+their fixed 409 detail and current-revision payload, and catalog-document
+associations reuse the reviewed inventory contract. Complete catalog/inventory
+and boundary validation passes locally; exact-source hosted Build and CodeQL
+remain required after push.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

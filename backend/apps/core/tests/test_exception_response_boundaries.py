@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 
 from apps.core import asset_csv, data_flow_views, document_views, inventory, invoicing, software_inventory, stock
 from apps.core.asset_csv import AssetCsvError
+from apps.core.catalogs import CatalogError, StaleCatalogRevision
 from apps.core.data_flows import DataFlowError
 from apps.core.diagram_exports import DiagramRenderError
 from apps.core.document_exports import ExportConflict
@@ -35,6 +36,7 @@ GENERIC_TRANSLATORS = (
 )
 
 RISKY_HANDLERS = {
+    "catalog_views.py": {"CatalogError", "InventoryError", "StaleCatalogRevision"},
     "content_graph_views.py": {"ContentIndexError"},
     "document_views.py": {
         "DocumentOperationsError",
@@ -223,6 +225,18 @@ def test_asset_csv_row_wrapper_propagates_only_the_nested_public_detail():
     )
     assert str(wrapped) == "Row 7: private hardware diagnostic"
     assert wrapped.public_detail == "Row 7: The hardware profile is invalid."
+
+
+def test_catalog_error_separates_internal_and_public_details():
+    error = CatalogError("private catalog diagnostic", public_detail="The catalog request is invalid.")
+    assert str(error) == "private catalog diagnostic"
+    assert error.public_detail == "The catalog request is invalid."
+
+
+def test_stale_catalog_revision_has_a_fixed_public_detail():
+    error = StaleCatalogRevision(object())  # type: ignore[arg-type]
+    assert str(error) == "The model changed after this edit began."
+    assert error.public_detail == "The model changed after this edit began."
 
 
 @pytest.mark.parametrize(

@@ -45,7 +45,9 @@ SPECIFICATION_KEY = re.compile(r"^[a-z][a-z0-9_]{0,79}$")
 
 
 class CatalogError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 _UNSET = object()
@@ -54,6 +56,9 @@ _UNSET = object()
 @dataclass(frozen=True, slots=True)
 class StaleCatalogRevision(CatalogError):
     current_revision: CatalogModelRevision
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "public_detail", "The model changed after this edit began.")
 
     def __str__(self) -> str:
         return "The model changed after this edit began."

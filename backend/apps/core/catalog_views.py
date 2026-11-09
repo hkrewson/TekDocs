@@ -244,7 +244,7 @@ def _workspace(request, organization_entity_id: UUID, permission: PermissionKey)
     try:
         require_supplier(workspace.organization)
     except CatalogError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -339,7 +339,7 @@ class CatalogProductListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except CatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(CatalogProductSerializer(product).data, status=201)
 
 
@@ -388,7 +388,7 @@ class CatalogModelListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except CatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         model = _model(workspace, _product(workspace, product_entity_id), model.entity_id)
         model = (
             CatalogModel.scoped.for_scope(workspace.data_scope)
@@ -421,13 +421,16 @@ class CatalogModelDetailView(APIView):
             revise_model(model=model, actor_id=request.user.pk, specification_version=version, **data)
         except StaleCatalogRevision as exc:
             return Response(
-                {"detail": str(exc), "current_revision": CatalogModelRevisionSerializer(exc.current_revision).data},
+                {
+                    "detail": exc.public_detail,
+                    "current_revision": CatalogModelRevisionSerializer(exc.current_revision).data,
+                },
                 status=409,
             )
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except CatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         refreshed = products_for_scope(workspace.data_scope).get(pk=product.pk).models.get(pk=model.pk)
         return Response(CatalogModelSerializer(refreshed).data)
 
@@ -464,7 +467,7 @@ class CatalogSpecificationDefinitionListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except CatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         definition = definitions_for_scope(workspace.data_scope).get(pk=definition.pk)
         return Response(SpecificationDefinitionSerializer(definition).data, status=201)
 
@@ -484,7 +487,7 @@ class CatalogSpecificationDefinitionVersionView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except CatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(SpecificationVersionSerializer(version).data, status=201)
 
 
@@ -536,7 +539,7 @@ class CatalogProductDocumentListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         association = product_documents(product).get(pk=association.pk)
         return Response(CatalogProductDocumentSerializer(association).data, status=201)
 

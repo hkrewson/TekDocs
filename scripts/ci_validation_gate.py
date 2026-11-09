@@ -19,7 +19,8 @@ INTEGRATION_JOBS = (
     "diagram-exports",
     "production-containers",
 )
-RELEASE_JOBS = ("release-codeql", "release-extended", "publish-containers")
+ASSURANCE_JOBS = ("release-codeql", "release-extended")
+RELEASE_JOBS = ("publish-containers",)
 
 
 def _flag(outputs: Mapping[str, object], name: str, errors: list[str]) -> bool:
@@ -43,22 +44,28 @@ def validate(needs: Mapping[str, object]) -> list[str]:
         errors.append("prepare outputs are missing from the terminal gate")
     code = _flag(outputs, "code", errors)
     integration = _flag(outputs, "integration", errors)
+    assurance = _flag(outputs, "assurance", errors)
     release = _flag(outputs, "release", errors)
     lane = outputs.get("lane")
 
-    if lane == "documentation" and (code or integration or release):
-        errors.append("the documentation lane cannot request code, integration, or release jobs")
-    elif lane == "pull-request" and (not code or integration or release):
-        errors.append("the pull-request lane requires code jobs only")
+    if lane == "documentation" and (code or integration or assurance or release):
+        errors.append("the documentation lane cannot request code, integration, assurance, or release jobs")
+    elif lane == "code" and (not code or integration or assurance or release):
+        errors.append("the code lane requires code jobs only")
     elif lane == "integration" and (not code or not integration):
         errors.append("the integration lane requires code and integration jobs")
-    elif lane not in {"documentation", "pull-request", "integration"}:
+    elif lane not in {"documentation", "code", "integration"}:
         errors.append(f"unknown validation lane {lane!r}")
+    if assurance and not integration:
+        errors.append("assurance jobs require the integration lane")
     if release and not integration:
         errors.append("release jobs require the integration lane")
+    if release and not assurance:
+        errors.append("release jobs require assurance jobs")
 
     expected = {job: code for job in CODE_JOBS}
     expected.update({job: integration for job in INTEGRATION_JOBS})
+    expected.update({job: assurance for job in ASSURANCE_JOBS})
     expected.update({job: release for job in RELEASE_JOBS})
     for job, should_succeed in expected.items():
         entry = needs.get(job)

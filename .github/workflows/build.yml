@@ -2,6 +2,8 @@ name: Build, test, and secure
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 7 * * 1"
   pull_request:
   push:
     branches: [main]
@@ -17,7 +19,7 @@ concurrency:
 jobs:
   release-codeql:
     needs: prepare
-    if: needs.prepare.outputs.release == 'true'
+    if: needs.prepare.outputs.assurance == 'true'
     permissions:
       contents: read
       actions: read
@@ -26,7 +28,7 @@ jobs:
 
   release-extended:
     needs: prepare
-    if: needs.prepare.outputs.release == 'true'
+    if: needs.prepare.outputs.assurance == 'true'
     permissions:
       contents: read
       actions: read
@@ -38,9 +40,10 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.release.outputs.release }}
-      lane: ${{ steps.lane.outputs.lane }}
-      code: ${{ steps.lane.outputs.code }}
-      integration: ${{ steps.lane.outputs.integration }}
+      lane: ${{ steps.scope.outputs.lane }}
+      code: ${{ steps.scope.outputs.code }}
+      integration: ${{ steps.scope.outputs.integration }}
+      assurance: ${{ steps.scope.outputs.assurance }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -67,6 +70,8 @@ jobs:
                 ;;
               workflow_dispatch)
                 ;;
+              schedule)
+                ;;
             esac
           } | python3 scripts/ci_lane.py --event "$EVENT_NAME" --github-output "$GITHUB_OUTPUT"
       - id: version
@@ -91,6 +96,30 @@ jobs:
             fi
           fi
           echo "release=$release" >> "$GITHUB_OUTPUT"
+      - id: scope
+        name: Resolve scheduled and release assurance scope
+        env:
+          SELECTED_LANE: ${{ steps.lane.outputs.lane }}
+          SELECTED_CODE: ${{ steps.lane.outputs.code }}
+          SELECTED_INTEGRATION: ${{ steps.lane.outputs.integration }}
+          RELEASE: ${{ steps.release.outputs.release }}
+        run: |
+          lane="$SELECTED_LANE"
+          code="$SELECTED_CODE"
+          integration="$SELECTED_INTEGRATION"
+          assurance=false
+          if [[ "$GITHUB_EVENT_NAME" == schedule || "$GITHUB_EVENT_NAME" == workflow_dispatch || "$RELEASE" == true ]]; then
+            lane=integration
+            code=true
+            integration=true
+            assurance=true
+          fi
+          {
+            echo "lane=$lane"
+            echo "code=$code"
+            echo "integration=$integration"
+            echo "assurance=$assurance"
+          } >> "$GITHUB_OUTPUT"
       - name: Validate pinned supply chain
         run: |
           ./scripts/check-supply-chain-pins.sh
@@ -105,15 +134,14 @@ jobs:
           {
             echo "## TekDocs validation path"
             echo
-            echo "Selected lane: ${{ steps.lane.outputs.lane }}."
+            echo "Selected lane: ${{ steps.scope.outputs.lane }}."
             echo
             echo "1. Documentation-only changes stop after repository policy checks."
-            echo "2. Pull requests add backend/frontend static and component checks plus dependency/security policy."
-            echo "3. Code pushes to main add browser journeys, runtime/RLS and PostgreSQL shards with combined coverage."
-            echo "4. Production containers are built, inventoried, and vulnerability-scanned last."
-            echo "5. New versions on main add CodeQL and Extended validation before verified images and atomic application/receipt tags."
+            echo "2. Pull requests and ordinary code pushes run backend/frontend static and component checks plus dependency/security policy."
+            echo "3. The weekly schedule and manual Build runs add browser journeys, runtime/RLS, PostgreSQL shards, production containers, CodeQL, and Extended validation."
+            echo "4. New versions on main use that same full assurance scope before verified images and atomic application/receipt tags."
             echo
-            echo "CodeQL and extended validation are required release dependencies; schedules remain available."
+            echo "Ordinary pushes stay light; weekly and release assurance remain exact-source gates."
           } >> "$GITHUB_STEP_SUMMARY"
 
   backend:

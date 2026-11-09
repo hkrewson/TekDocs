@@ -24,16 +24,16 @@ class CILanePolicyTests(unittest.TestCase):
     def test_pull_request_code_uses_fast_validation(self) -> None:
         decision = classify("pull_request", ["backend/apps/core/models.py"])
 
-        self.assertEqual(decision.lane, "pull-request")
+        self.assertEqual(decision.lane, "code")
         self.assertTrue(decision.code)
         self.assertFalse(decision.integration)
 
-    def test_main_code_uses_full_integration(self) -> None:
+    def test_main_code_uses_fast_validation(self) -> None:
         decision = classify("push", ["frontend/src/App.tsx"])
 
-        self.assertEqual(decision.lane, "integration")
+        self.assertEqual(decision.lane, "code")
         self.assertTrue(decision.code)
-        self.assertTrue(decision.integration)
+        self.assertFalse(decision.integration)
 
     def test_manual_runs_fail_closed_to_full_integration(self) -> None:
         decision = classify("workflow_dispatch", [])
@@ -42,20 +42,31 @@ class CILanePolicyTests(unittest.TestCase):
         self.assertTrue(decision.code)
         self.assertTrue(decision.integration)
 
-    def test_missing_change_inventory_fails_closed(self) -> None:
+    def test_scheduled_runs_use_full_integration(self) -> None:
+        decision = classify("schedule", [])
+
+        self.assertEqual(decision.lane, "integration")
+        self.assertTrue(decision.code)
+        self.assertTrue(decision.integration)
+
+    def test_missing_push_inventory_uses_fast_validation(self) -> None:
         decision = classify("push", [])
 
         self.assertTrue(decision.code)
-        self.assertTrue(decision.integration)
+        self.assertFalse(decision.integration)
 
     def test_workflows_and_branch_contract_define_one_authority_per_state(self) -> None:
         build = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
         codeql = (ROOT / ".github/workflows/codeql.yml").read_text(encoding="utf-8")
+        extended = (ROOT / ".github/workflows/extended-validation.yml").read_text(encoding="utf-8")
         policy = (ROOT / "planning/ci-and-environment-state.md").read_text(encoding="utf-8")
 
         self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", build)
-        self.assertIn("code: ${{ steps.lane.outputs.code }}", build)
-        self.assertIn("integration: ${{ steps.lane.outputs.integration }}", build)
+        self.assertIn("code: ${{ steps.scope.outputs.code }}", build)
+        self.assertIn("integration: ${{ steps.scope.outputs.integration }}", build)
+        self.assertIn("assurance: ${{ steps.scope.outputs.assurance }}", build)
+        self.assertIn('"$RELEASE" == true', build)
+        self.assertIn("if: needs.prepare.outputs.assurance == 'true'", build)
         self.assertIn("needs.prepare.outputs.integration == 'true'", build)
         self.assertIn("name: Validation passed", build)
         self.assertIn("python3 scripts/ci_validation_gate.py", build)
@@ -63,8 +74,10 @@ class CILanePolicyTests(unittest.TestCase):
         release_codeql = build.split("  release-codeql:\n", 1)[1].split("\n  release-extended:\n", 1)[0]
         self.assertIn("actions: read", release_codeql)
         self.assertNotIn("  pull_request:\n", codeql.split("permissions:", 1)[0])
-        self.assertIn('cron: "17 7 * * 3"', codeql)
-        self.assertIn("`main` is the development and integration authority", policy)
+        self.assertIn('cron: "17 7 * * 1"', build)
+        self.assertNotIn("  schedule:\n", codeql.split("permissions:", 1)[0])
+        self.assertNotIn("  schedule:\n", extended.split("permissions:", 1)[0])
+        self.assertIn("`main` is the development authority", policy)
         self.assertIn("Production has no mutable Git branch", policy)
         self.assertIn("`receipts/vX.Y.Z`", policy)
 

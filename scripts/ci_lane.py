@@ -23,18 +23,18 @@ def _is_documentation(path: str) -> bool:
 
 def classify(event: str, paths: list[str]) -> CILane:
     changed = [path.strip() for path in paths if path.strip()]
-    if event == "workflow_dispatch" or not changed:
+    if event in {"workflow_dispatch", "schedule"}:
         return CILane(lane="integration", code=True, integration=True)
+    if not changed:
+        return CILane(lane="code", code=True, integration=False)
     if all(_is_documentation(path) for path in changed):
         return CILane(lane="documentation", code=False, integration=False)
-    if event == "pull_request":
-        return CILane(lane="pull-request", code=True, integration=False)
-    return CILane(lane="integration", code=True, integration=True)
+    return CILane(lane="code", code=True, integration=False)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Classify a TekDocs GitHub Actions validation lane")
-    parser.add_argument("--event", required=True, choices=("pull_request", "push", "workflow_dispatch"))
+    parser.add_argument("--event", required=True, choices=("pull_request", "push", "workflow_dispatch", "schedule"))
     parser.add_argument("--github-output", type=Path, required=True)
     args = parser.parse_args()
     decision = classify(args.event, sys.stdin.read().splitlines())

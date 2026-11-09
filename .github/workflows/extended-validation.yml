@@ -3,8 +3,6 @@ name: Extended validation
 on:
   workflow_call:
   workflow_dispatch:
-  schedule:
-    - cron: "29 8 * * 1"
 
 permissions:
   contents: read

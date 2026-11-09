@@ -3,8 +3,6 @@ name: CodeQL
 on:
   workflow_call:
   workflow_dispatch:
-  schedule:
-    - cron: "17 7 * * 3"
 
 permissions:
   contents: read

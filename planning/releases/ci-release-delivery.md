@@ -19,14 +19,16 @@ The [branch and production state](branch-and-production-state.md) defines why
 ## Release path
 
 1. Prepare validates version agreement and supply-chain/workflow contracts.
-   PRs and manual validation runs cannot publish. A main push whose `VERSION`
+   PRs, scheduled assurance and manual validation runs cannot publish. Ordinary
+   main pushes run the light code lane. A main push whose `VERSION`
    already belongs to an earlier tagged commit validates without republishing;
    advance version metadata when preparing the next release. A retry of the
    original tagged SHA may finish delivery, but cannot overwrite different images.
-2. Existing Build tests, PostgreSQL coverage, authorization, Chromium, diagram,
+2. The version-bump push promotes Build to full assurance: existing Build tests, PostgreSQL coverage, authorization, Chromium, diagram,
    production-image and Mailpit persistence checks run. The existing CodeQL and
    extended browser/performance/DAST/upgrade/recovery workflows are reusable,
-   required release dependencies in the same run. Scheduled validation remains.
+   required release dependencies in the same run. The weekly Build schedule runs
+   the same assurance scope without publication.
 3. Build creates and scans the four images once and transfers those images to
    publication. Publication has no rebuild step. All required jobs must succeed.
 4. Publication pushes commit-addressed images and signs provenance and SBOMs.

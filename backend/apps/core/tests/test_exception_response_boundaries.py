@@ -8,15 +8,18 @@ from pathlib import Path
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from apps.core import data_flow_views, document_views, invoicing, stock
+from apps.core import asset_csv, data_flow_views, document_views, inventory, invoicing, software_inventory, stock
+from apps.core.asset_csv import AssetCsvError
 from apps.core.data_flows import DataFlowError
 from apps.core.diagram_exports import DiagramRenderError
 from apps.core.document_exports import ExportConflict
 from apps.core.document_key_freeze import KeyFreezeConflict
 from apps.core.document_operations import DocumentOperationsError
 from apps.core.documents import PlacementConflict
+from apps.core.inventory import InventoryError
 from apps.core.invoicing import InvoiceError
 from apps.core.publications import PublicationConflict
+from apps.core.software_inventory import SoftwareInventoryError
 from apps.core.stock import StockError
 from apps.core.taxonomies import TaxonomyError
 
@@ -40,7 +43,13 @@ RISKY_HANDLERS = {
         "PublicationConflict",
         "RevisionConflict",
     },
-    "inventory_views.py": {"DjangoValidationError"},
+    "inventory_views.py": {
+        "AssetCsvError",
+        "DjangoValidationError",
+        "InventoryError",
+        "PublicationConflict",
+        "SoftwareInventoryError",
+    },
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
@@ -165,6 +174,55 @@ def test_stock_model_validation_does_not_become_public():
 
     assert caught.value.public_detail == "The stock record is invalid."
     assert "private" not in caught.value.public_detail
+
+
+def test_inventory_model_validation_does_not_become_public():
+    class InvalidHardwareProfile:
+        def full_clean(self):
+            raise DjangoValidationError("private hardware model detail")
+
+    with pytest.raises(InventoryError) as caught:
+        inventory._validate_profile(InvalidHardwareProfile())
+
+    assert str(caught.value) == "private hardware model detail"
+    assert caught.value.public_detail == "The hardware profile is invalid."
+
+
+def test_software_inventory_model_validation_does_not_become_public():
+    class InvalidSoftwareRecord:
+        def full_clean(self):
+            raise DjangoValidationError("private software model detail")
+
+    with pytest.raises(SoftwareInventoryError) as caught:
+        software_inventory._validate(InvalidSoftwareRecord())
+
+    assert str(caught.value) == "private software model detail"
+    assert caught.value.public_detail == "The software inventory record is invalid."
+
+
+@pytest.mark.parametrize(
+    "error",
+    (
+        InventoryError("private inventory diagnostic", public_detail="The inventory request is invalid."),
+        AssetCsvError("private CSV diagnostic", public_detail="The asset CSV request is invalid."),
+        SoftwareInventoryError(
+            "private software diagnostic",
+            public_detail="The software inventory request is invalid.",
+        ),
+    ),
+)
+def test_inventory_domain_errors_separate_internal_and_public_details(error):
+    assert str(error).startswith("private")
+    assert "private" not in error.public_detail
+
+
+def test_asset_csv_row_wrapper_propagates_only_the_nested_public_detail():
+    wrapped = asset_csv._row_error(
+        7,
+        InventoryError("private hardware diagnostic", public_detail="The hardware profile is invalid."),
+    )
+    assert str(wrapped) == "Row 7: private hardware diagnostic"
+    assert wrapped.public_detail == "Row 7: The hardware profile is invalid."
 
 
 @pytest.mark.parametrize(

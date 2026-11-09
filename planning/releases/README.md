@@ -89,9 +89,18 @@ The next bounded slice selects all twelve exact results in `document_views.py`.
 Document operations, composition, export and publication conflicts now expose
 only explicit public details, including through taxonomy, content-key and
 diagram-renderer wrappers. Unexpected renderer `ValueError` instances are no
-longer translated into public conflict text. Focused Docker validation and the
-backend static/security checks pass locally; exact-source Build and CodeQL are
-required after push before these twelve paths are counted closed.
+longer translated into public conflict text. Build 42565561039 passed its final
+validation job; CodeQL 42565622117 passed both languages and reduced the exact
+stack-trace queue from 97 to 85, closing exactly those twelve selected paths.
+
+The inventory-handler follow-up selects all nine results in
+`inventory_views.py`. Inventory, asset-CSV and software-inventory exceptions
+now carry explicit public details; framework model diagnostics receive fixed
+hardware/software explanations, CSV row wrappers propagate only nested public
+details, and retained publication downloads reuse the reviewed publication
+contract. Existing controlled business refusals and HTTP behavior remain
+unchanged. Focused Docker validation passes locally; exact-source hosted Build
+and CodeQL remain required after push.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

@@ -30,14 +30,19 @@ from .scoping import DataScope
 
 
 class SoftwareInventoryError(Exception):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def _validate(record) -> None:  # type: ignore[no-untyped-def]
     try:
         record.full_clean()
     except ValidationError as exc:
-        raise SoftwareInventoryError(" ".join(exc.messages)) from exc
+        raise SoftwareInventoryError(
+            " ".join(exc.messages),
+            public_detail="The software inventory record is invalid.",
+        ) from exc
 
 
 def installations_for_scope(scope: DataScope) -> QuerySet[ClientSoftwareInstallation]:

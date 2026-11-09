@@ -461,7 +461,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -534,7 +534,7 @@ class ClientAssetBulkView(APIView):
                 lifecycle_state=values.get("lifecycle_state"),
             )
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ClientAssetBulkResultSerializer({"action": values["action"], "processed": processed}).data)
 
 
@@ -569,7 +569,7 @@ class ClientAssetCsvPreviewView(APIView):
         try:
             preview = preview_assets_csv(scope=workspace.data_scope, content=serializer.validated_data["file"].read())
         except AssetCsvError as exc:
-            raise serializers.ValidationError({"file": str(exc)}) from exc
+            raise serializers.ValidationError({"file": exc.public_detail}) from exc
         return Response(AssetCsvPreviewSerializer(preview).data)
 
 
@@ -589,7 +589,7 @@ class ClientAssetCsvApplyView(APIView):
                 organization=workspace.organization,
             )
         except (AssetCsvError, InventoryError, SoftwareInventoryError) as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(AssetCsvApplyResultSerializer(result).data)
 
 
@@ -762,7 +762,7 @@ class ClientHardwareDetailView(APIView):
                 values=serializer.validated_data,
             )
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(HardwareProfileSerializer(profile).data)
 
 
@@ -797,7 +797,7 @@ class ClientHardwareAssignmentView(APIView):
                 **serializer.validated_data,
             )
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(HardwareProfileSerializer(profile).data)
 
     @extend_schema(responses={200: HardwareProfileSerializer})
@@ -806,7 +806,7 @@ class ClientHardwareAssignmentView(APIView):
         try:
             profile = unassign_hardware(asset=_asset(workspace, asset_entity_id), actor_id=request.user.pk)
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(HardwareProfileSerializer(profile).data)
 
 
@@ -823,7 +823,7 @@ class ClientHardwareDisposalView(APIView):
                 **serializer.validated_data,
             )
         except InventoryError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(HardwareProfileSerializer(profile).data)
 
 
@@ -888,7 +888,7 @@ class ClientAssetDocumentArtifactDownloadView(APIView):
         try:
             content = read_publication_artifact(artifact)
         except PublicationConflict as conflict:
-            return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+            return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
         response = HttpResponse(content, content_type=artifact.media_type)
         disposition = content_disposition_header(True, artifact.original_filename)
         if disposition is not None:

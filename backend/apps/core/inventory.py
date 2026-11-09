@@ -43,7 +43,9 @@ from .scoping import DataScope
 
 
 class InventoryError(Exception):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 MAX_BULK_ASSETS = 100
@@ -527,7 +529,10 @@ def _validate_profile(profile: ClientHardwareAsset) -> None:
     try:
         profile.full_clean()
     except ValidationError as exc:
-        raise InventoryError(" ".join(exc.messages)) from exc
+        raise InventoryError(
+            " ".join(exc.messages),
+            public_detail="The hardware profile is invalid.",
+        ) from exc
 
 
 def _append_event(  # type: ignore[no-untyped-def]

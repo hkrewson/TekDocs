@@ -1,9 +1,8 @@
 # Exception response hardening
 
-Status: the first two bounded slices are confirmed by exact-source Build and
-CodeQL; the document-operation and publication slice is locally complete and
-awaits exact-source hosted validation. Owner: maintainer / pre-1.0 security
-closeout.
+Status: the first three bounded slices are confirmed by exact-source Build and
+CodeQL; the inventory-handler slice is locally complete and awaits exact-source
+hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -67,10 +66,21 @@ diagram-renderer refusals propagate only their reviewed domain detail through
 nested exceptions. Both publication implementations catch the renderer's
 specific safe error type; an unexpected `ValueError` is no longer translated
 into a public 409 response. Established conflict text, response shapes and
-status codes remain unchanged.
+status codes remain unchanged. Exact-source CodeQL run 42565622117 reduced the
+queue from 97 to 85, closing exactly those twelve selected paths; Build
+42565561039 passed its final validation job.
+
+The fourth bounded slice selects all nine results in `inventory_views.py`.
+Inventory, asset-CSV and software-inventory exceptions now separate internal
+diagnostics from an explicit public detail. Django model-validation text maps to
+fixed hardware or software inventory explanations, and CSV row wrappers carry
+only the nested public detail across the import boundary. Existing controlled
+inventory business refusals remain the default public detail. Retained
+publication downloads reuse the previously reviewed publication conflict
+contract.
 
 No migration, OpenAPI shape, persistence contract, authorization decision, or
-production configuration changes in either slice. The remaining exact results
+production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
 and either evidence-backed dismissal or a later fixed-message change before 1.0.
 
@@ -108,5 +118,16 @@ Git-publication and migration-inventory suites pass against the retained
 development PostgreSQL service. Ruff, full backend mypy, Bandit, Django system
 checks and migration-drift checks pass. The self-review covered every direct
 constructor and dynamic nested-exception wrapper for the affected domain types.
-Exact-source Build and CodeQL remain required after push; no alert is dismissed
-or counted closed before that evidence exists.
+Build 42565561039 passed the final validation job. CodeQL 42565622117 passed both
+languages and evidence delivery and confirmed the expected twelve-result
+reduction to 85.
+
+For the inventory-handler slice, the exact SARIF reproduced all nine direct
+caught-exception reads before the change. Tests inject private hardware and
+software model diagnostics, verify the internal string remains available to the
+server, and prove only fixed public details cross the response contract. A CSV
+row-wrapper regression proves nested internal text does not become its public
+detail. The boundary/business-error suites and the complete inventory suite pass
+against the retained development PostgreSQL service. Exact-source Build and
+CodeQL remain required after push; no alert is dismissed or counted closed
+before that evidence exists.

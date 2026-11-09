@@ -73,7 +73,16 @@ SOFTWARE_FIELDS = {"software_status", "installed_version", "installed_on", "last
 
 
 class AssetCsvError(Exception):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
+
+def _row_error(number: int, error: InventoryError | SoftwareInventoryError) -> AssetCsvError:
+    return AssetCsvError(
+        f"Row {number}: {error}",
+        public_detail=f"Row {number}: {error.public_detail}",
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -442,6 +451,6 @@ def apply_assets_csv(
             elif detail_changes:
                 update_installation(asset=asset, actor_id=actor_id, values=detail_changes)
         except (InventoryError, SoftwareInventoryError) as exc:
-            raise AssetCsvError(f"Row {number}: {exc}") from exc
+            raise _row_error(number, exc) from exc
         counts["updated"] += 1
     return counts

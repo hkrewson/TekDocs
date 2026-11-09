@@ -1,7 +1,8 @@
 # Exception response hardening
 
-Status: implementation complete; exact-source hosted CodeQL remains the final
-alert authority. Owner: maintainer / pre-1.0 security closeout.
+Status: first slice confirmed by exact-source CodeQL; invoice and stock follow-up
+implemented locally with hosted verification pending. Owner: maintainer / pre-1.0
+security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -25,10 +26,11 @@ or redefine intentional domain conflict messages.
 
 ## Disposition
 
-The November 8, 2026 shipped-code inventory contained 127 open
-`py/stack-trace-exposure` alerts. Review separated 19 ambiguous sites from 108
-sites whose current messages appear to be bounded domain or conflict text. The
-19 sites share eleven response families: six generic translators plus content
+The November 8, 2026 repository-wide alert view contained 127 open
+`py/stack-trace-exposure` alerts, but that view combines stale Build analyses and
+non-default branch instances. The exact standalone Python analysis at `4dbe9b80`
+contained 131 shipped-source results. The first slice selected 19 ambiguous
+results across eleven response families: six generic translators plus content
 indexing, asset network records, invoice/service-rate operations, stock
 operations, and repository publication evidence.
 
@@ -42,18 +44,40 @@ The repository-publication path retains HTTP 409; validation paths retain HTTP
 400; invoice delivery still records an unconfirmed attempt before returning its
 bounded retry-safe message.
 
+Exact-source CodeQL run 42551427527 reduced those stack-trace results from 131 to
+112, closing exactly the selected 19. The repository-wide alert count remains
+inflated by the older `.github/workflows/build.yml:analyze` configuration and
+branch instances; no alerts were dismissed to obtain this result.
+
+The second bounded slice covers all fourteen remaining invoice-view results and
+the directly connected stock-view result. `InvoiceError` and `StockError` now
+carry explicit public details. Framework validation is translated to fixed
+invoice or stock text before those exceptions are created, while established
+business refusals such as insufficient on-hand quantity remain useful. This
+follow-up is expected to reduce the exact queue from 112 to 97; hosted CodeQL is
+required before recording that reduction as verified.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
-production configuration changes in this slice. The remaining 108 alerts are
-not accepted as safe by implication: each still requires an exact handler review
+production configuration changes in either slice. The remaining exact results
+are not accepted as safe by implication: each still requires a handler review
 and either evidence-backed dismissal or a later fixed-message change before 1.0.
 
 ## Validation
 
-The red regression first failed all eleven affected response families because
+The first red regression failed all eleven affected response families because
 their public text was derived from caught exceptions. After the implementation,
 the focused boundary suite passes 29 cases, including injected private database
 and model-validation diagnostics plus explicit bounded domain details. Data-flow,
 network, inventory, stock, invoice, and content-composition suites pass against
 the retained `tekdocs` development services. Ruff, targeted mypy, Django system
-checks, and migration drift checks also pass. Hosted Build and CodeQL remain
-required on the pushed commit.
+checks, and migration drift checks also pass. Build 42544014776 and CodeQL
+42551427527 confirm the first slice on exact source.
+
+For the invoice/stock follow-up, injected Django validation and stock-allocation
+diagnostics first demonstrated the unsafe translation paths. The first broad
+test exposed an over-broad replacement that removed the established on-hand
+quantity response; the final public-detail boundary preserves that response.
+The boundary suite and the complete targeted invoice-draft, issue, delivery,
+stock-inventory, and recurring-invoice files pass against retained PostgreSQL.
+Ruff, targeted mypy, Bandit, Django checks, and migration-drift checks pass.
+Exact-source Build and CodeQL remain required for this follow-up.

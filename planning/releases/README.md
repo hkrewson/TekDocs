@@ -64,17 +64,22 @@ hiding the remaining shipped-code queue. Provider observation schema v2 now
 derives retained fingerprints only from the allowlisted safe projection and
 rejects mismatched digests before persistence; provider identity keys retain
 their established semantics. Historical v1 observations remain readable. The
-127 shipped-code stack-trace-exposure alerts remain a separate pre-1.0 API error
-contract review, and exact-source hosted CodeQL is the final alert authority.
+repository-wide stack-trace alert view combines analysis configurations and
+branch instances; exact standalone analysis results are the pre-1.0 API error
+contract authority.
 
 The first bounded [exception-response hardening
 slice](../exception-response-hardening.md) removes caught-exception text from 19
 ambiguous sites across eleven response families while retaining established
 400/409 statuses, response shapes, audit behavior, and fixed conflict messages.
 Regression tests inject private diagnostics and the guard is part of the backend
-image security gates. The other 108 shipped-code alerts remain open for
-handler-by-handler review; exact-source hosted CodeQL is required before this
-slice is closed.
+image security gates. Build 42544014776 passed every selected job and final
+validation. Exact-source CodeQL 42551427527 passed both languages and evidence,
+reducing Python stack-trace results from 131 to 112: exactly the selected 19.
+The invoice/stock follow-up covers another fifteen results with explicit public
+domain-error contracts and fixed framework-validation translations; its local
+boundary, invoice, stock, lint, type, security and Django checks pass. Hosted
+Build and CodeQL remain required before recording the expected 97-result queue.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

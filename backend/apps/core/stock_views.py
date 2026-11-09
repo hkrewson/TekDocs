@@ -271,7 +271,7 @@ class StockItemDetailView(APIView):
         try:
             archive_stock_item(item=self._record(workspace, item_id), actor_id=request.user.pk)
         except StockError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(status=204)
 
 

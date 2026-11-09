@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from apps.core import data_flow_views
+from apps.core import data_flow_views, invoicing, stock
 from apps.core.data_flows import DataFlowError
+from apps.core.invoicing import InvoiceError
+from apps.core.stock import StockError
 
 VIEW_ROOT = Path(__file__).parents[1]
 
@@ -25,10 +27,12 @@ GENERIC_TRANSLATORS = (
 RISKY_HANDLERS = {
     "content_graph_views.py": {"ContentIndexError"},
     "inventory_views.py": {"DjangoValidationError"},
-    "invoice_views.py": {"DjangoValidationError"},
+    "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
+    "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
     "repository_publication_views.py": {"RepositoryServiceError"},
-    "stock_views.py": {"DjangoValidationError"},
+    "stock.py": {"ValidationError"},
+    "stock_views.py": {"DjangoValidationError", "StockError"},
 }
 
 
@@ -97,3 +101,54 @@ def test_data_flow_domain_refusal_uses_its_explicit_public_contract():
     translated = data_flow_views._refuse(DataFlowError("The selected source is unavailable in this workspace."))
     assert translated.status_code == 400
     assert str(translated.detail["detail"]) == "The selected source is unavailable in this workspace."
+
+
+def test_invoice_model_validation_does_not_become_public():
+    class InvalidInvoice:
+        def full_clean(self):
+            raise DjangoValidationError("private invoice model detail")
+
+    with pytest.raises(InvoiceError) as caught:
+        invoicing._validate(InvalidInvoice())
+
+    assert caught.value.public_detail == "The invoice record is invalid."
+    assert "private" not in caught.value.public_detail
+
+
+def test_invoice_stock_failure_does_not_become_public(monkeypatch):
+    class InvoiceLine:
+        stock_item_id = 1
+        stock_item = object()
+        stock_quantity_consumed = 0
+        organization = None
+
+        def save(self, **kwargs):
+            raise AssertionError("The failed allocation must not be saved")
+
+    def refuse_stock_change(**kwargs):
+        raise StockError("Only 1000.000 foot are on hand")
+
+    monkeypatch.setattr(invoicing, "change_stock", refuse_stock_change)
+
+    with pytest.raises(InvoiceError) as caught:
+        invoicing._sync_stock_consumption(line=InvoiceLine(), actor_id=object(), desired_quantity=1)
+
+    assert caught.value.public_detail == "Only 1000.000 foot are on hand"
+
+
+def test_invoice_domain_refusal_retains_its_explicit_public_detail():
+    refusal = InvoiceError("Only draft invoices can be edited")
+    assert refusal.public_detail == "Only draft invoices can be edited"
+    assert str(refusal) == "Only draft invoices can be edited"
+
+
+def test_stock_model_validation_does_not_become_public():
+    class InvalidStockRecord:
+        def full_clean(self):
+            raise DjangoValidationError("private stock model detail")
+
+    with pytest.raises(StockError) as caught:
+        stock._validate(InvalidStockRecord())
+
+    assert caught.value.public_detail == "The stock record is invalid."
+    assert "private" not in caught.value.public_detail

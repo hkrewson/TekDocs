@@ -736,7 +736,7 @@ class InvoiceListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
 
@@ -762,7 +762,7 @@ class MSPInvoiceSettingsView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceIssueSettingsResultSerializer(_issue_settings_payload(member.tenant)).data)
 
 
@@ -779,7 +779,7 @@ class InvoiceIssueView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
 
 
@@ -798,7 +798,7 @@ class InvoiceFollowUpView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
 
@@ -824,7 +824,7 @@ class InvoiceCreditNoteView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data, status=201)
 
 
@@ -844,7 +844,7 @@ class InvoiceVoidView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(record).data)
 
 
@@ -864,7 +864,7 @@ class InvoiceRecurringWithdrawalView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
 
 
@@ -877,7 +877,7 @@ def _invoice_download_response(invoice: Invoice, export_format: str) -> HttpResp
             content = invoice_csv_bytes(invoice)
             media_type = "text/csv; charset=utf-8"
     except InvoiceError as exc:
-        return HttpResponse(str(exc), status=409, content_type="text/plain; charset=utf-8")
+        return HttpResponse(exc.public_detail, status=409, content_type="text/plain; charset=utf-8")
     response = HttpResponse(content, content_type=media_type)
     disposition = content_disposition_header(True, f"{invoice.number}.{export_format}")
     if disposition is not None:
@@ -911,7 +911,7 @@ class InvoiceAccountingExportView(APIView):
         try:
             payload = invoice_accounting_export(invoice)
         except InvoiceError as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return Response({"detail": exc.public_detail}, status=409)
         response = Response(payload)
         response["Content-Disposition"] = f'attachment; filename="{invoice.number}-accounting.json"'
         response["Cache-Control"] = "private, no-store"
@@ -1013,7 +1013,7 @@ class InvoiceDetailView(APIView):
                 values=values,
             )
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, record.entity_id)).data)
 
     @extend_schema(request=None, responses={204: OpenApiResponse(description="Draft deleted")})
@@ -1022,7 +1022,7 @@ class InvoiceDetailView(APIView):
         try:
             delete_invoice(invoice=_invoice(workspace, invoice_entity_id), actor_id=request.user.pk)
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(status=204)
 
 
@@ -1052,7 +1052,7 @@ class InvoiceLineListCreateView(APIView):
         except IntegrityError as exc:
             raise serializers.ValidationError({"detail": "The request conflicts with stored data."}) from exc
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data, status=201)
 
 
@@ -1072,7 +1072,7 @@ class InvoiceLineDetailView(APIView):
                 values=dict(serializer.validated_data),
             )
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
 
     @extend_schema(request=None, responses={200: InvoiceSerializer})
@@ -1082,7 +1082,7 @@ class InvoiceLineDetailView(APIView):
         try:
             delete_line(line=_line(workspace, invoice, line_id), actor_id=request.user.pk)
         except InvoiceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(InvoiceSerializer(_invoice(workspace, invoice_entity_id)).data)
 
 

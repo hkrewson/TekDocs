@@ -57,7 +57,11 @@ from .stock import StockError, change_stock
 
 
 class InvoiceError(ValueError):
-    pass
+    """A bounded invoice refusal whose detail is safe for API clients."""
+
+    def __init__(self, public_detail: str) -> None:
+        self.public_detail = public_detail
+        super().__init__(public_detail)
 
 
 ISSUED_SIGNATURE_FORMAT = "tekdocs-issued-invoice/v1"
@@ -808,7 +812,7 @@ def _validate(instance) -> None:  # type: ignore[no-untyped-def]
     try:
         instance.full_clean()
     except ValidationError as exc:
-        raise InvoiceError("; ".join(exc.messages)) from exc
+        raise InvoiceError("The invoice record is invalid.") from exc
 
 
 @transaction.atomic
@@ -1133,7 +1137,7 @@ def _sync_stock_consumption(*, line: InvoiceLine, actor_id: UUID, desired_quanti
             note=("Added to invoice draft" if change > 0 else "Removed from invoice draft"),
         )
     except StockError as exc:
-        raise InvoiceError(str(exc)) from exc
+        raise InvoiceError(exc.public_detail) from exc
     line.stock_quantity_consumed = desired_quantity
     line.save(update_fields=("stock_quantity_consumed", "updated_at"))
 

@@ -56,6 +56,19 @@ from .repository_source_exports import RepositorySourceExportError, export_repos
 from .repository_storage import RepositoryStorageError
 from .workspaces import ResolvedWorkspace
 
+AuthoringInputError = ContentAuthoringError | RepositoryInputError
+AuthoringConflictError = (
+    RepositoryPrimaryFileConflict | RepositorySourceExportError | RepositoryEditableBundleError
+)
+
+
+def _authoring_input_error(exc: AuthoringInputError) -> Response:
+    return Response({"detail": exc.public_detail}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _authoring_conflict(exc: AuthoringConflictError) -> Response:
+    return Response({"detail": exc.public_detail}, status=status.HTTP_409_CONFLICT)
+
 
 class ContentAuthoringMutationSerializer(serializers.Serializer):
     operation = serializers.ChoiceField(choices=("create", "update", "move"))
@@ -188,7 +201,7 @@ def _write(request, organization_entity_id: UUID | None = None) -> Response:  # 
     except ContentIndexValidationError as exc:
         return Response({"diagnostics": list(exc.diagnostics)}, status=status.HTTP_400_BAD_REQUEST)
     except (ContentAuthoringError, RepositoryInputError) as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return _authoring_input_error(exc)
     except RepositoryReconciliationError:
         return Response({"detail": "Repository requires reconciliation"}, status=status.HTTP_409_CONFLICT)
     except RepositoryServiceError:
@@ -401,7 +414,7 @@ def _primary_versions(request, content_id: UUID, organization_entity_id: UUID | 
         try:
             require_repository_primary_file_authority(repository=repository, content_id=content_id)
         except RepositoryPrimaryFileConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return _authoring_conflict(exc)
         records = DocumentAttachment.objects.filter(
             tenant=repository.tenant,
             organization=repository.workspace.organization,
@@ -444,7 +457,7 @@ def _append_primary_version(
             expected_current_entity_id=serializer.validated_data["expected_current_id"],
         )
     except RepositoryPrimaryFileConflict as exc:
-        return Response({"detail": str(exc)}, status=409)
+        return _authoring_conflict(exc)
     version.is_current = True  # type: ignore[attr-defined]
     return Response(DocumentPrimaryFileSerializer(version).data, status=201)
 
@@ -526,7 +539,7 @@ def _source_snapshot(request, organization_entity_id: UUID | None = None) -> Htt
     except WorkspaceRepository.DoesNotExist:
         return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_404_NOT_FOUND)
     except (RepositorySourceExportError, RepositoryEditableBundleError) as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _authoring_conflict(exc)
     except (RepositoryServiceError, RepositoryStorageError):
         return Response({"detail": "Repository source is unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
     AuditEvent.objects.create(

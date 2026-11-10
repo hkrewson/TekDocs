@@ -1,10 +1,8 @@
 # Exception response hardening
 
-Status: the first seven bounded slices are confirmed by exact-source CodeQL;
-their Build evidence is complete except for the retained catalog and commercial
-shard interruptions described below. The repository-publication workflow slice
-is locally complete and awaits exact-source hosted validation. Owner: maintainer
-/ pre-1.0 security closeout.
+Status: the first eight bounded slices are confirmed by exact-source Build and
+CodeQL. The content-authoring handler slice is locally complete and awaits
+exact-source hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -141,6 +139,18 @@ existing 409 response shape. All current constructors use fixed bounded domain
 messages; injected private diagnostics prove the boundary does not depend on
 that implementation detail.
 
+Exact-source Build 42762718287 passed every selected job and final validation.
+CodeQL 42762767250 passed both languages and reduced the current stack-trace
+queue from 54 to 49, closing exactly the five repository-publication paths.
+
+The ninth bounded slice selects all four results in
+`content_authoring_views.py`: the authoring input adapter, primary-file history,
+primary-file compare-and-swap append, and source/editable-bundle export. The five
+underlying exception types now separate internal diagnostics from explicit
+public details. Two status-specific translators preserve the existing 400 and
+409 response shapes and all established bounded authoring, file-authority and
+export messages. Structured authoring-conflict payloads remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -233,6 +243,17 @@ the exception types lacked a public-detail contract. After the fix, all 58
 boundary cases pass, including five injected private diagnostics and five
 controls that retain the established bounded domain message. Every direct
 constructor and catcher was reviewed; no migration, authorization, persistence,
-OpenAPI or status-code behavior changes. Exact-source Build and CodeQL remain
-required after push; the expected CodeQL queue is 49 and no alert is dismissed
-in advance.
+OpenAPI or status-code behavior changes. Exact-source Build 42762718287 passed
+final validation. CodeQL 42762767250 confirms the expected five-result reduction
+to 49 without dismissals.
+
+For the content-authoring handler slice, the exact analysis reproduced all four
+direct caught-exception reads before the change. The static guard first failed
+on the module, and focused regressions failed because all five exception types
+lacked a separate public-detail contract. After the fix, all 69 boundary cases
+pass, including five injected private diagnostics and five controls that retain
+their established bounded message. The review covered every direct constructor,
+catcher and subclass, including DRF validation detail behavior and the separate
+structured compare-and-swap conflict payload. Exact-source Build and CodeQL
+remain required after push; the expected CodeQL queue is 45 and no alert is
+dismissed in advance.

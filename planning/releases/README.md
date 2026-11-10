@@ -142,8 +142,17 @@ The repository-publication workflow follow-up selects the five remaining
 STATIC creation, release/withdrawal control, and delivery authorization now use
 explicit public details through one reviewed 409 translator. Existing bounded
 domain refusals and response shapes remain unchanged; injected private
-diagnostics and the static boundary guard pass locally. Exact-source Build and
-CodeQL remain required after push, with an expected stack-trace queue of 49.
+diagnostics and the static boundary guard pass locally. Exact-source Build
+42762718287 passed final validation, and CodeQL 42762767250 reduced the exact
+stack-trace queue from 54 to 49.
+
+The content-authoring handler follow-up selects all four
+`content_authoring_views.py` results. Authoring input, primary-file history and
+append, and repository export conflicts now expose only explicit public details
+through fixed 400/409 translators. Existing bounded messages and structured
+compare-and-swap conflict payloads remain unchanged. Private-diagnostic injection
+and bounded-message controls pass locally; exact-source Build and CodeQL remain
+required after push, with an expected stack-trace queue of 45.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

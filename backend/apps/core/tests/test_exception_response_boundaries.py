@@ -15,6 +15,7 @@ from apps.core import (
     asset_csv,
     commercial,
     commercial_views,
+    content_authoring_views,
     data_flow_views,
     document_views,
     inventory,
@@ -27,8 +28,10 @@ from apps.core import (
 from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
 from apps.core.commercial import CommercialError
+from apps.core.content_authoring import ContentAuthoringError
 from apps.core.data_flows import DataFlowError
 from apps.core.diagram_exports import DiagramRenderError
+from apps.core.document_attachments import RepositoryPrimaryFileConflict
 from apps.core.document_exports import ExportConflict
 from apps.core.document_key_freeze import KeyFreezeConflict
 from apps.core.document_operations import DocumentOperationsError
@@ -36,8 +39,11 @@ from apps.core.documents import PlacementConflict
 from apps.core.inventory import InventoryError
 from apps.core.invoicing import InvoiceError
 from apps.core.publications import PublicationConflict
+from apps.core.repository_editable_bundles import RepositoryEditableBundleError
 from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
 from apps.core.repository_publication_packages import RepositoryPublicationPackageError
+from apps.core.repository_service import RepositoryInputError
+from apps.core.repository_source_exports import RepositorySourceExportError
 from apps.core.repository_static_controls import RepositoryStaticControlError
 from apps.core.repository_static_delivery import RepositoryStaticDeliveryError
 from apps.core.repository_static_publications import RepositoryStaticPublicationError
@@ -59,6 +65,13 @@ GENERIC_TRANSLATORS = (
 RISKY_HANDLERS = {
     "catalog_views.py": {"CatalogError", "InventoryError", "StaleCatalogRevision"},
     "commercial_views.py": {"CommercialError", "InventoryError"},
+    "content_authoring_views.py": {
+        "ContentAuthoringError",
+        "RepositoryEditableBundleError",
+        "RepositoryInputError",
+        "RepositoryPrimaryFileConflict",
+        "RepositorySourceExportError",
+    },
     "content_graph_views.py": {"ContentIndexError"},
     "document_views.py": {
         "DocumentOperationsError",
@@ -375,6 +388,54 @@ def test_commercial_workspace_denial_exposes_only_public_detail(monkeypatch):
         == "This workspace cannot own commercial records."
     )
     assert "private commercial ownership diagnostic" not in str(response.data)
+
+
+@pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))
+def test_content_authoring_input_errors_expose_only_their_public_contract(error_type):
+    error = error_type(
+        "private authoring diagnostic",
+        public_detail="The content authoring request is invalid.",
+    )
+
+    response = content_authoring_views._authoring_input_error(error)
+
+    assert response.status_code == 400
+    assert response.data["detail"] == "The content authoring request is invalid."
+    assert "private authoring diagnostic" not in str(response.data)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (RepositoryPrimaryFileConflict, RepositorySourceExportError, RepositoryEditableBundleError),
+)
+def test_content_authoring_conflicts_expose_only_their_public_contract(error_type):
+    error = error_type(
+        "private authoring conflict diagnostic",
+        public_detail="The repository content changed.",
+    )
+
+    response = content_authoring_views._authoring_conflict(error)
+
+    assert response.status_code == 409
+    assert response.data["detail"] == "The repository content changed."
+    assert "private authoring conflict diagnostic" not in str(response.data)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (
+        ContentAuthoringError,
+        RepositoryInputError,
+        RepositoryPrimaryFileConflict,
+        RepositorySourceExportError,
+        RepositoryEditableBundleError,
+    ),
+)
+def test_content_authoring_domain_refusals_retain_their_public_messages(error_type):
+    error = error_type("The repository content is unavailable.")
+
+    assert str(error) == "The repository content is unavailable."
+    assert error.public_detail == "The repository content is unavailable."
 
 
 @pytest.mark.parametrize(

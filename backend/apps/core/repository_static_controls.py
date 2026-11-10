@@ -23,6 +23,10 @@ from .repository_static_publications import verify_repository_static_publication
 class RepositoryStaticControlError(RuntimeError):
     """The requested internal publication transition is not valid."""
 
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
 
 def _lock_content(*, workspace_id: UUID, content_id: UUID) -> None:
     if connection.vendor != "postgresql":

@@ -19,6 +19,7 @@ from apps.core import (
     document_views,
     inventory,
     invoicing,
+    repository_publication_views,
     software_inventory,
     software_inventory_views,
     stock,
@@ -35,6 +36,11 @@ from apps.core.documents import PlacementConflict
 from apps.core.inventory import InventoryError
 from apps.core.invoicing import InvoiceError
 from apps.core.publications import PublicationConflict
+from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
+from apps.core.repository_publication_packages import RepositoryPublicationPackageError
+from apps.core.repository_static_controls import RepositoryStaticControlError
+from apps.core.repository_static_delivery import RepositoryStaticDeliveryError
+from apps.core.repository_static_publications import RepositoryStaticPublicationError
 from apps.core.software_inventory import SoftwareInventoryError
 from apps.core.stock import StockError
 from apps.core.taxonomies import TaxonomyError
@@ -71,7 +77,14 @@ RISKY_HANDLERS = {
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
-    "repository_publication_views.py": {"RepositoryServiceError"},
+    "repository_publication_views.py": {
+        "RepositoryPackageAuthorizationError",
+        "RepositoryPublicationPackageError",
+        "RepositoryServiceError",
+        "RepositoryStaticControlError",
+        "RepositoryStaticDeliveryError",
+        "RepositoryStaticPublicationError",
+    },
     "stock_views.py": {"DjangoValidationError", "StockError"},
     "software_inventory_views.py": {"InventoryError", "SoftwareInventoryError"},
 }
@@ -362,6 +375,46 @@ def test_commercial_workspace_denial_exposes_only_public_detail(monkeypatch):
         == "This workspace cannot own commercial records."
     )
     assert "private commercial ownership diagnostic" not in str(response.data)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (
+        RepositoryPublicationPackageError,
+        RepositoryPackageAuthorizationError,
+        RepositoryStaticPublicationError,
+        RepositoryStaticControlError,
+        RepositoryStaticDeliveryError,
+    ),
+)
+def test_repository_publication_conflicts_expose_only_their_public_contract(error_type):
+    error = error_type(
+        "private repository diagnostic",
+        public_detail="The repository publication request conflicts with its retained state.",
+    )
+
+    response = repository_publication_views._publication_conflict(error)
+
+    assert response.status_code == 409
+    assert response.data["detail"] == "The repository publication request conflicts with its retained state."
+    assert "private repository diagnostic" not in str(response.data)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (
+        RepositoryPublicationPackageError,
+        RepositoryPackageAuthorizationError,
+        RepositoryStaticPublicationError,
+        RepositoryStaticControlError,
+        RepositoryStaticDeliveryError,
+    ),
+)
+def test_repository_publication_domain_refusals_retain_their_public_messages(error_type):
+    error = error_type("The retained publication record is unavailable.")
+
+    assert str(error) == "The retained publication record is unavailable."
+    assert error.public_detail == "The retained publication record is unavailable."
 
 
 def test_asset_csv_row_wrapper_propagates_only_the_nested_public_detail():

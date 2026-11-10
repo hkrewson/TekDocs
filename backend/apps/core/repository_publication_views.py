@@ -83,6 +83,18 @@ from .repository_static_publications import (
 )
 from .workspaces import ResolvedWorkspace
 
+RepositoryPublicationConflict = (
+    RepositoryPublicationPackageError
+    | RepositoryPackageAuthorizationError
+    | RepositoryStaticPublicationError
+    | RepositoryStaticControlError
+    | RepositoryStaticDeliveryError
+)
+
+
+def _publication_conflict(exc: RepositoryPublicationConflict) -> Response:
+    return Response({"detail": exc.public_detail}, status=status.HTTP_409_CONFLICT)
+
 
 class RepositoryEvidenceWriteSerializer(serializers.Serializer):
     content_id = serializers.UUIDField()
@@ -677,7 +689,7 @@ def _package(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> Respon
     except IntegrityError:
         return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
     except RepositoryPublicationPackageError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _publication_conflict(exc)
     return Response(_package_data(package), status=status.HTTP_201_CREATED)
 
 
@@ -721,7 +733,7 @@ def _authorization(request, workspace: ResolvedWorkspace, evidence_id: UUID) -> 
     except IntegrityError:
         return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
     except RepositoryPackageAuthorizationError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _publication_conflict(exc)
     return Response(_authorization_data(authorization), status=status.HTTP_201_CREATED)
 
 
@@ -760,7 +772,7 @@ def _static_publication(request, workspace: ResolvedWorkspace, evidence_id: UUID
     except IntegrityError:
         return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
     except RepositoryStaticPublicationError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _publication_conflict(exc)
     return Response(_static_publication_data(publication), status=status.HTTP_201_CREATED)
 
 
@@ -874,7 +886,7 @@ def _static_control(request, workspace: ResolvedWorkspace, evidence_id: UUID) ->
     except IntegrityError:
         return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
     except RepositoryStaticControlError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _publication_conflict(exc)
     return Response(_static_control_data(publication), status=status.HTTP_201_CREATED)
 
 
@@ -919,7 +931,7 @@ def _static_delivery(request, workspace: ResolvedWorkspace, evidence_id: UUID) -
     except IntegrityError:
         return Response({"detail": "The request conflicts with stored data."}, status=status.HTTP_409_CONFLICT)
     except RepositoryStaticDeliveryError as exc:
-        return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
+        return _publication_conflict(exc)
     return Response(_static_delivery_data(authorization), status=status.HTTP_201_CREATED)
 
 

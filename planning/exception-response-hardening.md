@@ -1,8 +1,10 @@
 # Exception response hardening
 
-Status: the first six bounded slices are confirmed by exact-source Build and
-CodeQL. The commercial handler slice is locally complete and awaits exact-source
-hosted validation. Owner: maintainer / pre-1.0 security closeout.
+Status: the first seven bounded slices are confirmed by exact-source CodeQL;
+their Build evidence is complete except for the retained catalog and commercial
+shard interruptions described below. The repository-publication workflow slice
+is locally complete and awaits exact-source hosted validation. Owner: maintainer
+/ pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -124,6 +126,21 @@ the established provider, linked-circuit and unavailable-cost refusals retain
 their useful messages. Existing 400/403 statuses and the error envelope remain
 unchanged.
 
+Exact-source CodeQL 42741303468 passed and reduced the current stack-trace queue
+from 61 to 54, closing exactly the seven commercial paths. Build 42741286617 ran
+the source but was cancelled after the unrelated `core-a-4` PostgreSQL shard was
+cancelled; its final validation job failed closed. That run is retained as
+incomplete Build evidence, not commercial acceptance.
+
+The eighth bounded slice selects the five remaining results in
+`repository_publication_views.py`: package creation, final package authorization,
+STATIC record creation, release/withdrawal control, and client-delivery
+authorization. Each workflow exception now separates its internal diagnostic
+from an explicit public detail, and one reviewed translator preserves the
+existing 409 response shape. All current constructors use fixed bounded domain
+messages; injected private diagnostics prove the boundary does not depend on
+that implementation detail.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -204,6 +221,18 @@ contract tests first failed on the original source. After the fix, direct DRF
 tests prove private commercial and workspace diagnostics do not reach the error
 envelope, framework model text receives the fixed public explanation, and the
 ordinary unavailable-cost refusal remains unchanged. The complete 48-case
-exception-response boundary suite passes locally. Exact-source Build and CodeQL
-remain required after push; the expected CodeQL queue is 54 and no alert is
-dismissed in advance.
+exception-response boundary suite passes locally. Exact-source CodeQL
+42741303468 confirms the expected seven-result reduction to 54. Build
+42741286617 remains incomplete because the unrelated `core-a-4` shard was
+cancelled; it is not represented as passing acceptance.
+
+For the repository-publication workflow slice, the exact analysis reproduced
+all five direct caught-exception reads before the change. The static boundary
+guard first failed on those handlers, and the focused regressions failed because
+the exception types lacked a public-detail contract. After the fix, all 58
+boundary cases pass, including five injected private diagnostics and five
+controls that retain the established bounded domain message. Every direct
+constructor and catcher was reviewed; no migration, authorization, persistence,
+OpenAPI or status-code behavior changes. Exact-source Build and CodeQL remain
+required after push; the expected CodeQL queue is 49 and no alert is dismissed
+in advance.

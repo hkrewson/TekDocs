@@ -132,8 +132,18 @@ results. The workspace ownership denial and six contract/cost mutations now use
 explicit public details. Framework model validation receives a fixed commercial
 record explanation, while controlled provider, linked-circuit and cost refusals
 retain their established messages and 400/403 behavior. The boundary guard and
-direct DRF regressions pass locally; exact-source Build and CodeQL remain
-required after push, with an expected stack-trace queue of 54.
+direct DRF regressions pass locally. Exact-source CodeQL 42741303468 passed and
+reduced the stack-trace queue from 61 to 54. Build 42741286617 remains incomplete
+because the unrelated `core-a-4` PostgreSQL shard was cancelled and final
+validation failed closed.
+
+The repository-publication workflow follow-up selects the five remaining
+`repository_publication_views.py` results. Package creation, package approval,
+STATIC creation, release/withdrawal control, and delivery authorization now use
+explicit public details through one reviewed 409 translator. Existing bounded
+domain refusals and response shapes remain unchanged; injected private
+diagnostics and the static boundary guard pass locally. Exact-source Build and
+CodeQL remain required after push, with an expected stack-trace queue of 49.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

@@ -33,6 +33,10 @@ def _domain(format_name: str) -> bytes:
 class RepositoryStaticPublicationError(RuntimeError):
     """An authorized package cannot be recorded as an internal STATIC artifact."""
 
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
 
 def _timestamp(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")

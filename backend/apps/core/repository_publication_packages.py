@@ -32,6 +32,10 @@ PRIMARY_PACKAGE_FORMAT = "tekdocs-repository-publication-package/v2"
 class RepositoryPublicationPackageError(RuntimeError):
     """The exact reviewed evidence cannot be packaged."""
 
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
 
 def _manifest(
     *, package_id: uuid.UUID, decision: RepositoryEvidenceReviewDecision,

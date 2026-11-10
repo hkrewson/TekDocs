@@ -1,10 +1,8 @@
 # Exception response hardening
 
-Status: the first four bounded slices are confirmed by exact-source Build and
-CodeQL. Exact-source CodeQL confirms the catalog-handler slice; its Build rerun
-was inconclusive after an unrelated template-migration shard reached its runner
-time limit. The software-inventory handler slice is locally complete and awaits
-exact-source hosted validation. Owner: maintainer / pre-1.0 security closeout.
+Status: the first six bounded slices are confirmed by exact-source Build and
+CodeQL. The commercial handler slice is locally complete and awaits exact-source
+hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
 implementation diagnostic into a public API response. It does not dismiss or
@@ -113,6 +111,19 @@ that contract consistently. Existing controlled messages such as exhausted-seat
 and inactive-license refusals remain public, with their established 400/403
 statuses and error envelope unchanged.
 
+Exact-source Build 42695200570 passed every selected job and final validation
+on attempt 1. CodeQL 42695221641 passed both languages and evidence delivery,
+reducing the exact queue from 68 to 61 and closing exactly the seven software
+inventory paths.
+
+The seventh bounded slice selects all seven results in `commercial_views.py`:
+the workspace ownership denial plus six contract and cost mutations.
+`CommercialError` now separates its internal diagnostic from `public_detail`;
+framework model validation maps to a fixed commercial-record explanation while
+the established provider, linked-circuit and unavailable-cost refusals retain
+their useful messages. Existing 400/403 statuses and the error envelope remain
+unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -183,6 +194,16 @@ first failed on the module, then passed after every handler used
 `public_detail`. Direct DRF response tests inject distinct private software and
 workspace diagnostics and prove neither reaches the public error envelope. A
 control retains the existing exhausted-seat domain message. The complete
+exception-response boundary suite passes locally. Build 42695200570 and CodeQL
+42695221641 passed on attempt 1; CodeQL confirms the expected seven-result
+reduction to 61.
+
+For the commercial handler slice, the exact analysis reproduced all seven direct
+caught-exception reads before the change. The static guard and four focused
+contract tests first failed on the original source. After the fix, direct DRF
+tests prove private commercial and workspace diagnostics do not reach the error
+envelope, framework model text receives the fixed public explanation, and the
+ordinary unavailable-cost refusal remains unchanged. The complete 48-case
 exception-response boundary suite passes locally. Exact-source Build and CodeQL
-remain required after push; the expected CodeQL queue is 61 and no alert is
+remain required after push; the expected CodeQL queue is 54 and no alert is
 dismissed in advance.

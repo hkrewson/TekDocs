@@ -166,7 +166,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -262,7 +262,7 @@ class CommercialContractListCreateView(APIView):
                 values=values,
             )
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialized(_record(workspace, record.entity_id), workspace), status=201)
 
 
@@ -284,7 +284,7 @@ class CommercialContractDetailView(APIView):
                 values=dict(serializer.validated_data),
             )
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialized(_record(workspace, record.entity_id), workspace))
 
     @extend_schema(responses={204: None})
@@ -293,7 +293,7 @@ class CommercialContractDetailView(APIView):
         try:
             archive_contract(record=_record(workspace, contract_entity_id), actor_id=request.user.pk)
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(status=204)
 
 
@@ -322,7 +322,7 @@ class ContractCostListCreateView(APIView):
                 contract=_record(workspace, contract_entity_id), actor_id=request.user.pk, values=values
             )
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialized(_record(workspace, record.entity_id), workspace), status=201)
 
 
@@ -341,7 +341,7 @@ class ContractCostDetailView(APIView):
                 values=dict(serializer.validated_data),
             )
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialized(_record(workspace, record.entity_id), workspace))
 
     @extend_schema(responses={200: ContractSerializer})
@@ -353,5 +353,5 @@ class ContractCostDetailView(APIView):
                 contract=_record(workspace, contract_entity_id), cost_id=cost_id, actor_id=request.user.pk
             )
         except CommercialError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialized(_record(workspace, record.entity_id), workspace))

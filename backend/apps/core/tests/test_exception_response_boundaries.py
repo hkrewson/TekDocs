@@ -13,6 +13,8 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.core import (
     asset_csv,
+    commercial,
+    commercial_views,
     data_flow_views,
     document_views,
     inventory,
@@ -23,6 +25,7 @@ from apps.core import (
 )
 from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
+from apps.core.commercial import CommercialError
 from apps.core.data_flows import DataFlowError
 from apps.core.diagram_exports import DiagramRenderError
 from apps.core.document_exports import ExportConflict
@@ -49,6 +52,7 @@ GENERIC_TRANSLATORS = (
 
 RISKY_HANDLERS = {
     "catalog_views.py": {"CatalogError", "InventoryError", "StaleCatalogRevision"},
+    "commercial_views.py": {"CommercialError", "InventoryError"},
     "content_graph_views.py": {"ContentIndexError"},
     "document_views.py": {
         "DocumentOperationsError",
@@ -288,6 +292,76 @@ def test_software_inventory_workspace_denial_exposes_only_public_detail(monkeypa
     assert response.status_code == 403
     assert str(response.data["error"]["detail"]["detail"]) == "This workspace cannot own inventory."
     assert "private ownership database diagnostic" not in str(response.data)
+
+
+def test_commercial_model_validation_does_not_become_public():
+    class InvalidCommercialRecord:
+        def full_clean(self):
+            raise DjangoValidationError("private commercial model detail")
+
+    with pytest.raises(CommercialError) as caught:
+        commercial._validate(InvalidCommercialRecord())
+
+    assert str(caught.value) == "private commercial model detail"
+    assert caught.value.public_detail == "The commercial record is invalid."
+
+
+def test_commercial_domain_refusal_retains_its_public_message():
+    error = CommercialError("The cost entry is unavailable.")
+    assert str(error) == "The cost entry is unavailable."
+    assert error.public_detail == "The cost entry is unavailable."
+
+
+def test_commercial_response_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace()
+    monkeypatch.setattr(commercial_views, "_workspace", lambda *args, **kwargs: workspace)
+    monkeypatch.setattr(commercial_views, "_record", lambda *args, **kwargs: object())
+
+    def refuse_archive(**kwargs):
+        raise CommercialError(
+            "private commercial database diagnostic",
+            public_detail="The commercial request is invalid.",
+        )
+
+    monkeypatch.setattr(commercial_views, "archive_contract", refuse_archive)
+    request = APIRequestFactory().delete("/contracts/")
+    force_authenticate(request, user=SimpleNamespace(pk=uuid4(), is_authenticated=True))
+    response = commercial_views.CommercialContractDetailView.as_view()(
+        request,
+        organization_entity_id=uuid4(),
+        contract_entity_id=uuid4(),
+    )
+
+    assert response.status_code == 400
+    assert str(response.data["error"]["detail"]["detail"]) == "The commercial request is invalid."
+    assert "private commercial database diagnostic" not in str(response.data)
+
+
+def test_commercial_workspace_denial_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace(organization=object())
+    monkeypatch.setattr(commercial_views, "resolve_organization_workspace", lambda *args, **kwargs: workspace)
+    monkeypatch.setattr(commercial_views, "require_permission", lambda *args, **kwargs: None)
+
+    def refuse_owner(organization):
+        raise InventoryError(
+            "private commercial ownership diagnostic",
+            public_detail="This workspace cannot own commercial records.",
+        )
+
+    monkeypatch.setattr(commercial_views, "require_operational_owner", refuse_owner)
+    request = APIRequestFactory().get("/contracts/")
+    force_authenticate(request, user=SimpleNamespace(pk=uuid4(), is_authenticated=True))
+    response = commercial_views.CommercialContractListCreateView.as_view()(
+        request,
+        organization_entity_id=uuid4(),
+    )
+
+    assert response.status_code == 403
+    assert (
+        str(response.data["error"]["detail"]["detail"])
+        == "This workspace cannot own commercial records."
+    )
+    assert "private commercial ownership diagnostic" not in str(response.data)
 
 
 def test_asset_csv_row_wrapper_propagates_only_the_nested_public_detail():

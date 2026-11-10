@@ -123,8 +123,17 @@ The software-inventory handler follow-up selects all seven
 software installation/license mutation handlers now expose only their explicit
 public detail. Existing controlled seat, license and installation refusals keep
 their established messages, error envelope and 400/403 behavior. The boundary
-guard and direct DRF regressions pass locally; exact-source Build and CodeQL
-remain required after push, with an expected stack-trace queue of 61.
+guard and direct DRF regressions pass locally. Build 42695200570 passed every
+selected job and final validation on attempt 1; CodeQL 42695221641 passed both
+languages and reduced the exact stack-trace queue from 68 to 61.
+
+The commercial handler follow-up selects all seven `commercial_views.py`
+results. The workspace ownership denial and six contract/cost mutations now use
+explicit public details. Framework model validation receives a fixed commercial
+record explanation, while controlled provider, linked-circuit and cost refusals
+retain their established messages and 400/403 behavior. The boundary guard and
+direct DRF regressions pass locally; exact-source Build and CodeQL remain
+required after push, with an expected stack-trace queue of 54.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

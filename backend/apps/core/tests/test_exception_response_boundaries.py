@@ -22,6 +22,7 @@ from apps.core import (
     inventory,
     invoicing,
     network_endpoint_views,
+    network_inventory_views,
     repository_publication_views,
     software_inventory,
     software_inventory_views,
@@ -41,6 +42,7 @@ from apps.core.documents import PlacementConflict
 from apps.core.inventory import InventoryError
 from apps.core.invoicing import InvoiceError
 from apps.core.network_endpoints import NetworkAssignmentConflict
+from apps.core.network_inventory import NetworkInventoryConflict, NetworkInventoryError
 from apps.core.publications import PublicationConflict
 from apps.core.repository_editable_bundles import RepositoryEditableBundleError
 from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
@@ -94,6 +96,11 @@ RISKY_HANDLERS = {
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
     "network_endpoint_views.py": {"InventoryError", "NetworkAssignmentConflict"},
+    "network_inventory_views.py": {
+        "InventoryError",
+        "NetworkInventoryConflict",
+        "NetworkInventoryError",
+    },
     "repository_publication_views.py": {
         "RepositoryPackageAuthorizationError",
         "RepositoryPublicationPackageError",
@@ -433,6 +440,60 @@ def test_network_assignment_domain_refusal_retains_its_public_message():
 
     assert str(error) == "Choose a different interface."
     assert error.public_detail == "Choose a different interface."
+
+
+def test_network_inventory_workspace_denial_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace(organization=object())
+    monkeypatch.setattr(network_inventory_views, "resolve_msp_workspace", lambda *args, **kwargs: workspace)
+    monkeypatch.setattr(network_inventory_views, "require_permission", lambda *args, **kwargs: None)
+
+    def refuse_owner(organization):
+        raise InventoryError(
+            "private network inventory ownership diagnostic",
+            public_detail="This workspace cannot own network inventory.",
+        )
+
+    monkeypatch.setattr(network_inventory_views, "require_operational_owner", refuse_owner)
+    request = SimpleNamespace(user=SimpleNamespace(is_authenticated=True))
+
+    with pytest.raises(PermissionDenied) as caught:
+        network_inventory_views._workspace(request, None, network_inventory_views.PermissionKey.NETWORKS_VIEW)
+
+    assert str(caught.value.detail) == "This workspace cannot own network inventory."
+    assert "private network inventory ownership diagnostic" not in str(caught.value.detail)
+
+
+def test_network_inventory_service_error_exposes_only_its_public_contract():
+    error = NetworkInventoryError(
+        "private rack diagnostic",
+        public_detail="The network inventory request is invalid.",
+    )
+
+    translated = network_inventory_views._service_error(error)
+
+    assert translated.status_code == 400
+    assert str(translated.detail["detail"]) == "The network inventory request is invalid."
+    assert "private rack diagnostic" not in str(translated.detail)
+
+
+def test_network_inventory_conflict_exposes_only_its_public_contract():
+    error = NetworkInventoryConflict(
+        "private hardware binding diagnostic",
+        public_detail="The hardware binding changed. Reload before trying again.",
+    )
+
+    response = network_inventory_views._service_conflict(error)
+
+    assert response.status_code == 409
+    assert response.data["detail"] == "The hardware binding changed. Reload before trying again."
+    assert "private hardware binding diagnostic" not in str(response.data)
+
+
+def test_network_inventory_domain_refusal_retains_its_public_message():
+    error = NetworkInventoryError("Those rack units overlap an existing device placement.")
+
+    assert str(error) == "Those rack units overlap an existing device placement."
+    assert error.public_detail == "Those rack units overlap an existing device placement."
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

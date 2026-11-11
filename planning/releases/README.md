@@ -159,8 +159,18 @@ The network-endpoint handler follow-up selects all four
 inventory public contract, while interface, IP and MAC assignment conflicts use
 an explicit public detail through one 409 translator. Existing reload and
 assignment guidance remains unchanged. Private-diagnostic injection and network
-translation controls pass locally; exact-source Build and CodeQL remain required
-after push, with an expected stack-trace queue of 41.
+translation controls pass locally. Exact-source Build 42937377177 passed final
+validation, and CodeQL 42937418397 reduced the exact stack-trace queue from 45
+to 41.
+
+The network-inventory handler follow-up selects all three
+`network_inventory_views.py` results. Workspace ownership reuses the reviewed
+inventory public contract; ordinary inventory validation and hardware-binding
+conflicts now expose only explicit public details through status-specific 400
+and 409 translators. Existing placement, ownership and reload guidance remains
+unchanged. Private-diagnostic injection and the combined boundary suites pass
+locally; exact-source Build and CodeQL remain required after push, with an
+expected stack-trace queue of 38.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

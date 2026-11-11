@@ -163,6 +163,18 @@ public text, and one reviewed 409 translator serves all three compare-and-swap
 assignment paths. Existing reload, different-assignment and protected-hardware
 guidance remains unchanged.
 
+Exact-source Build 42937377177 passed every selected job and final validation.
+CodeQL 42937418397 passed both languages and reduced the current stack-trace
+queue from 45 to 41, closing exactly the four network-endpoint paths.
+
+The eleventh bounded slice selects all three results in
+`network_inventory_views.py`: workspace ownership, ordinary inventory
+validation, and hardware-binding conflicts. The workspace boundary reuses the
+reviewed inventory public-detail contract. `NetworkInventoryError` now separates
+internal diagnostics from an explicit public detail, while status-specific
+translators preserve the established 400 and 409 response shapes and actionable
+placement and reload guidance.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -277,5 +289,17 @@ workspace boundary exposed an injected private diagnostic and the endpoint
 exception lacked a separate public contract. After the fix, the combined
 exception-response and network-translation suites pass 88 cases. The review
 covered every endpoint-error constructor and catcher plus interface, IP and MAC
-assignment transitions. Exact-source Build and CodeQL remain required after
-push; the expected CodeQL queue is 41 and no alert is dismissed in advance.
+assignment transitions. Exact-source Build 42937377177 passed final validation,
+and CodeQL 42937418397 confirmed the expected four-result reduction to 41
+without dismissals.
+
+For the network-inventory handler slice, the exact analysis reproduced all
+three caught-exception reads before the change. The static guard and four direct
+regressions first failed because the workspace boundary exposed an injected
+private diagnostic, the service boundary derived public text from the exception,
+and the inventory exception lacked a separate public contract. After the fix,
+the combined exception-response and network-error boundary suites pass 93
+cases. The review covered every inventory-error constructor and catcher,
+including the distinct 400 validation and 409 compare-and-swap paths. Exact-
+source Build and CodeQL remain required after push; the expected queue is 38 and
+no alert is dismissed in advance.

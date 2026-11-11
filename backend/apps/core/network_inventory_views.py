@@ -256,7 +256,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -275,7 +275,11 @@ def _device(workspace: ResolvedWorkspace, entity_id: UUID) -> NetworkDevice:
 
 
 def _service_error(exc: NetworkInventoryError) -> serializers.ValidationError:
-    return serializers.ValidationError({"detail": str(exc)})
+    return serializers.ValidationError({"detail": exc.public_detail})
+
+
+def _service_conflict(exc: NetworkInventoryConflict) -> Response:
+    return Response({"detail": exc.public_detail}, status=409)
 
 
 def _device_data(device: NetworkDevice, workspace: ResolvedWorkspace) -> dict[str, object]:
@@ -529,7 +533,7 @@ class NetworkDeviceDetailView(APIView):
                 values=serializer.validated_data,
             )
         except NetworkInventoryConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return _service_conflict(exc)
         except NetworkInventoryError as exc:
             raise _service_error(exc) from exc
         return Response(_device_data(device, workspace))

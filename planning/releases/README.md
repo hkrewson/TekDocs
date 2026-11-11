@@ -206,8 +206,17 @@ The taxonomy follow-up selects all three taxonomy API results. Taxonomy creation
 revision, and client-local term creation now use the existing reviewed
 `TaxonomyError.public_detail` contract instead of caught-exception text. The
 HTTP 400 response shape and bounded taxonomy guidance remain unchanged, and all
-111 exception-boundary cases pass locally. Exact-source Build and CodeQL remain
-required after push, with an expected stack-trace queue of 14.
+111 exception-boundary cases pass locally. Exact-source Build 42965406290 passed
+final validation, and CodeQL 42965406040 reduced the stack-trace queue from 17
+to 14.
+
+The remaining network-service follow-up selects five results across service,
+addressing, circuit, and NetBox reconciliation handlers. Workspace ownership
+uses the reviewed inventory public contract, while DNS compare-and-swap
+conflicts use an explicit network-service public detail. Existing 403/409
+statuses, response shapes, and bounded guidance remain unchanged. The combined
+133-case network and exception boundary suites pass locally. Exact-source Build
+and CodeQL remain required after push, with an expected stack-trace queue of 9.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

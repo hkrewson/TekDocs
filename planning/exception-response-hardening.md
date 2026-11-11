@@ -224,6 +224,18 @@ creation now use that existing public detail instead of deriving response text
 from the caught exception. Their field-neutral HTTP 400 shape and bounded
 taxonomy guidance remain unchanged.
 
+Exact-source Build 42965406290 passed final validation, and CodeQL 42965406040
+passed both languages and reduced the stack-trace queue from 17 to 14, closing
+exactly those three taxonomy paths.
+
+The sixteenth bounded slice selects all five remaining network-service results:
+workspace ownership in service, addressing, circuit, and NetBox reconciliation
+handlers plus DNS record compare-and-swap conflicts. Ownership denials now use
+the existing `InventoryError.public_detail` contract. `NetworkServiceError`
+separates internal diagnostics from explicit public details, and the existing
+409 conflict response uses only that public contract. Status codes, response
+shapes, and bounded network guidance remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -382,5 +394,12 @@ CodeQL 42959635217 passed; the queue reached the expected 17.
 For the taxonomy API slice, the static boundary regression first failed because
 all three catchers bypassed the existing `TaxonomyError.public_detail`
 contract. After the fix, all 111 exception-response boundary cases pass. Exact-
-source Build and CodeQL remain required after push, with an expected stack-
-trace queue of 14.
+source Build 42965406290 and CodeQL 42965406040 passed; the queue reached the
+expected 14.
+
+For the remaining network-service slice, the focused regression first failed
+five checks: four ownership handlers read caught exception text, and the DNS
+conflict type could not separate internal and public diagnostics. After the fix,
+the 118-case exception-response suite and combined 133-case network boundary
+suite pass. Exact-source Build and CodeQL remain required after push, with an
+expected stack-trace queue of 9.

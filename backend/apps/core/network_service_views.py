@@ -150,7 +150,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -461,7 +461,7 @@ class DNSRecordDetailView(APIView):
                 values=serializer.validated_data,
             )
         except NetworkServiceConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return Response({"detail": exc.public_detail}, status=409)
         except (NetworkServiceError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         return Response(RecordSerializer(record).data)

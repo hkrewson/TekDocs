@@ -61,6 +61,7 @@ from apps.core.invoicing import InvoiceError
 from apps.core.money import MoneyError
 from apps.core.network_endpoints import NetworkAssignmentConflict
 from apps.core.network_inventory import NetworkInventoryConflict, NetworkInventoryError
+from apps.core.network_services import NetworkServiceConflict, NetworkServiceError
 from apps.core.publications import PublicationConflict
 from apps.core.repository_editable_bundles import RepositoryEditableBundleError
 from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
@@ -120,12 +121,16 @@ RISKY_HANDLERS = {
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
+    "netbox_reconciliation_views.py": {"InventoryError"},
+    "network_addressing_views.py": {"InventoryError"},
+    "network_circuit_views.py": {"InventoryError"},
     "network_endpoint_views.py": {"InventoryError", "NetworkAssignmentConflict"},
     "network_inventory_views.py": {
         "InventoryError",
         "NetworkInventoryConflict",
         "NetworkInventoryError",
     },
+    "network_service_views.py": {"InventoryError", "NetworkServiceConflict"},
     "repository_publication_views.py": {
         "RepositoryPackageAuthorizationError",
         "RepositoryPublicationPackageError",
@@ -521,6 +526,24 @@ def test_network_inventory_domain_refusal_retains_its_public_message():
 
     assert str(error) == "Those rack units overlap an existing device placement."
     assert error.public_detail == "Those rack units overlap an existing device placement."
+
+
+def test_network_service_conflict_exposes_only_its_public_contract():
+    error = NetworkServiceConflict(
+        "private DNS conflict diagnostic",
+        public_detail="The DNS record changed. Reload before trying again.",
+    )
+
+    assert str(error) == "private DNS conflict diagnostic"
+    assert error.public_detail == "The DNS record changed. Reload before trying again."
+
+
+@pytest.mark.parametrize("error_type", (NetworkServiceError, NetworkServiceConflict))
+def test_network_service_refusals_retain_their_public_messages(error_type):
+    error = error_type("The DNS record is invalid.")
+
+    assert str(error) == "The DNS record is invalid."
+    assert error.public_detail == "The DNS record is invalid."
 
 
 @pytest.mark.parametrize(

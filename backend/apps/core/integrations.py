@@ -1192,7 +1192,7 @@ def adopt_netbox_conflict(
             fingerprint=conflict.remote_fingerprint,
         )
     except NetBoxReferenceError as exc:
-        raise ValidationError({"detail": str(exc)}) from exc
+        raise ValidationError({"detail": exc.public_detail}) from exc
     except ValueError as exc:
         raise ValidationError({"detail": "The NetBox record could not be linked."}) from exc
     reference.last_observed_at = conflict.observation.observed_at

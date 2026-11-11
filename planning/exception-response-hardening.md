@@ -246,6 +246,17 @@ contract instead of caught-exception text. The existing field-keyed `parent_id`
 HTTP 400 response, unavailable-parent guidance, cycle prevention, site scoping,
 and audit behavior remain unchanged.
 
+Exact-source Build 43042437039 passed final validation, and CodeQL 43042435901
+passed both languages and reduced the stack-trace queue from 9 to 7, closing
+exactly those two site hierarchy paths.
+
+The eighteenth bounded slice selects the integration conflict-resolution
+result. `NetBoxReferenceError` now separates internal diagnostics from explicit
+public details, and the NetBox link resolver uses only that public contract.
+The existing HTTP 400 response, reconciliation guidance, fingerprint and mapping
+persistence, tenant scope, conflict transitions, and audit behavior remain
+unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -417,5 +428,12 @@ queue reached the expected 9.
 For the site hierarchy slice, the focused boundary regression first failed
 three checks: the public catchers read exception text, and the hierarchy error
 lacked a separate public contract. After the fix, all 121 exception-response
-boundary cases pass. Exact-source Build and CodeQL remain required after push,
-with an expected stack-trace queue of 7.
+boundary cases pass. Exact-source Build 43042437039 and CodeQL 43042435901
+passed; the queue reached the expected 7.
+
+For the integration conflict slice, the focused regression first failed two
+checks: the resolver read caught exception text, and the NetBox error could not
+separate internal and public diagnostics. After the fix, the 124-case exception-
+response suite and combined 127-case integration boundary suite pass. Exact-
+source Build and CodeQL remain required after push, with an expected stack-
+trace queue of 6.

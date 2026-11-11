@@ -33,9 +33,9 @@ NETBOX_ENTITY_TYPES: dict[str, str] = {
 
 
 class NetBoxReferenceError(ValueError):
-    def __init__(self, public_detail: str) -> None:
-        self.public_detail = public_detail
-        super().__init__(public_detail)
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 class NetBoxObservation(TypedDict):

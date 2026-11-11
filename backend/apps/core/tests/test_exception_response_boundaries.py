@@ -59,6 +59,7 @@ from apps.core.inventory import InventoryError
 from apps.core.invoice_recurrence import RecurrenceError
 from apps.core.invoicing import InvoiceError
 from apps.core.money import MoneyError
+from apps.core.netbox_reconciliation import NetBoxReferenceError
 from apps.core.network_endpoints import NetworkAssignmentConflict
 from apps.core.network_inventory import NetworkInventoryConflict, NetworkInventoryError
 from apps.core.network_services import NetworkServiceConflict, NetworkServiceError
@@ -121,6 +122,7 @@ RISKY_HANDLERS = {
     },
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
+    "integrations.py": {"NetBoxReferenceError"},
     "network_circuits.py": {"ValidationError"},
     "netbox_reconciliation_views.py": {"InventoryError"},
     "network_addressing_views.py": {"InventoryError"},
@@ -546,6 +548,26 @@ def test_network_service_refusals_retain_their_public_messages(error_type):
 
     assert str(error) == "The DNS record is invalid."
     assert error.public_detail == "The DNS record is invalid."
+
+
+def test_netbox_reference_error_exposes_only_its_public_contract():
+    error = NetBoxReferenceError(
+        "private NetBox reconciliation diagnostic",
+        public_detail="The NetBox record could not be linked.",
+    )
+
+    translated = serializers.ValidationError({"detail": error.public_detail})
+
+    assert translated.status_code == 400
+    assert str(translated.detail["detail"]) == "The NetBox record could not be linked."
+    assert "private NetBox reconciliation diagnostic" not in str(translated.detail)
+
+
+def test_netbox_reference_refusal_retains_its_public_message():
+    error = NetBoxReferenceError("That NetBox object is already linked inside this Workspace.")
+
+    assert str(error) == "That NetBox object is already linked inside this Workspace."
+    assert error.public_detail == "That NetBox object is already linked inside this Workspace."
 
 
 @pytest.mark.parametrize(

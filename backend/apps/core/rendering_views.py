@@ -72,7 +72,7 @@ class DiagramPreviewView(APIView):
                 "diagram.renderer.invalid_response",
             }
             return Response(
-                {"code": error.code, "detail": str(error)},
+                {"code": error.code, "detail": error.public_detail},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE if unavailable else status.HTTP_400_BAD_REQUEST,
             )
         if len(artifacts) != 1:

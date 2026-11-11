@@ -27,6 +27,7 @@ from apps.core import (
     network_inventory_views,
     recurring_invoice_views,
     recurring_invoices,
+    rendering_views,
     repository_publication_views,
     software_inventory,
     software_inventory_views,
@@ -123,6 +124,7 @@ RISKY_HANDLERS = {
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
     "integrations.py": {"NetBoxReferenceError"},
+    "rendering_views.py": {"DiagramRenderError"},
     "network_circuits.py": {"ValidationError"},
     "netbox_reconciliation_views.py": {"InventoryError"},
     "network_addressing_views.py": {"InventoryError"},
@@ -866,12 +868,52 @@ def test_document_domain_errors_expose_only_their_explicit_public_contract(error
     assert error.public_detail == message
 
 
-def test_diagram_render_error_message_is_an_explicit_safe_public_contract():
+def test_diagram_render_error_exposes_only_its_explicit_public_contract():
+    error = DiagramRenderError(
+        "private renderer diagnostic",
+        code="diagram.renderer.timeout",
+        public_detail="The isolated diagram renderer timed out.",
+    )
+    assert str(error) == "private renderer diagnostic"
+    assert error.public_detail == "The isolated diagram renderer timed out."
+
+
+def test_diagram_render_error_retains_its_safe_default_message():
     error = DiagramRenderError(
         "The isolated diagram renderer timed out.",
         code="diagram.renderer.timeout",
     )
+    assert str(error) == "The isolated diagram renderer timed out."
     assert error.public_detail == "The isolated diagram renderer timed out."
+
+
+def test_diagram_preview_response_exposes_only_the_public_detail(monkeypatch):
+    monkeypatch.setattr(rendering_views, "require_installation_member", lambda _user: None)
+    monkeypatch.setattr(rendering_views.DiagramPreviewView, "throttle_classes", [])
+
+    def fail_render(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise DiagramRenderError(
+            "private renderer path /srv/renderer/jobs/example",
+            code="diagram.renderer.unavailable",
+            public_detail="The isolated diagram renderer is unavailable.",
+        )
+
+    monkeypatch.setattr(rendering_views, "render_diagram_exports", fail_render)
+    request = APIRequestFactory().post(
+        "/api/v1/render/diagram-preview",
+        {"source": "flowchart LR\nA-->B"},
+        format="json",
+    )
+    force_authenticate(request, user=SimpleNamespace(is_authenticated=True))
+
+    response = rendering_views.DiagramPreviewView.as_view()(request)
+
+    assert response.status_code == 503
+    assert response.data == {
+        "code": "diagram.renderer.unavailable",
+        "detail": "The isolated diagram renderer is unavailable.",
+    }
+    assert "private renderer path" not in str(response.data)
 
 
 def test_document_conflict_response_uses_only_the_explicit_public_contract():

@@ -257,6 +257,17 @@ The existing HTTP 400 response, reconciliation guidance, fingerprint and mapping
 persistence, tenant scope, conflict transitions, and audit behavior remain
 unchanged.
 
+Exact-source Build 43046093822 passed final validation, and CodeQL 43046109239
+passed both languages and reduced the stack-trace queue from 7 to 6, closing
+the integration conflict path.
+
+The nineteenth bounded slice selects the authenticated diagram-preview result.
+`DiagramRenderError` now separates internal diagnostics from explicit public
+details, and the preview endpoint uses only that public contract. The existing
+error code, HTTP 400-versus-503 mapping, safe actionable guidance, renderer
+isolation, sanitization, throttling, permission, publication and preflight
+behavior remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -435,5 +446,13 @@ For the integration conflict slice, the focused regression first failed two
 checks: the resolver read caught exception text, and the NetBox error could not
 separate internal and public diagnostics. After the fix, the 124-case exception-
 response suite and combined 127-case integration boundary suite pass. Exact-
-source Build and CodeQL remain required after push, with an expected stack-
-trace queue of 6.
+source Build 43046093822 and CodeQL 43046109239 passed; the queue reached the
+expected 6.
+
+For the diagram-preview slice, the focused regression first failed two checks:
+the endpoint read caught exception text, and the renderer error could not
+separate internal and public diagnostics. After the fix, all 127 exception-
+response boundary cases pass, including a database-free endpoint request that
+keeps an injected private renderer path out of the JSON response. Exact-source
+Build and CodeQL remain required after push, with an expected stack-trace queue
+of 5.

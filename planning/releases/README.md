@@ -231,8 +231,18 @@ The integration conflict-resolution follow-up selects the NetBox link result.
 details, and the resolver uses only that public contract. Existing HTTP 400
 behavior, mappings, fingerprints, tenant scope, and conflict transitions remain
 unchanged. The combined 127-case integration and exception boundary suites pass
-locally. Exact-source Build and CodeQL remain required after push, with an
-expected stack-trace queue of 6.
+locally. Exact-source Build 43046093822 passed final validation, and CodeQL
+43046109239 reduced the stack-trace queue from 7 to 6.
+
+The diagram-preview follow-up selects the authenticated renderer error result.
+`DiagramRenderError` now separates internal diagnostics from explicit public
+details, and the endpoint uses only that public contract. Existing error codes,
+HTTP 400-versus-503 mapping, actionable guidance, sanitization, throttling,
+permissions, publication and preflight behavior remain unchanged. Exact-source
+Build and CodeQL remain required after push. All 127 exception-response boundary
+cases pass locally, including a database-free endpoint request that proves a
+private renderer path cannot reach the response; the expected stack-trace queue
+is 5.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

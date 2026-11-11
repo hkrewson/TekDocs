@@ -396,7 +396,11 @@ def test_diagram_preview_rejects_anonymous_fenced_and_unavailable_requests(clien
     assert fenced.status_code == 400
 
     def unavailable(*_args, **_kwargs):  # type: ignore[no-untyped-def]
-        raise DiagramRenderError("The isolated diagram renderer is unavailable.", code="diagram.renderer.unavailable")
+        raise DiagramRenderError(
+            "private renderer path /srv/renderer/jobs/example",
+            code="diagram.renderer.unavailable",
+            public_detail="The isolated diagram renderer is unavailable.",
+        )
 
     monkeypatch.setattr("apps.core.rendering_views.render_diagram_exports", unavailable)
     failed = client.post(endpoint, {"source": "flowchart LR\nA-->B"}, content_type="application/json")

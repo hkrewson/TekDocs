@@ -156,16 +156,23 @@ _SVG_ATTRIBUTES = {
 
 
 class DiagramRenderError(ValueError):
-    """A safe diagram failure with a stable preflight code.
+    """A diagram failure with a stable preflight code and public detail.
 
-    The message may be shown to a person. It must never include Mermaid source,
-    renderer stderr, filesystem paths, or other customer-controlled values.
+    Only ``public_detail`` may be shown to a person. It must never include
+    Mermaid source, renderer stderr, filesystem paths, or other
+    customer-controlled values.
     """
 
-    def __init__(self, message: str, *, code: str = "diagram.render_failed") -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "diagram.render_failed",
+        public_detail: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.code = code
-        self.public_detail = message
+        self.public_detail = message if public_detail is None else public_detail
 
 
 @dataclass(frozen=True, slots=True)

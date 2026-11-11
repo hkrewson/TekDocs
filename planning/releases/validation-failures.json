@@ -1358,9 +1358,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Fresh Docker test test_legacy_library_works_with_a_new_unindexed_empty_repository reproduced 409 instead of 200 before the correction (65.91s). Original CI timed out at live-workspace.spec.ts:428 while opening the supplier publication; backend document-search returned 409.",
       "cause": "The native discovery guard treated an initialized, empty Git repository awaiting its first index as unavailable native content, blocking a valid legacy-only Workspace library.",
-      "next_action": "The same follow-up commit proves accepted Git has no Markdown before allowing legacy discovery. Nine API cases pass, including MSP/organization blank repositories and rejection of the first unindexed native document. Validate the corrected source in hosted live-workspace and all required gates; preserve this failed run.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Verified: Build 41562895300 attempt 1 passed the entire live browser/server journey on b716026742e513c94dbaaf65a5c30a2cf8d2c3ce. All ten publication cases passed without retries and server verification passed. Preserve the original failure.",
+      "fix_commit": "a355f88077cd9144232fc108f1ef7ce7cb8ae39e",
+      "retest_run": "41562895300"
     },
     {
       "run_id": "41551481488",
@@ -1368,9 +1368,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Original CI: document-operations.spec.ts:110 timed out awaiting Keep editing after history.back(). The unchanged exact case passed five serial and twenty four-worker Docker replays, zero retries; surrounding eight-case suite passed three times (24 cases, 29.2s).",
       "cause": "unknown; no causal link to the backend discovery changes was established, and the unchanged failure has not reproduced locally.",
-      "next_action": "Retain the failure and original timing uncertainty. Run unchanged WebKit assertions and budgets on the corrected source; investigate recurrence rather than increasing waits or claiming an application fix from a passing retry.",
+      "next_action": "Verified unchanged WebKit artifact 13197214521 on b7160267: Back assertion passed with zero retries. The 415-case summary has four existing skips and no failures or retries. Original cause remains unknown; investigate recurrence without weakening assertions.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "41562941477"
     },
     {
       "run_id": "41551455933",
@@ -1378,9 +1378,9 @@
       "owner": "TekDocs maintainer",
       "reproduction": "The allocation-preservation planning regression failed for all four core groups before correction. Docker pytest collection measured 393 cases in the failed allocation versus 298 in the restored allocation, both 19 modules; no test database was provisioned for collection.",
       "cause": "The new discovery test filename shifted the alphabetical round-robin assignments for existing modules. The enlarged core-a-2 workload was cancelled at the unchanged 30-minute job deadline after reporting 144 cases of progress.",
-      "next_action": "Restore the independently captured validated 64bb580 allocation and append discovery only to core-a/core-a-1. All 11 plan/coverage checks and shell syntax pass. Keep the deadline, coverage requirement and failed attempt; exact-source hosted completion must confirm capacity.",
-      "fix_commit": null,
-      "retest_run": null
+      "next_action": "Verified Build 41562895300 attempt 1: all 20 database groups and 89% combined coverage passed. Split core-a-2 passed 194 cases with two existing skips in 621.28s; core-a-3 passed 101 cases with one existing skip in 1185.70s. No assertion, coverage threshold or deadline was relaxed. Preserve earlier unsuccessful corrections and runs.",
+      "fix_commit": "b716026742e513c94dbaaf65a5c30a2cf8d2c3ce",
+      "retest_run": "41562895300"
     },
     {
       "run_id": "41556077294",
@@ -1388,9 +1388,21 @@
       "owner": "TekDocs maintainer",
       "reproduction": "The restored 298-case allocation was cancelled again at 30 minutes, after 144 cases of progress. New public selector test_slow_core_a_branch_is_split_without_omitting_modules failed before adding the third group. Full selections passed sequentially with coverage in the existing Docker project: 194 passed/2 existing skips in 393.64s and 101 passed/1 existing skip in 500.38s.",
       "cause": "Restoring the validated allocation did not provide sufficient runtime headroom for the slower branch. The sparse progress output does not identify one causal slow test; the earlier allocation-only correction was insufficient.",
-      "next_action": "Divide only the former second branch into disjoint core-a-2/core-a-3 groups; require every coverage output at the unchanged 80% aggregate threshold and unchanged 30-minute deadline. Keep complete union/disjointness and baseline-family tests. Added verbose module progress retains better evidence if capacity fails again. Both full groups, 160 tooling cases and both review axes passed locally. Exact-source hosted CI must confirm startup/execution headroom.",
+      "next_action": "Verified Build 41562895300 attempt 1: all 20 database groups and 89% combined coverage passed. Split core-a-2 passed 194 cases with two existing skips in 621.28s; core-a-3 passed 101 cases with one existing skip in 1185.70s. No assertion, coverage threshold or deadline was relaxed. Preserve earlier unsuccessful corrections and runs.",
+      "fix_commit": "b716026742e513c94dbaaf65a5c30a2cf8d2c3ce",
+      "retest_run": "41562895300"
+    },
+    {
+      "run_id": "41562941477",
+      "run_attempt": 1,
+      "job_id": "125677558581",
+      "job": "Supported upgrade matrix",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted diagram upgrade promotion failed in exercise_diagram_fixture during first Git publication with DiagramRenderError: A required diagram could not be rendered. Existing-service Docker exact adapter replay passed (68.42s), all 34 surrounding diagram-migration cases passed (150.68s), and 100 required renders of the three synthetic fixture variants passed. The original failure did not reproduce locally.",
+      "cause": "unknown; the generic error hides the caught OSError/ValueError/JSON decoding detail, and failure cleanup retained backend logs but not renderer diagnostics. No causal link to discovery/export or CI allocation changes is established.",
+      "next_action": "Verified unchanged-source attempt 2 passed every upgrade stage and final diagram evidence. Upgrade artifact 13201899400 and diagram artifact 13202308307 are passed and bound to b716026742e513c94dbaaf65a5c30a2cf8d2c3ce. Build 41562895300 and CodeQL 41562938749 passed attempt 1. Preserve attempt 1 and original unknown cause; investigate any recurrence without weakening rendering or publication checks. No application fix is attributed to this successful retry.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "41562941477"
     },
     {
       "run_id": "41672338029",
@@ -1400,9 +1412,33 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Existing-service Docker test_document_attachment_owner.py::test_copied_legacy_document_cannot_acquire_native_file_owner reproduced the exact expected-ValidationError versus plain-RepositoryPrimaryFileConflict failure before correction. The first corrected full owner/authoring/file-migration replay passed all 62 cases. New exact HTTP-detail assertions then reproduced DRF list-style messages before preserving plain formatting.",
       "cause": "The new shared primary-file authority guard preserved the upload denial but changed the existing service validation exception contract. The focused local slice suite omitted the legacy-owner module. Specializing the conflict as the existing DRF ValidationError restores service compatibility while the specific HTTP adapters continue returning 409; explicit string formatting preserves the existing detail messages.",
-      "next_action": "Final Docker owner/authoring/file-migration replay passed all 62 cases, exact plain conflict-message assertions passed, Ruff/mypy passed and both reviews are clear. Push the bounded correction directly to main and require exact-source Build, CodeQL, supported upgrades and independent encrypted restore. Preserve the failed first run; no test assertion or deadline was weakened.",
+      "next_action": "Verified final main 61908a2c: core-b passed in Build 41677910926, all twenty database groups and combined coverage passed, and the complete workflow passed attempt 2. Keep the reproduced service-contract regression and explicit runtime correction; no owner assertion or deadline was weakened. Initial dbd55ae2 workflow was cancelled as superseded.",
+      "fix_commit": "61908a2c7679b42c044bd75e0050094b10f2be23",
+      "retest_run": "41677910926"
+    },
+    {
+      "run_id": "41677948851",
+      "run_attempt": 1,
+      "job_id": "126064454437",
+      "job": "Browser (webkit)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted existing document-publication.spec.ts document-wide draft protection at 1280px failed waiting for the discard-confirmation dialog after Files click. Exact unchanged single Docker replay passed in 6.2s; twenty four-worker replays passed in 45.3s and all eighteen surrounding publication cases passed in 20.7s, zero retries. Failed artifact 13251819531 (SHA-256 2ea314de76da6d95fd2550ecb4118c238c7ee39618fea782f28d2c3f1243ff0c) is retained and verified.",
+      "cause": "unknown; the hosted symptom did not reproduce locally and no causal link to primary-file controls or the backend exception correction is established. Passing unchanged replays do not diagnose the original dialog absence.",
+      "next_action": "Verified unchanged-source Extended attempt 2 passed WebKit and browser evidence. Final artifact 13256797126 (SHA-256 da40b9a44b3e72ea2d103c54a51cb0bc0f70eee7b5a9048d8750827de385b620) reports 411 passed, four existing skips, zero retries and the original 1280px case passed. Original dialog absence remains unexplained; investigate recurrence before aggregate 1.0 acceptance. No source, selector, assertion, timeout or retry budget was changed.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "41677948851"
+    },
+    {
+      "run_id": "41677910926",
+      "run_attempt": 1,
+      "job_id": "126068633428",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Hosted final source 61908a2c passed the new native staff/client/primary journeys and twelve of thirteen publication cases, but existing templateJourney timed out waiting for the copy introduction. Diagnostics retained a pending Git document read aged 2954ms. Failed artifact 13253698105, SHA-256 702f20a2d0649d51edae0c115cb2d927c6be6983350dc39c75d6ad9484723ae7, is downloaded and verified. Full unchanged existing-project Docker replay is in progress. The full unchanged final-source Docker replay passed all thirteen cases in 4.2 minutes, zero retries, followed by server retained-byte/authority verification and artifact hygiene.",
+      "cause": "unknown underlying read latency; the timing repeats the previously recorded template-copy symptom. No causal link to primary-file controls or the service exception correction is established. A pending request in an error report is not a causal diagnosis.",
+      "next_action": "Verified unchanged-source Build attempt 2 passed the full browser/server job and production-image gates. Artifact 13257196697 (SHA-256 63749a36fcadff314b3c8be1cf228ae54a5cdb578e8bf0e06727fef3a5183bde) has thirteen passed cases, every retry zero and server verification passed. Preserve attempt 1 and investigate recurring template read latency before aggregate 1.0 acceptance; no causal application fix or assertion/deadline/retry relaxation is claimed.",
+      "fix_commit": null,
+      "retest_run": "41677910926"
     },
     {
       "run_id": "41736862074",
@@ -1410,9 +1446,21 @@
       "owner": "TekDocs maintainer",
       "reproduction": "Existing Docker migrate service: pytest apps/core/tests/test_permission_idor_matrix.py::test_route_permission_inventory_covers_every_api_route_and_has_stable_unique_contracts -q reproduces the two missing key-read routes.",
       "cause": "The native key routes were implemented and individually tested but omitted from AUTHENTICATED_ROUTE_PERMISSIONS and the shared matrix route-argument map.",
-      "next_action": "Corrected inventory, both route-denial cases and the complete constrained-runtime authorization matrix pass locally on a fresh synthetic database. Both source reviews and static/secret checks pass. Validate corrective source in hosted Build, CodeQL and Extended workflows.",
+      "next_action": "Corrective e6224338 passes core-c and all twenty database groups plus combined coverage in Build41741689645. Preserve the reproduced inventory omission and its explicit correction; final image/upgrade/recovery completion remains pending.",
+      "fix_commit": "e6224338e2279134ea8c3230712b586008c5882d",
+      "retest_run": "41741689645"
+    },
+    {
+      "run_id": "41736862074",
+      "run_attempt": 1,
+      "job_id": "126272204960",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Thirteen of fourteen hosted journeys passed, including both native-key workflows. Existing templateJourney failed its unchanged 5000ms copy-introduction assertion; Git document read remained pending for 2780ms. Earlier complete local run passed 14/14; unchanged final-source full replay passed all 14 cases in 4.8 minutes, zero retries, with server retained-byte/authority verification and artifact hygiene.",
+      "cause": "unknown underlying read latency; symptom matches previously retained template-copy failures. Pending read timing alone is not a causal diagnosis.",
+      "next_action": "Final-source hosted Build41741689645 passes all14 publication/browser/server cases with zero retries. Preserve the original failed artifact13281891476 (SHA-256 a4a46c946458aef57b61ae921d0d63bf26dbdcd6442ed218a95da2398d71f71c) and unknown timing cause as aggregate1.0 follow-up. No selector, deadline or retry budget changed; no causal fix is claimed.",
       "fix_commit": null,
-      "retest_run": null
+      "retest_run": "41741689645"
     },
     {
       "run_id": "41767392831",
@@ -1422,7 +1470,7 @@
       "cause": "Four older mock fixtures omitted the newly required exact-client native template catalog response. Each hosted browser failed the same six library widths.",
       "next_action": "Confirm corrected exact source in hosted Extended validation.",
       "fix_commit": "fa9f4da64d5ccb3f61738c5cb24929bc5915d891",
-      "retest_run": null
+      "retest_run": "41770247116"
     },
     {
       "run_id": "41767369135",
@@ -1431,8 +1479,8 @@
       "reproduction": "Exact identity-proof case and complete 34-case module pass unchanged in existing Docker services. Forced actual-worker claim before ready chmod reproduces diagram.renderer.unavailable; deterministic test_renderer_can_claim_ready_before_producer_returns fails old code and passes readiness-last fix.",
       "cause": "Reproduced producer/worker readiness race: worker can rename ready before producer chmod. This matches the hosted symptom; the hosted underlying OS error was not retained, so attribution remains inferred.",
       "next_action": "Review and validate readiness-last fix, then confirm exact-source hosted diagram and recovery gates.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "c78559ae24acbf339e3c789e5c99391008fbc449",
+      "retest_run": "41770233254"
     },
     {
       "run_id": "41767369135",
@@ -1441,6 +1489,16 @@
       "reproduction": "Existing every-tenant-model scoped-manager inventory test reproduced locally before the fix. Corrected entity/scoping modules pass 29 cases; 16 focused native-template cases pass with populated positive/negative scoped queries.",
       "cause": "The three new native-template models omitted the standard fail-closed scoped managers. Existing service filtering and database guards remain unchanged.",
       "next_action": "Confirm corrected exact source in hosted Build and Extended validation.",
+      "fix_commit": "c78559ae24acbf339e3c789e5c99391008fbc449",
+      "retest_run": "41770233254"
+    },
+    {
+      "run_id": "41770233254",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Fourteen of fifteen hosted publication journeys passed, including new native template enrollment. Older templateJourney failed its unchanged 5000ms copy-introduction visibility assertion. The document/list read finished at9408ms, dependent Git read at10048ms (HTTP200), and assertion failed at10067ms. A controlled load-order reproduction is in progress.",
+      "cause": "Unknown underlying hosted read latency. The observed response timing leaves only19ms before the render assertion deadline; investigating missing load synchronization before attributing a cause.",
+      "next_action": "Reproduce the load-order boundary, retain assertions and budgets, validate any correction and rerun full browser/server acceptance.",
       "fix_commit": null,
       "retest_run": null
     },

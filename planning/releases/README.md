@@ -209,44 +209,90 @@ configuration remain later slices; the six legacy migration gaps stay deferred.
 
 ## Native primary-file version controls after publication
 
-The [bounded primary-file slice](../git-native-primary-files.md) connects the
-repository editor to existing scanned intake, immutable version history,
-compare-and-swap replacement and private retained downloads. Selected files and
-Markdown drafts survive errors and protected navigation; refresh requires
-explicit confirmation of a changed replacement target. File updates do not
-rewrite signed publications or their independently retained files/PDFs.
-The pre-existing history adapter also now shows the exact promoted legacy-owner
-chain; repository read/append refuse legacy-authoritative shadows. This is a
-bounded compatibility correction, not a migration or existing-data rewrite.
-Local frontend validation passed 849 tests, coverage, lint, types and bundles;
-privacy diagnostics passed ten cases. Both review axes are clear after the
-reproduced compatibility correction. The final combined authoring gate passed
-196 cases; all thirteen clean browser journeys passed without retries, followed
-by retained-byte/authority verification and artifact hygiene. Exact-source hosted
-Build, CodeQL, upgrade and independent encrypted restore remain required before
-closeout. Initial Build 41672338029 failed the existing core-b owner-validation
-contract; the exact Docker test reproduced the exception-type regression. Its
-bounded correction preserves validation compatibility, HTTP 409 and plain error
-messages. All 62 owner/authoring/file-migration cases and both final reviews passed;
-final-source hosted validation is still required. Version remains 0.9.18 development. No deployment,
-release/tag publication or existing-data change is authorized by this slice.
+The [bounded primary-file slice](../git-native-primary-files.md) connects newly
+created Git documents to scanned upload, explicit compare-and-swap replacement,
+paged retained history and private downloads. Files and Markdown drafts survive
+conflicts/denials; signed publications and their independent files/PDFs remain
+intact. The reproduced promoted-owner history gap and service validation-contract
+regression are corrected without rewriting existing data.
+Verified November 3: remote main `61908a2c7679b42c044bd75e0050094b10f2be23` passed
+[Build 41677910926](https://github.com/hkrewson/TekDocs/actions/runs/41677910926)
+on attempt 2, [CodeQL 41677944767](https://github.com/hkrewson/TekDocs/actions/runs/41677944767)
+on attempt 1 and [Extended 41677948851](https://github.com/hkrewson/TekDocs/actions/runs/41677948851)
+on attempt 2. All twenty database groups, combined coverage, thirteen hosted
+browser/server journeys without retries, supported upgrades and independent
+encrypted restore passed. Restored native file versions, signatures and PDFs were
+verified exactly. Production image, diagram, SBOM and vulnerability gates passed.
+Local frontend validation passed 849 cases; combined authoring passed 196 cases;
+the final contract correction passed all 62 owner/authoring/file-migration cases.
+Both source reviews are clear. Commit-bound artifacts and digests are verified.
+The task record preserves the first contract failure and two intermittent browser
+failures. The template-copy and WebKit dialog cases passed unchanged local and
+hosted replays; their timing causes remain unknown and require follow-up before
+aggregate 1.0 acceptance. No causal fix is claimed for those unchanged retries.
+Version remains 0.9.18 development. No deployment, release/tag publication,
+production export or existing-data change occurred. Configuration and final
+clean-start acceptance remain next; the six optional migration gaps stay deferred.
+Wiki/status closeout edits remain local post-push records.
 
 ## Native staff and client publication controls after discovery/export
 
 The [native publication slice](../git-native-publication-interface.md) connects
-new Git-only documents to retained snapshots, publishing, corrections, withdrawal,
-history and PDF downloads. Staff decisions use guarded append-only records;
+new Git-only documents to snapshots, staff/client publishing, corrections,
+withdrawal, history and retained PDF downloads. Staff decisions are append-only;
 client delivery retains independent approval and exact-client authorization.
-Version remains 0.9.18 development. Local Docker validation passed the adapted
-170-case authoring gate, targeted scope/schema/concurrency checks, all 817 frontend
-tests and all twelve real browser journeys without retries, with server custody
-verification. Standards and Spec reviews each reported zero findings. Migration
-0219 remains unapplied to retained development data; no deployment occurred.
-Exact-source hosted Build, CodeQL, supported upgrade and independent encrypted
-recovery must pass after push. Primary-file controls and configuration are later
-bounded workflow slices; the six automatic-migration gaps remain deferred.
+Verified November 3: remote main `a598cf003790f495d15a0a408223c300b9b10731`
+passed [Build 41591436635](https://github.com/hkrewson/TekDocs/actions/runs/41591436635)
+on attempt 2 and [CodeQL 41591450327](https://github.com/hkrewson/TekDocs/actions/runs/41591450327)
+and [Extended 41591452633](https://github.com/hkrewson/TekDocs/actions/runs/41591452633)
+on attempt 1. All twenty database groups, 89% combined backend coverage, all
+twelve real browser/server journeys without retries, production-image scans,
+supported upgrades and independent encrypted restore passed. Local frontend
+validation passed 818 tests, coverage, lint, types and bundle checks. Both source
+reviews are clear. Downloaded commit-bound upgrade/recovery/diagram receipts and
+browser evidence were verified against GitHub artifact digests.
+The task record retains unsuccessful attempts, the reproduced/fixed upload-test
+synchronization defect, and the unconfirmed startup/template timing failures;
+passing unchanged replays are not claimed as causal fixes for those timings.
+Version remains 0.9.18 development. Migration 0219 remains unapplied to retained
+development data; no deployment or existing-document change occurred. Primary-file
+controls and configuration remain later bounded slices; the six automatic-migration
+gaps remain deferred. These results do not establish aggregate 1.0 acceptance.
+
+## Git-native discovery/export correction after the clean-start audit
+
+The [bounded discovery/export correction](../git-native-discovery-export.md)
+reproduced omission of native-only documents before fixing the library and
+cross-checked Markdown inventory. Native selection now opens the repository
+editor; fragments and archived legacy shadows are excluded from new-document
+fallback. Local aggregate/runtime, nine discovery, thirteen exporter, 104
+component and ten real browser/server journeys passed; both source-review axes
+are clear. Verified November 2: exact source
+`b716026742e513c94dbaaf65a5c30a2cf8d2c3ce` is on remote main and passed
+[Build 41562895300](https://github.com/hkrewson/TekDocs/actions/runs/41562895300)
+and [CodeQL 41562938749](https://github.com/hkrewson/TekDocs/actions/runs/41562938749)
+on attempt 1. All 20 database groups and 89% combined coverage passed. All ten
+live publication journeys passed without retries and server verification passed.
+[Extended 41562941477](https://github.com/hkrewson/TekDocs/actions/runs/41562941477)
+completed successfully on attempt 2: attempt 1's diagram fixture render failure
+remains unexplained after a passing exact local replay, 34 surrounding tests and
+100 required synthetic renders. The unchanged-source upgrade retry passed; no
+application fix is attributed to that retry. Commit-bound upgrade, independent
+recovery and diagram receipts were downloaded and verified. The task record and
+failure ledger retain artifact identities, hashes and unsuccessful attempts.
+No existing data or schema was changed, no production export/deployment occurred,
+and version remains 0.9.18 development. These results do not establish aggregate
+1.0 acceptance or reopen the six deferred migration gaps.
 
 ## Cross-Workspace reuse and remaining-gap audit after 0.9.18
+
+Current scope revision, November 2, 2026: the maintainer chose a clean Git-backed
+start with manual document copying/recreation. The six remaining automatic
+legacy-migration gaps are deferred, not 1.0 blockers or completed closures.
+Existing data remains intact. The [current closeout plan](../1.0-closeout-plan.md)
+orders manual-copy review, Git-backed workflow validation and final candidate
+acceptance. The development and CI records below retain their historical scope;
+this planning decision neither changes release status nor waives recovery gates.
 
 The maintainer authorized the [remaining migration audit](../migrations/remaining-migration-audit.md),
 starting with [cross-Workspace reuse](../migrations/cross-workspace-reuse-migration.md),
@@ -264,8 +310,8 @@ Follow-up source `b8afcca6` passed Build 41479545080 and CodeQL 41479558453.
 Extended 41479563043 passed its browser, performance, DAST and supported-upgrade
 jobs but failed supported recovery. The [recovery follow-up](cross-workspace-recovery-follow-up.md)
 records the reproduced baseline-timing defect and corrected-source validation
-requirements. The [immediate 1.0 plan](../1.0-closeout-plan.md) now orders recovery,
-document contract freeze, required migration completion and candidate acceptance;
+requirements. The [immediate 1.0 plan](../1.0-closeout-plan.md) now orders manual
+document copying, Git-backed workflow validation and candidate acceptance;
 the distinct interface rework is the first post-1.0 priority.
 
 Corrected runtime `3e275779` passed CodeQL 41499022087 and all of Extended
@@ -278,6 +324,19 @@ browser checks with completed scoped Git reads. All nine final browser/server
 journeys, privacy/selection checks, lint and types passed; corrected-source
 hosted validation follows the next authorized push. No production data or
 permission behavior changed.
+
+Verified November 2: follow-up HEAD `64bb580534e326717dcb725594316d995b511947`
+passed [Build 41518555143](https://github.com/hkrewson/TekDocs/actions/runs/41518555143),
+[CodeQL 41518952177](https://github.com/hkrewson/TekDocs/actions/runs/41518952177) and
+[Extended 41518956667](https://github.com/hkrewson/TekDocs/actions/runs/41518956667)
+on attempt 1. Exact-source upgrade and independent encrypted-recovery receipts
+were downloaded and checked. All nine live publication journeys passed with
+zero retries. The [clean-start workflow audit](../git-backed-workflow-audit.md)
+records artifact identities and limits: migrated journeys do not establish
+complete Git-native interface coverage. A fresh local Docker probe reproduced
+native main-library omission and legacy-route 404s. Those findings do not reopen
+the six deferred migration gaps or authorize production changes. No new release
+or aggregate 1.0 acceptance is claimed.
 
 ## Repeated shared-block migration development after 0.9.18
 

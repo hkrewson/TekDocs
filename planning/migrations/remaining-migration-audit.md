@@ -5,6 +5,24 @@ with cross-Workspace reuse. This ledger separates implemented closures, valid
 legacy shapes still under investigation and intentional fail-closed prerequisites.
 It must not be read as completed 1.0 acceptance.
 
+## Scope decision — November 2, 2026
+
+The maintainer chose a clean Git-backed start with manual copying/recreation of
+the few existing documents. This supersedes the earlier inclusion of all six
+rows in 1.0. **All six are deferred optional automatic-migration work and are
+not 1.0 release blockers.** They remain unimplemented gaps, not verified closures;
+future implementation requires a new scope decision. The
+[closeout plan](../1.0-closeout-plan.md) now governs manual-copy review,
+Git-backed workflow validation and final candidate acceptance.
+
+The [older same-Workspace pin criteria](same-workspace-historical-pins.md),
+including complete retained source-block revision custody, are preserved as
+superseded design context. No automatic historical-fidelity promise applies to
+the manual copy. Existing documents, revisions, signatures, PDFs, files and
+volumes must remain intact; this decision authorizes no deletion or production
+operation. Current Git-backed workflow, isolation and recovery defects remain
+release obligations regardless of this legacy-import deferral.
+
 ## Cross-Workspace continuation
 
 The [current slice](cross-workspace-reuse-migration.md) closes ordinary MSP library
@@ -14,20 +32,22 @@ revision archives, source dependencies, client-owned keys and retained publicati
 history. [Development evidence](../releases/cross-workspace-reuse-migration-notes.md)
 records local reproductions and remaining validation gates.
 
-## Additional valid shapes to close
+## Deferred automatic migration shapes — none blocks 1.0
 
 | Shape | Audit evidence | Status |
 | --- | --- | --- |
-| Same-Workspace pin predating represented Git history | `test_repeated_shared_block_migration` deliberately reproduces the prerequisite; foreign archive support does not yet select local archives | Open implementation gap |
-| Reusing a same-Workspace source Block that has children | Legacy resolution uses the Block body; `_linked_historical_leaf` / `_existing_references` reject source includes | Open body-only selection gap |
-| Consumer-owned children under a reused placement | Legacy placement tree permits it; `owned_placement_tree` currently rejects `cross_document_nested_reference` | Open structural projection gap |
-| Incoming record relationships and non-neutral outgoing relationships | Existing mapping rejects every incoming/non-REFERENCES/metadata-bearing edge although entity identities remain retained | Open semantic audit; do not invent neutral mentions |
-| Removed, archived owned blocks | Normal removal archives the Block/revisions, while inventory's unplaced-owned query also sees archived rows | Reproduction and closure pending |
-| Parameterized foreign reusable bodies | Legacy field/content keys resolve through the consuming document; current foreign fragment profile requires independent text | Reproduction and scope-preserving design pending |
+| Same-Workspace pin predating represented Git history | `test_repeated_shared_block_migration` deliberately reproduces the prerequisite; foreign archive support does not yet select local archives | Deferred; superseded acceptance draft retained, implementation not started |
+| Reusing a same-Workspace source Block that has children | Legacy resolution uses the Block body; `_linked_historical_leaf` / `_existing_references` reject source includes | Deferred body-only selection gap |
+| Consumer-owned children under a reused placement | Legacy placement tree permits it; `owned_placement_tree` currently rejects `cross_document_nested_reference` | Deferred structural projection gap |
+| Incoming record relationships and non-neutral outgoing relationships | Existing mapping rejects every incoming/non-REFERENCES/metadata-bearing edge although entity identities remain retained | Deferred semantic audit; do not invent neutral mentions |
+| Removed, archived owned blocks | Normal removal archives the Block/revisions, while inventory's unplaced-owned query also sees archived rows | Deferred; reproduction and closure pending |
+| Parameterized foreign reusable bodies | Legacy field/content keys resolve through the consuming document; current foreign fragment profile requires independent text | Deferred; reproduction and scope-preserving design pending |
 
-These entries remain open until their own implementation, positive/negative tests,
-signed/file preservation, rollback/recovery and review agree. No original signed
-record or PDF may be rewritten to make a shape fit.
+These entries remain deferred unless explicitly rescheduled. Any future closure
+still requires implementation, positive/negative tests, signed/file preservation,
+rollback/recovery and review. No original signed record or PDF may be rewritten
+to make a shape fit. Existing migration prerequisites and guards below remain
+unchanged; deferral is not permission to bypass them.
 
 ## Prerequisites that remain fail closed
 

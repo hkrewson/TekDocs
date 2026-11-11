@@ -14,23 +14,55 @@ aggregate 1.0 acceptance.
 
 ## Immediate route to 1.0
 
-The maintainer-authorized [closeout plan](../planning/1.0-closeout-plan.md) orders
-the remaining work: repair current recovery validation, freeze the document
-support matrix, complete required migration gaps, then finish candidate
-acceptance and the 1.0 compatibility decision. Full completion of the current
-migration scope remains an option; no valid legacy shape is silently deferred.
+The maintainer revised the [closeout plan](../planning/1.0-closeout-plan.md) on
+November 2, 2026: use a clean Git-backed start with manual copying/recreation of
+the few existing documents. The six remaining automatic legacy-migration gaps
+are **deferred optional work, not 1.0 blockers**. Their audit and older pin draft
+remain design context; they are not completed implementations.
+
+The remaining sequence is:
+
+1. Review the Markdown copies and separately save wanted files/PDFs; explicitly
+   recreate desired references and access. No automatic history or identity
+   transfer is promised. Keep existing data and the normal backup intact.
+2. Validate the supported Git-backed interface end to end: authoring, conflicts,
+   live/pinned reuse, templates, keys/entities, diagrams, monitored content,
+   files, publishing/corrections/withdrawal/history and PDF downloads. Prove
+   client isolation, unavailable states, rollback and independent recovery.
+3. Freeze one candidate and complete source-bound CI, security/risk review,
+   fresh-install/supported-upgrade checks, browser/accessibility/performance
+   validation and human acceptance before the 1.0 compatibility decision.
+
+This planning decision performs no export, production operation, reset or data
+deletion. Manual copies are not full backups or transfers of signed publication
+history. Existing migration guards remain; defects in supported Git-backed
+workflows remain blockers. No new release or acceptance pass is claimed.
+
+The [clean-start workflow audit](../planning/git-backed-workflow-audit.md) now
+accounts for existing passing CI and the remaining native paths. Its first fix
+is the reproduced library/export enumeration gap; native-only documents can be
+opened in Repository content while omitted from the ordinary document list.
+The [bounded discovery/export correction](../planning/git-native-discovery-export.md),
+native publication controls and [primary-file controls](../planning/git-native-primary-files.md)
+now have exact-source hosted evidence. Final source `61908a2c` passed Build,
+CodeQL, supported upgrades, independent restore and thirteen browser/server
+journeys. File versions, signed publications and PDFs remain preserved. Two
+intermittent browser timings passed unchanged replays and remain recorded for
+investigation before aggregate 1.0 acceptance. Native configuration and a
+clean-created final acceptance journey remain next. The six deferred legacy-import
+gaps remain deferred; no existing data was changed or deployment performed.
 The first post-1.0 priority is a distinct TekDocs
 [end-to-end interface rework](../planning/post-1.0-interface-rework.md), covering
 copy, controls/forms, workflow simplification, navigation and visual identity.
 
-The maintainer-authorized [remaining-gap audit](../planning/migrations/remaining-migration-audit.md)
-now starts with [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md).
+The [remaining-gap audit](../planning/migrations/remaining-migration-audit.md)
+retains the completed bounded [cross-Workspace reuse](../planning/migrations/cross-workspace-reuse-migration.md) work and deferred gaps.
 It covers ordinary library and client-listing references, unenrolled template
 reuse, reviewed pre-Git pin custody and distinct signed source proof. Both review
 axes, 704 combined Docker cases and nine real browser/server journeys passed.
 Exact-source hosted upgrade/recovery artifacts remain required. Other valid
-structural, local-history and relationship shapes remain
-explicit audit work; this is development at 0.9.18, not aggregate 1.0 acceptance.
+structural, local-history and relationship migration shapes are deferred by the
+November 2 decision; this is development at 0.9.18, not aggregate 1.0 acceptance.
 
 The maintainer-authorized [repeated shared-block slice](../planning/migrations/repeated-shared-block-migration.md)
 continues #105/#106 after published 0.9.18 (`81fed48f`, release CI 41362859970).

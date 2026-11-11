@@ -207,3 +207,24 @@ and scoping modules pass 29 cases; Django reports no schema drift.
 
 The focused native template follow-up passes all 16 cases; both scoped-manager
 reviews are clear, strict typing passes and no schema drift is detected.
+
+## Legacy template browser load synchronization
+
+Hosted build `41770233254` on `c78559ae` passes all twenty database groups,
+combined coverage and the new native-template browser journey. The older
+`templateJourney` fails its unchanged five-second copy-introduction assertion.
+Safe diagnostics show the dependent Git read completes successfully only 19ms
+before that assertion expires. This repeats the previously recorded legacy
+template-copy timing symptom; it does not identify the cause of server latency.
+
+A controlled production-preview reproduction injects 4 seconds of search latency
+and 1.6 seconds of Git-read latency: the original assertion fails after 5.1 seconds.
+Waiting for the exact scoped GET, HTTP 200 and completed delivery before the
+unchanged rendering assertion passes the same scenario in 6.1 seconds. The
+original content checks, per-assertion timeout, retries and whole-journey budget
+remain unchanged. The regression exercises the shared navigation helper.
+
+Source review caught a proposed fixture-ID wiring error before acceptance: legacy
+navigation uses entity IDs while content reads use document IDs. Explicit content
+IDs and a fixture contract check are required for the real journey. Final review
+and the complete browser/server replay must pass before this follow-up is pushed.

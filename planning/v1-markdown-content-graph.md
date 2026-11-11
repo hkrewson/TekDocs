@@ -7,8 +7,11 @@ Current baseline: 0.9.0
 Target: 1.0.0
 
 Immediate execution order is maintained in the [1.0 closeout plan](1.0-closeout-plan.md):
-recovery correction, a finite document support matrix, required migration
-completion, then candidate acceptance. The maintainer's first post-1.0 priority
+manual copying/recreation for a clean Git-backed start, supported Git-backed
+workflow validation, then candidate acceptance. The November 2 scope revision
+defers the six remaining automatic legacy-migration gaps; existing data remains
+intact. Historical migration milestones below retain their original evidence
+but do not override that current release boundary. The maintainer's first post-1.0 priority
 is the [end-to-end interface rework](post-1.0-interface-rework.md).
 
 ## Version boundary

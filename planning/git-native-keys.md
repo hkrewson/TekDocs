@@ -119,3 +119,15 @@ No runtime permission handler or browser behavior changed. Corrective-source
 hosted validation remains required; the first failure is retained in the ledger. Local synthetic databases were removed; retained records,
 production, release tags and version remain unchanged. This post-push evidence
 note is local until results are final.
+
+Corrective source `e6224338e2279134ea8c3230712b586008c5882d` is pushed. Its
+[Build 41741689645](https://github.com/hkrewson/TekDocs/actions/runs/41741689645)
+and [Extended 41741701168](https://github.com/hkrewson/TekDocs/actions/runs/41741701168)
+passed; [CodeQL 41741698043](https://github.com/hkrewson/TekDocs/actions/runs/41741698043)
+passed. Final-source upgrade and recovery artifact digests were verified against
+GitHub's artifact metadata. The original Extended run passed. The original Build also recorded the
+known intermittent template-copy introduction timeout (Git read pending 2780ms),
+with 13/14 journeys passing, including both native-key journeys. Full unchanged
+final-source local replay passed 14/14 in 4.8 minutes with zero retries and server
+verification. Its underlying latency remains unknown and is retained as an
+aggregate 1.0 follow-up; no selector, deadline or retry budget was relaxed.

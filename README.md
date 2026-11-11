@@ -14,8 +14,10 @@ The bounded [diagram migration slice](planning/migrations/diagram-publication-mi
 tracks preservation of source revisions and signed graphics alongside the existing
 Git-backed document migration workflow.
 
-The [immediate 1.0 closeout plan](planning/1.0-closeout-plan.md) orders recovery,
-document-scope decisions, remaining migration work and final acceptance. A
+The [immediate 1.0 closeout plan](planning/1.0-closeout-plan.md) now uses a clean
+Git-backed start with reviewed manual document copies, Git-backed workflow
+validation and final acceptance. The six remaining automatic legacy-migration
+gaps are deferred and do not block 1.0. Existing data remains intact. A
 distinct TekDocs [interface rework](planning/post-1.0-interface-rework.md) is the
 first post-1.0 priority.
 
@@ -41,6 +43,10 @@ transient editor attempts without permitting inline styles. Exact-source Build,
 CodeQL, desktop/mobile browser acceptance and passive DAST passed for `286e84a3`.
 The release-bounded inline-style CSP and missing-COEP findings are retired; TekDocs
 does not claim full cross-origin isolation because COOP remains outside this slice.
+
+The [Git-backed workflow audit](planning/git-backed-workflow-audit.md) separates
+passing current CI from the remaining clean-start interface work. Native
+discovery and export completeness are the first bounded correction.
 
 ## Cross-Workspace reuse migration development
 
@@ -370,6 +376,10 @@ http://127.0.0.1:8025
 
 Operator, maintenance, and validation commands live in `scripts/`. Regression fixtures and Docker/browser/upgrade rehearsals live in `tests/rehearsals/` and remain available through their existing `make` targets.
 
+For a manual move of a few existing documents, the [Markdown copy tool](https://github.com/hkrewson/TekDocs/wiki/Markdown-document-copy)
+saves current accessible document text and an index to a new private local folder.
+Review the copies and separately download any wanted files or publication PDFs.
+
 ## Runtime
 
 - Django 5.2 LTS and Django REST Framework
@@ -566,7 +576,7 @@ The repository uses three primary workflows:
 
 Dependabot submits grouped weekly updates for Python, npm, Docker, and GitHub Actions dependencies.
 
-Production updates support explicit release selection with `scripts/update-production.sh --release vMAJOR.MINOR.PATCH` once this updater is installed. New version releases on `main` validate, publish and verify all four images, then atomically deliver the application and receipt tags in one CI run. The updater retrieves the CI receipt automatically; no receipt-only follow-up commit is needed. See the [single-push delivery contract](planning/releases/ci-release-delivery.md). Release mode checks the tag against a reviewed commit/image receipt, uses the tagged Compose configuration, and verifies the running application services against the approved digests. The tooling checkout stays unchanged; `.env` records `TEKDOCS_DEPLOYED_COMMIT` and image digests only after readiness and identity checks pass. Existing backup settings remain required. Without `--release`, the legacy upstream-branch update behavior remains. See the Wiki upgrade procedure for deployment instructions.
+Production updates can discover releases with `scripts/update-production.sh --check` or `--list-releases`, select the newest stable release with explicit `--latest`, or pin `--release vMAJOR.MINOR.PATCH`. New version releases on `main` validate, publish and verify all four images, then atomically deliver the application and receipt tags in one CI run. The updater retrieves the CI receipt automatically; no receipt-only follow-up commit is needed. See the [single-push delivery contract](planning/releases/ci-release-delivery.md). Release mode checks the tag against a reviewed commit/image receipt, shows the update plan, uses the tagged Compose configuration, and verifies the running application services against the approved digests. The tooling checkout stays unchanged; `.env` records `TEKDOCS_DEPLOYED_COMMIT` and image digests only after readiness and identity checks pass. Existing backup settings remain required. The legacy upstream-branch path remains available through explicit `--upstream`; omitting a selector with update options warns before preserving the older behavior. See the Wiki upgrade procedure for deployment instructions.
 
 ## Documentation
 

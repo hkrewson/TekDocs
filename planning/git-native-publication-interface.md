@@ -153,3 +153,59 @@ four minutes with zero retries, retained-byte/authority verification and artifac
 hygiene. Both review axes reported zero findings on the final two-file delta.
 The isolated full live-workspace stack remains hosted-only under the single-project
 local rule; the shared repository helper ran through the existing-project gate.
+
+## Final exact-source delivery — November 3, 2026
+
+Verified: remote main is `a598cf003790f495d15a0a408223c300b9b10731`.
+[Build 41591436635](https://github.com/hkrewson/TekDocs/actions/runs/41591436635)
+passed on attempt 2; [CodeQL 41591450327](https://github.com/hkrewson/TekDocs/actions/runs/41591450327)
+and [Extended 41591452633](https://github.com/hkrewson/TekDocs/actions/runs/41591452633)
+passed on attempt 1. All twenty PostgreSQL groups and 89% combined coverage
+passed. The final hosted browser artifact reports twelve cases passed, every
+retry count zero, and server verification passed. Production-image, diagram-path,
+SBOM and vulnerability checks passed. Extended includes independent encrypted
+restore, repository restoration, recurring-invoice custody and supported upgrades.
+Its restore log explicitly verifies native staff lineage, signatures and PDFs.
+
+Build attempt 1 passed the new repository/staff/client journeys and eleven of
+twelve publication cases, then the older template case timed out waiting for its
+copy introduction while a Git read was pending (age 2,921 ms at diagnostics).
+The unchanged local gate passed all twelve cases in 3.9 minutes, zero retries,
+including that template case in 34.1 seconds and server custody. The unchanged
+hosted failed-job retry passed. No timeout, selector, assertion or source was
+changed for this retry; no causal application fix is claimed. The previous
+`b8da6a49` Build attempt 2 and Extended runs were cancelled as superseded after
+`a598cf00` was pushed, not reported as successful complete runs.
+
+Inferred: the causes of the earlier startup delay, template read latency and
+other recorded timing failures remain unconfirmed. Passing unchanged replays
+establish the tested final outcome, not a diagnosis of those earlier timings.
+Blocked: no remaining validation blocker for this bounded publication slice.
+Aggregate 1.0/operator acceptance and the remaining primary-file/configuration
+workflow slices are separate; none is declared complete here.
+
+Downloaded evidence and GitHub ZIP SHA-256 digests were verified:
+
+| Evidence | Artifact ID | SHA-256 |
+| --- | --- | --- |
+| CodeQL | 13210361514 | d0a817e6b7a502def43a60def7454dee5c94ac129479267defca6e2605da1646 |
+| Browser, Build attempt 2 | 13213046737 | 20ee11da2425de0b99a6de3abc8df15c71cb781bba2b8962583641e7affb62f8 |
+| Independent restore | 13211862311 | 1fcc836ec82cf48b705df82c844185d204298ba36b3396d8ce67afd3b15ea81b |
+| Supported upgrade | 13213475036 | 9fe8901bb84e282bdfad31c78c3f8b7634a16b6610e71a29c508d8e50721399b |
+| Diagram upgrade/restore | 13212783988 | b54c71dd7fd9bdf6ce5826c57844330ec23c85f0232e4960a11a958c02cc5ecf |
+
+Receipt status/scope and immutable identifiers match final source:
+`41591450327:1:python+javascript-typescript`,
+`41591452633:1:supported-recovery`, `41591452633:1:supported-upgrades`,
+`41591452633:1:diagram-upgrade+restore`. The browser artifact is bound to Build's
+verified final head SHA and attempt 2; the unsuccessful attempt-1 artifact is
+retained separately. Source reviews each have zero findings. Existing security
+risk/remediation records remain unchanged; this is development delivery, not a
+new runtime release candidate or acceptance of additional risk.
+
+Version remains 0.9.18. No deployment, production access, actual document export,
+retained-data modification or release/tag publication occurred. Migration 0219
+remains unapplied to retained development records. Wiki edits remain a local
+draft; pre-existing planning edits were preserved. This final evidence addendum
+is a local post-push record; the immutable hosted artifacts bind the delivered
+source without creating another source-validation loop.

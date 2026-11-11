@@ -140,11 +140,12 @@ actionlint executable was available under the single-project constraint.
 
 ## Immediate scope and later product direction
 
-The [1.0 closeout plan](../1.0-closeout-plan.md) makes the remaining three
-recommendations immediate work: freeze the finite document contract, complete
-its required gaps, and finish candidate acceptance. Full completion of the
-six currently recorded valid migration shapes remains an option; no silent
-deferral is authorized by the plan. The maintainer's
+The earlier [1.0 closeout plan](../1.0-closeout-plan.md) ordered a finite document
+contract, required migration gaps and candidate acceptance. On November 2, 2026,
+the maintainer explicitly superseded that migration scope with a clean Git-backed
+start and manual document copying/recreation. All six automatic-migration gaps
+are deferred optional work; Git-backed workflow, isolation, recovery and final
+acceptance gates remain. No existing data may be deleted. The maintainer's
 [post-1.0 interface brief](../post-1.0-interface-rework.md) prioritizes concise
 copy, coherent forms/actions, simpler workflows/navigation and a distinct
 TekDocs identity beyond inherited ITFlow patterns. Broad redesign follows 1.0;

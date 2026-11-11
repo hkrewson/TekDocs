@@ -185,3 +185,44 @@ WebKit artifact 13195373116 reports all 415 cases passed with zero retries,
 including the unchanged Back assertion. Its original failure cause remains
 unknown. The following correction changes only CI selection/coverage collection
 and diagnostics; the application code remains unchanged.
+
+
+## Exact-source hosted closeout: November 2, 2026
+
+Verified remote main is `b716026742e513c94dbaaf65a5c30a2cf8d2c3ce`.
+Build 41562895300 and CodeQL 41562938749 passed attempt 1. All 20 database
+groups passed; combined coverage is 89%. The split selections completed with
+194 passed/two existing skips in 621.28 seconds and 101 passed/one existing skip
+in 1185.70 seconds, under the unchanged 30-minute job deadline. Production
+container builds and vulnerability scans passed; unchanged-version image
+publication was correctly skipped.
+
+Publication artifact 13198943550 reports all ten cases passed with zero retries,
+including native library discovery/reopening; server verification passed. ZIP
+SHA-256 is `9dff75a60e231271e4e8f006ca3d79ce78eb4be7e2558291973b974a56927ccb`.
+Current WebKit artifact 13197214521 reports 411 passed, four existing skips and
+zero retries; the unchanged Back assertion passed.
+
+Extended 41562941477 passed on attempt 2. Preserve attempt 1: the diagram
+upgrade fixture's first Git publication raised a generic required-render error.
+Cause remains unknown because the underlying caught I/O/value/JSON detail and
+renderer diagnostics were not retained. The unchanged exact fixture replay
+passed in Docker (68.42 seconds), all 34 diagram-migration cases passed
+(150.68 seconds), and 100 required renders of the three synthetic fixture variants
+passed. Attempt 2 reran the failed hosted jobs on identical source; every upgrade
+stage passed. This is a successful retest, not evidence of a renderer code fix.
+
+Downloaded receipts all report passed and the exact source above:
+
+- Recovery artifact 13199226082, `41562941477:1:supported-recovery`, ZIP SHA-256
+  `43a2b599c5fb913dc7cad497342427068ffde2f0055fcd82cd262e3c514ea5bc`.
+- Upgrade artifact 13201899400, `41562941477:2:supported-upgrades`, ZIP SHA-256
+  `0e80cf60b8a6878baacd088db1861f1a17698b50118452f421a7f6523b959cf4`.
+- Diagram artifact 13202308307, `41562941477:2:diagram-upgrade+restore`, ZIP SHA-256
+  `7ffc0338bb6b966e9342fc4c140d6d33568423a08632317b91bf305f937a686b`.
+
+No production inspection/deployment, actual document export, retained data or
+schema change occurred. Earlier user-owned planning changes remain local.
+These closeout evidence updates are local and do not change validated source.
+The original diagram and WebKit failure causes remain unknown; all required
+hosted gates are now verified passing. No aggregate 1.0 acceptance is claimed.

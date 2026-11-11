@@ -236,6 +236,16 @@ separates internal diagnostics from explicit public details, and the existing
 409 conflict response uses only that public contract. Status codes, response
 shapes, and bounded network guidance remain unchanged.
 
+Exact-source Build 43030879004 passed final validation, and CodeQL 43030876923
+passed both languages and reduced the stack-trace queue from 14 to 9, closing
+exactly those five network-service paths.
+
+The seventeenth bounded slice selects both site hierarchy results. Location
+creation and update now use an explicit `SiteHierarchyError.public_detail`
+contract instead of caught-exception text. The existing field-keyed `parent_id`
+HTTP 400 response, unavailable-parent guidance, cycle prevention, site scoping,
+and audit behavior remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -401,5 +411,11 @@ For the remaining network-service slice, the focused regression first failed
 five checks: four ownership handlers read caught exception text, and the DNS
 conflict type could not separate internal and public diagnostics. After the fix,
 the 118-case exception-response suite and combined 133-case network boundary
-suite pass. Exact-source Build and CodeQL remain required after push, with an
-expected stack-trace queue of 9.
+suite pass. Exact-source Build 43030879004 and CodeQL 43030876923 passed; the
+queue reached the expected 9.
+
+For the site hierarchy slice, the focused boundary regression first failed
+three checks: the public catchers read exception text, and the hierarchy error
+lacked a separate public contract. After the fix, all 121 exception-response
+boundary cases pass. Exact-source Build and CodeQL remain required after push,
+with an expected stack-trace queue of 7.

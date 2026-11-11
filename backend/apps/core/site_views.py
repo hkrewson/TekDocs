@@ -161,7 +161,7 @@ def _create_location(workspace: ResolvedWorkspace, site_entity_id: UUID, request
             **values,
         )
     except SiteHierarchyError as exc:
-        raise serializers.ValidationError({"parent_id": str(exc)}) from exc
+        raise serializers.ValidationError({"parent_id": exc.public_detail}) from exc
     except IntegrityError as exc:
         raise serializers.ValidationError({"code": "Location codes must be unique beneath one parent."}) from exc
     return Response(LocationSerializer(_location(workspace, site, location.entity_id)).data, status=201)
@@ -192,7 +192,7 @@ def _update_location(
             **values,
         )
     except SiteHierarchyError as exc:
-        raise serializers.ValidationError({"parent_id": str(exc)}) from exc
+        raise serializers.ValidationError({"parent_id": exc.public_detail}) from exc
     except IntegrityError as exc:
         raise serializers.ValidationError({"code": "Location codes must be unique beneath one parent."}) from exc
     return Response(LocationSerializer(_location(workspace, site, location_entity_id)).data)

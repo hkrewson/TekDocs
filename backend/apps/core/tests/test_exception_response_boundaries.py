@@ -71,6 +71,7 @@ from apps.core.repository_source_exports import RepositorySourceExportError
 from apps.core.repository_static_controls import RepositoryStaticControlError
 from apps.core.repository_static_delivery import RepositoryStaticDeliveryError
 from apps.core.repository_static_publications import RepositoryStaticPublicationError
+from apps.core.sites import SiteHierarchyError
 from apps.core.software_inventory import SoftwareInventoryError
 from apps.core.stock import StockError
 from apps.core.taxonomies import TaxonomyError
@@ -139,6 +140,7 @@ RISKY_HANDLERS = {
         "RepositoryStaticDeliveryError",
         "RepositoryStaticPublicationError",
     },
+    "site_views.py": {"SiteHierarchyError"},
     "recurring_invoice_views.py": {"InvoiceError", "MoneyError", "RecurrenceError"},
     "stock_views.py": {"DjangoValidationError", "StockError"},
     "software_inventory_views.py": {"InventoryError", "SoftwareInventoryError"},
@@ -694,6 +696,26 @@ def test_domain_refusals_retain_their_public_messages(error_type):
 
     assert str(error) == "The selected domain record is unavailable."
     assert error.public_detail == "The selected domain record is unavailable."
+
+
+def test_site_hierarchy_error_exposes_only_its_public_contract():
+    error = SiteHierarchyError(
+        "private location hierarchy diagnostic",
+        public_detail="The selected parent location is unavailable.",
+    )
+
+    translated = serializers.ValidationError({"parent_id": error.public_detail})
+
+    assert translated.status_code == 400
+    assert str(translated.detail["parent_id"]) == "The selected parent location is unavailable."
+    assert "private location hierarchy diagnostic" not in str(translated.detail)
+
+
+def test_site_hierarchy_refusal_retains_its_public_message():
+    error = SiteHierarchyError("A location cannot be moved beneath itself.")
+
+    assert str(error) == "A location cannot be moved beneath itself."
+    assert error.public_detail == "A location cannot be moved beneath itself."
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

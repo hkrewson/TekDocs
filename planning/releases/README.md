@@ -216,7 +216,15 @@ uses the reviewed inventory public contract, while DNS compare-and-swap
 conflicts use an explicit network-service public detail. Existing 403/409
 statuses, response shapes, and bounded guidance remain unchanged. The combined
 133-case network and exception boundary suites pass locally. Exact-source Build
-and CodeQL remain required after push, with an expected stack-trace queue of 9.
+43030879004 passed final validation, and CodeQL 43030876923 reduced the stack-
+trace queue from 14 to 9.
+
+The site hierarchy follow-up selects both location create/update results.
+`SiteHierarchyError` now separates internal diagnostics from explicit public
+details, while the field-keyed `parent_id` HTTP 400 response and existing parent
+and cycle guidance remain unchanged. All 121 exception-boundary cases pass
+locally. Exact-source Build and CodeQL remain required after push, with an
+expected stack-trace queue of 7.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

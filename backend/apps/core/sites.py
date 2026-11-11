@@ -13,7 +13,9 @@ from .scoping import DataScope
 
 
 class SiteHierarchyError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def _validate_timezone(value: str) -> None:

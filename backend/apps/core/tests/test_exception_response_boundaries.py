@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.core import (
@@ -20,6 +21,7 @@ from apps.core import (
     document_views,
     inventory,
     invoicing,
+    network_endpoint_views,
     repository_publication_views,
     software_inventory,
     software_inventory_views,
@@ -38,6 +40,7 @@ from apps.core.document_operations import DocumentOperationsError
 from apps.core.documents import PlacementConflict
 from apps.core.inventory import InventoryError
 from apps.core.invoicing import InvoiceError
+from apps.core.network_endpoints import NetworkAssignmentConflict
 from apps.core.publications import PublicationConflict
 from apps.core.repository_editable_bundles import RepositoryEditableBundleError
 from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
@@ -90,6 +93,7 @@ RISKY_HANDLERS = {
     "invoice_views.py": {"DjangoValidationError", "InvoiceError"},
     "invoicing.py": {"StockError", "ValidationError"},
     "network_circuits.py": {"ValidationError"},
+    "network_endpoint_views.py": {"InventoryError", "NetworkAssignmentConflict"},
     "repository_publication_views.py": {
         "RepositoryPackageAuthorizationError",
         "RepositoryPublicationPackageError",
@@ -388,6 +392,47 @@ def test_commercial_workspace_denial_exposes_only_public_detail(monkeypatch):
         == "This workspace cannot own commercial records."
     )
     assert "private commercial ownership diagnostic" not in str(response.data)
+
+
+def test_network_endpoint_workspace_denial_exposes_only_public_detail(monkeypatch):
+    workspace = SimpleNamespace(organization=object())
+    monkeypatch.setattr(network_endpoint_views, "resolve_msp_workspace", lambda *args, **kwargs: workspace)
+    monkeypatch.setattr(network_endpoint_views, "require_permission", lambda *args, **kwargs: None)
+
+    def refuse_owner(organization):
+        raise InventoryError(
+            "private network ownership diagnostic",
+            public_detail="This workspace cannot own network endpoints.",
+        )
+
+    monkeypatch.setattr(network_endpoint_views, "require_operational_owner", refuse_owner)
+    request = SimpleNamespace(user=SimpleNamespace(is_authenticated=True))
+
+    with pytest.raises(PermissionDenied) as caught:
+        network_endpoint_views._workspace(request, None, network_endpoint_views.PermissionKey.NETWORKS_VIEW)
+
+    assert str(caught.value.detail) == "This workspace cannot own network endpoints."
+    assert "private network ownership diagnostic" not in str(caught.value.detail)
+
+
+def test_network_assignment_conflict_exposes_only_its_public_contract():
+    error = NetworkAssignmentConflict(
+        "private assignment diagnostic",
+        public_detail="The assignment changed. Reload before trying again.",
+    )
+
+    response = network_endpoint_views._assignment_conflict(error)
+
+    assert response.status_code == 409
+    assert response.data["detail"] == "The assignment changed. Reload before trying again."
+    assert "private assignment diagnostic" not in str(response.data)
+
+
+def test_network_assignment_domain_refusal_retains_its_public_message():
+    error = NetworkAssignmentConflict("Choose a different interface.")
+
+    assert str(error) == "Choose a different interface."
+    assert error.public_detail == "Choose a different interface."
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

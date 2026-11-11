@@ -1,7 +1,7 @@
 # Exception response hardening
 
-Status: the first eight bounded slices are confirmed by exact-source Build and
-CodeQL. The content-authoring handler slice is locally complete and awaits
+Status: the first nine bounded slices are confirmed by exact-source Build and
+CodeQL. The network-endpoint handler slice is locally complete and awaits
 exact-source hosted validation. Owner: maintainer / pre-1.0 security closeout.
 
 This bounded slice addresses the exception families most likely to turn an
@@ -151,6 +151,18 @@ public details. Two status-specific translators preserve the existing 400 and
 409 response shapes and all established bounded authoring, file-authority and
 export messages. Structured authoring-conflict payloads remain unchanged.
 
+Exact-source Build 42825216132 passed every selected job and final validation.
+CodeQL 42825279413 passed both languages and reduced the current stack-trace
+queue from 49 to 45, closing exactly the four content-authoring paths.
+
+The tenth bounded slice selects all four results in
+`network_endpoint_views.py`: workspace ownership plus interface, IP-address and
+MAC-address assignment conflicts. The workspace boundary now uses the existing
+inventory public-detail contract. `NetworkEndpointError` separates internal and
+public text, and one reviewed 409 translator serves all three compare-and-swap
+assignment paths. Existing reload, different-assignment and protected-hardware
+guidance remains unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -254,6 +266,16 @@ lacked a separate public-detail contract. After the fix, all 69 boundary cases
 pass, including five injected private diagnostics and five controls that retain
 their established bounded message. The review covered every direct constructor,
 catcher and subclass, including DRF validation detail behavior and the separate
-structured compare-and-swap conflict payload. Exact-source Build and CodeQL
-remain required after push; the expected CodeQL queue is 45 and no alert is
-dismissed in advance.
+structured compare-and-swap conflict payload. Exact-source Build 42825216132
+passed final validation. CodeQL 42825279413 confirms the expected four-result
+reduction to 45 without dismissals.
+
+For the network-endpoint handler slice, the exact analysis reproduced the
+workspace denial and all three assignment-conflict reads before the change. The
+static guard first failed on the module; the focused regressions also proved the
+workspace boundary exposed an injected private diagnostic and the endpoint
+exception lacked a separate public contract. After the fix, the combined
+exception-response and network-translation suites pass 88 cases. The review
+covered every endpoint-error constructor and catcher plus interface, IP and MAC
+assignment transitions. Exact-source Build and CodeQL remain required after
+push; the expected CodeQL queue is 41 and no alert is dismissed in advance.

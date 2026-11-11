@@ -222,7 +222,7 @@ def _workspace(request, organization_entity_id: UUID | None, permission: Permiss
     try:
         require_operational_owner(workspace.organization)
     except InventoryError as exc:
-        raise PermissionDenied(str(exc)) from exc
+        raise PermissionDenied(exc.public_detail) from exc
     return workspace
 
 
@@ -261,6 +261,10 @@ def _error(exc: Exception) -> serializers.ValidationError:
     else:
         detail = "The network endpoint request is invalid."
     return serializers.ValidationError({"detail": detail})
+
+
+def _assignment_conflict(exc: NetworkAssignmentConflict) -> Response:
+    return Response({"detail": exc.public_detail}, status=409)
 
 
 INTERFACE_ORDERING = {"name": "entity__display_name", "kind": "kind", "status": "status"}
@@ -366,7 +370,7 @@ class InterfaceDetailView(APIView):
                 values=serializer.validated_data,
             )
         except NetworkAssignmentConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return _assignment_conflict(exc)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         return Response(InterfaceSerializer(record).data)
@@ -514,7 +518,7 @@ class IPAddressDetailView(APIView):
                 values=serializer.validated_data,
             )
         except NetworkAssignmentConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return _assignment_conflict(exc)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         can_view_assets = context_has_permission(
@@ -619,7 +623,7 @@ class MACAddressDetailView(APIView):
                 values=serializer.validated_data,
             )
         except NetworkAssignmentConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return _assignment_conflict(exc)
         except (NetworkEndpointError, DjangoValidationError, IntegrityError) as exc:
             raise _error(exc) from exc
         can_view_assets = context_has_permission(

@@ -150,9 +150,17 @@ The content-authoring handler follow-up selects all four
 `content_authoring_views.py` results. Authoring input, primary-file history and
 append, and repository export conflicts now expose only explicit public details
 through fixed 400/409 translators. Existing bounded messages and structured
-compare-and-swap conflict payloads remain unchanged. Private-diagnostic injection
-and bounded-message controls pass locally; exact-source Build and CodeQL remain
-required after push, with an expected stack-trace queue of 45.
+compare-and-swap conflict payloads remain unchanged. Exact-source Build
+42825216132 passed final validation, and CodeQL 42825279413 reduced the exact
+stack-trace queue from 49 to 45.
+
+The network-endpoint handler follow-up selects all four
+`network_endpoint_views.py` results. Workspace ownership uses the reviewed
+inventory public contract, while interface, IP and MAC assignment conflicts use
+an explicit public detail through one 409 translator. Existing reload and
+assignment guidance remains unchanged. Private-diagnostic injection and network
+translation controls pass locally; exact-source Build and CodeQL remain required
+after push, with an expected stack-trace queue of 41.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

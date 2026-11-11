@@ -2470,8 +2470,10 @@ signed output, PDFs and file versions remain immutable. See
 [acceptance and validation](../planning/git-native-keys.md). Local tests, all 14 browser/server journeys and both source reviews pass;
 exact-source hosted validation follows the authorized push. Legacy-backed
 fragment identities cannot bypass permissions through native keys.
-Native template enrollment is implemented; monitored-source configuration remains next, followed by
-clean-start combined acceptance. The six legacy migration gaps remain deferred;
+Native template enrollment and Git-native monitored-source configuration are implemented.
+The monitored-source candidate harness extends the combined clean-start browser,
+upgrade, rollback-refusal and independent-recovery acceptance; exact-source hosted
+confirmation remains. The six legacy migration gaps remain deferred;
 no existing-data migration or production deployment is included.
 
 ## Native template enrollment (bounded development slice)

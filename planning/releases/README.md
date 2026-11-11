@@ -58,6 +58,14 @@ inline-style CSP and missing-COEP findings are retired as of November 8, 2026. Z
 distinct missing-COOP warning remains outside this slice; no full cross-origin
 isolation claim is made. The prior v0.9.19 acceptance remains historical.
 
+The [Git-native monitored-source acceptance slice](../git-native-monitored-sources.md)
+now extends the combined clean-start browser journey and the hosted supported-
+upgrade and independent-recovery rehearsals. Fixed-point
+[source review](git-native-monitored-source-review.md) is clear after adding exact
+settings binding, immutable per-observation application proof, lossless rollback
+refusal and full SQL/Git recovery fingerprints. Exact-source Build, Extended and
+CodeQL confirmation remains pending; this is not a deployment record.
+
 The [CodeQL alert triage and provider fingerprint hardening
 slice](../codeql-alert-triage.md) narrows code scanning to shipped source without
 hiding the remaining shipped-code queue. Provider observation schema v2 now

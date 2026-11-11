@@ -125,6 +125,25 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   }
   await page.getByLabel('Markdown body').fill(linkedBody)
 
+  // Configure monitoring on the newly authored Git-only document through the
+  // visible editor, then reload it from the retained SQL settings.
+  await page.getByRole('button', { name: 'Web source', exact: true }).click()
+  await page.getByLabel('Public document URL').fill('https://example.invalid/live-git-setup.md')
+  await page.getByLabel('Source format').selectOption('markdown')
+  await page.getByLabel('Check every (minutes)').fill('180')
+  await page.getByLabel('Check automatically').uncheck()
+  const sourcePath = `${endpoint}/${created.content_id}/remote-source`
+  const sourceSaved = page.waitForResponse(response =>
+    new URL(response.url()).pathname === sourcePath && response.request().method() === 'PUT')
+  await page.getByRole('button', { name: 'Save source', exact: true }).click()
+  expect((await sourceSaved).status()).toBe(201)
+  await page.goto(directLink)
+  await page.getByRole('button', { name: 'Web source', exact: true }).click()
+  await expect(page.getByLabel('Public document URL')).toHaveValue('https://example.invalid/live-git-setup.md')
+  await expect(page.getByLabel('Source format')).toHaveValue('markdown')
+  await expect(page.getByLabel('Check every (minutes)')).toHaveValue('180')
+  await expect(page.getByLabel('Check automatically')).not.toBeChecked()
+
   // The same authenticated owner cannot resolve an organization document in MSP scope.
   const foreignScope = await page.request.get(`/api/v1/workspaces/msp/content-graph/authoring/${created.content_id}`)
   expect(foreignScope.status()).toBe(404)

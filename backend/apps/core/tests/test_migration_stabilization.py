@@ -110,6 +110,7 @@ DOCUMENT_RLS_TABLES = {
     "core_documenttemplateenrollment",
     "core_documentremotesource",
     "core_documentremoteobservation",
+    "core_documentremoteapplication",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",

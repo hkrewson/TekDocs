@@ -214,6 +214,14 @@ def _apply_legacy_observation(
     )
     source.last_applied_observation = observation
     source.save(update_fields=("last_applied_observation", "updated_at"))
+    from .document_source_models import DocumentRemoteApplication
+
+    DocumentRemoteApplication.objects.get_or_create(
+        observation=observation, defaults={
+            "tenant_id": source.tenant_id, "organization_id": source.organization_id,
+            "source_id": source.id, "actor_id": actor_id,
+        },
+    )
     AuditEvent.objects.create(
         tenant=source.tenant,
         actor_id=actor_id,

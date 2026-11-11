@@ -293,8 +293,10 @@ def _retain_pinned_evidence(
             repository=repository, content_id=content_id, archived_at__isnull=True,
         ).first()
         if monitored is not None:
-            unapplied = monitored.observations.filter(state="changed")
+            unapplied = monitored.observations.filter(state="changed", application__isnull=True)
             if monitored.last_applied_observation_id is not None:
+                # Pre-application-history fixtures and upgraded rows retain the
+                # established pointer as an applied proof as well.
                 unapplied = unapplied.exclude(id=monitored.last_applied_observation_id)
             if unapplied.exists():
                 raise RepositoryPublicationEvidenceError(

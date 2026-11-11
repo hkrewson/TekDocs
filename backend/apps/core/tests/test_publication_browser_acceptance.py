@@ -370,6 +370,7 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
             Document,
             DocumentAttachment,
             DocumentAttachmentPurpose,
+            DocumentRemoteSource,
             RepositoryPublicationEvidence,
             RepositoryStaticPublication,
         )
@@ -378,6 +379,16 @@ def test_migrated_publication_browser_journey(request, tmp_path, django_runtime_
         from apps.core.repository_static_controls import repository_static_state
         from apps.core.repository_static_delivery import repository_static_delivery_ready
         from apps.core.repository_static_publications import verify_repository_static_publication
+
+        native_monitored = ContentNode.objects.get(title="Live Git setup guide")
+        assert not Document.objects.filter(pk=native_monitored.content_id).exists()
+        native_source = DocumentRemoteSource.objects.get(
+            repository_id=native_monitored.repository_id, content_id=native_monitored.content_id,
+        )
+        assert (native_source.url, native_source.source_kind, native_source.enabled,
+                native_source.check_interval_minutes) == (
+            "https://example.invalid/live-git-setup.md", "markdown", False, 180,
+        )
 
         for title, internal in (("Native staff browser guide", True), ("Native client browser guide", False)):
             node = ContentNode.objects.get(title=title)

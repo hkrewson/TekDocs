@@ -248,7 +248,9 @@ def run_document_preflight(*, workspace, document: Document, resolved, audience:
         source = document.remote_source
     except ObjectDoesNotExist:
         source = None
-    changed_observations = source.observations.filter(state="changed") if source is not None else None
+    changed_observations = (
+        source.observations.filter(state="changed", application__isnull=True) if source is not None else None
+    )
     if source is not None and changed_observations is not None and source.last_applied_observation_id is not None:
         changed_observations = changed_observations.exclude(id=source.last_applied_observation_id)
     if changed_observations is not None and changed_observations.exists():

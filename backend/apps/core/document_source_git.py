@@ -14,7 +14,7 @@ from uuid import UUID
 from .content_authoring import AuthoredContent, ContentAuthoringError, author_content, read_authored_content
 from .document_authority_handoff import prepare_rollback_markdown_projection
 from .document_migration_publications import publication_migration_actor_allowed
-from .document_source_models import DocumentRemoteObservation, DocumentRemoteSource
+from .document_source_models import DocumentRemoteApplication, DocumentRemoteObservation, DocumentRemoteSource
 from .document_source_state import MonitoredSourceStateError, monitored_source_fingerprint
 from .documents import PlacementConflict, primary_placement
 from .models import AuditEvent, Document, DocumentAuthority, WorkspaceRepository
@@ -102,6 +102,11 @@ def _source_review_snapshot(
         prior = source.last_applied_observation
         fingerprint = hashlib.sha256(json.dumps({
             "source": str(source.id), "updated": source.updated_at.isoformat(),
+            "settings": {
+                "url": source.url, "source_kind": source.source_kind,
+                "enabled": source.enabled,
+                "check_interval_minutes": source.check_interval_minutes,
+            },
             "repository": str(repository.id), "document": str(source.content_id),
             "commit": authored.accepted_commit, "blob": authored.source_blob,
             "last_applied": str(source.last_applied_observation_id or ""),
@@ -146,6 +151,8 @@ def _source_review_snapshot(
 def _observation_review(snapshot: _SourceReviewSnapshot, observation: DocumentRemoteObservation) -> dict[str, Any]:
     if observation.state == "failed" or not observation.canonical_markdown:
         raise PlacementConflict("Only a successful retained source observation can be applied.")
+    if hashlib.sha256(observation.canonical_markdown.encode()).hexdigest() != observation.content_digest:
+        raise PlacementConflict("The retained source observation is unavailable.")
     authored = snapshot.authored
     local_changes = authored.markdown != observation.canonical_markdown and (
         snapshot.prior_markdown is None or authored.markdown != snapshot.prior_markdown
@@ -218,6 +225,12 @@ def apply_git_observation(
         raise PlacementConflict("The source update is unavailable. Review the document and source again.") from exc
     source.last_applied_observation = retained
     source.save(update_fields=("last_applied_observation", "updated_at"))
+    DocumentRemoteApplication.objects.get_or_create(
+        observation=retained, defaults={
+            "tenant_id": source.tenant_id, "organization_id": source.organization_id,
+            "source_id": source.id, "actor_id": actor_id,
+        },
+    )
     AuditEvent.objects.create(
         tenant=source.tenant, actor_id=actor_id, action="document.remote_source_applied",
         entity_id=document.entity_id if document is not None else source.content_id,

@@ -107,6 +107,18 @@ run_monitored_source_fixture() {
     < "$repository_root/backend/apps/core/tests/monitored_source_fixture.py"
 }
 
+run_native_monitored_source_fixture() {
+  native_project=$1
+  native_environment=$2
+  native_mode=$3
+  native_sha=${4:-}
+  compose_for "$native_project" "$native_environment" "$repository_root" exec -T \
+    -e TEKDOCS_NATIVE_MONITORED_SOURCE_FIXTURE_MODE="$native_mode" \
+    -e TEKDOCS_NATIVE_MONITORED_SOURCE_SHA256="$native_sha" \
+    backend python manage.py shell --no-imports \
+    < "$repository_root/backend/apps/core/tests/native_monitored_source_recovery_fixture.py"
+}
+
 run_client_publication_fixture() {
   client_publication_project=$1
   client_publication_environment=$2
@@ -211,6 +223,10 @@ run_monitored_source_fixture "$upgrade_project" "$upgrade_environment" "$reposit
 run_client_publication_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$client_publication_upgrade_sha"
 run_repeated_block_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$repeated_block_upgrade_sha"
 run_cross_workspace_fixture "$upgrade_project" "$upgrade_environment" "$repository_root" promote "$cross_workspace_upgrade_sha"
+run_native_monitored_source_fixture "$upgrade_project" "$upgrade_environment" create > "$work_directory/native-monitored-upgrade.log"
+native_monitored_upgrade_sha=$(sed -n 's/^NATIVE_MONITORED_SOURCE_SHA256=//p' "$work_directory/native-monitored-upgrade.log")
+printf '%s\n' "$native_monitored_upgrade_sha" | grep -Eq '^[0-9a-f]{64}$'
+run_native_monitored_source_fixture "$upgrade_project" "$upgrade_environment" verify "$native_monitored_upgrade_sha"
 
 echo "Running the identical migration workflow on a fresh installation"
 compose_for "$fresh_project" "$fresh_environment" "$repository_root" up -d --build --wait backend
@@ -249,6 +265,10 @@ run_monitored_source_fixture "$fresh_project" "$fresh_environment" "$repository_
 run_client_publication_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$client_publication_fresh_sha"
 run_repeated_block_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$repeated_block_fresh_sha"
 run_cross_workspace_fixture "$fresh_project" "$fresh_environment" "$repository_root" promote "$cross_workspace_fresh_sha"
+run_native_monitored_source_fixture "$fresh_project" "$fresh_environment" create > "$work_directory/native-monitored-fresh.log"
+native_monitored_fresh_sha=$(sed -n 's/^NATIVE_MONITORED_SOURCE_SHA256=//p' "$work_directory/native-monitored-fresh.log")
+printf '%s\n' "$native_monitored_fresh_sha" | grep -Eq '^[0-9a-f]{64}$'
+run_native_monitored_source_fixture "$fresh_project" "$fresh_environment" verify "$native_monitored_fresh_sha"
 cmp "$work_directory/upgraded-result.json" "$work_directory/fresh-result.json"
 
 echo "Document migration fresh/0.8.46 upgrade acceptance passed"

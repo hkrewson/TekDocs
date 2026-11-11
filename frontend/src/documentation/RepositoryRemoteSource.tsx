@@ -22,7 +22,8 @@ export function RepositoryRemoteSource({ contentId, organizationId, client, disa
   const [observations, setObservations] = useState<DocumentRemoteObservation[]>([])
   const [error, setError] = useState('')
   const dirty = useMemo(() => source === null
-    ? draft.url !== ''
+    ? draft.url !== emptyDraft.url || draft.source_kind !== emptyDraft.source_kind
+      || draft.enabled !== emptyDraft.enabled || draft.check_interval_minutes !== emptyDraft.check_interval_minutes
     : draft.url !== source.url || draft.source_kind !== source.source_kind
       || draft.enabled !== source.enabled || draft.check_interval_minutes !== source.check_interval_minutes,
   [draft, source])

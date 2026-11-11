@@ -1,7 +1,7 @@
 # Git-native monitored-source configuration
 
 Bounded clean-start 1.0 configuration slice following native template enrollment
-at `191f7c2e`. Version remains 0.9.18 development. This slice does not migrate
+at `191f7c2e`. Version remains 0.9.19 development. This slice does not migrate
 legacy settings, inspect production, deploy, publish, or change existing documents.
 
 ## Acceptance
@@ -33,20 +33,25 @@ routes, reuses observation fetching/review and applies directly to the native
 document through managed authoring. The repository editor reuses the protected
 Web source panel and keeps unfinished settings inside the navigation guard.
 
-## Current evidence
+## Candidate acceptance evidence
 
-- **Verified:** fresh-database focused native configuration/apply/local-edit and
-  publication-blocker tests; existing monitored-source migration and remote-egress
-  cohorts; route permission inventory; frontend repository panel tests; frontend
-  type checking; focused Ruff and mypy; generated OpenAPI with zero errors.
-- **Inferred pending broader gates:** full backend/frontend coverage, live browser
-  check against the bounded test HTTP source, supported upgrade, rollback refusal,
-  independent encrypted recovery and production-image validation.
-- **Blocked locally:** the retained development Valkey AOF is corrupt, so the full
-  normal Compose project cannot become healthy until the cache/queue AOF is repaired
-  or replaced with operator approval. Backend tests were run in the existing
-  backend/database services without creating another Compose project or volume.
+- **Locally verified:** the production frontend build (including TypeScript and
+  bundle policy), focused Ruff, Django checks, shell syntax, and both independent
+  source-review axes. The review correction binds every source setting directly,
+  treats older applied changes as history rather than permanent publication
+  blockers, and protects every unfinished setting in the navigation guard.
+- **Candidate harness prepared:** the combined clean-start browser journey now
+  authors a Git-only document, configures its Web source through the visible UI,
+  reloads the retained settings, and verifies server-side that no legacy Document
+  exists. Migration-executor tests prove empty-schema upgrade and populated-schema
+  rollback refusal. The supported-upgrade rehearsal exercises the native fixture
+  on both upgraded and fresh schemas, and independent encrypted recovery compares
+  the exact SQL observation/settings state with the managed Git commit and blob.
+- **Hosted confirmation required:** exact-source Build must pass the live browser,
+  database shards, production-container and final validation jobs; Extended must
+  pass supported upgrade and independent recovery; CodeQL must complete. The
+  retained development database role cannot create the isolated test database,
+  so the focused database cases are intentionally left to those hosted gates.
 
-Exact-source hosted Build, CodeQL and Extended evidence, source review and the
-combined clean-start journey remain required before this slice or aggregate 1.0
-acceptance is closed.
+No production deployment or existing-data transition is part of this acceptance
+slice.

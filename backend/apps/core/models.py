@@ -29,6 +29,7 @@ from .content_index_models import ContentTemplateSourceState as ContentTemplateS
 from .content_index_models import DocumentAuthority as DocumentAuthority
 from .content_index_models import DocumentAuthorityMode as DocumentAuthorityMode
 from .document_key_models import DocumentKeyBinding as DocumentKeyBinding
+from .document_source_models import DocumentRemoteApplication as DocumentRemoteApplication
 from .document_source_models import DocumentRemoteObservation as DocumentRemoteObservation
 from .document_source_models import DocumentRemoteSource as DocumentRemoteSource
 from .document_source_models import DocumentSourceKind as DocumentSourceKind

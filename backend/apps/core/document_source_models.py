@@ -133,4 +133,42 @@ class DocumentRemoteObservation(models.Model):
         raise ValidationError("Remote document observations are retained")
 
 
-__all__ = ["DocumentRemoteObservation", "DocumentRemoteSource", "DocumentSourceKind"]
+class DocumentRemoteApplication(models.Model):
+    """Retained proof that one immutable observation was applied."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("core.Tenant", on_delete=models.PROTECT, related_name="document_remote_applications")
+    organization = models.ForeignKey(
+        "core.Organization", on_delete=models.PROTECT, related_name="document_remote_applications",
+        null=True, blank=True,
+    )
+    source = models.ForeignKey(
+        DocumentRemoteSource, on_delete=models.PROTECT, related_name="applications"
+    )
+    observation = models.OneToOneField(
+        DocumentRemoteObservation, on_delete=models.PROTECT, related_name="application"
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="document_remote_applications",
+        null=True, blank=True,
+    )
+    applied_at = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    scoped = OrganizationScopedManager()
+
+    def __str__(self) -> str:
+        return f"Application of observation {self.observation_id}"
+
+    def save(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if not self._state.adding:
+            raise ValidationError("Remote document applications are immutable")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        raise ValidationError("Remote document applications are retained")
+
+
+__all__ = [
+    "DocumentRemoteApplication", "DocumentRemoteObservation", "DocumentRemoteSource", "DocumentSourceKind",
+]

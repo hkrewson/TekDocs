@@ -167,6 +167,12 @@ compose_for "$source_environment" "$source_secrets" exec -T \
   < "$repository_root/backend/apps/core/tests/native_template_recovery_fixture.py" > "$native_template_log"
 native_template_sha=$(sed -n 's/^NATIVE_TEMPLATE_SHA256=//p' "$native_template_log")
 printf '%s\n' "$native_template_sha" | grep -Eq '^[0-9a-f]{64}$'
+native_monitored_log="$work_directory/native-monitored-source.log"
+compose_for "$source_environment" "$source_secrets" exec -T \
+  -e TEKDOCS_NATIVE_MONITORED_SOURCE_FIXTURE_MODE=create backend python manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/native_monitored_source_recovery_fixture.py" > "$native_monitored_log"
+native_monitored_sha=$(sed -n 's/^NATIVE_MONITORED_SOURCE_SHA256=//p' "$native_monitored_log")
+printf '%s\n' "$native_monitored_sha" | grep -Eq '^[0-9a-f]{64}$'
 source_snapshot_log="$work_directory/source-snapshots.log"
 compose_for "$source_environment" "$source_secrets" exec -T \
   -e TEKDOCS_RECOVERY_CONTENT_MODE=create backend python manage.py shell --no-imports \
@@ -460,6 +466,11 @@ compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_HISTORY_SHA256="$publication_history_sha" \
   backend python manage.py shell --no-imports \
   < "$repository_root/tests/rehearsals/fixtures/repository-content-recovery-fixture.py"
+compose_for "$restore_environment" "$restored_secrets" exec -T \
+  -e TEKDOCS_NATIVE_MONITORED_SOURCE_FIXTURE_MODE=verify \
+  -e TEKDOCS_NATIVE_MONITORED_SOURCE_SHA256="$native_monitored_sha" \
+  backend python manage.py shell --no-imports \
+  < "$repository_root/backend/apps/core/tests/native_monitored_source_recovery_fixture.py"
 compose_for "$restore_environment" "$restored_secrets" exec -T \
   -e TEKDOCS_RECOVERY_PUBLICATION_MODE=verify \
   -e TEKDOCS_RECOVERY_INTERNAL_PUBLICATION_SHA256="$internal_publication_sha" \

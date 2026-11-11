@@ -30,6 +30,7 @@ ORGANIZATION_SCOPED_TABLES = (
     "core_repositorytemplateenrollment",
     "core_documentremotesource",
     "core_documentremoteobservation",
+    "core_documentremoteapplication",
     "core_credentialreference",
     "core_catalogproduct",
     "core_catalogmodel",

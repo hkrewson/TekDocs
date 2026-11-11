@@ -27,6 +27,7 @@ import pytest
     ("models", "DocumentAuthority", "content_index_models"),
     ("models", "DocumentAuthorityMode", "content_index_models"),
     ("models", "DocumentKeyBinding", "document_key_models"),
+    ("models", "DocumentRemoteApplication", "document_source_models"),
     ("models", "DocumentRemoteObservation", "document_source_models"),
     ("models", "DocumentRemoteSource", "document_source_models"),
     ("models", "DocumentSourceKind", "document_source_models"),

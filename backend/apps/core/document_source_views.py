@@ -114,7 +114,7 @@ def _source_apply(source: DocumentRemoteSource, observation_id: UUID, request: R
             review_fingerprint=serializer.validated_data.get("review_fingerprint"),
         )
     except PlacementConflict as exc:
-        return Response({"code": "placement_conflict", "detail": str(exc)}, status=409)
+        return Response({"code": "placement_conflict", "detail": exc.public_detail}, status=409)
     return Response(RemoteObservationSerializer(observation).data)
 
 

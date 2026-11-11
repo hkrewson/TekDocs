@@ -155,7 +155,7 @@ class EntityRelationshipListCreateView(APIView):
         except ObjectDoesNotExist as exc:
             raise _not_found() from exc
         except EntityRelationshipError as exc:
-            raise ValidationError(str(exc)) from exc
+            raise ValidationError(exc.public_detail) from exc
         return Response(EntityRelationshipSerializer(relationship).data, status=201)
 
 

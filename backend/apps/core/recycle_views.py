@@ -85,7 +85,7 @@ class RecycleBinRestoreView(APIView):
                 record_id=record_id,
             )
         except RecoveryConflict as exc:
-            return Response({"detail": str(exc)}, status=409)
+            return Response({"detail": exc.public_detail}, status=409)
         except (ValueError, ObjectDoesNotExist):
             raise _not_found() from None
         return Response(status=204)

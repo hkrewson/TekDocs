@@ -65,6 +65,9 @@ from apps.core.network_endpoints import NetworkAssignmentConflict
 from apps.core.network_inventory import NetworkInventoryConflict, NetworkInventoryError
 from apps.core.network_services import NetworkServiceConflict, NetworkServiceError
 from apps.core.publications import PublicationConflict
+from apps.core.recycle_bin import RecoveryConflict
+from apps.core.relationships import EntityRelationshipError
+from apps.core.reminders import ReminderError
 from apps.core.repository_editable_bundles import RepositoryEditableBundleError
 from apps.core.repository_package_authorization import RepositoryPackageAuthorizationError
 from apps.core.repository_publication_packages import RepositoryPublicationPackageError
@@ -114,6 +117,7 @@ RISKY_HANDLERS = {
     },
     "domain_hierarchy_views.py": {"DomainError"},
     "domain_views.py": {"CertificateMonitoringError", "DomainError"},
+    "document_source_views.py": {"PlacementConflict"},
     "inventory_views.py": {
         "AssetCsvError",
         "DjangoValidationError",
@@ -136,6 +140,10 @@ RISKY_HANDLERS = {
         "NetworkInventoryError",
     },
     "network_service_views.py": {"InventoryError", "NetworkServiceConflict"},
+    "portal_views.py": {"PublicationConflict"},
+    "recycle_views.py": {"RecoveryConflict"},
+    "relationship_views.py": {"EntityRelationshipError"},
+    "reminder_views.py": {"ReminderError"},
     "repository_publication_views.py": {
         "RepositoryPackageAuthorizationError",
         "RepositoryPublicationPackageError",
@@ -570,6 +578,36 @@ def test_netbox_reference_refusal_retains_its_public_message():
 
     assert str(error) == "That NetBox object is already linked inside this Workspace."
     assert error.public_detail == "That NetBox object is already linked inside this Workspace."
+
+
+@pytest.mark.parametrize(
+    ("error_type", "public_detail"),
+    (
+        (ReminderError, "The selected source is unavailable in this workspace."),
+        (EntityRelationshipError, "That relationship already exists."),
+        (RecoveryConflict, "Restore the parent record before restoring this record."),
+    ),
+)
+def test_remaining_response_errors_expose_only_their_public_contract(error_type, public_detail):
+    error = error_type("private domain diagnostic", public_detail=public_detail)
+
+    assert str(error) == "private domain diagnostic"
+    assert error.public_detail == public_detail
+
+
+@pytest.mark.parametrize(
+    ("error_type", "message"),
+    (
+        (ReminderError, "The selected owner is unavailable."),
+        (EntityRelationshipError, "A record cannot be related to itself."),
+        (RecoveryConflict, "Restore the site before restoring this location."),
+    ),
+)
+def test_remaining_response_errors_retain_their_bounded_default_message(error_type, message):
+    error = error_type(message)
+
+    assert str(error) == message
+    assert error.public_detail == message
 
 
 @pytest.mark.parametrize(

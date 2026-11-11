@@ -136,7 +136,7 @@ class ReminderListCreateView(APIView):
                 value=ReminderInput(**serializer.validated_data),
             )
         except ReminderError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ReminderSerializer(reminder).data, status=201)
 
 

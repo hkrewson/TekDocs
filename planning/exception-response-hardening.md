@@ -268,6 +268,18 @@ error code, HTTP 400-versus-503 mapping, safe actionable guidance, renderer
 isolation, sanitization, throttling, permission, publication and preflight
 behavior remain unchanged.
 
+Exact-source Build 43051513584 passed final validation, and CodeQL 43051535748
+passed both languages and reduced the stack-trace queue from 6 to 5, closing
+the diagram-preview path.
+
+The twentieth and final bounded slice selects the remaining five exact results:
+monitored-source apply, reminder creation, relationship creation, recycle-bin
+restore and client-portal publication artifact download. Their domain errors now
+expose only explicit public details through the existing response translators.
+The existing HTTP 400/409 statuses, JSON/plain-text shapes, placement code,
+bounded guidance, permissions, tenant scope, transactions, audit/state
+transitions and artifact-integrity behavior remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -454,5 +466,10 @@ the endpoint read caught exception text, and the renderer error could not
 separate internal and public diagnostics. After the fix, all 127 exception-
 response boundary cases pass, including a database-free endpoint request that
 keeps an injected private renderer path out of the JSON response. Exact-source
-Build and CodeQL remain required after push, with an expected stack-trace queue
-of 5.
+Build 43051513584 and CodeQL 43051535748 passed; the queue reached the expected
+5.
+
+For the final response slice, the focused regression first failed all five
+handler guards plus the three missing domain-error contracts. After the fix,
+all 138 exception-response boundary cases pass. Exact-source Build and CodeQL
+remain required after push, with an expected stack-trace queue of 0.

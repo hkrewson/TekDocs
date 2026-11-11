@@ -370,7 +370,7 @@ class ClientPortalDocumentArtifactDownloadView(APIView):
         try:
             content = read_publication_artifact(artifact)
         except PublicationConflict as conflict:
-            return HttpResponse(str(conflict), status=409, content_type="text/plain; charset=utf-8")
+            return HttpResponse(conflict.public_detail, status=409, content_type="text/plain; charset=utf-8")
         response = HttpResponse(content, content_type="application/octet-stream")
         disposition = content_disposition_header(True, artifact.original_filename)
         if disposition is not None:

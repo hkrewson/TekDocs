@@ -238,11 +238,19 @@ The diagram-preview follow-up selects the authenticated renderer error result.
 `DiagramRenderError` now separates internal diagnostics from explicit public
 details, and the endpoint uses only that public contract. Existing error codes,
 HTTP 400-versus-503 mapping, actionable guidance, sanitization, throttling,
-permissions, publication and preflight behavior remain unchanged. Exact-source
-Build and CodeQL remain required after push. All 127 exception-response boundary
-cases pass locally, including a database-free endpoint request that proves a
-private renderer path cannot reach the response; the expected stack-trace queue
-is 5.
+permissions, publication and preflight behavior remain unchanged. All 127
+exception-response boundary cases pass locally, including a database-free
+endpoint request that proves a private renderer path cannot reach the response.
+Exact-source Build 43051513584 passed final validation, and CodeQL 43051535748
+reduced the stack-trace queue from 6 to 5.
+
+The final response-hardening follow-up selects the remaining five exact results:
+monitored-source apply, reminder creation, relationship creation, recycle-bin
+restore and portal publication-artifact download. Each translator now uses an
+explicit public detail while preserving existing HTTP status, response shape,
+bounded guidance, authorization, transaction, audit/state and integrity behavior.
+All 138 exception-response boundary cases pass locally. Exact-source Build and
+CodeQL remain required after push, with an expected stack-trace queue of 0.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

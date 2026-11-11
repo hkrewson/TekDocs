@@ -129,7 +129,7 @@ def test_native_monitored_observations_apply_and_protect_local_edits(authoring_c
         "url": "https://example.invalid/revised-native-guide.md",
         "source_kind": "html", "enabled": True, "check_interval_minutes": 240,
     }, content_type="application/json")
-    assert saved.status_code == 200, saved.content
+    assert saved.status_code == 201, saved.content
     before_stale_apply = read_authored_content(repository=repository, content_id=authored.content_id)
     rejected = browser.post(
         reverse("msp-content-authoring-remote-observation-apply", args=[authored.content_id, stale.id]),

@@ -43,8 +43,13 @@ def native_monitored_source_fingerprint(owner: User) -> str:
         assert source.last_applied_observation_id == observations[-1].id
         assert authored.markdown == observations[-1].canonical_markdown
         payload = {
+            # The repository head can legitimately advance after this fixture is
+            # created because the combined recovery rehearsal adds other
+            # documents before taking its backup. The content blob is the stable
+            # Git identity for this document; repository-wide recovery verifies
+            # the final accepted head separately.
             "content": {"id": str(CONTENT_ID), "path": authored.path, "title": authored.title,
-                        "commit": authored.accepted_commit, "blob": authored.source_blob,
+                        "blob": authored.source_blob,
                         "sha256": hashlib.sha256(authored.markdown.encode()).hexdigest()},
             "source": {"id": str(source.id), "tenant": str(source.tenant_id),
                        "organization": str(source.organization_id or ""),

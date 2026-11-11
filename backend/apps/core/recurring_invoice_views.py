@@ -265,9 +265,9 @@ def _call(operation: Callable[..., Result], **kwargs: Any) -> Result:
     try:
         return operation(**kwargs)
     except (RecurrenceError, InvoiceError) as exc:
-        raise RecurringConflict(str(exc)) from exc
+        raise RecurringConflict(exc.public_detail) from exc
     except MoneyError as exc:
-        raise serializers.ValidationError({"detail": str(exc)}) from exc
+        raise serializers.ValidationError({"detail": exc.public_detail}) from exc
     except IntegrityError as exc:
         # Never expose SQL or source identifiers from a failed persistence guard.
         raise RecurringConflict("The recurring records changed; review the schedule again.") from exc

@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -17,12 +18,15 @@ from apps.core import (
     commercial,
     commercial_views,
     content_authoring_views,
+    custom_field_views,
     data_flow_views,
     document_views,
     inventory,
     invoicing,
     network_endpoint_views,
     network_inventory_views,
+    recurring_invoice_views,
+    recurring_invoices,
     repository_publication_views,
     software_inventory,
     software_inventory_views,
@@ -32,6 +36,11 @@ from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
 from apps.core.commercial import CommercialError
 from apps.core.content_authoring import ContentAuthoringError
+from apps.core.custom_fields import (
+    CustomFieldConfigurationError,
+    CustomFieldValueError,
+    validate_custom_field_value,
+)
 from apps.core.data_flows import DataFlowError
 from apps.core.diagram_exports import DiagramRenderError
 from apps.core.document_attachments import RepositoryPrimaryFileConflict
@@ -40,7 +49,9 @@ from apps.core.document_key_freeze import KeyFreezeConflict
 from apps.core.document_operations import DocumentOperationsError
 from apps.core.documents import PlacementConflict
 from apps.core.inventory import InventoryError
+from apps.core.invoice_recurrence import RecurrenceError
 from apps.core.invoicing import InvoiceError
+from apps.core.money import MoneyError
 from apps.core.network_endpoints import NetworkAssignmentConflict
 from apps.core.network_inventory import NetworkInventoryConflict, NetworkInventoryError
 from apps.core.publications import PublicationConflict
@@ -78,6 +89,7 @@ RISKY_HANDLERS = {
         "RepositorySourceExportError",
     },
     "content_graph_views.py": {"ContentIndexError"},
+    "custom_field_views.py": {"CustomFieldConfigurationError", "CustomFieldValueError"},
     "document_views.py": {
         "DocumentOperationsError",
         "ExportConflict",
@@ -109,6 +121,7 @@ RISKY_HANDLERS = {
         "RepositoryStaticDeliveryError",
         "RepositoryStaticPublicationError",
     },
+    "recurring_invoice_views.py": {"InvoiceError", "MoneyError", "RecurrenceError"},
     "stock_views.py": {"DjangoValidationError", "StockError"},
     "software_inventory_views.py": {"InventoryError", "SoftwareInventoryError"},
 }
@@ -494,6 +507,94 @@ def test_network_inventory_domain_refusal_retains_its_public_message():
 
     assert str(error) == "Those rack units overlap an existing device placement."
     assert error.public_detail == "Those rack units overlap an existing device placement."
+
+
+@pytest.mark.parametrize(
+    ("error_type", "field", "public_detail"),
+    (
+        (CustomFieldConfigurationError, "entity_type", "The custom-field configuration is invalid."),
+        (CustomFieldValueError, "value", "The custom-field value does not satisfy its configured rules."),
+    ),
+)
+def test_custom_field_errors_expose_only_their_public_contract(error_type, field, public_detail):
+    error = error_type("private custom-field diagnostic", public_detail=public_detail)
+
+    translated = custom_field_views._custom_field_error(error, field=field)
+
+    assert translated.status_code == 400
+    assert str(translated.detail[field]) == public_detail
+    assert "private custom-field diagnostic" not in str(translated.detail)
+
+
+def test_json_schema_diagnostic_is_not_the_custom_field_public_contract():
+    with pytest.raises(CustomFieldValueError) as caught:
+        validate_custom_field_value(schema={"type": "integer"}, value="private custom-field value")
+
+    assert "private custom-field value" in str(caught.value)
+    assert caught.value.public_detail == "The custom-field value does not satisfy its configured rules."
+    assert "private custom-field value" not in caught.value.public_detail
+
+
+def test_recurring_model_validation_diagnostic_is_not_the_public_contract():
+    class InvalidRecurringRecord:
+        def full_clean(self):
+            raise DjangoValidationError("private recurring model diagnostic")
+
+        def save(self):
+            raise AssertionError("invalid record must not be saved")
+
+    with pytest.raises(RecurrenceError) as caught:
+        recurring_invoices._save(InvalidRecurringRecord())
+
+    assert "private recurring model diagnostic" in str(caught.value)
+    assert caught.value.public_detail == "The recurring invoice record is invalid."
+    assert "private recurring model diagnostic" not in caught.value.public_detail
+
+
+def test_recurring_conflict_exposes_only_its_public_contract():
+    def refuse():
+        raise RecurrenceError(
+            "private recurring diagnostic",
+            public_detail="The recurring schedule changed; review it again.",
+        )
+
+    with pytest.raises(recurring_invoice_views.RecurringConflict) as caught:
+        recurring_invoice_views._call(refuse)
+
+    assert caught.value.status_code == 409
+    assert str(caught.value.detail) == "The recurring schedule changed; review it again."
+    assert "private recurring diagnostic" not in str(caught.value.detail)
+
+
+def test_recurring_money_error_exposes_only_its_public_contract():
+    def refuse():
+        raise MoneyError(
+            "private money diagnostic",
+            public_detail="The recurring monetary values are invalid.",
+        )
+
+    with pytest.raises(serializers.ValidationError) as caught:
+        recurring_invoice_views._call(refuse)
+
+    assert caught.value.status_code == 400
+    assert str(caught.value.detail["detail"]) == "The recurring monetary values are invalid."
+    assert "private money diagnostic" not in str(caught.value.detail)
+
+
+@pytest.mark.parametrize(
+    ("error_type", "message"),
+    (
+        (CustomFieldConfigurationError, "Unsupported target record type."),
+        (CustomFieldValueError, "The value is invalid."),
+        (RecurrenceError, "The approved terms changed; review the schedule again"),
+        (MoneyError, "Amount cannot be negative"),
+    ),
+)
+def test_framework_boundary_domain_errors_retain_their_default_public_message(error_type, message):
+    error = error_type(message)
+
+    assert str(error) == message
+    assert error.public_detail == message
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

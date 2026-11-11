@@ -14,6 +14,10 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 class MoneyError(ValueError):
     """Raised when a value cannot participate in supported money arithmetic."""
 
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
+
 
 # ISO 4217 List One, published 2026-01-01 by the ISO maintenance agency:
 # https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml

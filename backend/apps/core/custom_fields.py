@@ -27,11 +27,15 @@ ORGANIZATION_OWNED_ENTITY_TYPES = ("site", "location")
 
 
 class CustomFieldConfigurationError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 class CustomFieldValueError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +77,10 @@ def validate_custom_field_value(*, schema: dict[str, Any], value: Any) -> None:
     try:
         Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
     except JSONSchemaValidationError as exc:
-        raise CustomFieldValueError(exc.message) from exc
+        raise CustomFieldValueError(
+            exc.message,
+            public_detail="The custom-field value does not satisfy its configured rules.",
+        ) from exc
 
 
 def definition_versions_queryset(tenant: Tenant | UUID) -> QuerySet[CustomFieldDefinitionVersion]:

@@ -103,7 +103,10 @@ def _save(record: models.Model) -> None:
     try:
         record.full_clean()
     except ValidationError as exc:
-        raise RecurrenceError(" ".join(exc.messages)) from exc
+        raise RecurrenceError(
+            " ".join(exc.messages),
+            public_detail="The recurring invoice record is invalid.",
+        ) from exc
     record.save()
 
 

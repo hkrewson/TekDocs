@@ -68,6 +68,12 @@ def _definition_context(workspace: ResolvedWorkspace) -> dict[str, object]:
     return {"organization_id": workspace.organization.id if workspace.organization is not None else None}
 
 
+def _custom_field_error(
+    exc: CustomFieldConfigurationError | CustomFieldValueError, *, field: str
+) -> serializers.ValidationError:
+    return serializers.ValidationError({field: exc.public_detail})
+
+
 def _list_definitions(workspace: ResolvedWorkspace) -> Response:
     records = sorted(
         definitions_for_scope(scope=workspace.data_scope),
@@ -92,7 +98,7 @@ def _create_definition(workspace: ResolvedWorkspace, request) -> Response:  # ty
             **serializer.validated_data,
         )
     except CustomFieldConfigurationError as exc:
-        raise serializers.ValidationError({"entity_type": str(exc)}) from exc
+        raise _custom_field_error(exc, field="entity_type") from exc
     except IntegrityError as exc:
         raise serializers.ValidationError({"key": "That key is already used for this record type and scope."}) from exc
     return Response(
@@ -116,7 +122,7 @@ def _version_definition(workspace: ResolvedWorkspace, definition_id: UUID, reque
             **serializer.validated_data,
         )
     except CustomFieldConfigurationError as exc:
-        raise serializers.ValidationError({"field_type": str(exc)}) from exc
+        raise _custom_field_error(exc, field="field_type") from exc
     payload = {
         "definition": updated,
         "migration_impact": {
@@ -164,7 +170,7 @@ def _set_entity_field(
             actor_id=request.user.pk,
         )
     except (CustomFieldValueError, CustomFieldConfigurationError) as exc:
-        raise serializers.ValidationError({"value": str(exc)}) from exc
+        raise _custom_field_error(exc, field="value") from exc
     except ObjectDoesNotExist as exc:
         raise Http404 from exc
     return _entity_fields(workspace, entity_id)

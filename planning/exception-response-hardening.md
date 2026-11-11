@@ -175,6 +175,22 @@ internal diagnostics from an explicit public detail, while status-specific
 translators preserve the established 400 and 409 response shapes and actionable
 placement and reload guidance.
 
+Exact-source CodeQL 42943705006 passed both languages and reduced the current
+stack-trace queue from 38 to 35, closing exactly the three network-inventory
+paths. Build 42943637853 was cancelled after later `main` pushes superseded it;
+its failed-closed final validation is retained as incomplete Build evidence.
+The obsolete `build.yml:analyze` configuration and its 22 historical analyses
+were then removed through GitHub's supported configuration-retirement path.
+The open headline is now 300 findings from the sole active CodeQL configuration,
+including 35 stack-trace results; no alert was dismissed.
+
+The twelfth bounded slice selects the five framework-derived results in
+`custom_field_views.py` and `recurring_invoice_views.py`. Custom-field JSON
+Schema diagnostics and recurring Django model-validation messages now remain
+internal, while explicit public details preserve the existing field-keyed 400,
+recurring-conflict 409, and money-validation 400 response contracts. Direct
+domain refusals retain their established messages.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -301,5 +317,16 @@ and the inventory exception lacked a separate public contract. After the fix,
 the combined exception-response and network-error boundary suites pass 93
 cases. The review covered every inventory-error constructor and catcher,
 including the distinct 400 validation and 409 compare-and-swap paths. Exact-
-source Build and CodeQL remain required after push; the expected queue is 38 and
-no alert is dismissed in advance.
+source CodeQL 42943705006 passed and confirmed the expected three-result
+reduction from 38 to 35 without dismissals. Build 42943637853 was cancelled as
+superseded and is not represented as passing acceptance.
+
+For the framework-derived custom-field and recurring-invoice slice, the static
+guard and twelve focused regressions first failed on both response modules, both
+framework wrappers, and the three exception types without public-detail
+contracts. After the fix, the combined exception-response, recurrence, and
+money suites pass 118 cases. Every constructor and catcher was reviewed;
+JSON Schema and Django diagnostics remain available internally while fixed
+public explanations cross the API boundary. Exact-source Build and CodeQL remain
+required after push; the expected stack-trace queue is 30 and no alert is
+dismissed in advance.

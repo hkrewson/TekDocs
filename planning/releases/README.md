@@ -169,8 +169,20 @@ inventory public contract; ordinary inventory validation and hardware-binding
 conflicts now expose only explicit public details through status-specific 400
 and 409 translators. Existing placement, ownership and reload guidance remains
 unchanged. Private-diagnostic injection and the combined boundary suites pass
-locally; exact-source Build and CodeQL remain required after push, with an
-expected stack-trace queue of 38.
+locally. Exact-source CodeQL 42943705006 passed and reduced the current queue
+from 38 to 35. Build 42943637853 was cancelled after later `main` pushes
+superseded it and is retained as incomplete evidence. The obsolete
+`build.yml:analyze` configuration and all 22 of its historical analyses were
+removed without dismissing alerts; GitHub now reports 300 open findings from the
+sole active CodeQL configuration, including 35 stack-trace results.
+
+The framework-derived handler follow-up selects all five custom-field and
+recurring-invoice results. JSON Schema and Django model-validation diagnostics
+remain internal; explicit public details preserve field-keyed 400 responses,
+recurring 409 conflicts, money-validation 400 responses, and established bounded
+domain messages. The static guard and 118 focused boundary, recurrence, and money
+cases pass locally. Exact-source Build and CodeQL remain required after push,
+with an expected stack-trace queue of 30.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

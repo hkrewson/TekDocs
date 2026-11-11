@@ -189,9 +189,17 @@ evidence, risk, and evidence-bundle results. Five domain error types now expose
 only explicit public details through the four existing HTTP 400 translators;
 the response shape and bounded compliance guidance remain unchanged. All 104
 exception-boundary cases plus changed-source Ruff and mypy checks pass locally.
-The retained runtime database role cannot create the owning suite's isolated
-test database, so exact-source Build must confirm that suite. CodeQL is expected
-to reduce the stack-trace queue from 30 to 22 without dismissals.
+The retained runtime database role could not create the owning suite's isolated
+test database locally; exact-source Build 42954508839 confirmed it and passed
+final validation. CodeQL 42954514565 reduced the stack-trace queue from 30 to 22
+without dismissals.
+
+The domain-management follow-up selects all five domain, hostname,
+DNS-observation, and certificate-endpoint results. Domain and certificate
+monitoring errors now expose only explicit public details through the existing
+HTTP 400 translators. All established bounded guidance remains unchanged, and
+the 110-case exception-boundary suite passes locally. Exact-source Build and
+CodeQL remain required after push, with an expected stack-trace queue of 17.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

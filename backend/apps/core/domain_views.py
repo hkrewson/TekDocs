@@ -166,7 +166,7 @@ class DomainListCreateView(APIView):
                 workspace=workspace, actor_id=request.user.pk, value=DomainInput(**serializer.validated_data)
             )
         except DomainError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(DomainSerializer(domain).data, status=201)
 
 
@@ -193,7 +193,7 @@ class DomainReviewView(APIView):
         try:
             domain = review_domain(domain=domain, actor_id=request.user.pk, **serializer.validated_data)
         except DomainError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(DomainSerializer(domain).data)
 
 
@@ -350,7 +350,7 @@ class CertificateEndpointListCreateView(APIView):
                 scope=workspace.data_scope, domain=domain, actor_id=request.user.pk, **serializer.validated_data
             )
         except CertificateMonitoringError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(CertificateEndpointSerializer(endpoint).data, status=201)
 
 

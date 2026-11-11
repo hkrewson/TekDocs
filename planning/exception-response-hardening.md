@@ -202,6 +202,17 @@ explicit public details. The four response modules preserve the existing
 field-neutral `detail` shape, HTTP 400 status, and all established bounded
 compliance messages.
 
+Exact-source Build 42954508839 passed final validation, and CodeQL 42954514565
+passed both languages and reduced the stack-trace queue from 30 to 22, closing
+exactly those eight compliance paths.
+
+The fourteenth bounded slice selects all five domain-management results across
+`domain_views.py` and `domain_hierarchy_views.py`. `DomainError` and
+`CertificateMonitoringError` now separate internal diagnostics from explicit
+public details. Domain creation and review, hostname and DNS-observation
+creation, and certificate-endpoint creation retain their existing field-neutral
+HTTP 400 responses and bounded guidance.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -348,5 +359,11 @@ exceptions, and all five error types lacked a separate public contract. After
 the fix, all 104 exception-response boundary cases pass. Ruff and mypy pass for
 the changed source. The owning database-backed compliance suite cannot start
 locally because the retained runtime role cannot create its isolated test
-database; hosted Build must supply that evidence. Exact-source Build and CodeQL
-remain required after push, with an expected stack-trace queue of 22.
+database; exact-source Build 42954508839 supplied that evidence, and CodeQL
+42954514565 reduced the queue to the expected 22.
+
+For the domain-management slice, the focused boundary regression first failed
+six checks: both response modules derived public text from caught exceptions,
+and both error types lacked a separate public contract. After the fix, all 110
+exception-response boundary cases pass. Exact-source Build and CodeQL remain
+required after push, with an expected stack-trace queue of 17.

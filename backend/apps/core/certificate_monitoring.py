@@ -36,7 +36,9 @@ EXPIRATION_ALERT_WINDOW = timedelta(days=45)
 
 
 class CertificateMonitoringError(ValueError):
-    pass
+    def __init__(self, message: str, *, public_detail: str | None = None) -> None:
+        super().__init__(message)
+        self.public_detail = message if public_detail is None else public_detail
 
 
 def endpoints_for_domain(scope: DataScope, domain_id: UUID) -> QuerySet[CertificateEndpoint]:

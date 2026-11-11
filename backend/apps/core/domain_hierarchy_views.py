@@ -73,7 +73,7 @@ class HostnameListCreateView(APIView):
                 value=HostnameInput(**serializer.validated_data),
             )
         except DomainError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(HostnameSerializer(hostname).data, status=201)
 
 
@@ -95,7 +95,7 @@ class ObservationCreateView(APIView):
                 hostname=hostname, actor_id=request.user.pk, **serializer.validated_data
             )
         except DomainError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response({"id": str(observation.id), "content_digest": observation.content_digest}, status=201)
 
 

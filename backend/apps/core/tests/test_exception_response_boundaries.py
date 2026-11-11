@@ -34,6 +34,7 @@ from apps.core import (
 )
 from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
+from apps.core.certificate_monitoring import CertificateMonitoringError
 from apps.core.commercial import CommercialError
 from apps.core.compliance_bundles import ComplianceBundleError
 from apps.core.compliance_catalogs import ComplianceCatalogError
@@ -53,6 +54,7 @@ from apps.core.document_exports import ExportConflict
 from apps.core.document_key_freeze import KeyFreezeConflict
 from apps.core.document_operations import DocumentOperationsError
 from apps.core.documents import PlacementConflict
+from apps.core.domains import DomainError
 from apps.core.inventory import InventoryError
 from apps.core.invoice_recurrence import RecurrenceError
 from apps.core.invoicing import InvoiceError
@@ -106,6 +108,8 @@ RISKY_HANDLERS = {
         "PublicationConflict",
         "RevisionConflict",
     },
+    "domain_hierarchy_views.py": {"DomainError"},
+    "domain_views.py": {"CertificateMonitoringError", "DomainError"},
     "inventory_views.py": {
         "AssetCsvError",
         "DjangoValidationError",
@@ -644,6 +648,28 @@ def test_compliance_domain_refusals_retain_their_public_messages(error_type):
 
     assert str(error) == "The selected compliance record is unavailable."
     assert error.public_detail == "The selected compliance record is unavailable."
+
+
+@pytest.mark.parametrize("error_type", (DomainError, CertificateMonitoringError))
+def test_domain_errors_expose_only_their_public_contract(error_type):
+    error = error_type(
+        "private domain diagnostic",
+        public_detail="The domain request is invalid.",
+    )
+
+    translated = serializers.ValidationError({"detail": error.public_detail})
+
+    assert translated.status_code == 400
+    assert str(translated.detail["detail"]) == "The domain request is invalid."
+    assert "private domain diagnostic" not in str(translated.detail)
+
+
+@pytest.mark.parametrize("error_type", (DomainError, CertificateMonitoringError))
+def test_domain_refusals_retain_their_public_messages(error_type):
+    error = error_type("The selected domain record is unavailable.")
+
+    assert str(error) == "The selected domain record is unavailable."
+    assert error.public_detail == "The selected domain record is unavailable."
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

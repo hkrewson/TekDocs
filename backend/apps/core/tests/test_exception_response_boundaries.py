@@ -35,6 +35,11 @@ from apps.core import (
 from apps.core.asset_csv import AssetCsvError
 from apps.core.catalogs import CatalogError, StaleCatalogRevision
 from apps.core.commercial import CommercialError
+from apps.core.compliance_bundles import ComplianceBundleError
+from apps.core.compliance_catalogs import ComplianceCatalogError
+from apps.core.compliance_evidence import ComplianceEvidenceError
+from apps.core.compliance_operations import ComplianceOperationError
+from apps.core.compliance_risks import ComplianceRiskError
 from apps.core.content_authoring import ContentAuthoringError
 from apps.core.custom_fields import (
     CustomFieldConfigurationError,
@@ -81,6 +86,10 @@ GENERIC_TRANSLATORS = (
 RISKY_HANDLERS = {
     "catalog_views.py": {"CatalogError", "InventoryError", "StaleCatalogRevision"},
     "commercial_views.py": {"CommercialError", "InventoryError"},
+    "compliance_bundle_views.py": {"ComplianceBundleError"},
+    "compliance_catalog_views.py": {"ComplianceCatalogError", "ComplianceOperationError"},
+    "compliance_evidence_views.py": {"ComplianceEvidenceError"},
+    "compliance_risk_views.py": {"ComplianceRiskError"},
     "content_authoring_views.py": {
         "ContentAuthoringError",
         "RepositoryEditableBundleError",
@@ -595,6 +604,46 @@ def test_framework_boundary_domain_errors_retain_their_default_public_message(er
 
     assert str(error) == message
     assert error.public_detail == message
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (
+        ComplianceBundleError,
+        ComplianceCatalogError,
+        ComplianceEvidenceError,
+        ComplianceOperationError,
+        ComplianceRiskError,
+    ),
+)
+def test_compliance_errors_expose_only_their_public_contract(error_type):
+    error = error_type(
+        "private compliance diagnostic",
+        public_detail="The compliance request is invalid.",
+    )
+
+    translated = serializers.ValidationError({"detail": error.public_detail})
+
+    assert translated.status_code == 400
+    assert str(translated.detail["detail"]) == "The compliance request is invalid."
+    assert "private compliance diagnostic" not in str(translated.detail)
+
+
+@pytest.mark.parametrize(
+    "error_type",
+    (
+        ComplianceBundleError,
+        ComplianceCatalogError,
+        ComplianceEvidenceError,
+        ComplianceOperationError,
+        ComplianceRiskError,
+    ),
+)
+def test_compliance_domain_refusals_retain_their_public_messages(error_type):
+    error = error_type("The selected compliance record is unavailable.")
+
+    assert str(error) == "The selected compliance record is unavailable."
+    assert error.public_detail == "The selected compliance record is unavailable."
 
 
 @pytest.mark.parametrize("error_type", (ContentAuthoringError, RepositoryInputError))

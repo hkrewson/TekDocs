@@ -151,7 +151,7 @@ class ComplianceEvidenceListCreateView(APIView):
                 value=EvidenceInput(**serializer.validated_data),
             )
         except ComplianceEvidenceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ComplianceEvidenceSerializer(_evidence(workspace, evidence.entity_id)).data, status=201)
 
 
@@ -180,7 +180,7 @@ class ComplianceAssignmentEvidenceLinkView(APIView):
         try:
             link = link_evidence(assignment=assignment, evidence=evidence, actor_id=request.user.pk)
         except ComplianceEvidenceError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         refreshed = next(item for item in evidence_links_for_assignment(assignment) if item.pk == link.pk)
         return Response(ComplianceEvidenceControlLinkSerializer(refreshed).data, status=201)
 

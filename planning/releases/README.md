@@ -181,8 +181,17 @@ recurring-invoice results. JSON Schema and Django model-validation diagnostics
 remain internal; explicit public details preserve field-keyed 400 responses,
 recurring 409 conflicts, money-validation 400 responses, and established bounded
 domain messages. The static guard and 118 focused boundary, recurrence, and money
-cases pass locally. Exact-source Build and CodeQL remain required after push,
-with an expected stack-trace queue of 30.
+cases pass locally. Exact-source Build 42951661867 passed final validation, and
+CodeQL 42951666916 reduced the stack-trace queue from 35 to 30.
+
+The compliance handler follow-up selects all eight catalog, assignment,
+evidence, risk, and evidence-bundle results. Five domain error types now expose
+only explicit public details through the four existing HTTP 400 translators;
+the response shape and bounded compliance guidance remain unchanged. All 104
+exception-boundary cases plus changed-source Ruff and mypy checks pass locally.
+The retained runtime database role cannot create the owning suite's isolated
+test database, so exact-source Build must confirm that suite. CodeQL is expected
+to reduce the stack-trace queue from 30 to 22 without dismissals.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

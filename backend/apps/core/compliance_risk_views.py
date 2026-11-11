@@ -139,7 +139,7 @@ class ComplianceRiskListCreateView(APIView):
                 workspace=workspace, actor_id=request.user.pk, value=RiskInput(**serializer.validated_data)
             )
         except ComplianceRiskError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ComplianceRiskSerializer(_risk(workspace, risk.entity_id)).data, status=201)
 
 
@@ -155,7 +155,7 @@ class ComplianceRiskReviewView(APIView):
                 risk=risk, workspace=workspace, actor_id=request.user.pk, value=RiskInput(**serializer.validated_data)
             )
         except ComplianceRiskError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ComplianceRiskSerializer(_risk(workspace, risk.entity_id)).data)
 
 

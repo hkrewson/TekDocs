@@ -67,7 +67,7 @@ class BundleListCreateView(APIView):
         try:
             bundle = create_bundle(workspace=workspace, actor_id=request.user.pk, **serializer.validated_data)
         except ComplianceBundleError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(BundleSerializer(bundle).data, status=201)
 
 

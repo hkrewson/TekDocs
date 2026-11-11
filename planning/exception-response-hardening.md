@@ -191,6 +191,17 @@ internal, while explicit public details preserve the existing field-keyed 400,
 recurring-conflict 409, and money-validation 400 response contracts. Direct
 domain refusals retain their established messages.
 
+Exact-source Build 42951661867 passed final validation, and CodeQL 42951666916
+passed both languages and reduced the stack-trace queue from 35 to 30, closing
+exactly those five framework-derived paths.
+
+The thirteenth bounded slice selects all eight compliance API results across
+catalog, assignment, evidence, risk, and evidence-bundle handlers. Five
+compliance-domain exception types now separate internal diagnostics from their
+explicit public details. The four response modules preserve the existing
+field-neutral `detail` shape, HTTP 400 status, and all established bounded
+compliance messages.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -327,6 +338,15 @@ framework wrappers, and the three exception types without public-detail
 contracts. After the fix, the combined exception-response, recurrence, and
 money suites pass 118 cases. Every constructor and catcher was reviewed;
 JSON Schema and Django diagnostics remain available internally while fixed
-public explanations cross the API boundary. Exact-source Build and CodeQL remain
-required after push; the expected stack-trace queue is 30 and no alert is
-dismissed in advance.
+public explanations cross the API boundary. Exact-source Build 42951661867 and
+CodeQL 42951666916 passed; the queue reached the expected 30 without alert
+dismissals.
+
+For the compliance API slice, the focused boundary regression first failed 14
+checks: all four response modules still derived public text from caught
+exceptions, and all five error types lacked a separate public contract. After
+the fix, all 104 exception-response boundary cases pass. Ruff and mypy pass for
+the changed source. The owning database-backed compliance suite cannot start
+locally because the retained runtime role cannot create its isolated test
+database; hosted Build must supply that evidence. Exact-source Build and CodeQL
+remain required after push, with an expected stack-trace queue of 22.

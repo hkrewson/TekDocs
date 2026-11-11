@@ -186,7 +186,7 @@ class ComplianceFrameworkListCreateView(APIView):
                 **values,
             )
         except ComplianceCatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(_serialize(_record(workspace, framework.entity_id), workspace), status=201)
 
 
@@ -223,7 +223,7 @@ class ComplianceCatalogRevisionListCreateView(APIView):
                 **values,
             )
         except ComplianceCatalogError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         refreshed = _record(workspace, framework_entity_id)
         created = next(item for item in refreshed.revisions.all() if item.pk == revision.pk)
         return Response(ComplianceCatalogRevisionSerializer(created).data, status=201)
@@ -373,7 +373,7 @@ class ComplianceAssignmentReviewView(APIView):
                 value=AssignmentInput(**serializer.validated_data),
             )
         except ComplianceOperationError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(ComplianceAssignmentSerializer(_assignment(workspace, assignment.pk)).data)
 
 

@@ -213,6 +213,17 @@ public details. Domain creation and review, hostname and DNS-observation
 creation, and certificate-endpoint creation retain their existing field-neutral
 HTTP 400 responses and bounded guidance.
 
+Exact-source Build 42959635865 passed final validation, and CodeQL 42959635217
+passed both languages and reduced the stack-trace queue from 22 to 17, closing
+exactly those five domain-management paths.
+
+The fifteenth bounded slice selects all three taxonomy API results. The shared
+`TaxonomyError` already had a reviewed internal/public detail contract from the
+document-response slice; taxonomy creation, revision, and client-local term
+creation now use that existing public detail instead of deriving response text
+from the caught exception. Their field-neutral HTTP 400 shape and bounded
+taxonomy guidance remain unchanged.
+
 No migration, OpenAPI shape, persistence contract, authorization decision, or
 production configuration changes in these slices. The remaining exact results
 are not accepted as safe by implication: each still requires a handler review
@@ -365,5 +376,11 @@ database; exact-source Build 42954508839 supplied that evidence, and CodeQL
 For the domain-management slice, the focused boundary regression first failed
 six checks: both response modules derived public text from caught exceptions,
 and both error types lacked a separate public contract. After the fix, all 110
-exception-response boundary cases pass. Exact-source Build and CodeQL remain
-required after push, with an expected stack-trace queue of 17.
+exception-response boundary cases pass. Exact-source Build 42959635865 and
+CodeQL 42959635217 passed; the queue reached the expected 17.
+
+For the taxonomy API slice, the static boundary regression first failed because
+all three catchers bypassed the existing `TaxonomyError.public_detail`
+contract. After the fix, all 111 exception-response boundary cases pass. Exact-
+source Build and CodeQL remain required after push, with an expected stack-
+trace queue of 14.

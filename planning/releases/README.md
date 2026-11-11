@@ -198,8 +198,16 @@ The domain-management follow-up selects all five domain, hostname,
 DNS-observation, and certificate-endpoint results. Domain and certificate
 monitoring errors now expose only explicit public details through the existing
 HTTP 400 translators. All established bounded guidance remains unchanged, and
-the 110-case exception-boundary suite passes locally. Exact-source Build and
-CodeQL remain required after push, with an expected stack-trace queue of 17.
+the 110-case exception-boundary suite passes locally. Exact-source Build
+42959635865 passed final validation, and CodeQL 42959635217 reduced the stack-
+trace queue from 22 to 17.
+
+The taxonomy follow-up selects all three taxonomy API results. Taxonomy creation,
+revision, and client-local term creation now use the existing reviewed
+`TaxonomyError.public_detail` contract instead of caught-exception text. The
+HTTP 400 response shape and bounded taxonomy guidance remain unchanged, and all
+111 exception-boundary cases pass locally. Exact-source Build and CodeQL remain
+required after push, with an expected stack-trace queue of 14.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the

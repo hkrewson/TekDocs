@@ -60,7 +60,7 @@ class MSPTaxonomyListCreateView(APIView):
                 tenant=workspace.member.tenant, actor_id=request.user.pk, **serializer.validated_data
             )
         except TaxonomyError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(TaxonomySerializer(serialize_taxonomy(taxonomy)).data, status=status.HTTP_201_CREATED)
 
 
@@ -81,7 +81,7 @@ class MSPTaxonomyDetailView(APIView):
                 **serializer.validated_data,
             )
         except TaxonomyError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         return Response(TaxonomySerializer(serialize_taxonomy(taxonomy)).data)
 
     @extend_schema(operation_id="taxonomies_msp_archive", responses={204: None})
@@ -138,7 +138,7 @@ class OrganizationTaxonomyLocalTermCreateView(APIView):
                 **serializer.validated_data,
             )
         except TaxonomyError as exc:
-            raise serializers.ValidationError({"detail": str(exc)}) from exc
+            raise serializers.ValidationError({"detail": exc.public_detail}) from exc
         taxonomy.refresh_from_db()
         return Response(
             TaxonomySerializer(serialize_taxonomy(taxonomy, organization=workspace.organization)).data,

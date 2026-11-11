@@ -137,6 +137,7 @@ RISKY_HANDLERS = {
     "recurring_invoice_views.py": {"InvoiceError", "MoneyError", "RecurrenceError"},
     "stock_views.py": {"DjangoValidationError", "StockError"},
     "software_inventory_views.py": {"InventoryError", "SoftwareInventoryError"},
+    "taxonomy_views.py": {"TaxonomyError"},
 }
 
 

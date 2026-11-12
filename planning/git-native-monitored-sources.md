@@ -47,11 +47,19 @@ Web source panel and keeps unfinished settings inside the navigation guard.
   rollback refusal. The supported-upgrade rehearsal exercises the native fixture
   on both upgraded and fresh schemas, and independent encrypted recovery compares
   the exact SQL observation/settings state with the managed Git commit and blob.
-- **Hosted confirmation required:** exact-source Build must pass the live browser,
-  database shards, production-container and final validation jobs; Extended must
-  pass supported upgrade and independent recovery; CodeQL must complete. The
-  retained development database role cannot create the isolated test database,
-  so the focused database cases are intentionally left to those hosted gates.
+- **Hosted confirmation verified:** exact source
+  `03abebfe9653349bd3f2f2ce7aa14da83cc15ec4` passed
+  [Build 43139510245](https://github.com/hkrewson/TekDocs/actions/runs/43139510245)
+  on November 11, 2026 (America/Chicago). The manually selected full release lane
+  passed every PostgreSQL shard, the live browser-to-PostgreSQL journey, all five
+  browser configurations, production containers, SBOM and vulnerability checks,
+  supported upgrades, independent backup/restore, DAST, performance, both CodeQL
+  languages and final `Validation passed`. The commit-bound upgrade artifact digest
+  is `sha256:0bcec8dd90ccc621cbf769e517a6110cc852e73f551ad0e0b4fc84a527eda661`;
+  the backup/restore digest is
+  `sha256:0514f18e9c93125d4c9305888b41e91ce2c5d478347462f0f20688966cd985cb`.
+  This supplies the isolated database evidence that the retained development role
+  could not produce locally.
 
 No production deployment or existing-data transition is part of this acceptance
 slice.

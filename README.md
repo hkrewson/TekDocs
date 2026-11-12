@@ -46,7 +46,10 @@ does not claim full cross-origin isolation because COOP remains outside this sli
 
 The [Git-backed workflow audit](planning/git-backed-workflow-audit.md) separates
 passing current CI from the remaining clean-start interface work. Native
-discovery and export completeness are the first bounded correction.
+discovery/export, publication, primary files, keys/entities, templates and
+monitored sources are implemented. Exact source `03abebfe` passed the complete
+Build 43139510245 release lane; reviewed manual copies and aggregate clean-start
+and human candidate acceptance remain before a 1.0 freeze.
 
 ## Cross-Workspace reuse migration development
 

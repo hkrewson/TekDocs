@@ -471,5 +471,11 @@ Build 43051513584 and CodeQL 43051535748 passed; the queue reached the expected
 
 For the final response slice, the focused regression first failed all five
 handler guards plus the three missing domain-error contracts. After the fix,
-all 138 exception-response boundary cases pass. Exact-source Build and CodeQL
-remain required after push, with an expected stack-trace queue of 0.
+all 138 exception-response boundary cases pass. Exact source
+`03abebfe9653349bd3f2f2ce7aa14da83cc15ec4` passed
+[Build 43139510245](https://github.com/hkrewson/TekDocs/actions/runs/43139510245),
+including both CodeQL languages, the complete database/browser/security release
+lane and final validation. GitHub's open-alert API now reports zero
+`py/stack-trace-exposure` findings without dismissals. The remaining open CodeQL
+findings belong to separately tracked rules and are not represented as incomplete
+response-hardening work.

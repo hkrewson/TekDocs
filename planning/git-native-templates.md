@@ -228,3 +228,14 @@ Source review caught a proposed fixture-ID wiring error before acceptance: legac
 navigation uses entity IDs while content reads use document IDs. Explicit content
 IDs and a fixture contract check are required for the real journey. Final review
 and the complete browser/server replay must pass before this follow-up is pushed.
+
+## Final hosted acceptance
+
+The browser-read stabilization landed at `191f7c2e`. Final exact source
+`03abebfe9653349bd3f2f2ce7aa14da83cc15ec4` passed
+[Build 43139510245](https://github.com/hkrewson/TekDocs/actions/runs/43139510245),
+including the native-template journey, all database shards, supported upgrades,
+independent backup/restore, all five browser configurations, production-image
+security checks, both CodeQL languages and final validation. This supersedes the
+intermediate “hosted confirmation required” statements above while retaining the
+failed-attempt diagnoses. No production data, release tag or deployment changed.

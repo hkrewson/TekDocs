@@ -63,8 +63,13 @@ now extends the combined clean-start browser journey and the hosted supported-
 upgrade and independent-recovery rehearsals. Fixed-point
 [source review](git-native-monitored-source-review.md) is clear after adding exact
 settings binding, immutable per-observation application proof, lossless rollback
-refusal and full SQL/Git recovery fingerprints. Exact-source Build, Extended and
-CodeQL confirmation remains pending; this is not a deployment record.
+refusal and full SQL/Git recovery fingerprints. Exact source `03abebfe` passed
+[Build 43139510245](https://github.com/hkrewson/TekDocs/actions/runs/43139510245),
+including all PostgreSQL shards, the combined clean-start browser journey, five
+browser configurations, supported upgrades, independent backup/restore,
+production containers, SBOM/vulnerability checks, DAST, performance, both CodeQL
+languages and final validation. This closes the bounded engineering slice; it is
+not a deployment, production-copy or aggregate 1.0 acceptance record.
 
 The [CodeQL alert triage and provider fingerprint hardening
 slice](../codeql-alert-triage.md) narrows code scanning to shipped source without
@@ -257,8 +262,10 @@ monitored-source apply, reminder creation, relationship creation, recycle-bin
 restore and portal publication-artifact download. Each translator now uses an
 explicit public detail while preserving existing HTTP status, response shape,
 bounded guidance, authorization, transaction, audit/state and integrity behavior.
-All 138 exception-response boundary cases pass locally. Exact-source Build and
-CodeQL remain required after push, with an expected stack-trace queue of 0.
+All 138 exception-response boundary cases pass locally. Exact-source Build
+43139510245 passed the complete release lane and both CodeQL languages. GitHub's
+open-alert API reports zero `py/stack-trace-exposure` findings without dismissals;
+other CodeQL rules remain separate review queues.
 
 The first exact-source Build for that slice passed all source, database, browser
 and coverage work but its SBOM job twice received HTTP 504 while downloading the
@@ -266,7 +273,8 @@ pinned Syft checksum asset. The bounded retries then exhausted against the same
 provider endpoint. The [Syft delivery resilience
 follow-up](2026-11-08-syft-download-resilience.md) now uses Anchore's official,
 digest-pinned Syft container without changing SBOM or vulnerability policy.
-Corrected-source hosted acceptance remains pending.
+Corrected-source Build 43139510245 generated all four SBOMs, scanned all four
+production images and passed final validation.
 
 ## Native template enrollment for new documents
 

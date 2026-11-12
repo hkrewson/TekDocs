@@ -37,7 +37,10 @@ Action download path.
 
 This is CI transport resilience only. It changes no runtime source, schema,
 image contents, scanner severity, accepted vulnerability or public workflow, so
-no Wiki update is required. The next exact-source Build must pass the production
-container/SBOM/vulnerability job and final `Validation passed` job. CodeQL must
-also complete for the corrective commit before the stack-trace alert review is
-closed out.
+no dedicated Wiki procedure change is required. Exact source
+`03abebfe9653349bd3f2f2ce7aa14da83cc15ec4` passed
+[Build 43139510245](https://github.com/hkrewson/TekDocs/actions/runs/43139510245):
+the production-container job generated all four SBOMs through the digest-pinned
+Syft image, scanned all four images and passed final validation. Both CodeQL
+languages also passed in that run, and the stack-trace alert review reached zero
+open findings without dismissals.

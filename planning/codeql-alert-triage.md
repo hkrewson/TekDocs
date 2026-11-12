@@ -52,7 +52,10 @@ retirement rows use schema v2 plus the empty safe-projection fingerprint instead
 of copying the historical digest. Exact fixtures pin the existing Microsoft
 permission-scope and NinjaOne software-identity values.
 
-The 127 shipped-code `py/stack-trace-exposure` results remain a separate API-error
-contract slice. They require exception-by-exception review because many expose
-intentional domain conflict messages while others may reveal internal details;
-they are not dismissed or hidden by this source-scope change.
+The 127 shipped-code `py/stack-trace-exposure` results entered a separate
+API-error contract slice because they required exception-by-exception review;
+many exposed intentional domain conflicts while others could reveal internal
+details. That later [response-hardening work](exception-response-hardening.md)
+reached zero open stack-trace findings without dismissals in exact-source Build
+43139510245. This provider/source-scope change does not claim that later result
+as part of its own implementation.

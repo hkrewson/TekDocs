@@ -48,9 +48,13 @@ now have exact-source hosted evidence. Final source `61908a2c` passed Build,
 CodeQL, supported upgrades, independent restore and thirteen browser/server
 journeys. File versions, signed publications and PDFs remain preserved. Two
 intermittent browser timings passed unchanged replays and remain recorded for
-investigation before aggregate 1.0 acceptance. Native configuration and a
-clean-created final acceptance journey remain next. The six deferred legacy-import
-gaps remain deferred; no existing data was changed or deployment performed.
+investigation before aggregate 1.0 acceptance. Native keys/entities, templates
+and monitored-source configuration are implemented; final source `03abebfe`
+passed Build 43139510245's full release lane, including the combined clean-start
+journey, supported upgrades, independent backup/restore and CodeQL. Reviewed
+manual copies plus aggregate clean-start and human candidate acceptance remain
+next. The six deferred legacy-import gaps remain deferred; no existing data was
+changed or deployment performed.
 The first post-1.0 priority is a distinct TekDocs
 [end-to-end interface rework](../planning/post-1.0-interface-rework.md), covering
 copy, controls/forms, workflow simplification, navigation and visual identity.
@@ -2467,13 +2471,16 @@ New Git-only documents can stage field/content bindings and entity references in
 the protected draft without legacy Document/Block records. Publication evidence
 v3 freezes field values, exact fragment source proof and entity cards; earlier
 signed output, PDFs and file versions remain immutable. See
-[acceptance and validation](../planning/git-native-keys.md). Local tests, all 14 browser/server journeys and both source reviews pass;
-exact-source hosted validation follows the authorized push. Legacy-backed
-fragment identities cannot bypass permissions through native keys.
+[acceptance and validation](../planning/git-native-keys.md). Local tests, all 14
+browser/server journeys and both source reviews pass; corrective-source hosted
+validation passed and remains covered by Build 43139510245 at final source
+`03abebfe`. Legacy-backed fragment identities cannot bypass permissions through
+native keys.
 Native template enrollment and Git-native monitored-source configuration are implemented.
 The monitored-source candidate harness extends the combined clean-start browser,
-upgrade, rollback-refusal and independent-recovery acceptance; exact-source hosted
-confirmation remains. The six legacy migration gaps remain deferred;
+upgrade, rollback-refusal and independent-recovery acceptance; exact source
+`03abebfe` passed the complete Build 43139510245 release lane. The six legacy
+migration gaps remain deferred;
 no existing-data migration or production deployment is included.
 
 ## Native template enrollment (bounded development slice)
@@ -2484,5 +2491,5 @@ It covers independent introductions/copies, live and pinned sections, exact-vers
 update review, detach, Workspace isolation and retained publication proof.
 Local validation passes 796 combined backend cases, 883 frontend cases and all 15
 browser/server journeys; source reviews are clear. Exact-source hosted upgrade and
-independent encrypted restore follow the authorized push. The change does not
+independent encrypted restore passed in Build 43139510245. The change does not
 migrate existing documents or alter the published 0.9.18 checkpoint.

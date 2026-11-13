@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { createMemoryRouter, Link, RouterProvider, useLocation, useNavigate } from 'react-router'
@@ -29,6 +29,13 @@ function setup() {
   render(<RouterProvider router={router} />)
   return router
 }
+
+it('presents draft protection in the departure interaction without waiting for another module', () => {
+  setup()
+  fireEvent.change(screen.getByLabelText('Draft'), { target: { value: 'Unsaved' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Close form' }))
+  expect(screen.getByRole('dialog')).toBeVisible()
+})
 
 it('blocks page and section links, preserves values on Keep editing, and clears them on Discard', async () => {
   const user = userEvent.setup()

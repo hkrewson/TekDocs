@@ -1,11 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useBlocker } from 'react-router'
 import type { Blocker } from 'react-router'
 import { NavigationGuardContext } from './navigationGuard'
 import type { EditState } from './navigationGuard'
-
-const UnsavedChangesDialog = lazy(() => import('./UnsavedChangesDialog'))
+import UnsavedChangesDialog from './UnsavedChangesDialog'
 
 export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   const [editors, setEditors] = useState<Record<string, EditState>>({})
@@ -61,8 +60,7 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
 
   return <NavigationGuardContext.Provider value={value}>
     {children}
-    {(pending || (blocker.state === 'blocked' && blocker !== dismissedBlocker)) && <Suspense fallback={null}>
-      <UnsavedChangesDialog dirty={dirty} busy={busy} onKeep={keepEditing} onDiscard={discard} />
-    </Suspense>}
+    {(pending || (blocker.state === 'blocked' && blocker !== dismissedBlocker)) &&
+      <UnsavedChangesDialog dirty={dirty} busy={busy} onKeep={keepEditing} onDiscard={discard} />}
   </NavigationGuardContext.Provider>
 }

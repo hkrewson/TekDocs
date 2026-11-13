@@ -12,11 +12,17 @@ The [1.0.0 candidate](1.0.0-candidate.md) aligns version metadata and records th
 intended Git-backed compatibility boundary. It is not accepted, authorized for
 release or published. Exact-candidate hosted validation, a commit-matched
 automated or AI-assisted security review, current risk disposition, the required
-human accessibility walkthroughs and the maintainer's release decision remain
-open. The review of preparation commit `59fdcb82` covered all 151 changed files
+human [accessibility walkthroughs](1.0-human-acceptance-walkthrough.md) and the
+maintainer's release decision remain open. The retained WebKit and recurring-
+template failures have a current
+[timing-risk investigation](1.0-timing-risk-disposition.md); local unchanged
+replays pass and the exact-candidate hosted replay remains open. The review of
+preparation commit `59fdcb82` covered all 151 changed files
 and reported one low diagram-renderer capacity issue. The follow-up candidate
 limits one principal to two active previews, below the shared eight-job pool;
-that new source still requires its own commit-matched review. The historical
+the exact review of commit `65598075` covered the full 151-file change set and
+reported no findings. The later timing-risk correction changes source again and
+therefore requires its own final commit-matched review. The historical
 pinned manifest below is not 1.0 evidence.
 
 ## Future release delivery

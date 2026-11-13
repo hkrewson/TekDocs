@@ -19097,7 +19097,7 @@ export interface operations {
                     readonly "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Diagram preview rate exceeded */
+            /** @description Diagram preview rate or concurrency exceeded */
             readonly 429: {
                 headers: {
                     /** @description Server-generated request correlation UUID. */

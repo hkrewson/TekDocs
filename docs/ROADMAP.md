@@ -8,7 +8,10 @@ accepted: exact-candidate hosted gates, commit-matched security review, human
 keyboard/mobile/screen-reader/200% zoom acceptance, timing-risk disposition and
 the maintainer's final decision are still required. The manual recreation route
 does not promise automatic legacy identity, history, access or publication
-transfer.
+transfer. The preparation-candidate security review covered all 151 changed
+files and found one low shared-renderer capacity issue. Its follow-up bounds one
+principal below the global renderer capacity; the resulting candidate still
+requires its own commit-matched review.
 
 ## Prepared 0.9.19 checkpoint
 

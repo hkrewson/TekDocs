@@ -10,6 +10,9 @@ The [1.0.0 candidate](planning/releases/1.0.0-candidate.md) freezes the intended
 Git-backed compatibility boundary but is not yet accepted or published. Exact-
 candidate hosted validation, commit-matched security review, human accessibility
 walkthroughs, risk disposition and the maintainer's release decision remain open.
+The preparation-candidate review found one low renderer-capacity issue; the
+follow-up candidate bounds each authenticated principal to two active diagram
+previews and requires a fresh exact-candidate review before acceptance.
 The six deferred automatic legacy-migration shapes are not 1.0 dependencies;
 selected existing documents are recreated manually without claiming automatic
 identity, history, access or publication-authority transfer.

@@ -1619,7 +1619,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiErrorEnvelope'
         '429':
-          description: Diagram preview rate exceeded
+          description: Diagram preview rate or concurrency exceeded
           headers:
             X-Request-ID:
               description: Server-generated request correlation UUID.

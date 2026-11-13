@@ -1,6 +1,12 @@
+import hashlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from django.db import connection
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
+from rest_framework.exceptions import Throttled
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
@@ -15,6 +21,35 @@ from .documents import documents_for_scope
 from .entity_mentions import resolve_entity_mentions
 from .rendering import render_markdown
 from .workspaces import resolve_msp_workspace, resolve_organization_workspace
+
+DIAGRAM_PREVIEW_CONCURRENCY = 2
+
+
+def _diagram_preview_lock_key(*, tenant_id: object, user_id: object, slot: int) -> int:
+    principal = f"diagram-preview:{tenant_id}:{user_id}:{slot}".encode()
+    digest = hashlib.blake2b(principal, digest_size=8, person=b"tekdocs").digest()
+    return int.from_bytes(digest, byteorder="big", signed=True)
+
+
+@contextmanager
+def diagram_preview_capacity(*, tenant_id: object, user_id: object) -> Iterator[None]:
+    """Reserve session-scoped renderer capacity for one authenticated principal."""
+    lock_key: int | None = None
+    for slot in range(DIAGRAM_PREVIEW_CONCURRENCY):
+        candidate = _diagram_preview_lock_key(tenant_id=tenant_id, user_id=user_id, slot=slot)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_try_advisory_lock(%s)", [candidate])
+            acquired = cursor.fetchone()
+        if acquired == (True,):
+            lock_key = candidate
+            break
+    if lock_key is None:
+        raise Throttled(detail="Too many diagram previews are already rendering. Try again shortly.")
+    try:
+        yield
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_unlock(%s)", [lock_key])
 
 
 class MarkdownRenderRequestSerializer(serializers.Serializer):
@@ -51,19 +86,20 @@ class DiagramPreviewView(APIView):
             200: DiagramPreviewResponseSerializer,
             400: OpenApiResponse(description="Invalid or oversized Mermaid source"),
             403: OpenApiResponse(description="Installation membership required"),
-            429: OpenApiResponse(description="Diagram preview rate exceeded"),
+            429: OpenApiResponse(description="Diagram preview rate or concurrency exceeded"),
             503: OpenApiResponse(description="Isolated diagram renderer unavailable"),
         },
     )
     def post(self, request):  # type: ignore[no-untyped-def]
-        require_installation_member(request.user)
+        member = require_installation_member(request.user)
         serializer = DiagramPreviewRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         source = serializer.validated_data["source"]
         if "```" in source:
             raise serializers.ValidationError({"source": ["Diagram source contains an invalid fence."]})
         try:
-            artifacts = render_diagram_exports(f"```mermaid\n{source}\n```\n", required=True)
+            with diagram_preview_capacity(tenant_id=member.tenant.pk, user_id=member.user.pk):
+                artifacts = render_diagram_exports(f"```mermaid\n{source}\n```\n", required=True)
         except DiagramRenderError as error:
             unavailable = error.code in {
                 "diagram.renderer.busy",

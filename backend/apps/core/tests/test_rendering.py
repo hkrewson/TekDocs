@@ -1,11 +1,20 @@
+import secrets
+from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from html import unescape
 from html.parser import HTMLParser
+from threading import Event, Lock
 from urllib.parse import urlsplit
 
 import pytest
+from django.contrib.auth.hashers import make_password
+from django.db import connection
+from django.test import Client
 from django.urls import reverse
+from django.utils import timezone
 
 from apps.accounts.bootstrap import bootstrap_owner
+from apps.accounts.models import APIToken, APITokenKind, APITokenWorkspaceScope
 from apps.core.diagram_exports import DiagramExportArtifact, DiagramRenderError, DiagramSource
 from apps.core.models import InstallationState
 from apps.core.rendering import render_markdown, render_pdf, split_markdown_sections
@@ -377,6 +386,100 @@ def test_diagram_preview_uses_isolated_sanitized_renderer(client, monkeypatch) -
         "description": "Trusted route",
         "renderer_version": "@mermaid-js/mermaid-cli@11.16.0",
     }
+    prefix = "a1b2c3d4e5f6"
+    secret = secrets.token_urlsafe(32)
+    APIToken.objects.create(
+        tenant=installation.tenant,
+        kind=APITokenKind.PERSONAL,
+        name="Diagram preview test",
+        subject=installation.owner,
+        created_by=installation.owner,
+        workspace_scope=APITokenWorkspaceScope.MSP,
+        prefix=prefix,
+        secret_hash=make_password(secret),
+        expires_at=timezone.now() + timedelta(days=1),
+        permissions_locked_at=timezone.now(),
+    )
+    bearer_response = Client().post(
+        reverse("diagram-preview"),
+        {"source": source},
+        content_type="application/json",
+        headers={"Authorization": f"Bearer tdp_{prefix}_{secret}"},
+    )
+    assert bearer_response.status_code == 200
+
+
+@pytest.mark.django_db(transaction=True)
+def test_diagram_preview_limits_one_member_below_shared_renderer_capacity(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    InstallationState.objects.get_or_create(pk=InstallationState.SINGLETON_ID)
+    installation = bootstrap_owner(
+        tenant_name="Diagram Preview Capacity MSP",
+        owner_email="diagram-preview-capacity-owner@example.invalid",
+        owner_display_name="Diagram Preview Capacity Owner",
+        password="Preview-capacity-password-42!",
+    )
+    source = "flowchart LR\naccTitle: Network path\naccDescr: Trusted route\nA-->B"
+    artifact = DiagramExportArtifact(
+        source=DiagramSource(
+            index=1,
+            source=source,
+            source_checksum="b" * 64,
+            title="Network path",
+            description="Trusted route",
+            family="flowchart",
+        ),
+        state="rendered",
+        renderer_version="@mermaid-js/mermaid-cli@11.16.0",
+        svg=b'<svg xmlns="http://www.w3.org/2000/svg"><text>Safe</text></svg>',
+        png=b"png",
+    )
+    entered = Event()
+    release = Event()
+    call_lock = Lock()
+    calls = 0
+    database_sessions: set[int] = set()
+
+    def blocking_renderer(_markdown, *, required):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        assert required is True
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_backend_pid()")
+            database_session = cursor.fetchone()
+        assert database_session is not None
+        with call_lock:
+            calls += 1
+            database_sessions.add(database_session[0])
+            if calls == 2:
+                entered.set()
+        assert release.wait(timeout=5)
+        return (artifact,)
+
+    monkeypatch.setattr("apps.core.rendering_views.render_diagram_exports", blocking_renderer)
+    clients = [Client() for _ in range(3)]
+    for request_client in clients:
+        request_client.force_login(installation.owner)
+
+    def preview(request_client):  # type: ignore[no-untyped-def]
+        return request_client.post(reverse("diagram-preview"), {"source": source}, content_type="application/json")
+
+    try:
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            first = executor.submit(preview, clients[0])
+            second = executor.submit(preview, clients[1])
+            assert entered.wait(timeout=3)
+            third = executor.submit(preview, clients[2])
+            try:
+                third_response = third.result(timeout=2)
+            finally:
+                release.set()
+            assert first.result(timeout=3).status_code == 200
+            assert second.result(timeout=3).status_code == 200
+            assert third_response.status_code == 429
+    finally:
+        release.set()
+
+    assert calls == 2
+    assert len(database_sessions) == 2
 
 
 @pytest.mark.django_db(transaction=True)
@@ -409,3 +512,5 @@ def test_diagram_preview_rejects_anonymous_fenced_and_unavailable_requests(clien
         "code": "diagram.renderer.unavailable",
         "detail": "The isolated diagram renderer is unavailable.",
     }
+    retry = client.post(endpoint, {"source": "flowchart LR\nA-->B"}, content_type="application/json")
+    assert retry.status_code == 503

@@ -13,7 +13,11 @@ intended Git-backed compatibility boundary. It is not accepted, authorized for
 release or published. Exact-candidate hosted validation, a commit-matched
 automated or AI-assisted security review, current risk disposition, the required
 human accessibility walkthroughs and the maintainer's release decision remain
-open. The historical pinned manifest below is not 1.0 evidence.
+open. The review of preparation commit `59fdcb82` covered all 151 changed files
+and reported one low diagram-renderer capacity issue. The follow-up candidate
+limits one principal to two active previews, below the shared eight-job pool;
+that new source still requires its own commit-matched review. The historical
+pinned manifest below is not 1.0 evidence.
 
 ## Future release delivery
 

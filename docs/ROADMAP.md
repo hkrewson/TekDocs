@@ -1,5 +1,15 @@
 # Release Roadmap
 
+## Prepared 1.0.0 candidate
+
+The [1.0.0 candidate](../planning/releases/1.0.0-candidate.md) now fixes the
+intended version and compatibility boundary. It remains prepared rather than
+accepted: exact-candidate hosted gates, commit-matched security review, human
+keyboard/mobile/screen-reader/200% zoom acceptance, timing-risk disposition and
+the maintainer's final decision are still required. The manual recreation route
+does not promise automatic legacy identity, history, access or publication
+transfer.
+
 ## Prepared 0.9.19 checkpoint
 
 The [0.9.19 candidate](../planning/releases/0.9.19-candidate.md) consolidates the

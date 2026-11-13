@@ -6,6 +6,15 @@ work queue. `.github/release-candidate.json` still names the historical 0.9.12
 security/status packet. The latest exact-source publication record below names
 the later release; the checkout's HEAD may be an evidence/tooling commit.
 
+## Prepared 1.0.0 candidate
+
+The [1.0.0 candidate](1.0.0-candidate.md) aligns version metadata and records the
+intended Git-backed compatibility boundary. It is not accepted, authorized for
+release or published. Exact-candidate hosted validation, a commit-matched
+automated or AI-assisted security review, current risk disposition, the required
+human accessibility walkthroughs and the maintainer's release decision remain
+open. The historical pinned manifest below is not 1.0 evidence.
+
 ## Future release delivery
 
 The [single-push delivery contract](ci-release-delivery.md) makes image verification,

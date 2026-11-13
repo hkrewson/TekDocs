@@ -4,6 +4,16 @@ TekDocs is a self-hosted MSP documentation and inventory platform built around r
 
 TekDocs is an active homelab project published for people who want to run, inspect, or adapt it. Version numbers mark tested development checkpoints rather than commercial product releases. Do not deploy it without tested backups, controlled access, and an upgrade plan.
 
+## Prepared 1.0.0 candidate
+
+The [1.0.0 candidate](planning/releases/1.0.0-candidate.md) freezes the intended
+Git-backed compatibility boundary but is not yet accepted or published. Exact-
+candidate hosted validation, commit-matched security review, human accessibility
+walkthroughs, risk disposition and the maintainer's release decision remain open.
+The six deferred automatic legacy-migration shapes are not 1.0 dependencies;
+selected existing documents are recreated manually without claiming automatic
+identity, history, access or publication-authority transfer.
+
 ## Development provenance
 
 TekDocs is human-directed and built with AI assistance, primarily using OpenAI Sol. The maintainer defines the product, architecture, security boundaries, acceptance criteria, and release decisions. AI-produced implementation is treated as engineering work that must pass the same review, test, migration, isolation, and production-image gates as any other contribution.

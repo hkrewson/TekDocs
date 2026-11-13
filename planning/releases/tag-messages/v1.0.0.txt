@@ -1,0 +1,2 @@
+Git-backed Markdown content graph and supported clean-start workflows
+Breaking changes: legacy document authority is not migrated automatically; recreate selected documents through the Git-backed workflow

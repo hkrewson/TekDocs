@@ -10,10 +10,13 @@ the later release; the checkout's HEAD may be an evidence/tooling commit.
 
 The [1.0.0 candidate](1.0.0-candidate.md) aligns version metadata and records the
 intended Git-backed compatibility boundary. It is not accepted, authorized for
-release or published. Exact-candidate hosted validation, a commit-matched
-automated or AI-assisted security review, current risk disposition, the required
-human [accessibility walkthroughs](1.0-human-acceptance-walkthrough.md) and the
-maintainer's release decision remain open. The retained WebKit and recurring-
+release or published. The November 14 human
+[accessibility walkthrough](1.0-human-acceptance-walkthrough.md) passed across
+keyboard, touch/mobile, VoiceOver and native 200% zoom profiles. Codex Security
+scan `d6e6b1ca-e9e5-42e8-b780-a9ab06f16a88` completed the exact committed delta
+from `65598075` through `8c52b0da` with complete coverage and no findings.
+Exact-candidate hosted validation, current risk disposition and the maintainer's
+release decision remain open. The retained WebKit and recurring-
 template failures have a current
 [timing-risk investigation](1.0-timing-risk-disposition.md); local unchanged
 replays pass and the exact-candidate hosted replay remains open. The review of
@@ -21,8 +24,8 @@ preparation commit `59fdcb82` covered all 151 changed files
 and reported one low diagram-renderer capacity issue. The follow-up candidate
 limits one principal to two active previews, below the shared eight-job pool;
 the exact review of commit `65598075` covered the full 151-file change set and
-reported no findings. The later timing-risk correction changes source again and
-therefore requires its own final commit-matched review. The historical
+reported no findings. The later timing-risk delta is covered by the completed
+scan above. The historical
 pinned manifest below is not 1.0 evidence.
 
 ## Future release delivery

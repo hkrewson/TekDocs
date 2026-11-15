@@ -212,20 +212,22 @@ test('failure buffers stay bounded under an unfinished request burst', () => {
   diagnostic.dispose()
 })
 
-test('skipped runs stay silent and failure reporting is emitted only once', () => {
+test('diagnostics stay passive around browser dialogs and report failures only once', () => {
   const page = new EventEmitter(), lines = []
   const skipped = attachPublicationDiagnostics(page, { write: line => lines.push(line) })
+  assert.equal(page.listenerCount('dialog'), 0)
   skipped.finish('skipped')
   skipped.dispose()
   assert.deepEqual(lines, [])
   const failed = attachPublicationDiagnostics(page, { write: line => lines.push(line) })
+  assert.equal(page.listenerCount('dialog'), 0)
   page.emit('dialog', { message: () => { throw new Error('Dialog text must not be read') } })
   page.emit('pageerror', new Error('unpublished-heading'))
   failed.finish('failed')
   failed.finish('failed')
   assert.equal(lines.length, 1)
   assert.ok(!lines[0].includes('unpublished-heading'))
-  assert.deepEqual(JSON.parse(lines[0]).events.map(event => event.event), ['dialog', 'page_error'])
+  assert.deepEqual(JSON.parse(lines[0]).events.map(event => event.event), ['page_error'])
   failed.dispose()
 })
 

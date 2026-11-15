@@ -1,9 +1,15 @@
 import json
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
 
-from apps.core.integration_providers import HaloPSAProvider, _halo_encode_cursor, validate_provider_page
+from apps.core.integration_providers import (
+    HaloPSAProvider,
+    _halo_encode_cursor,
+    _halo_ticket_is_current,
+    validate_provider_page,
+)
 
 
 def connection():
@@ -126,12 +132,21 @@ def test_halopsa_pagination_is_opaque_and_advances_between_collections():
 
 
 def test_halopsa_retains_open_and_recently_closed_tickets_only():
+    now = datetime.now(UTC)
     provider = HaloPSAProvider(
         getter=lambda **_kwargs: {
             "tickets": [
                 {"id": 1, "summary": "Open ticket", "dateclosed": None},
-                {"id": 2, "summary": "Recent ticket", "dateclosed": "2026-08-15T12:00:00Z"},
-                {"id": 3, "summary": "Old ticket", "dateclosed": "2025-01-01T12:00:00Z"},
+                {
+                    "id": 2,
+                    "summary": "Recent ticket",
+                    "dateclosed": (now - timedelta(days=89)).isoformat(),
+                },
+                {
+                    "id": 3,
+                    "summary": "Old ticket",
+                    "dateclosed": (now - timedelta(days=91)).isoformat(),
+                },
             ],
             "record_count": 3,
         },
@@ -141,6 +156,17 @@ def test_halopsa_retains_open_and_recently_closed_tickets_only():
     page = provider.fetch_page(connection(), secret="client-secret", cursor=_halo_encode_cursor(4, 1))
 
     assert [item.remote_id for item in page.observations] == ["1", "2"]
+
+
+def test_halopsa_closed_ticket_window_includes_the_exact_ninetieth_day_only():
+    now = datetime(2026, 11, 15, 12, tzinfo=UTC)
+
+    assert _halo_ticket_is_current(
+        {"dateclosed": (now - timedelta(days=90)).isoformat()}, now=now
+    )
+    assert not _halo_ticket_is_current(
+        {"dateclosed": (now - timedelta(days=90, microseconds=1)).isoformat()}, now=now
+    )
 
 
 @pytest.mark.parametrize(

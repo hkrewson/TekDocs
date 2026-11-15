@@ -9,6 +9,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ReleaseGatePlanTests(unittest.TestCase):
+    def test_hosted_performance_jobs_install_frontend_dependencies(self) -> None:
+        for relative in (
+            ".github/workflows/extended-validation.yml",
+            ".github/workflows/performance-diagnostics.yml",
+        ):
+            workflow = (ROOT / relative).read_text()
+            setup = workflow.index("actions/setup-node@")
+            install = workflow.index("npm ci --prefix frontend --no-audit --no-fund")
+            performance = workflow.index("make test-public-beta-performance")
+            with self.subTest(workflow=relative):
+                self.assertLess(setup, install)
+                self.assertLess(install, performance)
+
     def test_release_gate_uses_current_upgrade_paths(self) -> None:
         result = subprocess.run(
             ["make", "-n", "release-gate"], cwd=ROOT,

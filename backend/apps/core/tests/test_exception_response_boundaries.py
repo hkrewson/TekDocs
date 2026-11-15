@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -926,7 +927,12 @@ def test_diagram_render_error_retains_its_safe_default_message():
 
 
 def test_diagram_preview_response_exposes_only_the_public_detail(monkeypatch):
-    monkeypatch.setattr(rendering_views, "require_installation_member", lambda _user: None)
+    member = SimpleNamespace(
+        tenant=SimpleNamespace(pk=uuid4()),
+        user=SimpleNamespace(pk=uuid4()),
+    )
+    monkeypatch.setattr(rendering_views, "require_installation_member", lambda _user: member)
+    monkeypatch.setattr(rendering_views, "diagram_preview_capacity", lambda **_kwargs: nullcontext())
     monkeypatch.setattr(rendering_views.DiagramPreviewView, "throttle_classes", [])
 
     def fail_render(*_args, **_kwargs):  # type: ignore[no-untyped-def]

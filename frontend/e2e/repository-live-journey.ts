@@ -137,6 +137,9 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
     new URL(response.url()).pathname === sourcePath && response.request().method() === 'PUT')
   await page.getByRole('button', { name: 'Save source', exact: true }).click()
   expect((await sourceSaved).status()).toBe(201)
+  // The response can arrive before React commits the saved source as the new
+  // baseline. Wait for the real dirty-state control before navigating.
+  await expect(page.getByRole('button', { name: 'Save source', exact: true })).toBeDisabled()
   await page.goto(directLink)
   await page.getByRole('button', { name: 'Web source', exact: true }).click()
   await expect(page.getByLabel('Public document URL')).toHaveValue('https://example.invalid/live-git-setup.md')

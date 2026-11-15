@@ -59,7 +59,7 @@ function requestPhase(request: Request) {
 }
 
 /** Failure-only diagnostics: at most 128 events/32 pending requests, with no URL,
- * identity, header, body, filename, dialog message or page-error text retained.
+ * identity, header, body, filename or page-error text retained.
  * A request_failed followed by download is normal Chromium download hand-off.
  */
 export function attachPublicationDiagnostics(page: Pick<Page, 'on' | 'off'>, options: Options = {}) {
@@ -100,14 +100,12 @@ export function attachPublicationDiagnostics(page: Pick<Page, 'on' | 'off'>, opt
   const onFinished = (request: Request) => complete(request, 'finished')
   const onFailed = (request: Request) => complete(request, 'request_failed')
   const onDownload = () => record('download', 'browser')
-  const onDialog = () => record('dialog', 'browser')
   const onPageError = () => record('page_error', 'browser')
   page.on('request', onRequest)
   page.on('response', onResponse)
   page.on('requestfinished', onFinished)
   page.on('requestfailed', onFailed)
   page.on('download', onDownload)
-  page.on('dialog', onDialog)
   page.on('pageerror', onPageError)
   return {
     mark(value: string) { if (milestones.has(value)) record('milestone', value) },
@@ -130,7 +128,6 @@ export function attachPublicationDiagnostics(page: Pick<Page, 'on' | 'off'>, opt
       page.off('requestfinished', onFinished)
       page.off('requestfailed', onFailed)
       page.off('download', onDownload)
-      page.off('dialog', onDialog)
       page.off('pageerror', onPageError)
       pending.clear()
       events.length = 0

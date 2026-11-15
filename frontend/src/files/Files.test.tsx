@@ -34,7 +34,7 @@ describe('Files', () => {
 
     expect(await screen.findByText('firewall-runbook.pdf')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Firewall guide/ })).toHaveAttribute('href', '/documentation?document=document-1')
-    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/files/file-1/download')
+    expect(screen.getByRole('link', { name: 'firewall-runbook.pdf' })).toHaveAttribute('href', '/api/files/file-1/download')
     expect(screen.getByRole('table', { name: 'Document files' })).toBeInTheDocument()
   })
 
@@ -46,7 +46,7 @@ describe('Files', () => {
     render(<RouterProvider router={router} />)
     expect(await screen.findByText('device-steps.txt')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Device setup' })).toHaveAttribute('href', '/documentation?repository=native-document')
-    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', '/api/native-file/download')
+    expect(screen.getByRole('link', { name: 'device-steps.txt' })).toHaveAttribute('href', '/api/native-file/download')
   })
 
   it('shows a truthful empty state when documents have no files', async () => {

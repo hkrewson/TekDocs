@@ -42,7 +42,7 @@ export type CapabilityGroup = (typeof navigationGroupRegistry)[number]['id']
 export const taskHubRegistry = [
   { id: 'home', label: translate('navigation.hub.home'), capabilities: ['overview', 'deadlines', 'activity'], navigationCapabilities: ['overview'] },
   { id: 'clients', label: translate('navigation.hub.clients'), capabilities: ['organizations', 'people', 'sites'] },
-  { id: 'knowledge', label: translate('navigation.hub.knowledge'), capabilities: ['documentation', 'files'] },
+  { id: 'knowledge', label: translate('navigation.hub.knowledge'), capabilities: ['documentation', 'files'], navigationCapabilities: ['documentation'] },
   { id: 'operations', label: translate('navigation.hub.operations'), capabilities: ['assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials'] },
   { id: 'business', label: translate('navigation.hub.business'), capabilities: ['services', 'vendors', 'products', 'invoices', 'stock'] },
   { id: 'assurance', label: translate('navigation.hub.assurance'), capabilities: ['compliance'] },
@@ -81,8 +81,10 @@ export function authorizedTaskHubs(authorizedCapabilities: readonly WorkspaceCap
   const authorized = new Set(authorizedCapabilities)
   return taskHubRegistry.flatMap((hub) => {
     const navigationCapabilities: readonly WorkspaceCapability[] = 'navigationCapabilities' in hub ? hub.navigationCapabilities : hub.capabilities
-    const children: AuthorizedHubChild[] = navigationCapabilities
-      .filter((capability) => authorized.has(capability))
+    const authorizedHubCapabilities = hub.capabilities.filter((capability) => authorized.has(capability))
+    const visibleCapabilities = navigationCapabilities.filter((capability) => authorized.has(capability))
+    const destinationCapabilities = visibleCapabilities.length > 0 ? visibleCapabilities : authorizedHubCapabilities.slice(0, 1)
+    const children: AuthorizedHubChild[] = destinationCapabilities
       .map((capability) => ({ capability, label: capabilityRegistry[capability].label, path: capabilityRegistry[capability].path }))
     return children.length > 0 ? [{ hub, children, defaultDestination: children[0] }] : []
   })

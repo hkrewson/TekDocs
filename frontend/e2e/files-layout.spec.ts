@@ -13,6 +13,7 @@ async function fixtures(page: Page, organization = false) {
     document_id: `00000000-0000-4000-a000-${String(index + 1).padStart(12, '0')}`,
     document_title: `Document ${String(index + 1).padStart(3, '0')}`,
     filename: `File ${String(index + 1).padStart(3, '0')}${index === 30 ? ` ${'LongFilename'.repeat(30)}` : ''}.pdf`,
+    source: 'legacy', download_url: `/api/v1/documents/files/${index + 1}/download`,
     kind: index % 5 === 0 ? 'primary' : 'attachment', version: index % 5 === 0 ? 1 : null,
     media_type: 'application/pdf', size: 2048 + index, checksum: 'a'.repeat(64), created_at: `2026-09-${String((index % 25) + 1).padStart(2, '0')}T12:00:00Z`,
   }))
@@ -64,14 +65,17 @@ async function fixtures(page: Page, organization = false) {
 }
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
-  test(`Files collection fits ${width}px and searches the complete workspace`, async ({ page }) => {
+  test(`Files collection fits ${width}px and searches the complete workspace`, async ({ page }, testInfo) => {
     const { files } = await fixtures(page)
     await page.setViewportSize({ width, height: 600 })
     await page.goto('/files')
+    await expect(page.getByRole('heading', { name: 'Files', level: 1 })).toBeVisible()
     await expect(page.getByText('31 files', { exact: true })).toBeVisible()
     await expect(page.getByText(files[30].filename, { exact: true })).toBeVisible()
+    await expect(page.getByRole('link', { name: files[30].filename, exact: true })).toHaveAttribute('href', files[30].download_url)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     expect((await new AxeBuilder({ page }).include('.content-section').analyze()).violations).toEqual([])
+    if (testInfo.project.name === 'chromium' && [320, 1440].includes(width)) await page.screenshot({ path: `../artifacts/knowledge-files-${width}.png` })
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(page).toHaveURL(/page=2/)
     await expect(page.getByText('File 006.pdf', { exact: true })).toBeVisible()

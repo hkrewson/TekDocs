@@ -433,8 +433,7 @@ it('loads the complete content-health queue from the server', async () => {
   documents.list = listDocuments
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
 
-  await user.click(await screen.findByText('More'))
-  await user.click(screen.getByRole('button', { name: 'Content health (26)' }))
+  await user.click(await screen.findByRole('button', { name: 'Needs attention (26)' }))
   await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
     {}, expect.any(AbortSignal), expect.objectContaining({ health: 'attention', page: 1, page_size: 25 }),
   ))
@@ -790,7 +789,7 @@ it('creates a client document from a published template with per-block behavior'
   }
   documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [template], count: 1 })
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
-  await user.click(await screen.findByRole('button', { name: 'Templates' }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
   await user.click(await screen.findByRole('button', { name: 'Use template' }))
   await user.selectOptions(screen.getByLabelText('Printer rationale'), 'live')
   await user.click(screen.getByRole('button', { name: 'Create document' }))
@@ -1205,7 +1204,7 @@ it('preserves a template draft after a denied write and guards leaving the libra
   documents.listTemplateLibrary = vi.fn().mockResolvedValue({ results: [{ ...sourceDocument, is_template: true }], count: 1 })
   instantiateTemplate.mockRejectedValue(new Error('Forbidden'))
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
-  await user.click(await screen.findByRole('button', { name: 'Templates' }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
   await user.click(await screen.findByRole('button', { name: 'Use template' }))
   const title = screen.getByLabelText('Document title')
   await user.clear(title)
@@ -1214,10 +1213,10 @@ it('preserves a template draft after a denied write and guards leaving the libra
   expect(await screen.findByRole('alert')).toHaveTextContent('Your choices are preserved')
   expect(title).toHaveValue('Preserved draft')
   expect(instantiateTemplate).toHaveBeenCalledTimes(1)
-  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Knowledge view' }), 'documents')
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(title).toHaveValue('Preserved draft')
-  await user.click(screen.getByRole('button', { name: 'Documents' }))
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Knowledge view' }), 'documents')
   await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
   expect(screen.queryByLabelText('Document title')).not.toBeInTheDocument()
   expect(instantiateTemplate).toHaveBeenCalledTimes(1)
@@ -1229,7 +1228,7 @@ it('searches the whole template library, pages results and recovers from a read 
   const library = vi.fn().mockRejectedValueOnce(new Error('Unavailable')).mockResolvedValue({ results: [{ ...sourceDocument, is_template: true }], count: 26, page: 1, page_size: 25, has_more: true })
   documents.listTemplateLibrary = library
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
-  await user.click(await screen.findByRole('button', { name: 'Templates' }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
   await user.click(await screen.findByRole('button', { name: 'Retry' }))
   await user.click(await screen.findByRole('button', { name: 'Next' }))
   await waitFor(() => expect(library).toHaveBeenLastCalledWith({ organizationId: 'org-1' }, expect.any(AbortSignal), '', 2))
@@ -1701,7 +1700,7 @@ it('binds a Git template enrollment to the reviewed source definition', async ()
     ...sourceDocument, content_authority: 'repository', source_state: 'ready', definition_sha256: 'a'.repeat(64),
   }], count: 1 })
   render(<Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} />)
-  await user.click(await screen.findByRole('button', { name: 'Templates' }))
+  await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
   await user.click(await screen.findByRole('button', { name: 'Use template' }))
   await user.click(screen.getByRole('button', { name: 'Create document' }))
   await waitFor(() => expect(instantiateTemplate).toHaveBeenCalledWith(
@@ -1791,7 +1790,7 @@ it('opens the exact newly enrolled native document from the template library', a
   const attachments = vi.spyOn(browserRepositoryClient, 'listAttachments').mockResolvedValue({ results: [], count: 0, page: 1, page_size: 25, has_more: false })
   try {
     render(<StrictMode><Documentation workspace={{ kind: 'organization', id: 'org-1', name: 'Acme', classifications: ['client'], capabilities: ['documentation'], organization: null }} client={documents} workspaceClient={workspaces} initialDocumentId={null} /></StrictMode>)
-    await user.click(await screen.findByRole('button', { name: 'Templates' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
     await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
     await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
     await waitFor(() => expect(window.location.search).toContain('repository=native-enrolled'))

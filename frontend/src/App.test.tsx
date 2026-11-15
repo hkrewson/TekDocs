@@ -341,7 +341,7 @@ it('opens a newly enrolled native document through the complete organization she
   })
   try {
     render(<App initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />)
-    await user.click(await screen.findByRole('button', { name: 'Templates' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Knowledge view' }), 'templates')
     await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
     await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
     await waitFor(() => expect(window.location.search).toContain(`repository=${source.content_id}`))

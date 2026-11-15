@@ -1,5 +1,24 @@
 .document-filters {
-  grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) auto auto;
+}
+
+.knowledge-view-picker {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.knowledge-view-picker select {
+  min-height: 36px;
+  padding: 6px 30px 6px 9px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  font: inherit;
+  font-size: 13px;
 }
 
 .document-sort-field {
@@ -11,6 +30,8 @@
 }
 
 .document-sort-field select {
+  width: 100%;
+  min-width: 0;
   min-height: 38px;
   padding: 7px 9px;
   color: var(--text);
@@ -109,6 +130,18 @@
 }
 
 @media (max-width: 640px) {
+  .knowledge-page-header {
+    flex-direction: column;
+  }
+
+  .knowledge-page-header .page-actions {
+    width: 100%;
+  }
+
+  .knowledge-page-header .button-label {
+    display: inline;
+  }
+
   .document-filters {
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -118,9 +151,6 @@
   }
 }
 
-.document-library-tabs { max-width: 100%; display: flex; gap: 16px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.document-library-tabs button, .document-library-tabs a { min-height: 40px; flex: none; display: inline-flex; align-items: center; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; text-decoration: none; cursor: pointer; }
-.document-library-tabs button[aria-pressed="true"], .document-library-tabs a.active { color: var(--text); border-bottom-color: currentColor; }
 .template-section-choices { list-style: none; padding: 0; }
 .client-template-library .template-section-choices > li { display: grid; gap: 12px; padding-block: 16px; border-bottom: 1px solid var(--border); }
 .template-section-choices > li, .reuse-results > li > div { min-width: 0; overflow-wrap: anywhere; }

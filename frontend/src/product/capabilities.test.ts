@@ -39,6 +39,7 @@ describe('product capability contract', () => {
   it('keeps contextual and administrative routes out of primary hub children', () => {
     const hubs = authorizedTaskHubs(workspaceCapabilities)
     expect(hubs.find(({ hub }) => hub.id === 'home')?.children.map(({ capability }) => capability)).toEqual(['overview'])
+    expect(hubs.find(({ hub }) => hub.id === 'knowledge')?.children.map(({ capability }) => capability)).toEqual(['documentation'])
     expect(hubs.find(({ hub }) => hub.id === 'assurance')?.children.map(({ capability }) => capability)).toEqual(['compliance'])
     expect(hubs.find(({ hub }) => hub.id === 'manage')?.children.map(({ capability }) => capability)).toEqual(['integrations', 'custom_fields', 'recycle_bin'])
     expect(taskHubForCapability('activity').id).toBe('home')

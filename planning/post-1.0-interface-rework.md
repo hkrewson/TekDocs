@@ -13,9 +13,10 @@ boundary while changing the working hierarchy:
 - Home contains a conditional first-organization setup action and a real reminder
   queue; Activity remains available by direct link and System status but is not a
   primary Home destination;
-- Knowledge exposes Documents and Files. Templates remain a related Documents
-  view, while repository tooling is in **More** and Content health appears only
-  when findings exist or its deep link is active;
+- Knowledge opens Documents directly. Templates and Files are supporting views
+  selected within Knowledge, while repository tooling is in **More** and the
+  actionable **Needs attention** queue appears only when findings exist or its
+  deep link is active;
 - Assurance contains Compliance; Recycle bin moves to Manage;
 - Manage exposes Integrations, Data model, and Recycle bin. Data model presents
   Fields and **Categories and tags** as related views while retaining the existing
@@ -137,12 +138,13 @@ hiding required actions.
 
 ## Reference workflow contract
 
-Knowledge has two primary destinations: **Documents** and **Files**. Documents
-retains the closely related **Documents** and **Templates** views. Search stays
-visible, filters remain in the shared filter menu, and **New document** is the
-single primary collection action. Import and repository work are subordinate in
-**More**. Content health appears there only when findings exist, while its existing
-deep link remains valid. A selected document exposes
+Knowledge has one primary destination: **Documents**. A compact Knowledge view
+selector reaches **Templates** and **Files** without a horizontal tab row or more
+sidebar entries. Search stays visible, filters remain in the shared filter menu,
+and **New document** is the single primary collection action. Import and repository
+work are subordinate in **More**. **Needs attention** is a visible collection
+queue only when findings exist; its existing content-health deep link remains
+valid. A selected document exposes
 **Content**, **Files**, **Links**, **Review and publication**, and **History** as
 applicable. Repository source operations remain contextual. Canonical Markdown,
 dirty-state protection, revision conflicts, independent review, publication
@@ -210,6 +212,28 @@ direct links, record opening, create/edit/archive recovery, workspace isolation,
 keyboard use, responsive layout, and accessibility. No backend or persistence
 change is part of this slice.
 
+## Remaining Knowledge rollout
+
+Knowledge now opens Documents directly and no longer expands a second Files link
+in the sidebar. Documents, Templates, and Files are related working views selected
+through one compact control that remains usable on narrow screens. Existing
+`/files`, `doc_library=templates`, and `doc_library=health` links remain valid,
+including the files-only capability fallback.
+
+The document collection places its count with the page title and removes the
+repeated section heading. Content findings are presented as **Needs attention**
+beside search and filters, not as a vague destination under **More**. Repository
+content opens as its own focused authoring workspace, without a duplicate Documents
+header above it. The Files collection removes explanatory text already implied by
+the context and makes the file name itself the download action; the owning document
+remains the management path.
+
+Acceptance requires deterministic permission-filtered hub behavior, retained deep
+links and URL state, unsaved-change protection while changing views, responsive and
+keyboard access to every Knowledge view, complete file ownership links, repository
+focus restoration, and unchanged Git evidence and authorization behavior. No API,
+schema, or persistence change is part of this slice.
+
 ## November 15, 2026 implementation evidence
 
 Verified:
@@ -226,6 +250,10 @@ Verified:
   create/edit/archive recovery, denial, keyboard use, and axe checks;
 - the Organization record remains free of horizontal overflow and axe findings
   at both 1440px and the required 320px minimum width;
+- 36 focused Chromium Knowledge and shell journeys pass, including all six review
+  widths for Needs attention, all Files collection widths, direct links, ownership
+  links, hub defaults, and axe checks; the 320px and 1440px Knowledge collections
+  were also visually inspected;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

@@ -1,6 +1,5 @@
-import { Download } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import { CollectionPagination } from '../CollectionPagination'
 import { CollectionTable } from '../collections/CollectionTable'
@@ -46,6 +45,7 @@ export function Files({ workspace, preferenceWorkspace, client = browserDocument
   preferenceClient?: typeof browserCollectionPreferences
 }) {
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const [preferences, setPreferences] = useState<CollectionPreferences>(() => defaultPreferences(columns))
   const [response, setResponse] = useState<{ key: string; result?: DocumentFileResult } | null>(null)
   const [reload, setReload] = useState(0)
@@ -106,11 +106,11 @@ export function Files({ workspace, preferenceWorkspace, client = browserDocument
 
   const rows = (result?.results ?? []).map((file) => ({ ...file, name: file.filename }))
   const tableOrder = tableOrdering(query.ordering ?? '-created_at')
+  const documentsPath = workspace ? `/workspaces/organizations/${encodeURIComponent(workspace.id)}/documentation` : '/documentation'
   return <>
-    <header className="page-header"><div><h1>{translate('files.heading')}</h1><p>{translate('files.intro')}</p></div></header>
+    <header className="page-header knowledge-page-header"><div><h1>{translate('files.heading')}</h1><p>{result ? translate('files.count', { count: result.count }) : translate('common.loading')}</p></div><div className="page-actions"><label className="knowledge-view-picker"><span>{translate('documentation.libraryView')}</span><select aria-label={translate('documentation.libraryView')} value="files" onChange={(event) => { if (event.target.value === 'documents') void navigate(documentsPath); else if (event.target.value === 'templates') void navigate(`${documentsPath}?doc_library=templates`) }}><option value="documents">{translate('documentation.documents')}</option>{workspace && <option value="templates">{translate('documentation.templates')}</option>}<option value="files">{translate('documentation.files')}</option></select></label></div></header>
     {preferenceError && <p role="alert">{preferenceError}</p>}
-    <section className="content-section" aria-labelledby="managed-files-heading">
-      <div className="section-heading"><div><h2 id="managed-files-heading">{translate('files.managed')}</h2><p>{translate('files.scope')}</p></div></div>
+    <section className="content-section" aria-label={translate('files.managed')}>
       <div className="collection-toolbar">
         <form key={query.q} className="collection-search" onSubmit={(event) => { event.preventDefault(); const value = new FormData(event.currentTarget).get('q'); browse({ q: typeof value === 'string' ? value.trim() : '' }) }}><input name="q" type="search" defaultValue={query.q} aria-label={translate('files.search')} /><button type="submit" className="secondary-button">{translate('collections.searchAction')}</button></form>
         <FilterMenu groups={[{ kind: 'choices', label: translate('files.kind'), value: query.kind ?? '', choices: [{ value: '', label: translate('collections.all') }, { value: 'primary', label: translate('files.kind.primary') }, { value: 'attachment', label: translate('files.kind.attachment') }], onChange: (kind) => browse({ kind: kind || null }) }]} activeCount={Number(Boolean(query.kind))} onClear={() => browse({ kind: null })} />
@@ -120,8 +120,7 @@ export function Files({ workspace, preferenceWorkspace, client = browserDocument
       {query.kind && <div className="collection-active-filters"><button type="button" className="row-action" aria-label={translate('collections.removeFilter', { label: translate('files.kind') })} onClick={() => browse({ kind: null })}>{translate('files.kind')}: {translate(`files.kind.${query.kind}`)} ×</button></div>}
       <label className="collection-mobile-order">{translate('collections.ordering')}<select value={tableOrder} onChange={(event) => browse({ ordering: apiOrdering(event.target.value) })}>{columns.flatMap((column) => [<option key={column} value={column}>{labels[column]} ↑</option>, <option key={`-${column}`} value={`-${column}`}>{labels[column]} ↓</option>])}</select></label>
       {!response || response.key !== key ? <p role="status">{translate('files.loading')}</p> : !result ? <p role="alert">{translate('files.loadFailed')} <button type="button" onClick={() => setReload((value) => value + 1)}>{translate('collections.retry')}</button></p> : <>
-        <p>{translate('files.count', { count: result.count })}</p>
-        {rows.length === 0 ? <p className="empty-state">{query.q || query.kind ? translate('files.noMatches') : translate('files.empty')}</p> : <CollectionTable<DocumentFile & { name: string }> label={translate('files.table')} rows={rows} selectable={false} selected={new Set()} onSelection={() => {}} ordering={tableOrder} onOrder={(ordering) => browse({ ordering: apiOrdering(ordering) })} columns={preferences.columns.map((column) => ({ id: column, label: labels[column as keyof typeof labels], render: (file) => column === 'name' ? <><strong>{file.filename}</strong><span className="collection-secondary">{file.checksum.slice(0, 12)}</span><a className="secondary-button compact-button collection-file-download" href={file.download_url}><Download size={14} aria-hidden="true" />{translate('files.download')}</a></> : column === 'document' ? <Link to={documentPath(workspace, file.document_id, file.source)}>{file.document_title}</Link> : column === 'kind' ? `${translate(`files.kind.${file.kind}`)}${file.version ? ` · ${translate('files.version', { version: file.version })}` : ''}` : column === 'type' ? file.media_type : column === 'size' ? `${formatInteger(file.size)} B` : formatDateTime(file.created_at) }))} />}
+        {rows.length === 0 ? <p className="empty-state">{query.q || query.kind ? translate('files.noMatches') : translate('files.empty')}</p> : <CollectionTable<DocumentFile & { name: string }> label={translate('files.table')} rows={rows} selectable={false} selected={new Set()} onSelection={() => {}} ordering={tableOrder} onOrder={(ordering) => browse({ ordering: apiOrdering(ordering) })} columns={preferences.columns.map((column) => ({ id: column, label: labels[column as keyof typeof labels], render: (file) => column === 'name' ? <><a className="collection-name" href={file.download_url}>{file.filename}</a><span className="collection-secondary">{file.checksum.slice(0, 12)}</span></> : column === 'document' ? <Link to={documentPath(workspace, file.document_id, file.source)}>{file.document_title}</Link> : column === 'kind' ? `${translate(`files.kind.${file.kind}`)}${file.version ? ` · ${translate('files.version', { version: file.version })}` : ''}` : column === 'type' ? file.media_type : column === 'size' ? `${formatInteger(file.size)} B` : formatDateTime(file.created_at) }))} />}
         <CollectionPagination label={translate('files.table')} page={page} pageSize={pageSize} count={result.count} hasMore={result.has_more} onPageChange={(next) => browse({ page: String(next) })} />
       </>}
     </section>

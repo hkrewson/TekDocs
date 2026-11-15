@@ -825,8 +825,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Revision two is retained.', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Documents', exact: true }).click()
-  await page.getByText('More', { exact: true }).click()
-  await page.getByRole('button', { name: /^Content health/ }).click()
+  await page.getByRole('button', { name: /^Needs attention/ }).click()
   await expect(page).toHaveURL(/doc_library=health/)
   await expect(page.getByRole('button', { name: /Live Acme onboarding/ })).toBeVisible()
   await page.getByRole('button', { name: 'Browse documents' }).click()

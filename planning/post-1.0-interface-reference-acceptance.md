@@ -23,71 +23,80 @@ Reviewer: ____________________  Date: ____________________
 
 ## 1. Shell and workspace boundaries
 
-- [ ] Sign in as the owner and confirm the sidebar contains exactly Home,
+- [ x] Sign in as the owner and confirm the sidebar contains exactly Home,
   Clients, Knowledge, Operations, Business, Assurance, and Manage.
-- [ ] Open each hub. Confirm it lands on the first visible local section and the
+- [ x] Open each hub. Confirm it lands on the first visible local section and the
   local navigation lists only pages available in the active workspace.
-- [ ] Switch from the MSP to Acceptance A, then to Acceptance B, and back. Confirm
+- [ x] Switch from the MSP to Acceptance A, then to Acceptance B, and back. Confirm
   the hub and local navigation update without showing inaccessible pages.
-- [ ] Open the account menu. Confirm Settings, Staff, Access control, Notification
+- [x ] Open the account menu. Confirm Settings, Staff, Access control, Notification
   delivery, and System status appear only when permitted and are absent from the
   task hubs.
-- [ ] Use global search, notifications, the skip link, and the account menu. Confirm
+- [ x] Use global search, notifications, the skip link, and the account menu. Confirm
   focus moves to the destination and returns to the trigger when an overlay closes.
-- [ ] Paste a direct URL containing filters or a selected record, refresh it, then
+- [x ] Paste a direct URL containing filters or a selected record, refresh it, then
   use Back and Forward. Confirm the URL and visible state agree after every action.
 
 ## 2. Documentation collection
 
-- [ ] Open Knowledge. Confirm it lands on Documentation and shows Documents,
+- [ x] Open Knowledge. Confirm it lands on Documentation and shows Documents,
   Templates, Repository, and Content health.
-- [ ] Confirm search is visible, filters use one Filters menu, and New document is
+- [ x] Confirm search is visible, filters use one Filters menu, and New document is
   the only primary collection action. Import Markdown and repository actions must
   remain visibly secondary.
-- [ ] Search for `Acceptance A Runbook`, apply a category or health filter, change
+- [x ] Search for `Acceptance A Runbook`, apply a category or health filter, change
   sorting, and move to another page. Refresh and use Back/Forward. Confirm the
   search, filter, order, page, and selected document are retained.
 - [ ] Open Templates and confirm an acceptance template is available. Return to
   Documents without losing the collection state.
-- [ ] Open Repository and a Git-backed document. Confirm repository evidence and
+        [X] Templates is not its own section. There is a template in the Doucments subsection.
+- [ x] Open Repository and a Git-backed document. Confirm repository evidence and
   source operations remain available without replacing the normal authoring path.
+        [x] repository content is a mess though. this surface will need a lot of work to become useful, if we even maintain it.
 - [ ] Open Content health. Confirm loading, populated, empty, and retry/error
   messages occupy the content area without shifting the shell.
+            [x] Content health doesn't change anything on the page.
+            [x] I'm also now noticing that clicking either the repository content or content health header prevents me from then selecting either of the other two headers (if I'm in repository content, Content health and Documents do nothing. If I'm in Content health, documents and repository content do nothing.)
 
 ## 3. Document record, recovery, and publication
 
-- [ ] Open a document and confirm its applicable sections are Content, Files,
+- [ x] Open a document and confirm its applicable sections are Content, Files,
   Links, Review and publication, and History.
-- [ ] Edit Markdown, try to leave without saving, and choose Stay. Confirm the edit
+- [ x] Edit Markdown, try to leave without saving, and choose Stay. Confirm the edit
   remains. Try again and choose Discard. Confirm the accepted revision returns.
 - [ ] In two browser tabs, open the same document. Save a change in the first tab,
   then save a different change in the second. Confirm a conflict is shown, neither
   version is silently lost, and the recovery choice is understandable.
+          [x] For the Acceptance MSP Incident Template, I'm able to distinctly add two text fields in two tabs, save both, and see both text fields added after save.
+          [x] for a git backed doc (Acceptance MSP Runbook 02), the second save attempt displays a version comparison
 - [ ] Confirm files and links remain attached after saving and refreshing.
-- [ ] As the owner, submit a publication for review. Confirm the owner cannot satisfy
+- [ x] As the owner, submit a publication for review. Confirm the owner cannot satisfy
   an independent approval that requires another authorized person.
 - [ ] Sign in as the reviewer, review the evidence, and approve. Confirm the
   publication state and History update. Verify the client user sees only the
   authorized client publication and retained downloads.
+          reviewer user no longer works
 - [ ] Open More. Confirm repository/source, key, export, or settings actions appear
   only when relevant and destructive actions remain visually separate.
 
 ## 4. Asset collection and record
 
-- [ ] Open Operations. Confirm it lands on Assets, search is visible, all filter
+- [ x] Open Operations. Confirm it lands on Assets, search is visible, all filter
   dimensions are in the Filters menu, and New asset is the primary action.
-- [ ] Confirm CSV transfer and column configuration are secondary utilities.
-- [ ] Filter to hardware, change ordering and page size, then open an asset in the
+- [x ] Confirm CSV transfer and column configuration are secondary utilities.
+- [x ] Filter to hardware, change ordering and page size, then open an asset in the
   quick drawer. Close it and confirm the same row, filters, order, page, scroll
   position, and keyboard focus are restored.
-- [ ] Reopen the drawer and choose the full-page record. Use Back and Forward,
+- [x ] Reopen the drawer and choose the full-page record. Use Back and Forward,
   refresh, and paste the record URL into a new tab. Confirm the selected section
   and collection state remain stable.
-- [ ] For hardware, check Overview, Specifications, Documentation, Network,
+- [ x] For hardware, check Overview, Specifications, Documentation, Network,
   Related, and History. For software, confirm Installation replaces Network.
-- [ ] Edit a safe field, save, refresh, and confirm the record and collection row
-  agree. Trigger a recoverable load failure and confirm Retry works without losing
+- [x ] Edit a safe field, save, refresh, and confirm the record and collection row
+  agree.
+  - [ ] Trigger a recoverable load failure and confirm Retry works without losing
   the collection state.
+                How?
 
 ## 5. Denial and limited users
 

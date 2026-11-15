@@ -1,21 +1,21 @@
 {
   "schema_version": 1,
   "repository": "hkrewson/TekDocs",
-  "candidate_commit": "b45a5439dbf54252cbab5b6f7ace1a51027f5126",
+  "candidate_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
   "pipeline": "single_push",
-  "security_record": "planning/releases/0.9.12-publication-security-review.json",
+  "security_record": "planning/releases/1.0.0-publication-security-review.json",
   "workflows": {
-    "Build, test, and secure": 40055908733,
-    "CodeQL": 40055908733,
-    "Extended validation": 40055908733
+    "Build, test, and secure": 43663469095,
+    "CodeQL": 43663469095,
+    "Extended validation": 43663469095
   },
   "operator_acceptance": {
     "decision": "accepted",
-    "date": "2026-10-23",
-    "reference": "planning/releases/0.9.12-operational-closeout.md",
-    "scope": "Explicit bounded CSP/COEP/KaTeX risk acceptance and main release authorization. No production deployment or new manual walkthrough claimed."
+    "date": "2026-11-14",
+    "reference": "planning/releases/1.0.0-candidate.md",
+    "scope": "Human keyboard, touch/mobile, VoiceOver and native 200% zoom acceptance; monitored latency acceptance; compatibility freeze; and authorization for the versioned 1.0 push and its automatic CI publication. Production deployment remains separate."
   },
   "remaining_release_actions": [
-    "Complete reversible first MSP document authority handoff as subsequent development; production mutation requires its own approval."
+    "Deploy v1.0.0 to production only after separate explicit authorization."
   ]
 }

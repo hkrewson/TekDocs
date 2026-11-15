@@ -2,32 +2,40 @@
 
 For release status, evidence closeout, CI failure triage or operator acceptance,
 start here. Historical review narratives are supporting evidence, not the live
-work queue. `.github/release-candidate.json` still names the historical 0.9.12
-security/status packet. The latest exact-source publication record below names
-the later release; the checkout's HEAD may be an evidence/tooling commit.
+work queue. `.github/release-candidate.json` pins the latest exact-source
+publication record; the checkout's HEAD may be a later evidence/tooling commit.
 
-## Prepared 1.0.0 candidate
+## Published 1.0.0; production deployment pending
 
-The [1.0.0 candidate](1.0.0-candidate.md) aligns version metadata and records the
-intended Git-backed compatibility boundary. On November 14, 2026, the maintainer
-accepted the monitored latency risk and authorized the single versioned push to
-`main`, including automatic CI image, tag, receipt and evidence delivery.
-Publication is not claimed until that exact hosted run succeeds. The November 14 human
-[accessibility walkthrough](1.0-human-acceptance-walkthrough.md) passed across
-keyboard, touch/mobile, VoiceOver and native 200% zoom profiles. Codex Security
-scan `d6e6b1ca-e9e5-42e8-b780-a9ab06f16a88` completed the exact committed delta
-from `65598075` through `8c52b0da` with complete coverage and no findings.
-Exact-candidate hosted validation and final Wiki publication remain open. The retained WebKit and recurring-
-template failures have a current
-[timing-risk investigation](1.0-timing-risk-disposition.md); local unchanged
-replays pass and the exact-candidate hosted replay remains open. The review of
-preparation commit `59fdcb82` covered all 151 changed files
-and reported one low diagram-renderer capacity issue. The follow-up candidate
-limits one principal to two active previews, below the shared eight-job pool;
-the exact review of commit `65598075` covered the full 151-file change set and
-reported no findings. The later timing-risk delta is covered by the completed
-scan above. The historical
-pinned manifest below is not 1.0 evidence.
+The [1.0.0 candidate](1.0.0-candidate.md) freezes the Git-backed compatibility
+boundary. Application tag `v1.0.0` peels to exact source
+`8badd87d849a7514d32e0f136194e0b05f3f1a36`; receipt tag
+`receipts/v1.0.0` identifies `a5260e0fb6499225c54acf568971620d5d44effb`.
+[Release run 43663469095](https://github.com/hkrewson/TekDocs/actions/runs/43663469095)
+passed all 51 jobs on attempt 1 and published the tested images, SBOMs,
+attestations, application tag, receipt and retained evidence. Final validation,
+both CodeQL languages, DAST, performance, all PostgreSQL shards, complete browser
+and live-server coverage, supported upgrade/recovery and production-image scans
+all passed.
+
+The November 14 human [accessibility walkthrough](1.0-human-acceptance-walkthrough.md)
+passed keyboard, touch/mobile, VoiceOver and native 200% zoom profiles. The
+[layered source review](1.0.0-source-review.md) covers the preparation, bounded
+diagram-capacity correction, timing-risk delta and final nine-file release-gate
+correction; no findings remain. The maintainer accepted the monitored
+approximately five-second recurring-template latency for 1.0, and the exact
+hosted performance and live-browser gates passed without wider timeouts or
+retries.
+
+The public Wiki was published at
+`19a233d6fd18d7f057fd28aa63f61fc385127764`. All 56 Markdown files matched their
+public raw bytes, all 55 rendered content pages returned successfully, and all
+25 contextual targets are included in the verified corpus. See
+[the publication record](1.0.0-wiki-publication-verification.json).
+
+Production remains on its previously selected release until a separately
+authorized deployment. The pinned manifest's only remaining action is that
+operator decision.
 
 ## Future release delivery
 

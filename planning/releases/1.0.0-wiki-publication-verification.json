@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "commit": "19a233d6fd18d7f057fd28aa63f61fc385127764",
+  "published_at": "2026-11-15T04:23:33Z",
+  "required_pages": 37,
+  "contextual_targets": 25,
+  "raw_markdown_files": 56,
+  "rendered_pages": 55,
+  "failures": [],
+  "verification": {
+    "local_inventory_and_links": "passed",
+    "public_raw_status": 200,
+    "public_raw_content_match": true,
+    "public_rendered_status": 200,
+    "tls_verification": true
+  },
+  "scope": "All public Markdown files, the sidebar, every rendered content page and every contextual-help target at the published Wiki commit."
+}

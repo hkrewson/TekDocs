@@ -1559,8 +1559,8 @@
       "reproduction": "A clean checkout with the pinned Node 24.22.2 image and no frontend/node_modules reproduced `vitest: not found` before any performance test or application container started. Installing the locked frontend dependencies first made Vitest available and the focused navigation-guard suite executed.",
       "cause": "The performance workflows invoked `make test-public-beta-performance` without installing frontend dependencies. frontend-gate.sh correctly used the runner's exact supported Node version directly, but a clean runner had no node_modules, so the prerequisite frontend test stopped at the missing Vitest executable.",
       "next_action": "Install locked frontend dependencies explicitly in both hosted performance workflows, retain the frontend prerequisite and performance budgets, and require a corrected-source hosted release lane to pass before publication.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
+      "retest_run": "43663469095"
     },
     {
       "run_id": "43656639820",
@@ -1571,8 +1571,8 @@
       "reproduction": "The exact focused test failed unchanged in the retained acceptance backend on 2026-11-14: the ticket closed at 2026-08-15T12:00:00Z was no longer inside the rolling 90-day window, so only the open ticket was retained. The corrected eight-case provider module passed in the same Docker backend, including explicit exact-boundary coverage.",
       "cause": "The test labeled a fixed 2026-08-15 closure date as recent while production intentionally compares against the current time. During the release run on 2026-11-15 UTC, that fixture had aged beyond 90 days. The product retention rule behaved correctly; the fixture was calendar-dependent.",
       "next_action": "Express the provider scenario relative to the test clock and add deterministic proof that exactly 90 days is included while any older instant is excluded. Require the corrected source to pass core-a-3 in the hosted release lane without changing the production window.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
+      "retest_run": "43663469095"
     },
     {
       "run_id": "43656639820",
@@ -1583,8 +1583,8 @@
       "reproduction": "The exact focused exception-boundary test failed unchanged in the retained acceptance backend because its membership stub returned None and the diagram preview now reads the authenticated tenant and user before rendering. The corrected focused test passed in the same Docker backend.",
       "cause": "Commit 65598075 added per-principal diagram preview capacity but the older renderer-error test still replaced require_installation_member with a None-returning stub. The test therefore failed on its obsolete prerequisite before reaching the renderer error and public-detail assertions; the runtime membership requirement and response contract were not defective.",
       "next_action": "Give the test a realistic minimal membership and isolate the already-covered capacity context so it reaches the intended renderer failure. Require corrected-source core-a-1 to pass without changing production authorization, concurrency, error translation, or response assertions.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
+      "retest_run": "43663469095"
     },
     {
       "run_id": "43656639820",
@@ -1595,8 +1595,8 @@
       "reproduction": "The unchanged full Docker browser/server gate reproduced the exact first-journey timeout: the remote-source PUT returned 201, a native before-unload dialog appeared, navigation aborted and one document read remained pending for 237 seconds. Fourteen later journeys passed. After correction, the same full gate passed all fifteen browser journeys in 5.4 minutes with zero retries, followed by retained-byte, runtime-role and artifact-hygiene verification.",
       "cause": "The test navigated as soon as the remote-source response arrived, before React committed that response as the new clean baseline. The resulting before-unload dialog then remained unhandled because the failure-only diagnostic recorder had installed a nominally passive dialog listener, disabling Playwright's automatic handling. This was a reproduced test synchronization and diagnostic non-interference defect, not a slow document read.",
       "next_action": "Wait for the saved-source control to become disabled before navigation and keep diagnostics passive by not subscribing to native dialogs. Require the corrected source to pass the hosted live journey without changing its timeout, retry budget, product guard, save assertion, retained-byte proof or runtime-role checks.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
+      "retest_run": "43663469095"
     }
   ]
 }

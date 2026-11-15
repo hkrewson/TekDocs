@@ -5,12 +5,11 @@ files remain engineering and operational source records, not a second user manua
 
 ## Current status
 
-The reviewed Wiki was published October 19, 2026 at
-`dec75e1e91b5da35458809e05de75cef3da48d07`. All 46 content pages and the sidebar
-match the published Git tree through public raw URLs; all 46 rendered pages,
-including the required contextual targets, passed public availability checks.
-See `0.9.8-wiki-review.md` and its publication verification record.
-Uncommitted supplemental drafts are excluded from this published corpus.
+The 1.0 manual was published November 14, 2026 at
+`19a233d6fd18d7f057fd28aa63f61fc385127764`. All 56 Markdown files, including the
+sidebar, match the published Git tree through public raw URLs. All 55 rendered
+content pages returned successfully, including all 25 contextual targets. See
+`1.0.0-wiki-publication-verification.json`.
 
 `frontend/src/help/topics.ts` now enables the verified Wiki guides in source.
 This post-0.9.8 application change is tracked in `wiki-link-enablement.md`; the

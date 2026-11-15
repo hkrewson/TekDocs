@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import * as OTPAuth from 'otpauth'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { openDocumentMoreAction } from './document-more-actions'
 import { rehearseRepositoryContent } from './repository-live-journey'
 
 function successStatus(page: Page) {
@@ -408,7 +409,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('LIVE-SEC-BIZ · Active · version 1')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Live Secure Agent' })).toHaveCount(0)
-  await page.getByLabel('Workspace', { exact: true }).getByRole('link', { name: 'Documentation' }).click()
+  await page.getByRole('link', { name: 'Knowledge', exact: true }).click()
   await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Document title').fill('Live EdgeSwitch installation guide')
   await page.locator('.document-edit-heading').getByLabel('Category').selectOption('guide')
@@ -773,7 +774,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.mouse.click(10, 100)
   await rehearseRecurringDraft(page)
 
-  await page.getByLabel('Workspace', { exact: true }).getByRole('link', { name: 'Documentation' }).click()
+  await page.getByRole('link', { name: 'Knowledge', exact: true }).click()
   await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Document title').fill('Live Acme onboarding')
   await page.getByRole('tab', { name: 'Markdown' }).click()
@@ -800,7 +801,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.locator('.revision-diff pre')).toContainText('# Acme onboarding')
   await page.getByRole('button', { name: 'Close revision history' }).click()
   await expect(page).not.toHaveURL(/document_view=/)
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await page.getByLabel('Title').fill('Unfinished live title')
   await page.getByRole('button', { name: 'Files', exact: true }).click()
   await page.getByRole('button', { name: 'Keep editing' }).click()
@@ -809,7 +810,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Discard changes' }).click()
   await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible()
   await page.getByRole('button', { name: 'Close files' }).click()
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await expect(page.getByLabel('Title')).toHaveValue('Live Acme onboarding')
   await page.getByRole('button', { name: 'Review section conversion' }).click()
   await expect(page.getByRole('heading', { name: 'Split into editable sections' })).toBeVisible()
@@ -878,16 +879,16 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Insert here' }).click()
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(successStatus(page)).toHaveText('File added.')
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await page.getByRole('button', { name: 'Use template' }).click()
   await expect(successStatus(page)).toHaveText('Independent document created from the template.')
   await expect(page.getByRole('region', { name: 'New from Live incident template' })).toBeVisible()
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await expect(page.getByLabel('Title', { exact: true })).toHaveValue('New from Live incident template')
   await expect(page.getByRole('checkbox', { name: 'Reusable template' })).not.toBeChecked()
   await page.getByRole('button', { name: /Files/ }).click()
   await expect(page.locator('.document-attachments').getByRole('link', { name: /incident-checklist\.txt/ })).toBeVisible()
-  await page.getByText('Export', { exact: true }).click()
+  await openDocumentMoreAction(page, 'Export')
   const [exported] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('link', { name: 'Markdown', exact: true }).click(),
@@ -930,13 +931,13 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('link', { name: 'Open created asset' }).click()
   await expect(page.getByRole('heading', { name: 'Live MSP core switch' })).toBeVisible()
   await expect(page.getByText('Live core switch', { exact: true })).not.toBeVisible()
-  await page.getByLabel('Workspace', { exact: true }).getByRole('link', { name: 'Documentation' }).click()
+  await page.getByRole('link', { name: 'Knowledge', exact: true }).click()
   await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Document title').fill('Live shared response')
   await page.getByRole('tab', { name: 'Markdown' }).click()
   await page.getByRole('textbox', { name: 'Markdown source' }).fill('One MSP-owned block.')
   await page.getByRole('button', { name: 'Create document' }).click()
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await page.getByRole('button', { name: 'Share with clients' }).click()
   await page.getByRole('searchbox', { name: 'Find a client' }).fill('Live Acme')
   await page.getByRole('button', { name: /Live Acme Client/ }).click()
@@ -1171,7 +1172,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect.poll(() => new URL(page.url()).searchParams.get('document')).toBeTruthy()
   const libraryTemplateId = new URL(page.url()).searchParams.get('document')
   expect(libraryTemplateId).toBeTruthy()
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await page.getByRole('checkbox', { name: 'Make reusable content findable in client documents' }).check()
   const librarySettingsSave = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().includes('/api/v1/documents/'))
   await page.getByRole('button', { name: 'Save settings' }).click()
@@ -1222,7 +1223,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page.locator('.document-content-item')).toHaveCount(3)
   await page.goto(`/workspaces/organizations/${clientId}/documentation?document=${libraryClientId}`)
-  await page.getByRole('button', { name: 'Document settings' }).click()
+  await openDocumentMoreAction(page, 'Document settings')
   await page.getByRole('button', { name: 'Check template updates' }).click()
   await page.getByRole('region', { name: 'Sections to add' }).getByRole('combobox').selectOption('pinned')
   await page.getByRole('button', { name: 'Apply update' }).click()
@@ -1237,7 +1238,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   expect(persistedLibrary.template_source_id).toBe(libraryTemplateId)
   expect(persistedLibrary.placements.filter((item) => item.resolution_mode === 'pinned')).toHaveLength(2)
   // Ownership and review use the actual workspace permissions and persist after reload.
-  await page.getByRole('button', { name: 'Ownership and review' }).click()
+  await page.getByRole('button', { name: 'Review and publication' }).click()
   const operations = page.getByRole('region', { name: 'Ownership and review' })
   await operations.getByRole('combobox', { name: 'Owner', exact: true }).selectOption({ label: 'Live Workspace Owner' })
   await operations.getByLabel('Review due').fill('2027-12-31')

@@ -1,4 +1,4 @@
-import { capabilityRegistry, navigationGroupRegistry, workspaceCapabilities } from './capabilities'
+import { authorizedTaskHubs, capabilityRegistry, navigationGroupRegistry, taskHubForCapability, taskHubRegistry, workspaceCapabilities } from './capabilities'
 
 describe('product capability contract', () => {
   it('contains only supported, routable product capabilities', () => {
@@ -18,5 +18,21 @@ describe('product capability contract', () => {
     expect(new Set(groupIds).size).toBe(groupIds.length)
     expect(workspaceCapabilities.every((capability) => groupIds.includes(capabilityRegistry[capability].group))).toBe(true)
     expect(groupIds.every((group) => workspaceCapabilities.some((capability) => capabilityRegistry[capability].group === group))).toBe(true)
+  })
+
+  it('assigns every supported capability to exactly one task hub', () => {
+    const assigned = taskHubRegistry.flatMap((hub) => [...hub.capabilities])
+    expect(new Set(assigned)).toEqual(new Set(workspaceCapabilities))
+    expect(assigned).toHaveLength(workspaceCapabilities.length)
+    for (const capability of workspaceCapabilities) expect(taskHubForCapability(capability).capabilities).toContain(capability)
+  })
+
+  it('omits unavailable hubs and chooses the first authorized child deterministically', () => {
+    const hubs = authorizedTaskHubs(['files', 'assets', 'domains'])
+    expect(hubs.map(({ hub }) => hub.id)).toEqual(['knowledge', 'operations'])
+    expect(hubs[0].children.map(({ capability }) => capability)).toEqual(['files'])
+    expect(hubs[0].defaultDestination).toMatchObject({ capability: 'files', path: '/files' })
+    expect(hubs[1].children.map(({ capability }) => capability)).toEqual(['assets', 'domains'])
+    expect(hubs[1].defaultDestination.capability).toBe('assets')
   })
 })

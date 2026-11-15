@@ -21,13 +21,16 @@ from apps.core.models import (
 from apps.core.rls import bind_local_rls_scope, OrganizationRLSMode, RLSPrincipalMode
 from apps.core.scoping import DataScope
 
-if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") != "isolated-disposable":
-    raise RuntimeError("Acceptance fixtures require the isolated preparation command")
+if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") not in {
+    "isolated-disposable",
+    "existing-development-empty",
+}:
+    raise RuntimeError("Acceptance fixtures require an approved local preparation mode")
 assert settings.TEKDOCS_PUBLIC_URL == os.environ["TEKDOCS_ACCEPTANCE_URL"]
 manifest = json.loads(Path("/fixture/manifest.json").read_text())
 state = InstallationState.objects.get()
 tenant, owner = state.tenant, state.owner
-assert tenant.name == "Acceptance MSP"
+assert tenant.name == manifest["tenant_name"]
 assert settings.EMAIL_HOST == "mailpit"
 assert IntegrationConnection.objects.count() == 0
 assert WebhookEndpoint.objects.count() == 0

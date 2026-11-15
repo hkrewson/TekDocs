@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, vi } from 'vitest'
 import { App } from './App'
@@ -110,18 +110,21 @@ describe('application shell', () => {
     expect(await screen.findByText(/no documents have been shared/i)).toBeInTheDocument()
   })
 
-  it('renders sectioned navigation and the active route', async () => {
+  it('renders task hubs and local navigation for the active route', async () => {
     render(app('/overview'))
 
     expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Documentation' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Compliance' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/files')
-    expect(screen.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/certificates')
+    const primary = within(screen.getByRole('navigation', { name: 'Primary navigation' }))
+    expect(primary.getAllByRole('link').map((link) => link.textContent)).toEqual(['Home', 'Clients', 'Knowledge', 'Operations', 'Business', 'Assurance', 'Manage'])
+    expect(primary.getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/documentation')
+    expect(primary.getByRole('link', { name: 'Operations' })).toHaveAttribute('href', '/assets')
+    expect(primary.getByRole('link', { name: 'Assurance' })).toHaveAttribute('href', '/compliance')
+    const local = within(screen.getByRole('navigation', { name: 'Home sections' }))
+    expect(local.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+    expect(local.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
+    expect(local.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
     expect(screen.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
-    expect(screen.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
     expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Client organizations/ })).toHaveAttribute('href', '/organizations')
     expect(screen.getByRole('link', { name: /Search/ })).toHaveAttribute('href', '/search')
@@ -241,48 +244,19 @@ describe('application shell', () => {
     expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }))
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Assets' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Operations' })).toBeInTheDocument()
   })
 
-  it('collapses navigation groups, preserves the preference, and moves focus safely', async () => {
-    render(app('/organizations'))
-
-    expect(await screen.findByRole('heading', { name: 'Organizations' })).toBeInTheDocument()
-    const infrastructure = screen.getByRole('button', { name: 'Infrastructure' })
-    const assets = screen.getByRole('link', { name: 'Assets' })
-    assets.focus()
-    fireEvent.click(infrastructure)
-
-    expect(infrastructure).toHaveFocus()
-    expect(infrastructure).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Assets' })).not.toBeInTheDocument()
-    expect(window.localStorage.getItem('tekdocs.navigation.collapsed-sections.v1')).toBe('["Infrastructure"]')
-  })
-
-  it('restores collapsed groups but expands the group containing the active destination', async () => {
-    window.localStorage.setItem('tekdocs.navigation.collapsed-sections.v1', '["Infrastructure","Governance"]')
+  it('uses deterministic hub destinations and exposes authorized local views', async () => {
     render(app('/assets'))
 
     expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('button', { name: 'Governance' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Compliance' })).not.toBeInTheDocument()
-  })
-
-  it.each(['Custom fields', 'Recycle bin'])('keeps unrelated navigation groups collapsed after opening %s', async (destination) => {
-    const user = userEvent.setup()
-    render(app('/assets'))
-
-    expect(await screen.findByRole('heading', { name: 'Assets' })).toBeInTheDocument()
-    for (const group of ['Workspace', 'Infrastructure', 'Relationships', 'Business', 'Governance']) {
-      await user.click(screen.getByRole('button', { name: group }))
-    }
-    await user.click(screen.getByRole('button', { name: 'Governance' }))
-    await user.click(screen.getByRole('link', { name: destination }))
-
-    expect(screen.getByRole('button', { name: 'Workspace' })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: 'Governance' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Operations' })).toHaveAttribute('href', '/assets')
+    expect(screen.getByRole('link', { name: 'Operations' })).toHaveAttribute('aria-current', 'page')
+    const local = within(screen.getByRole('navigation', { name: 'Operations sections' }))
+    expect(local.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
+    expect(local.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/certificates')
+    expect(screen.getByRole('combobox', { name: 'Operations sections' })).toHaveValue('assets')
   })
 
   it('resolves a deep-linked organization route through the workspace boundary', async () => {
@@ -299,17 +273,16 @@ describe('application shell', () => {
 
     await screen.findByRole('heading', { name: 'Acme Dental' })
     const sidebar = within(screen.getByRole('complementary'))
-    expect(sidebar.getByRole('link', { name: 'Assets' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
-    expect(sidebar.getByRole('link', { name: 'Files' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/files')
-    expect(sidebar.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/certificates')
-    expect(sidebar.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()
-    expect(sidebar.queryByRole('link', { name: 'Products' })).not.toBeInTheDocument()
-    expect(sidebar.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
+    expect(sidebar.getByRole('link', { name: 'Clients' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/people')
+    expect(sidebar.getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/documentation')
+    expect(sidebar.getByRole('link', { name: 'Operations' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
+    expect(sidebar.getByRole('link', { name: 'Business' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/services')
+    expect(sidebar.getByRole('link', { name: 'Assurance' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/recycle_bin')
+    expect(sidebar.queryByRole('link', { name: 'Manage' })).not.toBeInTheDocument()
     for (const link of sidebar.getAllByRole('link')) {
       expect(link.getAttribute('href')).toMatch(/^\/workspaces\/organizations\/00000000-0000-4000-8000-000000000010\//)
     }
-    expect(sidebar.getByRole('link', { name: 'Recycle bin' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/recycle_bin')
-    expect(screen.getByRole('navigation', { name: 'Governance' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Home sections' })).toBeInTheDocument()
   })
 
   it('loads People through the selected organization boundary', async () => {
@@ -348,7 +321,7 @@ describe('application shell', () => {
     expect(screen.getByRole('button', { name: /Current workspace: Example MSP/ })).toBeInTheDocument()
     expect(document.title).toBe('Example MSP · Overview · TekDocs')
     const sidebar = within(screen.getByRole('complementary'))
-    expect(sidebar.getByRole('link', { name: 'Organizations' })).toHaveAttribute('href', '/organizations')
+    expect(sidebar.getByRole('link', { name: 'Clients' })).toHaveAttribute('href', '/organizations')
     expect(sidebar.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     for (const link of sidebar.getAllByRole('link')) expect(link.getAttribute('href')).not.toMatch(/^\/workspaces\/organizations\//)
   })
@@ -373,7 +346,7 @@ it('opens a newly enrolled native document through the complete organization she
   })
   try {
     render(<App initialAuthContext={authContext} authClient={authClient} staffAdministrationClient={staffAdministrationClient} workspaceClient={workspaceClient} peopleClient={peopleClient} sitesClient={sitesClient} inventoryClient={inventoryClient} />)
-    await user.click(await screen.findByRole('button', { name: 'Templates from your MSP' }))
+    await user.click(await screen.findByRole('button', { name: 'Templates' }))
     await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
     await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
     await waitFor(() => expect(window.location.search).toContain(`repository=${source.content_id}`))

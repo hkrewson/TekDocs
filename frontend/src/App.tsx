@@ -5,37 +5,21 @@ import type { ReactNode } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import {
   Activity,
-  BadgeCheck,
   BookOpenText,
   Boxes,
   BriefcaseBusiness,
-  Building2,
-  CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
-  File,
-  Globe2,
-  Handshake,
-  KeyRound,
-  ListPlus,
+  Home,
   LogOut,
   Menu,
-  MapPin,
-  Network,
-  Package,
-  PackageOpen,
-  Plug,
-  ReceiptText,
   Search,
   Settings,
   ShieldCheck,
   UserPlus,
-  ScrollText,
   ServerCog,
-  Trash2,
-  Tags,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -83,8 +67,8 @@ import { browserSitesClient } from './sites/api'
 import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
-import { capabilityRegistry, navigationGroupRegistry, workspaceCapabilities } from './product/capabilities'
-import type { CapabilityGroup } from './product/capabilities'
+import { authorizedTaskHubs, capabilityRegistry, taskHubForCapability, workspaceCapabilities } from './product/capabilities'
+import type { LocalNavigationEntry, TaskHub, TaskHubId } from './product/capabilities'
 import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
@@ -127,24 +111,6 @@ const ProductCatalogs = lazy(async () => ({ default: (await import('./catalog/Pr
 const SearchResults = lazy(async () => ({ default: (await import('./search/SearchResults')).SearchResults }))
 const SystemStatus = lazy(async () => ({ default: (await import('./system-status/SystemStatus')).SystemStatus }))
 
-type NavigationItem = {
-  label: string
-  path: string
-  area: WorkspaceCapability
-  icon: typeof BookOpenText
-}
-
-type NavigationSection = {
-  id: CapabilityGroup
-  label: string
-  items: NavigationItem[]
-}
-
-function navigationItem(area: WorkspaceCapability, icon: NavigationItem['icon']): NavigationItem {
-  const definition = capabilityRegistry[area]
-  return { label: definition.label, path: definition.path, area, icon }
-}
-
 function AppLink({ to, className, children, ...props }: {
   to: string
   className?: string
@@ -153,51 +119,18 @@ function AppLink({ to, className, children, ...props }: {
   return <NavLink {...props} to={to} className={({ isActive }) => `${className ?? ''}${isActive ? ' active' : ''}`}>{children}</NavLink>
 }
 
-const navigationIcons: Record<WorkspaceCapability, NavigationItem['icon']> = {
-  overview: Activity,
-  organizations: Building2,
-  people: UsersRound,
-  sites: MapPin,
-  documentation: BookOpenText,
-  files: File,
-  assets: Boxes,
-  licenses: ScrollText,
-  networks: Network,
-  domains: Globe2,
-  certificates: BadgeCheck,
-  credentials: KeyRound,
-  services: BriefcaseBusiness,
-  vendors: Handshake,
-  products: Package,
-  invoices: ReceiptText,
-  stock: PackageOpen,
-  custom_fields: ListPlus,
-  taxonomies: Tags,
-  compliance: ShieldCheck,
-  deadlines: CalendarDays,
-  activity: Activity,
-  recycle_bin: Trash2,
-  integrations: Plug,
+const hubIcons: Record<TaskHubId, typeof BookOpenText> = {
+  home: Home,
+  clients: UsersRound,
+  knowledge: BookOpenText,
+  operations: Boxes,
+  business: BriefcaseBusiness,
+  assurance: ShieldCheck,
+  manage: Settings,
 }
 
-const navigationSections: NavigationSection[] = navigationGroupRegistry.map((group) => ({
-  ...group,
-  items: workspaceCapabilities
-    .filter((area) => capabilityRegistry[area].group === group.id)
-    .map((area) => navigationItem(area, navigationIcons[area])),
-}))
-
-const navigationSectionsPreferenceKey = 'tekdocs.navigation.collapsed-sections.v1'
-const navigationGroupIds = new Set<CapabilityGroup>(navigationGroupRegistry.map(({ id }) => id))
-
-function readCollapsedNavigationSections(): Set<CapabilityGroup> {
-  try {
-    const stored = JSON.parse(window.localStorage.getItem(navigationSectionsPreferenceKey) ?? '[]') as unknown
-    if (!Array.isArray(stored)) return new Set()
-    return new Set(stored.filter((value): value is CapabilityGroup => typeof value === 'string' && navigationGroupIds.has(value as CapabilityGroup)))
-  } catch {
-    return new Set()
-  }
+function capabilityPath(area: WorkspaceCapability, workspace: WorkspaceContext | null): string {
+  return workspace ? organizationWorkspacePath(workspace, area) : capabilityRegistry[area].path
 }
 
 function Brand({ collapsed }: { collapsed: boolean }) {
@@ -209,52 +142,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-function NavSection({ id, items, label, collapsed, sectionCollapsed, onToggle, onNavigate, workspace }: {
-  id: CapabilityGroup
-  items: NavigationItem[]
-  label: string
-  collapsed: boolean
-  sectionCollapsed: boolean
-  onToggle: () => void
-  onNavigate: () => void
-  workspace: WorkspaceContext | null
-}) {
-  const headingRef = useRef<HTMLButtonElement>(null)
-  const navigationRef = useRef<HTMLElement>(null)
-  const sectionId = `navigation-section-${id.toLowerCase()}`
-
-  function toggle() {
-    if (!sectionCollapsed && navigationRef.current?.contains(document.activeElement)) headingRef.current?.focus()
-    onToggle()
-  }
-
-  return (
-    <div className="nav-section">
-      {!collapsed && (
-        <button ref={headingRef} className="nav-section-heading" type="button" aria-expanded={!sectionCollapsed} aria-controls={sectionId} onClick={toggle}>
-          <span>{label}</span>
-          {sectionCollapsed ? <ChevronRight size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-        </button>
-      )}
-      <nav ref={navigationRef} id={sectionId} className="nav-list" aria-label={label} hidden={!collapsed && sectionCollapsed}>
-        {items.map(({ label, path, area, icon: Icon }) => (
-          <AppLink
-            key={area}
-            to={workspace ? organizationWorkspacePath(workspace, area) : path}
-            onClick={onNavigate}
-            className="nav-link"
-            title={collapsed ? label : undefined}
-          >
-            <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-            {!collapsed && <span>{label}</span>}
-          </AppLink>
-        ))}
-      </nav>
-    </div>
-  )
-}
-
-function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDismiss, tenant, workspace, activeArea, workspaceClient, workspaceLoading, organizationRoute, canManageInvoiceSettings, workspaceRestricted }: {
+function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDismiss, tenant, workspace, activeArea, availableCapabilities, workspaceClient, workspaceLoading, organizationRoute, workspaceRestricted }: {
   collapsed: boolean
   mobileOpen: boolean
   onCollapse: () => void
@@ -263,42 +151,18 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
   tenant: AuthenticatedContext['tenant']
   workspace: WorkspaceContext | null
   activeArea: WorkspaceArea
+  availableCapabilities: readonly WorkspaceCapability[]
   workspaceClient: WorkspaceClient
   workspaceLoading: boolean
   organizationRoute: boolean
-  canManageInvoiceSettings: boolean
   workspaceRestricted: boolean
 }) {
   const sidebarRef = useRef<HTMLElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
-  const activeGroup = workspaceCapabilities.includes(activeArea as WorkspaceCapability)
-    ? capabilityRegistry[activeArea as WorkspaceCapability].group
+  const activeHub = workspaceCapabilities.includes(activeArea as WorkspaceCapability)
+    ? taskHubForCapability(activeArea as WorkspaceCapability).id
     : null
-  const [navigationState, setNavigationState] = useState<{
-    collapsedSections: Set<CapabilityGroup>
-    acknowledgedArea: WorkspaceArea | null
-    acknowledgedMobileOpen: boolean
-  }>(() => ({
-    collapsedSections: readCollapsedNavigationSections(),
-    acknowledgedArea: null,
-    acknowledgedMobileOpen: false,
-  }))
-  const availableSections = navigationSections
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => workspace
-        ? workspace.capabilities.includes(item.area)
-        : (!workspaceRestricted && (item.area !== 'invoices' || canManageInvoiceSettings))),
-    }))
-    .filter((section) => section.items.length > 0)
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(navigationSectionsPreferenceKey, JSON.stringify([...navigationState.collapsedSections]))
-    } catch {
-      // Storage can be unavailable without preventing navigation.
-    }
-  }, [navigationState.collapsedSections])
+  const availableHubs = authorizedTaskHubs(availableCapabilities)
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -313,27 +177,6 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [mobileOpen, onMobileDismiss])
-
-  function sectionIsCollapsed(id: CapabilityGroup, state = navigationState): boolean {
-    const mustRevealActive = id === activeGroup && (
-      state.acknowledgedArea !== activeArea
-      || (!state.acknowledgedMobileOpen && mobileOpen)
-    )
-    return state.collapsedSections.has(id) && !mustRevealActive
-  }
-
-  function toggleSection(id: CapabilityGroup) {
-    setNavigationState((current) => {
-      const next = new Set(current.collapsedSections)
-      if (sectionIsCollapsed(id, current)) next.delete(id)
-      else next.add(id)
-      return {
-        collapsedSections: next,
-        acknowledgedArea: activeArea,
-        acknowledgedMobileOpen: mobileOpen,
-      }
-    })
-  }
 
   return (
     <>
@@ -351,17 +194,44 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
         <div className="sidebar-scroll">
           {organizationRoute && !workspace
             ? <p className="workspace-navigation-state">{workspaceLoading ? translate('navigation.loading') : translate('navigation.workspaceUnavailable')}</p>
-            : availableSections.map((section, index) => (
-              <div key={section.id}>
-                {index > 0 && <div className="nav-divider" />}
-                <NavSection id={section.id} items={section.items} label={section.label} collapsed={collapsed} sectionCollapsed={sectionIsCollapsed(section.id)} onToggle={() => toggleSection(section.id)} onNavigate={onMobileClose} workspace={workspace} />
-              </div>
-            ))}
+            : <nav className="nav-list hub-list" aria-label={translate('navigation.primary')}>
+              {availableHubs.map(({ hub, defaultDestination }) => {
+                const Icon = hubIcons[hub.id]
+                return <Link key={hub.id} to={capabilityPath(defaultDestination.capability, workspace)} onClick={onMobileClose} className={`nav-link hub-link${activeHub === hub.id ? ' active' : ''}`} aria-current={activeHub === hub.id ? 'page' : undefined} aria-label={collapsed ? hub.label : undefined} title={collapsed ? hub.label : undefined}>
+                  <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+                  {!collapsed && <span>{hub.label}</span>}
+                </Link>
+              })}
+            </nav>}
         </div>
       </aside>
       {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileDismiss} aria-label={translate('navigation.close')} />}
     </>
   )
+}
+
+function TaskHubLocalNavigation({ hub, capabilities, activeArea, workspace }: {
+  hub: TaskHub
+  capabilities: readonly WorkspaceCapability[]
+  activeArea: WorkspaceCapability
+  workspace: WorkspaceContext | null
+}) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const label = translate('navigation.local', { hub: hub.label })
+  const entries: LocalNavigationEntry[] = capabilities.map((capability) => ({
+    capability,
+    label: capabilityRegistry[capability].label,
+    path: capabilityRegistry[capability].path,
+    destination: capabilityPath(capability, workspace),
+    current: activeArea === capability,
+  }))
+  return <nav className="hub-local-navigation" aria-label={label}>
+    <div>
+      {entries.map((entry) => <Link key={entry.capability} to={entry.destination} state={location.state as unknown} aria-current={entry.current ? 'page' : undefined}>{entry.label}</Link>)}
+    </div>
+    <label>{translate('navigation.section')}<select aria-label={label} value={activeArea} onChange={(event) => { void navigate(capabilityPath(event.target.value as WorkspaceCapability, workspace), { state: location.state as unknown }) }}>{entries.map((entry) => <option key={entry.capability} value={entry.capability}>{entry.label}</option>)}</select></label>
+  </nav>
 }
 
 function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotifications, canViewSystemStatus, onSignOut, signingOut }: {
@@ -579,6 +449,20 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   }), [shellContext.tenant.id, shellContext.tenant.name])
   const activeArea = workspaceAreaFromPath(location.pathname)
   const requestedDocumentId = new URLSearchParams(location.search).get('document')
+  const availableCapabilities = useMemo<readonly WorkspaceCapability[]>(() => {
+    if (selectedWorkspace) return selectedWorkspace.capabilities
+    if (workspaceRestricted) return []
+    return workspaceCapabilities.filter((area) => {
+      if (area === 'invoices') return shellContext.permissions?.includes('invoices.issue') ?? false
+      if (area === 'stock') return shellContext.permissions?.includes('invoices.view') ?? false
+      return capabilityRegistry[area].scopes.includes('msp')
+    })
+  }, [selectedWorkspace, shellContext.permissions, workspaceRestricted])
+  const activeCapability = availableCapabilities.includes(activeArea as WorkspaceCapability) ? activeArea as WorkspaceCapability : null
+  const activeHub = activeCapability ? taskHubForCapability(activeCapability) : null
+  const activeHubCapabilities = activeHub
+    ? activeHub.capabilities.filter((area) => availableCapabilities.includes(area))
+    : []
 
   function submitSearch(event: React.FormEvent) {
     event.preventDefault()
@@ -617,7 +501,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">{translate('shell.skip')}</a>
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={closeMobileNavigation} onMobileDismiss={dismissMobileNavigation} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} canManageInvoiceSettings={shellContext.permissions?.includes('invoices.issue') ?? false} workspaceRestricted={workspaceRestricted} />
+      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onCollapse={() => setCollapsed((value) => !value)} onMobileClose={closeMobileNavigation} onMobileDismiss={dismissMobileNavigation} tenant={shellContext.tenant} workspace={selectedWorkspace} activeArea={activeArea} availableCapabilities={availableCapabilities} workspaceClient={workspaceClient} workspaceLoading={Boolean(organizationId) && visibleWorkspaceState.phase === 'loading'} organizationRoute={Boolean(organizationId)} workspaceRestricted={workspaceRestricted} />
       <div className={`app-body${collapsed ? ' sidebar-collapsed' : ''}`}>
         <header className="topbar">
           <button ref={mobileMenuRef} className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label={translate('navigation.open')}><Menu size={20} /></button>
@@ -626,6 +510,7 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           {!workspaceRestricted && <Suspense fallback={<span className="notification-menu" aria-hidden="true"><button className="notification-trigger" type="button" disabled tabIndex={-1} /></span>}><NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} /></Suspense>}
           <ProfileMenu user={shellContext.user} canManageAccess={!workspaceRestricted && (shellContext.permissions?.includes('memberships.assign_role') ?? false)} canManageStaff={!workspaceRestricted && (shellContext.permissions?.includes('staff_invitations.view') ?? false)} canManageNotifications={!workspaceRestricted && (shellContext.permissions?.includes('notifications.manage') ?? false)} canViewSystemStatus={!workspaceRestricted && (shellContext.permissions?.includes('system_diagnostics.view') ?? false)} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
         </header>
+        {activeHub && activeCapability && <TaskHubLocalNavigation hub={activeHub} capabilities={activeHubCapabilities} activeArea={activeCapability} workspace={selectedWorkspace} />}
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
           <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}>{workspaceRestricted && !organizationId && location.pathname !== '/settings' ? <AssignedWorkspacePrompt /> : <Routes>

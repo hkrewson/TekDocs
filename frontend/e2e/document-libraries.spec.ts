@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { openDocumentMoreAction } from './document-more-actions'
 const organizationId = crypto.randomUUID(), documentId = crypto.randomUUID(), blockId = crypto.randomUUID(), revisionId = crypto.randomUUID()
 const placement = { id: crypto.randomUUID(), block_id: blockId, block_name: 'Network guidance', block_kind: 'rich_text', parent_id: null, position: 0, depth: 0, resolution_mode: 'live', audience_profile: 'shared', pinned_revision_id: null, resolved_revision_id: revisionId, resolved_revision_number: 1, resolved_checksum: 'abc', resolved_markdown: 'Reviewed guidance', resolved_html: '<p>Reviewed guidance</p>', is_primary: true }
 const record = { id: documentId, title: 'Network baseline', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'guide', is_template: true, library_visible: true, markdown: 'Reviewed guidance', block_id: blockId, current_revision_id: revisionId, revision_number: 1, checksum: 'abc', resolved_markdown: 'Reviewed guidance', placements: [placement, { ...placement, id: crypto.randomUUID(), block_id: crypto.randomUUID(), block_name: 'Shared instructions', is_primary: false, position: 1 }], placement_count: 2, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z' }
@@ -23,6 +24,7 @@ async function setup(page: Page, baseURL?: string) {
     return r.fulfill({ json: { results: [{ ...record, is_template: false, template_enrollment_id: 'enrollment' }], count: 1, page: 1, page_size: 25, has_more: false } })
   })
 }
+
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   test(`template and reusable-content workflows at ${width}px`, async ({ page, baseURL }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
@@ -58,7 +60,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByText('Preview content', { exact: true }).click()
     await expect(page.getByText('Reviewed content for insertion')).toBeVisible()
     expect((await new AxeBuilder({ page }).include('.block-library').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations).toEqual([])
-    await page.getByRole('button', { name: 'Document settings' }).click()
+    await openDocumentMoreAction(page, 'Document settings')
     await page.getByRole('button', { name: 'Check template updates' }).click()
     await expect(page.getByRole('heading', { name: 'Changes need review' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Apply update' })).toBeDisabled()

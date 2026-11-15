@@ -34,13 +34,16 @@ from apps.core.repository_portal_views import (
     ClientPortalRepositoryPublicationAttachmentView,
 )
 
-if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") != "isolated-disposable":
-    raise RuntimeError("Acceptance fixtures require the isolated preparation command")
+if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") not in {
+    "isolated-disposable",
+    "existing-development-empty",
+}:
+    raise RuntimeError("Acceptance fixtures require an approved local preparation mode")
 assert settings.TEKDOCS_PUBLIC_URL == os.environ["TEKDOCS_ACCEPTANCE_URL"]
 manifest = json.loads(Path("/fixture/manifest.json").read_text())
 state = InstallationState.objects.get()
 tenant, owner = state.tenant, state.owner
-assert tenant.name == "Acceptance MSP"
+assert tenant.name == manifest["tenant_name"]
 assert settings.EMAIL_HOST == "mailpit"
 assert IntegrationConnection.objects.count() == 0
 assert WebhookEndpoint.objects.count() == 0
@@ -103,9 +106,18 @@ with transaction.atomic():
 results = []
 for row in manifest["workspaces"]:
     repo = WorkspaceRepository.objects.select_related(
-        "workspace__organization", "tenant", "accepted_commit", "indexed_commit"
+        "workspace", "tenant", "accepted_commit", "indexed_commit"
     ).get(pk=row["repository_id"])
-    org = repo.workspace.organization
+    org = None
+    if row["organization_entity_id"] is not None:
+        with transaction.atomic():
+            bind_local_rls_scope(
+                DataScope.tenant(tenant),
+                organization_mode=OrganizationRLSMode.MSP_ONLY,
+                actor_user_id=owner.id,
+                principal_mode=RLSPrincipalMode.USER,
+            )
+            org = Organization.objects.get(entity_id=row["organization_entity_id"])
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.owner(tenant, org),
@@ -115,15 +127,31 @@ for row in manifest["workspaces"]:
             actor_user_id=owner.id,
             principal_mode=RLSPrincipalMode.USER,
         )
+        prefix = row["name"].removeprefix("Acceptance ")
         counts = {
-            name: model.objects.filter(tenant=tenant, organization=org).count()
-            for name, model in [
-                ("assets", ClientAsset),
-                ("contracts", CommercialContract),
-                ("networks", NetworkSubnet),
-            ]
+            "assets": ClientAsset.objects.filter(
+                tenant=tenant,
+                organization=org,
+                entity__display_name__startswith=f"Acceptance {prefix} ",
+            ).count(),
+            "contracts": CommercialContract.objects.filter(
+                tenant=tenant,
+                organization=org,
+                entity__display_name__startswith=f"Acceptance {prefix} Support ",
+            ).count(),
+            "networks": NetworkSubnet.objects.filter(
+                tenant=tenant,
+                organization=org,
+                entity__display_name__startswith=f"Acceptance {prefix} Network ",
+            ).count(),
         }
-        assert all(count == 30 for count in counts.values()), counts
+        assert counts == {"assets": 31, "contracts": 30, "networks": 30}, counts
+        assert ClientAsset.objects.filter(
+            tenant=tenant,
+            organization=org,
+            entity_id=row["software_asset_id"],
+            software_installation__isnull=False,
+        ).exists()
         assert ContentNode.objects.filter(repository=repo).count() == 31
         assert repo.accepted_commit_id == repo.indexed_commit_id
         content = read_authored_content(

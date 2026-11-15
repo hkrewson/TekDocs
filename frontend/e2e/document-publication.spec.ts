@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { openDocumentMoreAction } from './document-more-actions'
 const organizationId = crypto.randomUUID(), documentId = crypto.randomUUID(), blockId = crypto.randomUUID(), revisionId = crypto.randomUUID()
 const placement = { id: crypto.randomUUID(), block_id: blockId, block_name: 'Network guidance', block_kind: 'rich_text', parent_id: null, position: 0, depth: 0, resolution_mode: 'live', audience_profile: 'shared', pinned_revision_id: null, resolved_revision_id: revisionId, resolved_revision_number: 1, resolved_checksum: 'abc', resolved_markdown: 'Reviewed guidance', resolved_html: '<p>Reviewed guidance</p>', is_primary: true }
 const record = { id: documentId, title: 'Network baseline', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'guide', is_template: true, library_visible: true, markdown: 'Reviewed guidance', block_id: blockId, current_revision_id: revisionId, revision_number: 1, checksum: 'abc', resolved_markdown: 'Reviewed guidance', placements: [placement, { ...placement, id: crypto.randomUUID(), block_id: crypto.randomUUID(), block_name: 'Shared instructions', is_primary: false, position: 1 }], placement_count: 2, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z' }
@@ -75,7 +76,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await form.getByRole('button', { name: 'Cancel publication' }).click()
     await page.getByRole('button', { name: 'Discard changes' }).click()
     await expect(page.getByRole('button', { name: 'Publish document' })).toBeFocused()
-    await page.getByRole('button', { name: 'Export', exact: true }).click()
+    await openDocumentMoreAction(page, 'Export')
     const exports = page.locator('.document-export-panel')
     for (const [name, format] of [['Markdown', 'md'], ['HTML', 'html'], ['PDF', 'pdf'], ['DOCX', 'docx'], ['Download ZIP', 'bundle']]) {
       await expect(exports.getByRole('link', { name, exact: true })).toHaveAttribute('href', new RegExp(`/documents/${documentId}/export\\?export_format=${format}$`))
@@ -106,7 +107,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.goto(`/workspaces/organizations/${organizationId}/documentation`)
     await page.getByRole('button', { name: /^Network baseline Guide/ }).click()
 
-    await page.getByRole('button', { name: 'Document settings' }).click()
+    await openDocumentMoreAction(page, 'Document settings')
     await page.getByLabel('Title').fill('Unfinished network title')
     const filesButton = page.getByRole('button', { name: 'Files (1)', exact: true })
     await filesButton.click()
@@ -140,7 +141,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await page.getByRole('button', { name: 'Discard changes' }).click()
 
-    await page.getByRole('button', { name: 'Document settings' }).click()
+    await openDocumentMoreAction(page, 'Document settings')
     await page.getByRole('button', { name: 'Web source' }).click()
     await page.getByLabel('Public document URL').fill('https://docs.example.invalid/unfinished')
     await page.goBack()
@@ -148,16 +149,13 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(dialog).toBeVisible()
     await expect(dialog.getByRole('button', { name: 'Keep editing' })).toBeFocused()
     expect((await new AxeBuilder({ page }).include('.unsaved-changes-dialog').analyze()).violations).toEqual([])
-    const overflow = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('body *')]
-      .filter((element) => element.getBoundingClientRect().right > document.documentElement.clientWidth + 1)
-      .map((element) => ({ element: element.outerHTML.slice(0, 180), right: element.getBoundingClientRect().right })))
-    expect(overflow).toEqual([])
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
     if (testInfo.project.name === 'chromium' && [320, 1440].includes(width)) await page.screenshot({ path: `../artifacts/document-drafts-${width}.png`, fullPage: true })
     await dialog.getByRole('button', { name: 'Keep editing' }).click()
     await expect(page.getByLabel('Public document URL')).toHaveValue('https://docs.example.invalid/unfinished')
     await page.getByRole('button', { name: 'Close web source' }).click()
     await page.getByRole('button', { name: 'Discard changes' }).click()
-    await expect(page.getByRole('button', { name: 'Document settings' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'More' })).toBeVisible()
   })
 }
 

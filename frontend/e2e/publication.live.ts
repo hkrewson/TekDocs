@@ -132,7 +132,7 @@ async function templateJourney(page: Page, state: State) {
   await expect(page.getByRole('button', { name: 'Make Template procedure a local copy' })).toHaveCount(0)
   await expect(page.getByText('Browser template procedure updated.', { exact: true })).toBeVisible()
   await page.goto(path)
-  await page.getByRole('button', { name: 'Templates from your MSP' }).click()
+  await page.getByRole('button', { name: 'Templates' }).click()
   await page.getByRole('button', { name: 'Use template' }).click()
   await page.getByLabel('Document title', { exact: true }).fill('Browser newly enrolled')
   const created = page.waitForResponse(response => response.url().endsWith('/from-template') && response.request().method() === 'POST')

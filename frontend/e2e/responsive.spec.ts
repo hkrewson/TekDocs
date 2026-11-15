@@ -75,10 +75,10 @@ test('small-screen shell reflows and navigation remains keyboard and touch opera
   await expectPhoneControlsDoNotTriggerIosZoom(page)
   const openNavigation = page.getByRole('button', { name: 'Open navigation' })
   await openNavigation.click()
-  const navigation = page.getByRole('navigation', { name: 'Workspace' })
+  const navigation = page.getByRole('navigation', { name: 'Primary navigation' })
   await expect(navigation).toBeVisible()
   await expect(page.locator('body')).toHaveCSS('overflow', 'hidden')
-  await expect(navigation.getByRole('link', { name: 'Documentation' })).toBeVisible()
+  await expect(navigation.getByRole('link', { name: 'Knowledge', exact: true })).toBeVisible()
   await page.getByRole('complementary').getByRole('button', { name: 'Close navigation' }).click()
   await expect(navigation).toBeHidden()
   await expect(openNavigation).toBeFocused()
@@ -98,25 +98,29 @@ test('small-screen shell reflows and navigation remains keyboard and touch opera
   await expect(new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze()).resolves.toMatchObject({ violations: [] })
 })
 
-test('navigation groups remain usable at the required review widths and text zoom', async ({ page }) => {
+test('task hubs and local sections remain usable at the required review widths and text zoom', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/overview')
 
   for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     if (width <= 800) await page.getByRole('button', { name: 'Open navigation' }).click()
-    const workspace = page.getByRole('button', { name: 'Workspace', exact: true })
-    await expect(workspace).toBeVisible()
-    await expect(workspace).toHaveAttribute('aria-expanded', 'true')
-    await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible()
+    const home = page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home', exact: true })
+    await expect(home).toBeVisible()
+    await expect(home).toHaveAttribute('aria-current', 'page')
+    if (width <= 800) {
+      await expect(page.getByRole('combobox', { name: 'Home sections' })).toHaveValue('overview')
+    } else {
+      await expect(page.getByRole('navigation', { name: 'Home sections' }).getByRole('link', { name: 'Overview' })).toBeVisible()
+    }
     if (width <= 800) await page.getByRole('complementary').getByRole('button', { name: 'Close navigation' }).click()
     await expectNoHorizontalPageOverflow(page)
   }
 
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.evaluate(() => { document.body.style.zoom = '2' })
-  await expect(page.getByRole('button', { name: 'Workspace', exact: true })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Overview' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Home sections' }).getByRole('link', { name: 'Overview' })).toBeVisible()
 })
 
 test('authentication and client portal shells reflow at review widths and text zoom', async ({ page }) => {

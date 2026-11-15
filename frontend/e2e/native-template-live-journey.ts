@@ -28,7 +28,7 @@ export async function rehearseNativeTemplates(page: Page, fixture: NativeTemplat
   for (const mode of modes) await templateRegion(page).getByLabel(fixture.fragments[mode].title, { exact: true }).check()
   await mutation(page, 'Save template settings')
   await page.goto(clientPath)
-  await page.getByRole('button', { name: 'Templates from your MSP', exact: true }).click()
+  await page.getByRole('button', { name: 'Templates', exact: true }).click()
   const library = page.getByRole('region', { name: 'Git-backed templates', exact: true })
   await library.getByLabel('Search Git-backed templates', { exact: true }).fill('Native browser template')
   await library.getByRole('button', { name: 'Use Git-backed template', exact: true }).click()

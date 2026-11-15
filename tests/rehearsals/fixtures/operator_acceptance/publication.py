@@ -23,17 +23,27 @@ from apps.core.models import (
 from apps.core.rls import bind_local_rls_scope, OrganizationRLSMode, RLSPrincipalMode
 from apps.core.scoping import DataScope
 
-if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") != "isolated-disposable":
-    raise RuntimeError("Acceptance fixtures require the isolated preparation command")
+if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") not in {
+    "isolated-disposable",
+    "existing-development-empty",
+}:
+    raise RuntimeError("Acceptance fixtures require an approved local preparation mode")
 assert settings.TEKDOCS_PUBLIC_URL == os.environ["TEKDOCS_ACCEPTANCE_URL"]
 manifest = json.loads(Path("/fixture/manifest.json").read_text())
 row = manifest["workspaces"][1]
 state = InstallationState.objects.get()
-assert state.tenant.name == "Acceptance MSP"
+assert state.tenant.name == manifest["tenant_name"]
 assert not RepositoryStaticPublication.objects.exists(), (
     "Do not duplicate the retained fixture"
 )
-org = Organization.objects.get(entity_id=row["organization_entity_id"])
+with transaction.atomic():
+    bind_local_rls_scope(
+        DataScope.tenant(state.tenant),
+        organization_mode=OrganizationRLSMode.MSP_ONLY,
+        actor_user_id=state.owner_id,
+        principal_mode=RLSPrincipalMode.USER,
+    )
+    org = Organization.objects.get(entity_id=row["organization_entity_id"])
 password = secrets.token_urlsafe(32)
 actors = []
 with transaction.atomic():

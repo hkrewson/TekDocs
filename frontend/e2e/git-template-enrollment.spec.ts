@@ -97,7 +97,7 @@ for (const [width, applyDelayMs, detachDelayMs, createDelayMs] of [[320, 0, 0, 0
     await page.setViewportSize({ width, height: 900 })
     const state = await setup(page, baseURL!, applyDelayMs, detachDelayMs, createDelayMs)
     await page.goto(location)
-    await page.getByRole('button', { name: 'Templates from your MSP' }).click()
+    await page.getByRole('button', { name: 'Templates' }).click()
     await page.getByRole('button', { name: 'Use template' }).click()
     await expect(page.getByRole('heading', { name: 'Create from Approved Git template' })).toBeFocused()
     await page.getByLabel('Document title', { exact: true }).fill('Client enrollment guide')

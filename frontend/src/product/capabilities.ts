@@ -39,6 +39,53 @@ export type WorkspaceCapability = keyof typeof capabilityRegistry
 export type CapabilityStatus = (typeof capabilityRegistry)[WorkspaceCapability]['status']
 export type CapabilityGroup = (typeof navigationGroupRegistry)[number]['id']
 
+export const taskHubRegistry = [
+  { id: 'home', label: translate('navigation.hub.home'), capabilities: ['overview', 'deadlines', 'activity'] },
+  { id: 'clients', label: translate('navigation.hub.clients'), capabilities: ['organizations', 'people', 'sites'] },
+  { id: 'knowledge', label: translate('navigation.hub.knowledge'), capabilities: ['documentation', 'files'] },
+  { id: 'operations', label: translate('navigation.hub.operations'), capabilities: ['assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials'] },
+  { id: 'business', label: translate('navigation.hub.business'), capabilities: ['services', 'vendors', 'products', 'invoices', 'stock'] },
+  { id: 'assurance', label: translate('navigation.hub.assurance'), capabilities: ['compliance', 'recycle_bin'] },
+  { id: 'manage', label: translate('navigation.hub.manage'), capabilities: ['integrations', 'custom_fields', 'taxonomies'] },
+] as const satisfies readonly {
+  id: string
+  label: string
+  capabilities: readonly WorkspaceCapability[]
+}[]
+
+export type TaskHub = (typeof taskHubRegistry)[number]
+export type TaskHubId = TaskHub['id']
+export type AuthorizedHubChild = {
+  capability: WorkspaceCapability
+  label: string
+  path: string
+}
+export type AuthorizedTaskHub = {
+  hub: TaskHub
+  children: readonly AuthorizedHubChild[]
+  defaultDestination: AuthorizedHubChild
+}
+export type LocalNavigationEntry = AuthorizedHubChild & {
+  destination: string
+  current: boolean
+}
+
+export function taskHubForCapability(capability: WorkspaceCapability): TaskHub {
+  const hub = taskHubRegistry.find((candidate) => (candidate.capabilities as readonly WorkspaceCapability[]).includes(capability))
+  if (!hub) throw new Error(`Capability ${capability} is not assigned to a task hub.`)
+  return hub
+}
+
+export function authorizedTaskHubs(authorizedCapabilities: readonly WorkspaceCapability[]): AuthorizedTaskHub[] {
+  const authorized = new Set(authorizedCapabilities)
+  return taskHubRegistry.flatMap((hub) => {
+    const children: AuthorizedHubChild[] = hub.capabilities
+      .filter((capability) => authorized.has(capability))
+      .map((capability) => ({ capability, label: capabilityRegistry[capability].label, path: capabilityRegistry[capability].path }))
+    return children.length > 0 ? [{ hub, children, defaultDestination: children[0] }] : []
+  })
+}
+
 export const workspaceCapabilities = Object.keys(capabilityRegistry) as WorkspaceCapability[]
 export const supportedCapabilitySet = new Set<WorkspaceCapability>(workspaceCapabilities)
 

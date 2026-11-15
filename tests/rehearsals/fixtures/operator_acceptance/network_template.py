@@ -1,6 +1,8 @@
 """Add safe network assignments and an explicitly legacy template fixture."""
 
+import json
 import os
+from pathlib import Path
 from django.conf import settings
 from django.db import transaction
 from apps.core.models import (
@@ -16,19 +18,28 @@ from apps.core.scoping import DataScope
 from apps.core.network_endpoints import create_ip_address
 from apps.core.documents import create_document
 
-if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") != "isolated-disposable":
-    raise RuntimeError("Acceptance fixtures require the isolated preparation command")
+if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") not in {
+    "isolated-disposable",
+    "existing-development-empty",
+}:
+    raise RuntimeError("Acceptance fixtures require an approved local preparation mode")
 assert settings.TEKDOCS_PUBLIC_URL == os.environ["TEKDOCS_ACCEPTANCE_URL"]
 state = InstallationState.objects.get()
-assert state.tenant.name == "Acceptance MSP"
+manifest = json.loads(Path("/fixture/manifest.json").read_text())
+assert state.tenant.name == manifest["tenant_name"]
 for prefix in ("MSP", "A", "B"):
-    org = (
-        None
-        if prefix == "MSP"
-        else Organization.objects.get(
-            tenant=state.tenant, entity__display_name=f"Acceptance {prefix}"
-        )
-    )
+    org = None
+    if prefix != "MSP":
+        with transaction.atomic():
+            bind_local_rls_scope(
+                DataScope.tenant(state.tenant),
+                organization_mode=OrganizationRLSMode.MSP_ONLY,
+                actor_user_id=state.owner_id,
+                principal_mode=RLSPrincipalMode.USER,
+            )
+            org = Organization.objects.get(
+                tenant=state.tenant, entity__display_name=f"Acceptance {prefix}"
+            )
     with transaction.atomic():
         bind_local_rls_scope(
             DataScope.owner(state.tenant, org),

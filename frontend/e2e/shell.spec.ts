@@ -136,47 +136,40 @@ test('authenticated application shell exposes primary navigation and backend hea
   await expect(skipLink).toBeVisible()
   await page.keyboard.press('Enter')
   await expect(page.locator('main')).toBeFocused()
-  await page.getByRole('link', { name: 'Documentation' }).click()
+  await page.getByRole('link', { name: 'Knowledge', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
   await expect(page.locator('main')).toBeFocused()
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
 
-test('navigation groups collapse, persist, and reveal the active destination', async ({ page }) => {
+test('task hubs expose deterministic authorized destinations and local navigation', async ({ page }) => {
   await mockAuthenticated(page)
   await page.goto('/overview')
 
-  const infrastructure = page.getByRole('button', { name: 'Infrastructure' })
-  await infrastructure.click()
-  await expect(infrastructure).toHaveAttribute('aria-expanded', 'false')
-  await expect(page.getByRole('link', { name: 'Assets' })).not.toBeVisible()
-  await page.reload()
-  await expect(page.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'false')
-
-  await page.evaluate(() => {
-    window.history.pushState({}, '', '/assets')
-    window.dispatchEvent(new PopStateEvent('popstate'))
-  })
-  await expect(page.getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-expanded', 'true')
-  await expect(page.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
+  const primary = page.getByRole('navigation', { name: 'Primary navigation' })
+  await expect(primary.getByRole('link')).toHaveCount(7)
+  await expect(primary.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+  await primary.getByRole('link', { name: 'Operations' }).click()
+  await expect(page).toHaveURL(/\/assets$/)
+  await expect(primary.getByRole('link', { name: 'Operations' })).toHaveAttribute('aria-current', 'page')
+  const local = page.getByRole('navigation', { name: 'Operations sections' })
+  await expect(local.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
+  await local.getByRole('link', { name: 'Domains' }).click()
+  await expect(page).toHaveURL(/\/domains$/)
   expect((await new AxeBuilder({ page }).include('aside').withTags(wcag22Tags).analyze()).violations).toEqual([])
 })
 
-test('hyphenated governance routes do not reveal the unrelated Workspace group', async ({ page }) => {
+test('direct routes select the matching hub without changing the deep link', async ({ page }) => {
   await mockAuthenticated(page)
 
-  for (const destination of ['Custom fields', 'Recycle bin']) {
-    await page.goto('/documentation')
-    await page.evaluate(() => window.localStorage.removeItem('tekdocs.navigation.collapsed-sections.v1'))
-    await page.reload()
-    for (const group of ['Workspace', 'Infrastructure', 'Relationships', 'Business', 'Governance']) {
-      await page.getByRole('button', { name: group, exact: true }).click()
-    }
-    await page.getByRole('button', { name: 'Governance', exact: true }).click()
-    await page.getByRole('link', { name: destination }).click()
-
-    await expect(page.getByRole('button', { name: 'Workspace', exact: true })).toHaveAttribute('aria-expanded', 'false')
-    await expect(page.getByRole('button', { name: 'Governance', exact: true })).toHaveAttribute('aria-expanded', 'true')
+  for (const [path, hub, section] of [
+    ['/custom-fields?sort=name', 'Manage', 'Custom fields'],
+    ['/recycle-bin?page=2', 'Assurance', 'Recycle bin'],
+  ] as const) {
+    await page.goto(path)
+    await expect(page).toHaveURL(path)
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: hub })).toHaveAttribute('aria-current', 'page')
+    await expect(page.getByRole('navigation', { name: `${hub} sections` }).getByRole('link', { name: section })).toHaveAttribute('aria-current', 'page')
   }
 })
 
@@ -557,7 +550,7 @@ test('mobile authenticated navigation is operable', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/overview')
   await page.getByRole('button', { name: 'Open navigation' }).click()
-  await expect(page.getByRole('link', { name: 'Documentation' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Knowledge', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Close navigation' }).first().click()
   await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible()
 })

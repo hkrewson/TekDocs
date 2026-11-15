@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { openDocumentMoreAction } from './document-more-actions'
 const organizationId = crypto.randomUUID(), documentId = crypto.randomUUID(), blockId = crypto.randomUUID(), revisionId = crypto.randomUUID()
 const placement = { id: crypto.randomUUID(), block_id: blockId, block_name: 'Network guidance', block_kind: 'rich_text', parent_id: null, position: 0, depth: 0, resolution_mode: 'live', audience_profile: 'shared', pinned_revision_id: null, resolved_revision_id: revisionId, resolved_revision_number: 1, resolved_checksum: 'abc', resolved_markdown: 'Reviewed guidance', resolved_html: '<p>Reviewed guidance</p>', is_primary: true }
 const record = { id: documentId, title: 'Network baseline', owner_kind: 'msp', owner_organization_id: null, owner_organization_name: null, is_reference: false, category: 'guide', is_template: true, library_visible: true, markdown: 'Reviewed guidance', block_id: blockId, current_revision_id: revisionId, revision_number: 1, checksum: 'abc', resolved_markdown: 'Reviewed guidance', placements: [placement, { ...placement, id: crypto.randomUUID(), block_id: crypto.randomUUID(), block_name: 'Shared instructions', is_primary: false, position: 1 }], placement_count: 2, attachments: [], attachment_count: 0, primary_file: null, primary_file_versions: [], publications: [], publication_count: 0, created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z' }
@@ -50,7 +51,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     const { reviewerId, allowChoices } = await setup(page, baseURL!)
     await page.goto(`/workspaces/organizations/${organizationId}/documentation?document=${documentId}`)
-    await page.getByRole('button', { name: 'Ownership and review' }).click()
+    await page.getByRole('button', { name: 'Review and publication' }).click()
     const panel = page.getByRole('region', { name: 'Ownership and review' })
     await expect(panel.getByRole('alert')).toContainText('could not be loaded')
     await expect(panel.getByRole('combobox', { name: 'Owner', exact: true })).toHaveCount(0)
@@ -64,7 +65,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await panel.getByLabel('Tags', { exact: true }).fill('network')
     await panel.getByRole('button', { name: 'Save ownership and organization' }).click()
     await expect(panel.getByRole('alert')).toContainText('Your unsaved choices are preserved.')
-    await page.getByRole('button', { name: 'Document settings' }).click()
+    await openDocumentMoreAction(page, 'Document settings')
     await page.getByRole('button', { name: 'Keep editing' }).click()
     await expect(panel.getByRole('combobox', { name: 'Owner', exact: true })).toHaveValue(reviewerId)
     await expect(page).toHaveURL(/document_view=operations/)
@@ -93,7 +94,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await panel.getByRole('textbox', { name: 'Review note', exact: true }).fill('Unsaved follow-up')
     await panel.getByRole('button', { name: 'Back to document' }).click()
     await page.getByRole('button', { name: 'Discard changes' }).click()
-    await expect(page.getByRole('button', { name: 'Ownership and review' })).toBeFocused()
+    await expect(page.getByRole('button', { name: 'Review and publication' })).toBeFocused()
   })
 }
 
@@ -123,7 +124,7 @@ test('browser Back protects an unfinished review request', async ({ page, baseUR
   const { allowChoices } = await setup(page, baseURL!)
   await page.goto(`/workspaces/organizations/${organizationId}/documentation`)
   await page.getByRole('button', { name: /Network baseline/ }).click()
-  await page.getByRole('button', { name: 'Ownership and review' }).click()
+  await page.getByRole('button', { name: 'Review and publication' }).click()
   const retry = page.getByRole('button', { name: 'Retry' })
   await expect(retry).toBeVisible()
   allowChoices()
@@ -134,7 +135,7 @@ test('browser Back protects an unfinished review request', async ({ page, baseUR
   await expect(page.getByRole('textbox', { name: 'Review note', exact: true })).toHaveValue('Keep this request')
   await page.evaluate(() => history.back())
   await page.getByRole('button', { name: 'Discard changes' }).click()
-  await expect(page.getByRole('button', { name: 'Ownership and review' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Review and publication' })).toBeVisible()
   await expect.poll(() => new URL(page.url()).searchParams.get('document_view')).toBeNull()
   await expect(page.getByRole('region', { name: 'Ownership and review' })).toHaveCount(0)
   await page.goBack()

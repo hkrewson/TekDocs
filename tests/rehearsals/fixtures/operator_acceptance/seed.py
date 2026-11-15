@@ -1,4 +1,4 @@
-"""Synthetic fixture for a newly prepared, isolated acceptance project only."""
+"""Synthetic fixture for an empty isolated or existing local development project."""
 
 import os
 import json
@@ -31,8 +31,9 @@ from apps.core.document_attachments import (
 from apps.core.rls import bind_local_rls_scope, OrganizationRLSMode, RLSPrincipalMode
 from apps.core.scoping import DataScope
 
-if os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE") != "isolated-disposable":
-    raise RuntimeError("Acceptance fixtures require the isolated preparation command")
+fixture_mode = os.environ.get("TEKDOCS_ACCEPTANCE_FIXTURE")
+if fixture_mode not in {"isolated-disposable", "existing-development-empty"}:
+    raise RuntimeError("Acceptance fixtures require an approved local preparation mode")
 assert settings.TEKDOCS_PUBLIC_URL == os.environ["TEKDOCS_ACCEPTANCE_URL"], (
     "Not the acceptance installation"
 )
@@ -42,7 +43,15 @@ assert not ClientAsset.objects.exists() and not ContentNode.objects.exists(), (
 )
 state = InstallationState.objects.get()
 access = Path("/fixture/access.txt")
-if state.is_bootstrapped:
+if fixture_mode == "existing-development-empty":
+    assert state.is_bootstrapped and settings.TEKDOCS_PUBLIC_URL.startswith("http://localhost:")
+    tenant, owner = state.tenant, state.owner
+    access.write_text(
+        f"LOCAL ACCEPTANCE ONLY — {settings.TEKDOCS_PUBLIC_URL}\n"
+        "Owner: use the existing local owner account.\n"
+    )
+    access.chmod(0o600)
+elif state.is_bootstrapped:
     assert access.exists() and state.tenant.name == "Acceptance MSP"
     tenant, owner = state.tenant, state.owner
 else:
@@ -101,7 +110,7 @@ with transaction.atomic():
     )
 
     definition = CatalogSpecificationDefinition.objects.filter(
-        tenant=tenant, organization=supplier
+        tenant=tenant, organization=supplier, product_kind="hardware"
     ).first() or create_definition(
         tenant=tenant,
         organization=supplier,
@@ -111,7 +120,7 @@ with transaction.atomic():
         schema={"type": "object", "additionalProperties": False, "properties": {}},
     )
     product = CatalogProduct.objects.filter(
-        tenant=tenant, organization=supplier
+        tenant=tenant, organization=supplier, kind="hardware"
     ).first() or create_product(
         tenant=tenant,
         organization=supplier,
@@ -130,69 +139,121 @@ with transaction.atomic():
         specifications={},
         notes="Not a real device",
     )
+    software_definition = CatalogSpecificationDefinition.objects.filter(
+        tenant=tenant, organization=supplier, product_kind="software"
+    ).first() or create_definition(
+        tenant=tenant,
+        organization=supplier,
+        actor_id=owner.id,
+        name="Acceptance software specification",
+        product_kind="software",
+        schema={"type": "object", "additionalProperties": False, "properties": {}},
+    )
+    software_product = CatalogProduct.objects.filter(
+        tenant=tenant, organization=supplier, kind="software"
+    ).first() or create_product(
+        tenant=tenant,
+        organization=supplier,
+        actor_id=owner.id,
+        name="Acceptance Endpoint Agent",
+        kind="software",
+        description="Made-up test software",
+    )
+    software_model = CatalogModel.objects.filter(product=software_product).first() or create_model(
+        product=software_product,
+        actor_id=owner.id,
+        name="Acceptance Endpoint Agent Model",
+        model_number="TEST-SW-098",
+        specification_version=software_definition.versions.get(version=1),
+        lifecycle="active",
+        specifications={},
+        notes="Not real software",
+    )
 
 manifest = {
     "url": os.environ["TEKDOCS_ACCEPTANCE_URL"],
     "source_commit": os.environ["TEKDOCS_ACCEPTANCE_COMMIT"],
     "build": "local source build; not the published GHCR images",
+    "tenant_name": tenant.name,
     "workspaces": [],
 }
 for org, prefix in [(None, "MSP"), (a, "A"), (b, "B")]:
     with transaction.atomic():
         scope(org)
-        assets = []
-        for n in range(1, 31):
-            asset = create_client_asset(
+        assets = list(
+            ClientAsset.objects.filter(
                 tenant=tenant,
                 organization=org,
-                actor_id=owner.id,
-                model_entity_id=model.entity_id,
-                name=f"Acceptance {prefix} Laptop {n:02}",
-            )
-            assets.append(asset)
-            create_contract(
-                tenant=tenant,
-                organization=org,
-                actor_id=owner.id,
-                values={
-                    "provider_id": supplier.entity_id,
-                    "name": f"Acceptance {prefix} Support {n:02}",
-                    "kind": "support",
-                    "description": "Disposable acceptance record",
-                },
-            )
-            create_subnet(
-                tenant=tenant,
-                organization=org,
-                actor_id=owner.id,
-                name=f"Acceptance {prefix} Network {n:02}",
-                cidr=f"10.98.{n}.0/24",
-                vrf_entity_id=None,
-                vlan_entity_id=None,
-                description="Test documentation only; no live network",
-            )
-        zone = create_dns_zone(
-            tenant=tenant,
-            organization=org,
-            actor_id=owner.id,
-            name=f"{prefix.lower()}.acceptance.invalid",
-            description="Local fixture; no provider connection",
+                entity__display_name__startswith=f"Acceptance {prefix} Laptop ",
+            ).order_by("entity__display_name")
         )
-        create_dns_record(
-            tenant=tenant,
-            organization=org,
-            actor_id=owner.id,
-            zone_entity_id=zone.entity_id,
-            owner_name=f"laptop.{prefix.lower()}.acceptance.invalid",
-            record_type="A",
-            value="10.98.1.10",
-            ttl=300,
-            priority=None,
-            weight=None,
-            port=None,
-            ip_address_entity_id=None,
-            description="Locally authored test DNS record",
-        )
+        if assets:
+            assert len(assets) == 30
+            software_asset = ClientAsset.objects.get(
+                tenant=tenant,
+                organization=org,
+                entity__display_name=f"Acceptance {prefix} Endpoint Agent",
+            )
+        else:
+            for n in range(1, 31):
+                asset = create_client_asset(
+                    tenant=tenant,
+                    organization=org,
+                    actor_id=owner.id,
+                    model_entity_id=model.entity_id,
+                    name=f"Acceptance {prefix} Laptop {n:02}",
+                )
+                assets.append(asset)
+                create_contract(
+                    tenant=tenant,
+                    organization=org,
+                    actor_id=owner.id,
+                    values={
+                        "provider_id": supplier.entity_id,
+                        "name": f"Acceptance {prefix} Support {n:02}",
+                        "kind": "support",
+                        "description": "Disposable acceptance record",
+                    },
+                )
+                create_subnet(
+                    tenant=tenant,
+                    organization=org,
+                    actor_id=owner.id,
+                    name=f"Acceptance {prefix} Network {n:02}",
+                    cidr=f"10.98.{n}.0/24",
+                    vrf_entity_id=None,
+                    vlan_entity_id=None,
+                    description="Test documentation only; no live network",
+                )
+            software_asset = create_client_asset(
+                tenant=tenant,
+                organization=org,
+                actor_id=owner.id,
+                model_entity_id=software_model.entity_id,
+                name=f"Acceptance {prefix} Endpoint Agent",
+            )
+            zone = create_dns_zone(
+                tenant=tenant,
+                organization=org,
+                actor_id=owner.id,
+                name=f"{prefix.lower()}.acceptance.invalid",
+                description="Local fixture; no provider connection",
+            )
+            create_dns_record(
+                tenant=tenant,
+                organization=org,
+                actor_id=owner.id,
+                zone_entity_id=zone.entity_id,
+                owner_name=f"laptop.{prefix.lower()}.acceptance.invalid",
+                record_type="A",
+                value="10.98.1.10",
+                ttl=300,
+                priority=None,
+                weight=None,
+                port=None,
+                ip_address_entity_id=None,
+                description="Locally authored test DNS record",
+            )
     workspace = Workspace.objects.get(tenant=tenant, organization=org)
     repository = ensure_workspace_repository(workspace).repository
 
@@ -200,6 +261,9 @@ for org, prefix in [(None, "MSP"), (a, "A"), (b, "B")]:
         repository.refresh_from_db()
         with transaction.atomic():
             scope(org)
+            existing = ContentNode.objects.filter(repository=repository, kind=kind, title=title).first()
+            if existing is not None:
+                return existing
             return author_content(
                 repository=repository,
                 actor_id=owner.id,
@@ -242,20 +306,33 @@ for org, prefix in [(None, "MSP"), (a, "A"), (b, "B")]:
         documents.append(str(document.content_id))
         with transaction.atomic():
             scope(org)
-            create_repository_document_attachment(
-                repository=repository,
-                content_id=document.content_id,
-                actor_id=owner.id,
-                upload=SimpleUploadedFile(
-                    f"acceptance-{prefix.lower()}-{n:02}.txt",
-                    b"Harmless acceptance attachment.\n",
-                    content_type="text/plain",
-                ),
-            )
+            filename = f"acceptance-{prefix.lower()}-{n:02}.txt"
+            if not DocumentAttachment.objects.filter(
+                owner_workspace=workspace,
+                owner_content_id=document.content_id,
+                purpose="attachment",
+                original_filename=filename,
+            ).exists():
+                create_repository_document_attachment(
+                    repository=repository,
+                    content_id=document.content_id,
+                    actor_id=owner.id,
+                    upload=SimpleUploadedFile(
+                        filename,
+                        b"Harmless acceptance attachment.\n",
+                        content_type="text/plain",
+                    ),
+                )
     with transaction.atomic():
         scope(org)
-        prior = None
-        for n in (1, 2):
+        versions = DocumentAttachment.objects.filter(
+            owner_workspace=workspace,
+            owner_content_id=uuid.UUID(documents[0]),
+            purpose="primary_file",
+        ).order_by("version_number")
+        assert versions.count() <= 2
+        prior = versions.last()
+        for n in range(versions.count() + 1, 3):
             prior = append_repository_primary_document_file(
                 repository=repository,
                 content_id=uuid.UUID(documents[0]),
@@ -278,6 +355,7 @@ for org, prefix in [(None, "MSP"), (a, "A"), (b, "B")]:
             "fragment_id": str(fragment.content_id),
             "document_ids": documents,
             "asset_01_id": str(assets[0].entity_id),
+            "software_asset_id": str(software_asset.entity_id),
         }
     )
 Path("/fixture/manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")

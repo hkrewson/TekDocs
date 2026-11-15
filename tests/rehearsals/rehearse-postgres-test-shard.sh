@@ -65,6 +65,7 @@ case "$shard" in
     esac
     core_files=$(find "$repository_root/backend/apps/core/tests" -name 'test_*.py' -type f \
       ! -name 'test_migration_stabilization.py' \
+      ! -name 'test_content_include_schema_cleanup.py' \
       ! -name 'test_document_discovery.py' \
       ! -name 'test_exception_response_boundaries.py' \
       ! -name 'test_permission_idor_matrix.py' \
@@ -118,6 +119,10 @@ case "$shard" in
         core_files=$(printf '%s\n%s\n%s\n' "$core_files" \
           'apps/core/tests/test_document_discovery.py' \
           'apps/core/tests/test_exception_response_boundaries.py')
+        ;;
+      core-b)
+        core_files=$(printf '%s\n%s\n' "$core_files" \
+          'apps/core/tests/test_content_include_schema_cleanup.py')
         ;;
     esac
     # shellcheck disable=SC2086

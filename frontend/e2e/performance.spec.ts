@@ -115,7 +115,7 @@ async function measureProfile(
     diagnostics.phase('shell-start')
     const shellStarted = Date.now()
     await page.goto('/documentation')
-    await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
     const shellReadyMs = Date.now() - shellStarted
     diagnostics.phase('shell-ready')
     const beforeEditor = await resources(page)
@@ -123,6 +123,7 @@ async function measureProfile(
 
     const editorStarted = Date.now()
     if (editor === 'repository') {
+      await page.getByText('More', { exact: true }).click()
       await page.getByRole('button', { name: 'Repository content', exact: true }).click()
       await page.getByRole('button', { name: /Git capacity runbook/ }).click()
       await expect(page.getByLabel('Markdown body')).toHaveValue(documentRecord.markdown, { timeout: 12_000 })

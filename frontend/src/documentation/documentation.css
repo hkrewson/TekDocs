@@ -119,8 +119,8 @@
 }
 
 .document-library-tabs { max-width: 100%; display: flex; gap: 16px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.document-library-tabs button { flex: none; padding: 10px 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
-.document-library-tabs button[aria-pressed="true"] { color: var(--text); border-bottom-color: currentColor; }
+.document-library-tabs button, .document-library-tabs a { min-height: 40px; flex: none; display: inline-flex; align-items: center; padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; text-decoration: none; cursor: pointer; }
+.document-library-tabs button[aria-pressed="true"], .document-library-tabs a.active { color: var(--text); border-bottom-color: currentColor; }
 .template-section-choices { list-style: none; padding: 0; }
 .client-template-library .template-section-choices > li { display: grid; gap: 12px; padding-block: 16px; border-bottom: 1px solid var(--border); }
 .template-section-choices > li, .reuse-results > li > div { min-width: 0; overflow-wrap: anywhere; }

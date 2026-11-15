@@ -9,6 +9,7 @@ import type { MessageId } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { lockBodyScroll } from '../shell/bodyScrollLock'
 import type { TaxonomiesClient, Taxonomy, TaxonomyBinding, TaxonomyInput, TaxonomyTerm } from './api'
+import { DataModelNavigation } from '../custom-fields/DataModelNavigation'
 
 const bindingOptions: { value: TaxonomyBinding; labelKey: MessageId }[] = [
   { value: 'document_tags', labelKey: 'taxonomies.binding.documentTags' }, { value: 'technology', labelKey: 'taxonomies.binding.technology' },
@@ -132,7 +133,8 @@ export function Taxonomies({ client }: { client: TaxonomiesClient }) {
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('taxonomies.heading')}</h1><p>{translate('taxonomies.intro')}</p></div><div className="page-actions"><button className="secondary-button" type="button" aria-pressed={migrationOpen} onClick={() => updateParameters({ view: migrationOpen ? null : 'migration' })}>{migrationOpen ? translate('taxonomies.backToDefinitions') : translate('taxonomies.migration')}</button><button className="primary-button" type="button" onClick={() => { setClosingAfterSave(false); updateParameters({ taxonomy: 'new' }) }}><Plus size={17} />{translate('taxonomies.new')}</button></div></header>
+    <header className="page-header"><div><h1>{translate('dataModel.heading')}</h1></div><div className="page-actions"><button className="secondary-button" type="button" aria-pressed={migrationOpen} onClick={() => updateParameters({ view: migrationOpen ? null : 'migration' })}>{migrationOpen ? translate('taxonomies.backToDefinitions') : translate('taxonomies.migration')}</button><button className="primary-button" type="button" onClick={() => { setClosingAfterSave(false); updateParameters({ taxonomy: 'new' }) }}><Plus size={17} />{translate('taxonomies.new')}</button></div></header>
+    <DataModelNavigation workspace={null} />
     {editorId && (editorId === 'new' || selected) && <TaxonomyEditor key={editorId} taxonomy={selected} saving={saving} closingAfterSave={closingAfterSave} error={error} onCancel={() => updateParameters({ taxonomy: null })} onSave={save} />}
     {editorId && editorId !== 'new' && phase === 'ready' && !selected && <div className="form-message warning" role="alert">{translate('taxonomies.taxonomyUnavailable')} <button className="row-action" type="button" onClick={() => updateParameters({ taxonomy: null })}>{translate('common.close')}</button></div>}
     {error && !editorId && phase !== 'error' && <div className="form-message error" role="alert">{error}</div>}

@@ -36,7 +36,7 @@ async function setup(page: Page, baseURL: string) {
         return route.fulfill({ json: { results, count: results.length, page: 1, page_size: 20, has_more: false } })
       }
       if (url.searchParams.get('health') === 'attention') return route.fulfill({ json: { results: [stale], count: 26, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 1 }, { value: 'stale', count: 26 }] } })
-      return route.fulfill({ json: { results: [current], count: 51, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 51 }] } })
+      return route.fulfill({ json: { results: [current], count: 77, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 51 }, { value: 'stale', count: 26 }] } })
     }
     return route.fulfill({ status: 404, json: { detail: 'Not found' } })
   })
@@ -47,7 +47,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await setup(page, baseURL!)
     await page.goto(`/workspaces/organizations/${organizationId}/documentation`)
-    await page.getByRole('button', { name: 'Content health' }).click()
+    await page.getByText('More', { exact: true }).click()
+    await page.getByRole('button', { name: /^Content health/ }).click()
     await expect(page).toHaveURL(/doc_library=health/)
     await expect(page.getByRole('button', { name: /Recovery standard requiring review/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /Current network standard/ })).toHaveCount(0)

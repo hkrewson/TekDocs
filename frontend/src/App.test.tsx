@@ -110,7 +110,7 @@ describe('application shell', () => {
     expect(await screen.findByText(/no documents have been shared/i)).toBeInTheDocument()
   })
 
-  it('renders task hubs and local navigation for the active route', async () => {
+  it('renders task hubs and keeps Home focused on work', async () => {
     render(app('/overview'))
 
     expect(await screen.findByRole('heading', { name: 'Overview' })).toBeInTheDocument()
@@ -119,15 +119,10 @@ describe('application shell', () => {
     expect(primary.getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/documentation')
     expect(primary.getByRole('link', { name: 'Operations' })).toHaveAttribute('href', '/assets')
     expect(primary.getByRole('link', { name: 'Assurance' })).toHaveAttribute('href', '/compliance')
-    const local = within(screen.getByRole('navigation', { name: 'Home sections' }))
-    expect(local.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
-    expect(local.getByRole('link', { name: 'Reminders' })).toHaveAttribute('href', '/deadlines')
-    expect(local.getByRole('link', { name: 'Activity' })).toHaveAttribute('href', '/activity')
+    expect(screen.queryByRole('navigation', { name: 'Home sections' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Client organizations/ })).toHaveAttribute('href', '/organizations')
-    expect(screen.getByRole('link', { name: /Search/ })).toHaveAttribute('href', '/search')
+    expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument()
   })
 
   it('does not advertise excluded capabilities through deep links', () => {
@@ -256,7 +251,7 @@ describe('application shell', () => {
     const local = within(screen.getByRole('navigation', { name: 'Operations sections' }))
     expect(local.getByRole('link', { name: 'Assets' })).toHaveAttribute('aria-current', 'page')
     expect(local.getByRole('link', { name: 'Certificates' })).toHaveAttribute('href', '/certificates')
-    expect(screen.getByRole('combobox', { name: 'Operations sections' })).toHaveValue('assets')
+    expect(screen.queryByRole('combobox', { name: 'Operations sections' })).not.toBeInTheDocument()
   })
 
   it('resolves a deep-linked organization route through the workspace boundary', async () => {
@@ -277,12 +272,12 @@ describe('application shell', () => {
     expect(sidebar.getByRole('link', { name: 'Knowledge' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/documentation')
     expect(sidebar.getByRole('link', { name: 'Operations' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/assets')
     expect(sidebar.getByRole('link', { name: 'Business' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/services')
-    expect(sidebar.getByRole('link', { name: 'Assurance' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/recycle_bin')
-    expect(sidebar.queryByRole('link', { name: 'Manage' })).not.toBeInTheDocument()
+    expect(sidebar.queryByRole('link', { name: 'Assurance' })).not.toBeInTheDocument()
+    expect(sidebar.getByRole('link', { name: 'Manage' })).toHaveAttribute('href', '/workspaces/organizations/00000000-0000-4000-8000-000000000010/recycle_bin')
     for (const link of sidebar.getAllByRole('link')) {
       expect(link.getAttribute('href')).toMatch(/^\/workspaces\/organizations\/00000000-0000-4000-8000-000000000010\//)
     }
-    expect(screen.getByRole('navigation', { name: 'Home sections' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Home sections' })).not.toBeInTheDocument()
   })
 
   it('loads People through the selected organization boundary', async () => {

@@ -1,6 +1,27 @@
 # Post-1.0 interface rework
 
-Status: reference slice implemented and automated validation complete; maintainer acceptance pending.
+Status: second reference pass implemented and automated evidence complete; hands-on acceptance pending.
+
+The first pass proved route, permission, and recovery compatibility but did not
+materially reduce interface complexity. Maintainer review therefore rejected the
+horizontal local-navigation row and the permanent exposure of setup, diagnostic,
+repository, and metadata terminology. The second pass keeps the compatibility
+boundary while changing the working hierarchy:
+
+- the active hub's destinations expand in the fixed sidebar instead of occupying
+  a second navigation bar above every page;
+- Home contains a conditional first-organization setup action and a real reminder
+  queue; Activity remains available by direct link and System status but is not a
+  primary Home destination;
+- Knowledge exposes Documents and Files. Templates remain a related Documents
+  view, while repository tooling is in **More** and Content health appears only
+  when findings exist or its deep link is active;
+- Assurance contains Compliance; Recycle bin moves to Manage;
+- Manage exposes Integrations, Data model, and Recycle bin. Data model presents
+  Fields and **Categories and tags** as related views while retaining the existing
+  custom-field and taxonomy routes;
+- existing personal Settings remains in the account menu. A future workspace
+  settings destination must contain real workspace controls before it is added.
 
 The first bounded slice is **Reference Shell, Documentation, and Assets**. It
 changes the information architecture and two representative workflows without
@@ -16,22 +37,23 @@ authorized. Selecting a hub opens its first authorized child in the order below.
 
 | Hub | Ordered children |
 | --- | --- |
-| Home | Overview, Reminders, Activity |
+| Home | Overview (Reminders and Activity remain compatible contextual routes) |
 | Clients | Organizations, People, Sites |
 | Knowledge | Documentation, Files |
 | Operations | Assets, Licenses, Networks, Domains, Certificates, Credentials |
 | Business | Services, Vendors, Products, Invoices, Stock |
-| Assurance | Compliance, Recycle bin |
-| Manage | Integrations, Custom fields, Taxonomies |
+| Assurance | Compliance |
+| Manage | Integrations, Data model, Recycle bin (Taxonomies remains the Categories and tags route inside Data model) |
 
 Personal settings, staff, access control, notification delivery, and system
 status remain in the permission-aware account menu. Workspace capabilities and
 permissions remain the source of truth. Omitting a link is not an authorization
 decision; the server continues to enforce every request.
 
-Desktop uses a solid 244px sidebar and a plain local navigation row. At 800px
-and below the sidebar remains a focus-trapped overlay and the local navigation
-becomes a labeled section selector. Existing workspace switching, global search,
+Desktop uses a solid 244px sidebar. The active hub expands its authorized primary
+destinations directly below the hub label. At 800px and below the same hierarchy
+appears in the focus-trapped sidebar overlay; there is no duplicate section row or
+selector above the page. Existing workspace switching, global search,
 notifications, account actions, skip navigation, focus transfer, and denial
 behavior remain intact.
 
@@ -46,8 +68,8 @@ add the noted permissions.
 | Hub | Route | Entry and authorization condition | Primary task entry |
 | --- | --- | --- | --- |
 | Home | `/overview` | all authorized workspaces | review workspace summary |
-| Home | `/deadlines` | `deadlines` capability | review reminders |
-| Home | `/activity` | `activity` capability | review activity |
+| Home (contextual) | `/deadlines` | `deadlines` capability | review reminders |
+| Home (administrative) | `/activity` | `activity` capability | review activity |
 | Clients | `/organizations` | MSP `organizations` capability | create or open organization |
 | Clients | `/people` | `people` capability | create or open person |
 | Clients | `/sites` | `sites` capability | create or open site |
@@ -65,10 +87,10 @@ add the noted permissions.
 | Business | `/invoices` | `invoices` capability and `invoices.issue` at MSP | invoice settings or draft |
 | Business | `/stock` | MSP `stock` capability and `invoices.view` | stock review |
 | Assurance | `/compliance` | `compliance` capability | review requirements |
-| Assurance | `/recycle-bin` | `recycle_bin` capability | restore eligible record |
+| Manage | `/recycle-bin` | `recycle_bin` capability | restore eligible record |
 | Manage | `/integrations` | `integrations` capability | add or inspect integration |
-| Manage | `/custom-fields` | `custom_fields` capability | new custom field |
-| Manage | `/taxonomies` | MSP `taxonomies` capability | new taxonomy |
+| Manage / Data model | `/custom-fields` | `custom_fields` capability | new custom field |
+| Manage / Data model | `/taxonomies` | MSP `taxonomies` capability | new category definition |
 
 The following are account-menu or shell routes rather than task-hub children:
 `/settings` (signed-in user), `/staff` (`staff_invitations.view`),
@@ -115,10 +137,12 @@ hiding required actions.
 
 ## Reference workflow contract
 
-Documentation has four stable local views: **Documents**, **Templates**,
-**Repository**, and **Content health**. Search stays visible, filters remain in
-the shared filter menu, and **New document** is the single primary collection
-action. Import and repository work are subordinate. A selected document exposes
+Knowledge has two primary destinations: **Documents** and **Files**. Documents
+retains the closely related **Documents** and **Templates** views. Search stays
+visible, filters remain in the shared filter menu, and **New document** is the
+single primary collection action. Import and repository work are subordinate in
+**More**. Content health appears there only when findings exist, while its existing
+deep link remains valid. A selected document exposes
 **Content**, **Files**, **Links**, **Review and publication**, and **History** as
 applicable. Repository source operations remain contextual. Canonical Markdown,
 dirty-state protection, revision conflicts, independent review, publication
@@ -168,7 +192,7 @@ authorization, and compatibility review.
 
 Verified:
 
-- all 886 frontend unit/component tests pass with the repository coverage gates;
+- all 888 frontend unit/component tests pass with the repository coverage gates;
 - lint, type checking, generated API agreement, the production build, CSP checks,
   untranslated-control coverage, and bundle budgets pass;
 - 60 reference shell/document browser cases pass across the six required widths,
@@ -182,6 +206,12 @@ Verified:
   30 networks, 30 Git-backed documents, one fragment, and 32 checksum-verified
   managed files, plus limited users and a retained client publication;
 - the public Wiki checkout passes all 37 required pages and 55 total pages.
+
+The second reference pass additionally verifies 35 focused Chromium browser
+journeys for the revised shell, conditional document health, Data model, and
+integration review queue. Eight responsive Chromium/WebKit journeys pass across
+the six review widths and 200% zoom. The final production image passes its bundle
+budget and is healthy at port 3200 in the retained `tekdocs` Compose project.
 
 The existing development database reproduced a pre-existing schema drift: an
 obsolete `core_contentinclude.resolved_markdown` column, absent from every current

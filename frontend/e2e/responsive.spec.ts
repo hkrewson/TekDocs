@@ -108,11 +108,7 @@ test('task hubs and local sections remain usable at the required review widths a
     const home = page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home', exact: true })
     await expect(home).toBeVisible()
     await expect(home).toHaveAttribute('aria-current', 'page')
-    if (width <= 800) {
-      await expect(page.getByRole('combobox', { name: 'Home sections' })).toHaveValue('overview')
-    } else {
-      await expect(page.getByRole('navigation', { name: 'Home sections' }).getByRole('link', { name: 'Overview' })).toBeVisible()
-    }
+    await expect(page.getByRole('navigation', { name: 'Home sections' })).toHaveCount(0)
     if (width <= 800) await page.getByRole('complementary').getByRole('button', { name: 'Close navigation' }).click()
     await expectNoHorizontalPageOverflow(page)
   }
@@ -120,7 +116,7 @@ test('task hubs and local sections remain usable at the required review widths a
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.evaluate(() => { document.body.style.zoom = '2' })
   await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Home', exact: true })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Home sections' }).getByRole('link', { name: 'Overview' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Home sections' })).toHaveCount(0)
 })
 
 test('authentication and client portal shells reflow at review widths and text zoom', async ({ page }) => {

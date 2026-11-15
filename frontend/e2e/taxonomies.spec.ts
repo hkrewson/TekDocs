@@ -40,7 +40,7 @@ test('taxonomy hierarchy can be revised, reordered, and used without accessibili
   })
 
   await page.goto('/taxonomies')
-  await expect(page.getByRole('heading', { name: 'Taxonomies' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Data model' })).toBeVisible()
   await expect(page.getByText('3 documents · 1 template')).toBeVisible()
   await page.getByRole('button', { name: 'New version' }).click()
   await expect(page.getByText('Affects 2 documents · 1 template')).toBeVisible()

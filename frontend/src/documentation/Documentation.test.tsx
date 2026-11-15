@@ -231,7 +231,7 @@ it('paginates the library and gives an opened document a focused workspace', asy
   expect(screen.getByRole('heading', { name: 'Firewall standard', level: 1 })).toBeVisible()
 
   await user.click(screen.getByRole('button', { name: 'Documents' }))
-  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Next' }))
   await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
     {}, expect.any(AbortSignal), expect.objectContaining({ page: 2, page_size: 25 }),
@@ -428,12 +428,13 @@ it('loads the complete content-health queue from the server', async () => {
     if ((filters as { health?: string } | undefined)?.health === 'attention') {
       return Promise.resolve({ results: [staleDocument], count: 26, page: 1, page_size: 25, has_more: true, health: [{ value: 'stale', count: 26 }] })
     }
-    return Promise.resolve({ results: [currentDocument], count: 51, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 51 }] })
+    return Promise.resolve({ results: [currentDocument], count: 51, page: 1, page_size: 25, has_more: true, health: [{ value: 'current', count: 51 }, { value: 'stale', count: 26 }] })
   })
   documents.list = listDocuments
   render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
 
-  await user.click(await screen.findByRole('button', { name: 'Content health' }))
+  await user.click(await screen.findByText('More'))
+  await user.click(screen.getByRole('button', { name: 'Content health (26)' }))
   await waitFor(() => expect(listDocuments).toHaveBeenLastCalledWith(
     {}, expect.any(AbortSignal), expect.objectContaining({ health: 'attention', page: 1, page_size: 25 }),
   ))
@@ -1604,7 +1605,7 @@ it('protects a new document draft when returning to the library', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Close document' }))
   await user.click(screen.getByRole('button', { name: 'Discard changes' }))
-  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
 })
 
 it('protects settings and inline content drafts before switching or cancelling', async () => {
@@ -1658,7 +1659,7 @@ it('keeps departure blocked until a document save has a known result', async () 
   const continueButton = await screen.findByRole('button', { name: 'Continue' })
   expect(continueButton).toBeEnabled()
   await user.click(continueButton)
-  expect(await screen.findByRole('heading', { name: 'Documentation' })).toBeVisible()
+  expect(await screen.findByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
 })
 
 it('reviews a promoted template update with the Git content fences', async () => {

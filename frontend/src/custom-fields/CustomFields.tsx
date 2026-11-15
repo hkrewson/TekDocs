@@ -11,6 +11,7 @@ import { lockBodyScroll } from '../shell/bodyScrollLock'
 import type { WorkspaceContext } from '../workspaces/api'
 import { browserCustomFieldsClient } from './api'
 import type { CustomFieldDefinition, CustomFieldDefinitionInput, CustomFieldEntityType, CustomFieldType, CustomFieldsClient, MigrationImpact } from './api'
+import { DataModelNavigation } from './DataModelNavigation'
 
 const fieldTypeLabels: Record<CustomFieldType, string> = {
   text: translate('customFields.typeText'), integer: translate('customFields.typeInteger'), number: translate('customFields.typeNumber'), boolean: translate('customFields.typeBoolean'),
@@ -156,7 +157,8 @@ export function CustomFields({ workspace, client = browserCustomFieldsClient }: 
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('customFields.heading')}</h1><p>{translate('customFields.headingHelp')}</p></div><button className="primary-button" type="button" aria-label={translate('customFields.new')} title={translate('customFields.new')} onClick={() => { setClosingAfterSave(false); updateParameters({ field: 'new' }); setImpact(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('customFields.new')}</span></button></header>
+    <header className="page-header"><div><h1>{translate('dataModel.heading')}</h1></div><button className="primary-button" type="button" aria-label={translate('customFields.new')} title={translate('customFields.new')} onClick={() => { setClosingAfterSave(false); updateParameters({ field: 'new' }); setImpact(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('customFields.new')}</span></button></header>
+    <DataModelNavigation workspace={workspace} />
     {editorId && (editorId === 'new' || editing) && <DefinitionForm key={`${scopeKey}:${editorId}`} definition={editing ?? null} organization={Boolean(workspace)} saving={saving} closingAfterSave={closingAfterSave} onCancel={() => updateParameters({ field: null })} onSave={save} />}
     {editorId && editorId !== 'new' && phase === 'ready' && !editing && <div className="form-message warning" role="alert">{translate('customFields.fieldUnavailable')} <button className="row-action" type="button" onClick={() => updateParameters({ field: null })}>{translate('common.close')}</button></div>}
     {error && phase !== 'error' && <div className="form-message error" role="alert">{error}</div>}

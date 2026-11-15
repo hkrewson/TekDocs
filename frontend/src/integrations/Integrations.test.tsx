@@ -252,7 +252,7 @@ describe('Integrations', () => {
       workspace, expect.objectContaining({ id: connection.id }), { api_token: 'replacement-token' },
     ))
 
-    await user.click(screen.getByRole('link', { name: 'Reconciliation' }))
+    await user.click(screen.getByRole('link', { name: 'Review queue' }))
     await waitFor(() => expect(provider.listConflicts).toHaveBeenCalledWith(workspace, {
       page: 1, page_size: 25, q: '', remote_type: '', status: 'open',
     }, expect.any(AbortSignal)))

@@ -249,7 +249,7 @@ test('workspace switcher preserves routes, capability navigation, history, and a
   await expect(page.getByRole('link', { name: 'Products' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Networks' })).not.toBeVisible()
   await expect(page).toHaveTitle(/Northwind Supply · Documentation · TekDocs/)
-  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])
 
   await page.getByRole('link', { name: 'Products' }).click()
@@ -414,7 +414,7 @@ test('separate tabs retain independent URL-derived workspace context', async ({ 
 
   await page.goto(`/workspaces/organizations/${supplierWorkspace.id}/documentation`)
   await otherPage.goto(`/workspaces/organizations/${clientWorkspace.id}/assets`)
-  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible({ timeout: 10_000 })
   await expect(otherPage.getByRole('heading', { name: 'Assets' })).toBeVisible({ timeout: 10_000 })
 
   await page.getByRole('link', { name: 'Products' }).click()

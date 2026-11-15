@@ -68,7 +68,7 @@ import type { SitesClient } from './sites/api'
 import { browserWorkspaceClient } from './workspaces/api'
 import type { WorkspaceCapability, WorkspaceClient, WorkspaceContext } from './workspaces/api'
 import { authorizedTaskHubs, capabilityRegistry, taskHubForCapability, workspaceCapabilities } from './product/capabilities'
-import type { LocalNavigationEntry, TaskHub, TaskHubId } from './product/capabilities'
+import type { TaskHubId } from './product/capabilities'
 import { organizationWorkspacePath, workspaceAreaFromPath } from './workspaces/navigation'
 import type { WorkspaceArea } from './workspaces/navigation'
 import { WorkspaceOverview } from './workspaces/WorkspaceOverview'
@@ -195,12 +195,18 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
           {organizationRoute && !workspace
             ? <p className="workspace-navigation-state">{workspaceLoading ? translate('navigation.loading') : translate('navigation.workspaceUnavailable')}</p>
             : <nav className="nav-list hub-list" aria-label={translate('navigation.primary')}>
-              {availableHubs.map(({ hub, defaultDestination }) => {
+              {availableHubs.map(({ hub, children, defaultDestination }) => {
                 const Icon = hubIcons[hub.id]
-                return <Link key={hub.id} to={capabilityPath(defaultDestination.capability, workspace)} onClick={onMobileClose} className={`nav-link hub-link${activeHub === hub.id ? ' active' : ''}`} aria-current={activeHub === hub.id ? 'page' : undefined} aria-label={collapsed ? hub.label : undefined} title={collapsed ? hub.label : undefined}>
-                  <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-                  {!collapsed && <span>{hub.label}</span>}
-                </Link>
+                const active = activeHub === hub.id
+                return <div className={`hub-navigation${active ? ' active' : ''}`} key={hub.id}>
+                  <Link to={capabilityPath(defaultDestination.capability, workspace)} onClick={onMobileClose} className={`nav-link hub-link${active ? ' active' : ''}`} aria-current={active ? 'page' : undefined} aria-label={collapsed ? hub.label : undefined} title={collapsed ? hub.label : undefined}>
+                    <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+                    {!collapsed && <span>{hub.label}</span>}
+                  </Link>
+                  {active && !collapsed && children.length > 1 && <nav className="hub-children" aria-label={translate('navigation.local', { hub: hub.label })}>
+                    {children.map((child) => <Link key={child.capability} to={capabilityPath(child.capability, workspace)} onClick={onMobileClose} className={activeArea === child.capability ? 'active' : ''} aria-current={activeArea === child.capability ? 'page' : undefined}>{child.label}</Link>)}
+                  </nav>}
+                </div>
               })}
             </nav>}
         </div>
@@ -208,30 +214,6 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose, onMobileDis
       {mobileOpen && <button className="sidebar-backdrop" onClick={onMobileDismiss} aria-label={translate('navigation.close')} />}
     </>
   )
-}
-
-function TaskHubLocalNavigation({ hub, capabilities, activeArea, workspace }: {
-  hub: TaskHub
-  capabilities: readonly WorkspaceCapability[]
-  activeArea: WorkspaceCapability
-  workspace: WorkspaceContext | null
-}) {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const label = translate('navigation.local', { hub: hub.label })
-  const entries: LocalNavigationEntry[] = capabilities.map((capability) => ({
-    capability,
-    label: capabilityRegistry[capability].label,
-    path: capabilityRegistry[capability].path,
-    destination: capabilityPath(capability, workspace),
-    current: activeArea === capability,
-  }))
-  return <nav className="hub-local-navigation" aria-label={label}>
-    <div>
-      {entries.map((entry) => <Link key={entry.capability} to={entry.destination} state={location.state as unknown} aria-current={entry.current ? 'page' : undefined}>{entry.label}</Link>)}
-    </div>
-    <label>{translate('navigation.section')}<select aria-label={label} value={activeArea} onChange={(event) => { void navigate(capabilityPath(event.target.value as WorkspaceCapability, workspace), { state: location.state as unknown }) }}>{entries.map((entry) => <option key={entry.capability} value={entry.capability}>{entry.label}</option>)}</select></label>
-  </nav>
 }
 
 function ProfileMenu({ user, canManageAccess, canManageStaff, canManageNotifications, canViewSystemStatus, onSignOut, signingOut }: {
@@ -458,12 +440,6 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
       return capabilityRegistry[area].scopes.includes('msp')
     })
   }, [selectedWorkspace, shellContext.permissions, workspaceRestricted])
-  const activeCapability = availableCapabilities.includes(activeArea as WorkspaceCapability) ? activeArea as WorkspaceCapability : null
-  const activeHub = activeCapability ? taskHubForCapability(activeCapability) : null
-  const activeHubCapabilities = activeHub
-    ? activeHub.capabilities.filter((area) => availableCapabilities.includes(area))
-    : []
-
   function submitSearch(event: React.FormEvent) {
     event.preventDefault()
     const query = searchDraft.trim()
@@ -510,13 +486,12 @@ export function ApplicationShell({ authContext, authClient, accessControlClient,
           {!workspaceRestricted && <Suspense fallback={<span className="notification-menu" aria-hidden="true"><button className="notification-trigger" type="button" disabled tabIndex={-1} /></span>}><NotificationInbox client={notificationsClient} onOpen={openNotificationTarget} /></Suspense>}
           <ProfileMenu user={shellContext.user} canManageAccess={!workspaceRestricted && (shellContext.permissions?.includes('memberships.assign_role') ?? false)} canManageStaff={!workspaceRestricted && (shellContext.permissions?.includes('staff_invitations.view') ?? false)} canManageNotifications={!workspaceRestricted && (shellContext.permissions?.includes('notifications.manage') ?? false)} canViewSystemStatus={!workspaceRestricted && (shellContext.permissions?.includes('system_diagnostics.view') ?? false)} onSignOut={() => { attemptNavigation(() => { void onSignOut() }); return Promise.resolve() }} signingOut={signingOut} />
         </header>
-        {activeHub && activeCapability && <TaskHubLocalNavigation hub={activeHub} capabilities={activeHubCapabilities} activeArea={activeCapability} workspace={selectedWorkspace} />}
         <main id="main-content" ref={mainRef} className="main-content" key={location.pathname} tabIndex={-1}>
           {signOutError && <div className="shell-alert" role="alert">{signOutError}</div>}
           <Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingWorkspace')}</section>}>{workspaceRestricted && !organizationId && location.pathname !== '/settings' ? <AssignedWorkspacePrompt /> : <Routes>
             <Route path="/" element={<Navigate to="/overview" replace />} />
             <Route path="/auth/invitations/accept" element={<Navigate to="/overview" replace />} />
-            <Route path="/overview" element={<Suspense fallback={<section role="status">{translate('collections.loading')}</section>}><Overview /></Suspense>} />
+            <Route path="/overview" element={<Suspense fallback={<section role="status">{translate('collections.loading')}</section>}><Overview workspaceClient={workspaceClient} /></Suspense>} />
             <Route path="/documentation" element={<Suspense fallback={<section className="content-section" role="status">{translate('shell.loadingDocumentation')}</section>}><Documentation workspace={null} client={documentsClient} workspaceClient={workspaceClient} relationshipsClient={relationshipsClient} initialDocumentId={requestedDocumentId} /></Suspense>} />
             <Route path="/files" element={<Suspense fallback={<section className="content-section" role="status">{translate('files.loading')}</section>}><Files workspace={null} preferenceWorkspace={mspWorkspace} client={documentsClient} /></Suspense>} />
             <Route path="/credentials" element={<CredentialReferences workspace={null} client={credentialReferencesClient} />} />

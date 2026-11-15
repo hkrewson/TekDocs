@@ -484,7 +484,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page).toHaveURL((url) => url.pathname === '/vendors')
 
   await page.goto('/taxonomies')
-  await expect(page.getByRole('heading', { name: 'Taxonomies' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Data model' })).toBeVisible()
   await page.getByRole('button', { name: 'New taxonomy' }).click()
   await page.getByLabel('Taxonomy key').fill(`live-service-${suffix.slice(0, 8)}`)
   await page.getByLabel('Name').fill('Live service classification')
@@ -503,7 +503,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Live Acme Client. Client · Vendor' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/vendors$/)
 
-  await page.getByRole('link', { name: 'Custom fields' }).click()
+  await page.getByRole('link', { name: 'Data model' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/custom_fields$/)
   await page.getByRole('button', { name: /New field/ }).click()
   await page.getByLabel('Label').fill('Support tier')
@@ -825,7 +825,8 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Revision two is retained.', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Documents', exact: true }).click()
-  await page.getByRole('button', { name: 'Content health' }).click()
+  await page.getByText('More', { exact: true }).click()
+  await page.getByRole('button', { name: /^Content health/ }).click()
   await expect(page).toHaveURL(/doc_library=health/)
   await expect(page.getByRole('button', { name: /Live Acme onboarding/ })).toBeVisible()
   await page.getByRole('button', { name: 'Browse documents' }).click()

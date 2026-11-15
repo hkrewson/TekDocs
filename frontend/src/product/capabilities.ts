@@ -40,17 +40,18 @@ export type CapabilityStatus = (typeof capabilityRegistry)[WorkspaceCapability][
 export type CapabilityGroup = (typeof navigationGroupRegistry)[number]['id']
 
 export const taskHubRegistry = [
-  { id: 'home', label: translate('navigation.hub.home'), capabilities: ['overview', 'deadlines', 'activity'] },
+  { id: 'home', label: translate('navigation.hub.home'), capabilities: ['overview', 'deadlines', 'activity'], navigationCapabilities: ['overview'] },
   { id: 'clients', label: translate('navigation.hub.clients'), capabilities: ['organizations', 'people', 'sites'] },
   { id: 'knowledge', label: translate('navigation.hub.knowledge'), capabilities: ['documentation', 'files'] },
   { id: 'operations', label: translate('navigation.hub.operations'), capabilities: ['assets', 'licenses', 'networks', 'domains', 'certificates', 'credentials'] },
   { id: 'business', label: translate('navigation.hub.business'), capabilities: ['services', 'vendors', 'products', 'invoices', 'stock'] },
-  { id: 'assurance', label: translate('navigation.hub.assurance'), capabilities: ['compliance', 'recycle_bin'] },
-  { id: 'manage', label: translate('navigation.hub.manage'), capabilities: ['integrations', 'custom_fields', 'taxonomies'] },
+  { id: 'assurance', label: translate('navigation.hub.assurance'), capabilities: ['compliance'] },
+  { id: 'manage', label: translate('navigation.hub.manage'), capabilities: ['integrations', 'custom_fields', 'taxonomies', 'recycle_bin'], navigationCapabilities: ['integrations', 'custom_fields', 'recycle_bin'] },
 ] as const satisfies readonly {
   id: string
   label: string
   capabilities: readonly WorkspaceCapability[]
+  navigationCapabilities?: readonly WorkspaceCapability[]
 }[]
 
 export type TaskHub = (typeof taskHubRegistry)[number]
@@ -79,7 +80,8 @@ export function taskHubForCapability(capability: WorkspaceCapability): TaskHub {
 export function authorizedTaskHubs(authorizedCapabilities: readonly WorkspaceCapability[]): AuthorizedTaskHub[] {
   const authorized = new Set(authorizedCapabilities)
   return taskHubRegistry.flatMap((hub) => {
-    const children: AuthorizedHubChild[] = hub.capabilities
+    const navigationCapabilities: readonly WorkspaceCapability[] = 'navigationCapabilities' in hub ? hub.navigationCapabilities : hub.capabilities
+    const children: AuthorizedHubChild[] = navigationCapabilities
       .filter((capability) => authorized.has(capability))
       .map((capability) => ({ capability, label: capabilityRegistry[capability].label, path: capabilityRegistry[capability].path }))
     return children.length > 0 ? [{ hub, children, defaultDestination: children[0] }] : []

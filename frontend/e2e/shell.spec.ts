@@ -137,7 +137,7 @@ test('authenticated application shell exposes primary navigation and backend hea
   await page.keyboard.press('Enter')
   await expect(page.locator('main')).toBeFocused()
   await page.getByRole('link', { name: 'Knowledge', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Documentation' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Documents', level: 1 })).toBeVisible()
   await expect(page.locator('main')).toBeFocused()
   await expect(page.getByRole('button', { name: 'UniFi Network Setup Guide' })).toBeVisible()
 })
@@ -163,8 +163,8 @@ test('direct routes select the matching hub without changing the deep link', asy
   await mockAuthenticated(page)
 
   for (const [path, hub, section] of [
-    ['/custom-fields?sort=name', 'Manage', 'Custom fields'],
-    ['/recycle-bin?page=2', 'Assurance', 'Recycle bin'],
+    ['/custom-fields?sort=name', 'Manage', 'Data model'],
+    ['/recycle-bin?page=2', 'Manage', 'Recycle bin'],
   ] as const) {
     await page.goto(path)
     await expect(page).toHaveURL(path)
@@ -250,7 +250,7 @@ test('excluded modules are unavailable and accounting redirects to invoices', as
   expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
 })
 
-test('NinjaOne setup and reconciliation states are explicit and accessible', async ({ page }) => {
+test('NinjaOne setup and review states are explicit and accessible', async ({ page }) => {
   await mockAuthenticated(page)
   await page.route('**/integrations/providers', (route) => route.fulfill({ json: [{
     key: 'ninjaone', label: 'NinjaOne', version: '1.0', direction: 'read_only',
@@ -284,7 +284,6 @@ test('NinjaOne setup and reconciliation states are explicit and accessible', asy
   await page.goto('/integrations')
   await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
-  await expect(page.getByText(/TekDocs does not change them/)).toBeVisible()
   await expect(page.getByText(/Stale · source observed/)).toBeVisible()
   await page.getByRole('button', { name: 'New connection' }).click()
   const providerSelect = page.locator('.integration-connection-form select')
@@ -293,7 +292,7 @@ test('NinjaOne setup and reconciliation states are explicit and accessible', asy
   await expect(page.getByRole('link', { name: 'NinjaOne setup guidance' })).toHaveAttribute('href', /ninjaone\.com/)
   await expect(page.getByText(/read-only API application/)).toBeVisible()
   await page.locator('.integration-connection-form').getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('link', { name: 'Reconciliation' }).click()
+  await page.getByRole('link', { name: 'Review queue' }).click()
   await expect(page.getByRole('heading', { name: 'Review differences' })).toBeVisible()
   await expect(page.getByText('Reception laptop in TekDocs')).toBeVisible()
   await expect(page.getByText('changed', { exact: true })).toBeVisible()

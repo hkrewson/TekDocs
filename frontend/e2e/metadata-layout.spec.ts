@@ -75,7 +75,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await fixtures(page)
 
     await page.goto('/custom-fields')
-    await expect(page.getByRole('heading', { name: 'Custom fields' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Data model' })).toBeVisible()
     await expect(page.getByText('31 fields')).toBeVisible()
     await expect(page.getByRole('table')).toHaveCount(0)
     await page.getByRole('button', { name: 'Next' }).click()
@@ -112,7 +112,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expectContained(page)
 
     await page.goto('/taxonomies')
-    await expect(page.getByRole('heading', { name: 'Taxonomies' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Data model' })).toBeVisible()
     await expect(page.getByText('31 taxonomies')).toBeVisible()
     await expect(page.getByRole('table')).toHaveCount(0)
     await page.getByRole('button', { name: 'Next' }).click()

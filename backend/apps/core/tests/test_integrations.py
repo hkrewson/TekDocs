@@ -69,6 +69,8 @@ from apps.core.network_endpoints import create_interface, create_ip_address, cre
 from apps.core.network_inventory import create_device, create_rack
 from apps.core.organizations import create_organization
 from apps.core.publications import publish_document
+from apps.core.rls import OrganizationRLSMode, system_rls_scope
+from apps.core.scoping import DataScope
 from apps.core.sites import create_site
 from apps.core.tasks import dispatch_integration_syncs, process_integration_sync_job
 from apps.core.tests.network_asset_fixtures import create_network_hardware_asset
@@ -1174,7 +1176,103 @@ def test_sync_job_is_idempotent_value_minimized_and_retryable(installation):
 
 
 @pytest.mark.django_db
-def test_netbox_sync_automatically_creates_asset_backed_device(installation):
+def test_netbox_sync_resolves_a_preexisting_conflict_with_the_job_actor(installation):
+    record = organization(installation, "Repeated prefix client")
+    source = connection(installation, record)
+
+    class PrefixAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            projection = {"id": 42, "prefix": "10.42.0.0/24"}
+            return ProviderPage(
+                observations=(
+                    ProviderObservation(
+                        "ipam.prefix",
+                        "42",
+                        provider_observation_fingerprint(projection),
+                        projection,
+                    ),
+                ),
+                next_cursor="",
+                complete_types=("ipam.prefix",),
+            )
+
+    first = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="prefix:first").id,
+        adapter=PrefixAdapter(),
+    )
+    observation = IntegrationObservation.objects.get(job=first)
+    reference = NetBoxReference.objects.get(object_type="ipam.prefix", object_id=42)
+    conflict = IntegrationConflict.objects.create(
+        tenant=source.tenant,
+        workspace=source.workspace,
+        organization=record,
+        connection=source,
+        observation=observation,
+        local_entity=reference.entity,
+        remote_type="ipam.prefix",
+        remote_id="42",
+        difference="changed",
+        remote_fingerprint=observation.fingerprint,
+        local_fingerprint="f" * 64,
+    )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="prefix:repeat").id,
+        adapter=PrefixAdapter(),
+    )
+
+    conflict.refresh_from_db()
+    assert completed.state == IntegrationJobState.SUCCEEDED
+    assert conflict.status == "accept_remote"
+    assert conflict.resolved_by == installation.owner
+    assert conflict.resolved_at is not None
+
+
+@pytest.mark.django_db
+def test_netbox_sync_keeps_nested_prefix_for_review_without_failing_the_page(installation):
+    record = organization(installation, "Nested prefix client")
+    source = connection(installation, record)
+
+    class NestedPrefixAdapter:
+        key = "netbox"
+        label = NetBoxProvider.label
+        contract = PROVIDERS["netbox"].contract
+
+        def fetch_page(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            parent = {"id": 1, "prefix": "10.50.0.0/16"}
+            child = {"id": 2, "prefix": "10.50.1.0/24"}
+            return ProviderPage(
+                observations=(
+                    ProviderObservation(
+                        "ipam.prefix", "1", provider_observation_fingerprint(parent), parent
+                    ),
+                    ProviderObservation(
+                        "ipam.prefix", "2", provider_observation_fingerprint(child), child
+                    ),
+                ),
+                next_cursor="",
+                complete_types=("ipam.prefix",),
+            )
+
+    completed = process_sync_job(
+        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="prefix:nested").id,
+        adapter=NestedPrefixAdapter(),
+    )
+
+    assert completed.state == IntegrationJobState.SUCCEEDED
+    assert NetworkSubnet.objects.filter(cidr="10.50.0.0/16").exists()
+    assert not NetworkSubnet.objects.filter(cidr="10.50.1.0/24").exists()
+    conflict = IntegrationConflict.objects.get(connection=source, remote_id="2")
+    assert conflict.difference == "unmatched"
+    assert conflict.status == "open"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_netbox_sync_automatically_creates_asset_backed_device(installation, django_runtime_role):
     record = organization(installation, "Automatic device client")
     source = connection(installation, record)
 
@@ -1209,10 +1307,12 @@ def test_netbox_sync_automatically_creates_asset_backed_device(installation):
                 complete_types=("dcim.device",),
             )
 
-    completed = process_sync_job(
-        job_id=enqueue_sync(connection=source, trigger="manual", idempotency_key="device:auto").id,
-        adapter=DeviceAdapter(),
-    )
+    job = enqueue_sync(connection=source, trigger="manual", idempotency_key="device:auto")
+    with django_runtime_role(), system_rls_scope(
+        DataScope.organization(installation.tenant, record),
+        organization_mode=OrganizationRLSMode.ORGANIZATION,
+    ):
+        completed = process_sync_job(job_id=job.id, adapter=DeviceAdapter())
     asset = ClientAsset.objects.get(entity__display_name="arrakis")
     device = asset.network_device
     assert asset.hardware.serial_number == "ARR-1"

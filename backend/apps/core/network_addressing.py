@@ -28,6 +28,10 @@ class NetworkAddressingError(ValueError):
         super().__init__(public_detail)
 
 
+class NetworkOverlapError(NetworkAddressingError):
+    """A valid subnet cannot be placed in the selected routing namespace."""
+
+
 def canonical_network(value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
     try:
         network = ipaddress.ip_network(value.strip(), strict=False)
@@ -100,7 +104,7 @@ def _assert_no_overlap(
     for existing in query.only("cidr"):
         if networks_overlap(cidr, existing.cidr):
             label = vrf.entity.display_name if vrf is not None else "the default routing table"
-            raise NetworkAddressingError(f"{cidr} overlaps {existing.cidr} in {label}.")
+            raise NetworkOverlapError(f"{cidr} overlaps {existing.cidr} in {label}.")
 
 
 def _create_entity(*, tenant: Tenant, organization: Organization | None, entity_type: str, name: str) -> Entity:

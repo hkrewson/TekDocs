@@ -162,6 +162,8 @@ indefinitely merely because the old interface once exposed them.
   catalog, asset, rack or network-device creation.
 - A NetBox prefix can become a CIDR record with its VLAN ID and provider identity
   without prior VLAN or VRF creation.
+- A nested NetBox prefix that conflicts with TekDocs' non-overlapping routing
+  namespace remains an unmatched review item without failing the provider page.
 - Network and asset views edit the same IP assignment.
 - CIDR-derived mask and broadcast are stable for IPv4 and IPv6 semantics.
 - Fresh-workspace sync, repeat sync, changed observations, ambiguous matches and

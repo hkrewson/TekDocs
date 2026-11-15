@@ -4,6 +4,7 @@ import ipaddress
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
+from django.db import connection as database_connection
 from django.utils import timezone
 
 from .catalogs import create_definition, create_model, create_product
@@ -30,9 +31,10 @@ from .models import (
     Organization,
     OrganizationKind,
 )
-from .network_addressing import create_subnet
+from .network_addressing import NetworkOverlapError, create_subnet
 from .network_inventory import create_device, update_device
 from .organizations import create_organization
+from .rls import OrganizationRLSMode, bind_local_rls_scope, system_rls_scope_if_postgresql
 from .scoping import DataScope
 
 GENERIC_MANUFACTURER = "NetBox imported"
@@ -113,7 +115,11 @@ def _link(job: IntegrationSyncJob, observation: IntegrationObservation, *, entit
         remote_type=observation.remote_type,
         remote_id=observation.remote_id,
         status=IntegrationConflictStatus.OPEN,
-    ).update(status=IntegrationConflictStatus.ACCEPT_REMOTE, resolved_at=now)
+    ).update(
+        status=IntegrationConflictStatus.ACCEPT_REMOTE,
+        resolved_by_id=_actor_id(job),
+        resolved_at=now,
+    )
 
 
 def _project_prefix(job: IntegrationSyncJob, observation: IntegrationObservation) -> bool:
@@ -134,20 +140,25 @@ def _project_prefix(job: IntegrationSyncJob, observation: IntegrationObservation
         matches = list(NetworkSubnet.scoped.for_scope(scope).filter(cidr=network.with_prefixlen)[:2])
         if len(matches) > 1:
             return False
-        record = (
-            matches[0]
-            if matches
-            else create_subnet(
-                tenant=job.tenant,
-                organization=job.organization,
-                actor_id=_actor_id(job),
-                name=network.with_prefixlen,
-                cidr=network.with_prefixlen,
-                vrf_entity_id=None,
-                vlan_entity_id=None,
-                description=_text(values.get("description"), maximum=4000),
-            )
-        )
+        if matches:
+            record = matches[0]
+        else:
+            try:
+                record = create_subnet(
+                    tenant=job.tenant,
+                    organization=job.organization,
+                    actor_id=_actor_id(job),
+                    name=network.with_prefixlen,
+                    cidr=network.with_prefixlen,
+                    vrf_entity_id=None,
+                    vlan_entity_id=None,
+                    description=_text(values.get("description"), maximum=4000),
+                )
+            except NetworkOverlapError:
+                # TekDocs intentionally keeps one non-overlapping CIDR namespace.
+                # Retain a nested NetBox prefix as an unmatched review item instead
+                # of aborting every observation in the provider page.
+                return False
     if not _link_available(job, observation, entity_id=record.entity_id):
         return False
     vlan_number = _integer(values.get("vlan_id"))
@@ -190,61 +201,77 @@ def _supplier(job: IntegrationSyncJob, name: str) -> Organization:
 
 def _catalog_model(job: IntegrationSyncJob, manufacturer: str, model_number: str) -> CatalogModel:
     supplier = _supplier(job, manufacturer)
-    product = (
-        CatalogProduct.objects.filter(
-            tenant=job.tenant,
-            organization=supplier,
-            entity__display_name=PRODUCT_NAME,
-            archived_at__isnull=True,
-        )
-        .select_related("entity")
-        .first()
-    )
-    if product is None:
-        product = create_product(
-            tenant=job.tenant,
-            organization=supplier,
-            actor_id=_actor_id(job),
-            name=PRODUCT_NAME,
-            kind=CatalogProductKind.HARDWARE,
-            description="Network hardware models observed through NetBox.",
-        )
-    model = (
-        CatalogModel.objects.filter(product=product, model_number=model_number, archived_at__isnull=True)
-        .select_related("entity", "product")
-        .first()
-    )
-    if model is not None:
-        return model
-    definition = CatalogSpecificationDefinition.objects.filter(
-        tenant=job.tenant,
-        organization=supplier,
-        name=DEFINITION_NAME,
-        product_kind=CatalogProductKind.HARDWARE,
-        archived_at__isnull=True,
-    ).first()
-    if definition is None:
-        definition = create_definition(
-            tenant=job.tenant,
-            organization=supplier,
-            actor_id=_actor_id(job),
-            name=DEFINITION_NAME,
-            product_kind=CatalogProductKind.HARDWARE,
-            schema={"type": "object", "additionalProperties": False, "properties": {}},
-        )
-    version = CatalogSpecificationDefinitionVersion.objects.filter(definition=definition).order_by("-version").first()
-    if version is None:
-        raise ValueError("netbox_catalog_definition_invalid")
-    return create_model(
-        product=product,
-        actor_id=_actor_id(job),
-        name=model_number,
-        model_number=model_number,
-        specification_version=version,
-        lifecycle=CatalogModelLifecycle.ACTIVE,
-        specifications={},
-        notes="Created from an observed NetBox device type.",
-    )
+    try:
+        with system_rls_scope_if_postgresql(
+            DataScope.organization(job.tenant, supplier),
+            organization_mode=OrganizationRLSMode.ORGANIZATION,
+        ):
+            product = (
+                CatalogProduct.objects.filter(
+                    tenant=job.tenant,
+                    organization=supplier,
+                    entity__display_name=PRODUCT_NAME,
+                    archived_at__isnull=True,
+                )
+                .select_related("entity")
+                .first()
+            )
+            if product is None:
+                product = create_product(
+                    tenant=job.tenant,
+                    organization=supplier,
+                    actor_id=_actor_id(job),
+                    name=PRODUCT_NAME,
+                    kind=CatalogProductKind.HARDWARE,
+                    description="Network hardware models observed through NetBox.",
+                )
+            model = (
+                CatalogModel.objects.filter(product=product, model_number=model_number, archived_at__isnull=True)
+                .select_related("entity", "product")
+                .first()
+            )
+            if model is not None:
+                return model
+            definition = CatalogSpecificationDefinition.objects.filter(
+                tenant=job.tenant,
+                organization=supplier,
+                name=DEFINITION_NAME,
+                product_kind=CatalogProductKind.HARDWARE,
+                archived_at__isnull=True,
+            ).first()
+            if definition is None:
+                definition = create_definition(
+                    tenant=job.tenant,
+                    organization=supplier,
+                    actor_id=_actor_id(job),
+                    name=DEFINITION_NAME,
+                    product_kind=CatalogProductKind.HARDWARE,
+                    schema={"type": "object", "additionalProperties": False, "properties": {}},
+                )
+            version = (
+                CatalogSpecificationDefinitionVersion.objects.filter(definition=definition)
+                .order_by("-version")
+                .first()
+            )
+            if version is None:
+                raise ValueError("netbox_catalog_definition_invalid")
+            return create_model(
+                product=product,
+                actor_id=_actor_id(job),
+                name=model_number,
+                model_number=model_number,
+                specification_version=version,
+                lifecycle=CatalogModelLifecycle.ACTIVE,
+                specifications={},
+                notes="Created from an observed NetBox device type.",
+            )
+    finally:
+        # Nested SET LOCAL values survive savepoint release. Return the worker to
+        # the connection owner's exact Workspace before projecting the asset.
+        if database_connection.vendor == "postgresql":
+            owner_scope = DataScope.owner(job.tenant, job.organization)
+            owner_mode = OrganizationRLSMode.ORGANIZATION if job.organization_id else OrganizationRLSMode.MSP_ONLY
+            bind_local_rls_scope(owner_scope, organization_mode=owner_mode)
 
 
 def _role(value: str) -> str:

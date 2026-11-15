@@ -172,18 +172,32 @@ describe('People', () => {
     expect(create).toHaveBeenCalledWith({ organizationId: workspace.id }, expect.objectContaining({ full_name: 'Morgan Ellis', role: 'Office Manager' }))
     expect(await screen.findByRole('status', { name: '' })).toHaveTextContent('Morgan Ellis was added.')
 
-    await user.click(screen.getByRole('button', { name: 'Edit Jordan Avery' }))
+    await user.click(screen.getByRole('button', { name: 'Jordan Avery' }))
+    await user.click(screen.getByRole('button', { name: 'Edit details' }))
     const preferredName = screen.getByLabelText(/Preferred name/)
     await user.clear(preferredName)
     await user.type(preferredName, 'Jordan')
     await user.click(screen.getByRole('button', { name: 'Save person' }))
     expect(update).toHaveBeenCalledWith({ organizationId: workspace.id }, person.id, expect.objectContaining({ preferred_name: 'Jordan' }))
 
-    await user.click(screen.getByRole('button', { name: 'Archive Jordan Avery' }))
+    await user.click(screen.getByText('More', { exact: true }))
+    await user.click(screen.getByRole('button', { name: 'Archive person' }))
     const dialog = screen.getByRole('alertdialog', { name: 'Archive Jordan Avery?' })
     expect(within(dialog).getByText(/may still appear in other workspaces/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Archive person' }))
     expect(archive).toHaveBeenCalledWith({ organizationId: workspace.id }, person.id)
+  })
+
+  it('restores search, field filter, sorting, and page from the URL', async () => {
+    const list = vi.fn().mockResolvedValue({ results: [person], page: 3, page_size: 25, count: 60, has_more: false })
+    render(<MemoryRouter initialEntries={['/people?q=north&person_field=role&person_value=admin&person_order=-email&person_page=3']}><People workspace={workspace} client={peopleClient({ list })} sitesClient={sitesClient} /></MemoryRouter>)
+
+    await vi.waitFor(() => expect(list).toHaveBeenCalledWith(
+      { organizationId: workspace.id },
+      expect.objectContaining({ q: 'north', filter_field: 'role', filter_value: 'admin', ordering: '-email', page: 3 }),
+      expect.any(AbortSignal),
+    ))
+    expect(screen.getByRole('searchbox', { name: 'Search all person fields' })).toHaveValue('north')
   })
 
   it('uses structured site and location choices while retaining display labels', async () => {

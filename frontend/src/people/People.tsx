@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Pencil, Plus, Search, Settings2, Trash2 } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { QuickDrawer } from '../collections/QuickDrawer'
+import { RecordActionMenu } from '../collections/RecordActionMenu'
 import '../collections/collections.css'
 import { translate } from '../i18n/localization'
 import { FilterMenu } from '../FilterMenu'
@@ -26,7 +27,7 @@ const columnLabels: Record<PersonColumn, string> = {
   email: translate('people.email'),
 }
 const optionalColumns = Object.keys(columnLabels).filter((column) => column !== 'full_name') as Exclude<PersonColumn, 'full_name'>[]
-const defaultColumns: PersonColumn[] = ['full_name', 'preferred_name', 'role', 'location', 'office', 'phone', 'email']
+const defaultColumns: PersonColumn[] = ['full_name', 'role', 'location', 'email']
 const preferenceKey = 'tekdocs.people.visible-columns.v1'
 const emptyInput: PersonInput = {
   full_name: '',
@@ -82,9 +83,8 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
-function PersonForm({ person, workspaceName, sites, sitesUnavailable, saving, onCancel, onDirtyChange, onSave }: {
+function PersonForm({ person, sites, sitesUnavailable, saving, onCancel, onDirtyChange, onSave }: {
   person: PersonRecord | null
-  workspaceName: string
   sites: SiteRecord[]
   sitesUnavailable: boolean
   saving: boolean
@@ -109,7 +109,6 @@ function PersonForm({ person, workspaceName, sites, sitesUnavailable, saving, on
 
   return (
       <form className="record-form record-form-grid people-form operational-record-form" onSubmit={submit}>
-        <p className="operational-record-context">{translate('people.workspaceHelp', { workspace: workspaceName })}</p>
         <label>{translate('people.fullName')}<input autoFocus required maxLength={240} value={input.full_name} onChange={(event) => setInput({ ...input, full_name: event.target.value })} /></label>
         <label>{translate('people.preferredName')} <span>{translate('common.optional')}</span><input maxLength={160} value={input.preferred_name} onChange={(event) => setInput({ ...input, preferred_name: event.target.value })} /></label>
         <label>{translate('people.relationship')}<select value={input.kind} onChange={(event) => setInput({ ...input, kind: event.target.value as PersonInput['kind'] })}><option value="employee">{translate('people.employee')}</option><option value="contact">{translate('people.contact')}</option></select></label>
@@ -129,7 +128,7 @@ function PersonForm({ person, workspaceName, sites, sitesUnavailable, saving, on
 
 function PersonOverview({ person, onArchive, onEdit }: { person: PersonRecord; onArchive: () => void; onEdit: () => void }) {
   return <div className="operational-record">
-    <div className="operational-record-actions"><button className="primary-button" type="button" onClick={onEdit}><Pencil size={15} aria-hidden="true" />{translate('people.editDetails')}</button><button className="secondary-button danger" type="button" onClick={onArchive}><Trash2 size={15} aria-hidden="true" />{translate('people.archiveButton')}</button></div>
+    <div className="operational-record-actions"><button className="primary-button" type="button" onClick={onEdit}><Pencil size={15} aria-hidden="true" />{translate('people.editDetails')}</button><RecordActionMenu><button className="danger" type="button" onClick={onArchive}><Trash2 size={15} aria-hidden="true" />{translate('people.archiveButton')}</button></RecordActionMenu></div>
     <dl className="record-facts">
       <div><dt>{translate('people.preferredName')}</dt><dd>{person.preferred_name || '—'}</dd></div>
       <div><dt>{translate('people.relationship')}</dt><dd>{person.kind === 'employee' ? translate('people.employee') : translate('people.contact')}</dd></div>
@@ -152,12 +151,21 @@ function cellValue(person: PersonRecord, column: PersonColumn) {
   return value
 }
 
+function queryFromParams(parameters: URLSearchParams): PeopleQuery {
+  const field = parameters.get('person_field')
+  const ordering = parameters.get('person_order')
+  const page = Number(parameters.get('person_page'))
+  const validField = optionalColumns.includes(field as Exclude<PersonColumn, 'full_name'>) ? field as PersonFilterField : ''
+  const validOrdering = ordering && [...Object.keys(columnLabels), ...Object.keys(columnLabels).map((column) => `-${column}`)].includes(ordering) ? ordering as PeopleQuery['ordering'] : 'full_name'
+  return { ...initialQuery, q: parameters.get('q') ?? '', filter_field: validField, filter_value: parameters.get('person_value') ?? '', ordering: validOrdering, page: Number.isInteger(page) && page > 0 ? page : 1 }
+}
+
 export function People({ workspace, client = browserPeopleClient, sitesClient = browserSitesClient }: { workspace: WorkspaceContext | null; client?: PeopleClient; sitesClient?: SitesClient }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const scope = useMemo(() => ({ organizationId: workspace?.id }), [workspace?.id])
   const scopeKey = workspace?.id ?? 'msp'
   const workspaceName = workspace?.name ?? translate('people.mspWorkspace')
-  const [query, setQuery] = useState<PeopleQuery>(initialQuery)
+  const [query, setQuery] = useState<PeopleQuery>(() => queryFromParams(searchParams))
   const [loaded, setLoaded] = useState<{ scopeKey: string; result: Awaited<ReturnType<PeopleClient['list']>> } | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const drawerId = searchParams.get('person')
@@ -227,7 +235,15 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
   }, [columnsOpen])
 
   const changeQuery = (changes: Partial<PeopleQuery>) => {
-    setQuery((current) => ({ ...current, ...changes, page: changes.page ?? 1 }))
+    const nextQuery = { ...query, ...changes, page: changes.page ?? 1 }
+    const nextParams = new URLSearchParams(searchParams)
+    if (nextQuery.q) nextParams.set('q', nextQuery.q); else nextParams.delete('q')
+    if (nextQuery.filter_field) nextParams.set('person_field', nextQuery.filter_field); else nextParams.delete('person_field')
+    if (nextQuery.filter_value) nextParams.set('person_value', nextQuery.filter_value); else nextParams.delete('person_value')
+    if (nextQuery.ordering !== 'full_name') nextParams.set('person_order', nextQuery.ordering); else nextParams.delete('person_order')
+    if (nextQuery.page > 1) nextParams.set('person_page', String(nextQuery.page)); else nextParams.delete('person_page')
+    setQuery(nextQuery)
+    setSearchParams(nextParams, { replace: true })
   }
 
   const toggleColumn = (column: Exclude<PersonColumn, 'full_name'>) => {
@@ -247,10 +263,10 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
     ? `${columnLabels[query.filter_field]}${query.filter_value ? `: ${query.filter_value}` : ''}`
     : translate('people.noFieldFilter')
 
-  const openPerson = (person: PersonRecord, mode: 'view' | 'edit' = 'view') => {
+  const openPerson = (person: PersonRecord) => {
     setSelected({ scopeKey, record: person })
     setDrawerErrorId(null)
-    setDrawerMode(mode)
+    setDrawerMode('view')
     setArchiving(null)
     setError(null)
     setMessage(null)
@@ -312,7 +328,7 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
 
   return (
     <>
-      <header className="page-header"><div><h1>{translate('people.heading')}</h1></div><button className="primary-button" type="button" aria-label={translate('people.new')} title={translate('people.new')} onClick={() => { setSelected(null); setDrawerMode('edit'); setArchiving(null); setError(null); setMessage(null); updateDrawerUrl('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('people.new')}</span></button></header>
+      <header className="page-header"><div><h1 id="people-heading">{translate('people.heading')}</h1><p className="page-count">{result ? translate(result.count === 1 ? 'people.countOne' : 'people.countMany', { count: result.count }) : translate('common.loading')}</p></div><button className="primary-button" type="button" aria-label={translate('people.new')} title={translate('people.new')} onClick={() => { setSelected(null); setDrawerMode('edit'); setArchiving(null); setError(null); setMessage(null); updateDrawerUrl('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('people.new')}</span></button></header>
       {error && !drawerId && <div className="form-error people-error" role="alert">{error}</div>}
       {message && !drawerId && <div className="form-success" role="status">{message}</div>}
       {drawerId && <QuickDrawer title={drawerId === 'new' ? translate('people.add') : drawerRecord?.full_name ?? translate('people.record')} onClose={closeDrawer} returnFocusId={drawerId === 'new' ? undefined : `person-row-${drawerId}`} returnHref={workspace ? `/workspaces/organizations/${workspace.id}/people` : '/people'} returnLabel={translate('people.back')}>
@@ -321,15 +337,14 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
         {drawerPhase === 'loading' && <p className="people-state" role="status">{translate('people.recordLoading')}</p>}
         {drawerPhase === 'error' && <div className="form-error" role="alert">{translate('people.recordUnavailable')}</div>}
         {drawerPhase === 'ready' && (drawerId === 'new' || drawerRecord) && (drawerId === 'new' || drawerMode === 'edit'
-          ? <PersonForm key={drawerId} person={drawerId === 'new' ? null : drawerRecord!} workspaceName={workspaceName} sites={sites} sitesUnavailable={sitesUnavailable} saving={saving} onCancel={drawerId === 'new' ? closeDrawer : () => { setDirty(false); setError(null); setDrawerMode('view') }} onDirtyChange={setDirty} onSave={save} />
+          ? <PersonForm key={drawerId} person={drawerId === 'new' ? null : drawerRecord!} sites={sites} sitesUnavailable={sitesUnavailable} saving={saving} onCancel={drawerId === 'new' ? closeDrawer : () => { setDirty(false); setError(null); setDrawerMode('view') }} onDirtyChange={setDirty} onSave={save} />
           : <PersonOverview person={drawerRecord!} onEdit={() => setDrawerMode('edit')} onArchive={() => setArchiving(drawerRecord)} />)}
         {confirmingClose && <div className="archive-confirmation" role="alertdialog" aria-labelledby="people-unsaved-heading" aria-describedby="people-unsaved-description"><div><strong id="people-unsaved-heading">{translate('navigation.unsaved.title')}</strong><p id="people-unsaved-description">{translate('navigation.unsaved.description')}</p></div><div className="form-actions"><button autoFocus className="primary-button" type="button" onClick={() => setConfirmingClose(false)}>{translate('navigation.unsaved.keep')}</button><button className="secondary-button" type="button" onClick={finishClose}>{translate('navigation.unsaved.discard')}</button></div></div>}
         {archiving && drawerId && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-person-drawer-heading"><div><strong id="archive-person-drawer-heading">{translate('people.archiveQuestion', { name: archiving.full_name })}</strong><p>{translate('people.archiveHelp', { workspace: workspaceName })}</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? translate('common.archiving') : translate('people.archiveButton')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div></div>}
       </QuickDrawer>}
-      <section className="content-section people-list-section" aria-labelledby="people-list-heading">
-        <div className="section-heading people-list-heading"><h2 id="people-list-heading">{translate('people.directory')}</h2><span>{result ? translate(result.count === 1 ? 'people.countOne' : 'people.countMany', { count: result.count }) : translate('common.loading')}</span></div>
-        <div className="people-toolbar">
-          <label className="people-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('people.searchAll')}</span><input type="search" aria-label={translate('people.searchAll')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} placeholder={translate('people.searchPlaceholder')} /></label>
+      <section className="content-section people-list-section" aria-labelledby="people-heading">
+        <div className="client-collection-toolbar">
+          <label className="client-collection-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('people.searchAll')}</span><input type="search" aria-label={translate('people.searchAll')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} placeholder={translate('people.searchPlaceholder')} /></label>
           <FilterMenu groups={[{
             kind: 'custom',
             label: translate('people.personField'),
@@ -340,7 +355,7 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
             </div>,
           }]} activeCount={query.filter_field || query.filter_value ? 1 : 0} onClear={() => changeQuery({ filter_field: '', filter_value: '' })} menuLabel={translate('people.filters')} />
           <div className="column-settings" ref={settingsRef}>
-            <button className="secondary-button column-settings-trigger" type="button" aria-label={translate('people.chooseColumns')} title={translate('people.chooseColumns')} aria-expanded={columnsOpen} onClick={() => setColumnsOpen((open) => !open)}><Settings2 size={16} aria-hidden="true" /></button>
+            <button className="secondary-button column-settings-trigger" type="button" aria-label={translate('people.chooseColumns')} title={translate('people.chooseColumns')} aria-expanded={columnsOpen} onClick={() => setColumnsOpen((open) => !open)}><Settings2 size={16} aria-hidden="true" />{translate('collections.columns')}</button>
             {columnsOpen && <fieldset className="column-settings-popover"><legend>{translate('people.visibleColumns')}</legend>{optionalColumns.map((column) => <label key={column}><input type="checkbox" checked={visibleColumns.includes(column)} onChange={() => toggleColumn(column)} />{columnLabels[column]}</label>)}</fieldset>}
           </div>
         </div>
@@ -350,13 +365,12 @@ export function People({ workspace, client = browserPeopleClient, sitesClient = 
         {visiblePhase === 'ready' && result && result.results.length > 0 && (
           <div className="people-table-wrap" role="group" aria-label={translate('people.table')} tabIndex={0}>
             <table className="people-table">
-              <thead><tr>{visibleColumns.map((column) => <th key={column} scope="col" aria-sort={query.ordering === column ? 'ascending' : query.ordering === `-${column}` ? 'descending' : 'none'}><button type="button" onClick={() => sort(column)}>{columnLabels[column]}{query.ordering === column && <ArrowUp size={13} aria-hidden="true" />}{query.ordering === `-${column}` && <ArrowDown size={13} aria-hidden="true" />}</button></th>)}<th scope="col"><span className="sr-only">{translate('common.actions')}</span></th></tr></thead>
-              <tbody>{result.results.map((person) => <tr key={person.association_id}>{visibleColumns.map((column) => <td key={column} data-label={columnLabels[column]}>{column === 'full_name' ? <button id={`person-row-${person.id}`} className="collection-name" type="button" onClick={() => openPerson(person)}>{person.full_name}</button> : cellValue(person, column)}</td>)}<td className="people-row-actions"><button className="row-action" type="button" aria-label={translate('people.edit', { name: person.full_name })} onClick={() => openPerson(person, 'edit')}><Pencil size={15} aria-hidden="true" />{translate('common.edit')}</button><button className="row-action danger" type="button" aria-label={translate('people.archive', { name: person.full_name })} onClick={() => { setArchiving(person); setMessage(null) }}><Trash2 size={15} aria-hidden="true" />{translate('common.archive')}</button></td></tr>)}</tbody>
+              <thead><tr>{visibleColumns.map((column) => <th key={column} scope="col" aria-sort={query.ordering === column ? 'ascending' : query.ordering === `-${column}` ? 'descending' : 'none'}><button type="button" onClick={() => sort(column)}>{columnLabels[column]}{query.ordering === column && <ArrowUp size={13} aria-hidden="true" />}{query.ordering === `-${column}` && <ArrowDown size={13} aria-hidden="true" />}</button></th>)}</tr></thead>
+              <tbody>{result.results.map((person) => <tr key={person.association_id}>{visibleColumns.map((column) => <td key={column} data-label={columnLabels[column]}>{column === 'full_name' ? <button id={`person-row-${person.id}`} className="collection-name" type="button" onClick={() => openPerson(person)}>{person.full_name}</button> : cellValue(person, column)}</td>)}</tr>)}</tbody>
             </table>
           </div>
         )}
         {visiblePhase === 'ready' && result && result.count > result.page_size && <nav className="people-pagination" aria-label={translate('people.pages')}><button className="secondary-button" type="button" disabled={result.page === 1} onClick={() => changeQuery({ page: result.page - 1 })}><ChevronLeft size={15} aria-hidden="true" />{translate('common.previous')}</button><span>{translate('common.pageNumber', { page: result.page })}</span><button className="secondary-button" type="button" disabled={!result.has_more} onClick={() => changeQuery({ page: result.page + 1 })}>{translate('common.next')}<ChevronRight size={15} aria-hidden="true" /></button></nav>}
-        {archiving && !drawerId && <div className="archive-confirmation" role="alertdialog" aria-labelledby="archive-person-heading"><div><strong id="archive-person-heading">{translate('people.archiveQuestion', { name: archiving.full_name })}</strong><p>{translate('people.archiveHelp', { workspace: workspaceName })}</p></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving} onClick={() => { void archive() }}>{saving ? translate('common.archiving') : translate('people.archiveButton')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setArchiving(null)}>{translate('common.cancel')}</button></div></div>}
       </section>
     </>
   )

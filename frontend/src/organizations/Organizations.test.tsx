@@ -50,7 +50,7 @@ describe('Organizations', () => {
     const list = vi.fn().mockResolvedValueOnce({ results: [acme], page: 1, page_size: 25, count: 1, has_more: false }).mockResolvedValue({ results: [], page: 1, page_size: 25, count: 0, has_more: false })
     renderOrganizations(client({ list }))
 
-    expect(await screen.findByRole('button', { name: 'Edit Acme Dental' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Acme Dental' })).toBeInTheDocument()
     expect(screen.getByText('Client, Partner')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Acme Dental' }))
     const drawer = screen.getByRole('dialog', { name: 'Acme Dental' })
@@ -100,6 +100,7 @@ describe('Organizations', () => {
     const drawer = screen.getByRole('dialog', { name: 'Acme Dental' })
     expect(within(drawer).getByText('accounts@acme.example.com')).toBeInTheDocument()
     expect(within(drawer).getByText('400 Congress Avenue')).toBeInTheDocument()
+    await user.click(within(drawer).getByText('More', { exact: true }))
     await user.click(within(drawer).getByRole('button', { name: 'Edit billing' }))
     await user.clear(within(drawer).getByLabelText(/Billing contact/))
     await user.type(within(drawer).getByLabelText(/Billing contact/), 'Taylor Morgan')
@@ -115,9 +116,10 @@ describe('Organizations', () => {
     const archive = vi.fn().mockResolvedValue(undefined)
     const organizationClient = client({ update, archive })
     renderOrganizations(organizationClient)
-    await screen.findByRole('button', { name: 'Edit Acme Dental' })
+    await screen.findByRole('button', { name: 'Acme Dental' })
 
-    await user.click(screen.getByRole('button', { name: 'Edit Acme Dental' }))
+    await user.click(screen.getByRole('button', { name: 'Acme Dental' }))
+    await user.click(screen.getByRole('button', { name: 'Edit details' }))
     const name = screen.getByLabelText('Display name')
     await user.clear(name)
     await user.type(name, 'Acme Health')
@@ -125,6 +127,7 @@ describe('Organizations', () => {
     expect(update).toHaveBeenCalledWith(acme.id, expect.objectContaining({ name: 'Acme Health' }))
     expect(await screen.findByRole('status')).toHaveTextContent('Acme Health was updated.')
 
+    await user.click(screen.getByText('More', { exact: true }))
     await user.click(screen.getByRole('button', { name: 'Archive' }))
     expect(screen.getByRole('alertdialog', { name: 'Archive Acme Health?' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Archive organization' }))
@@ -149,12 +152,12 @@ describe('Organizations', () => {
     expect(screen.getByLabelText('Display name')).toHaveValue('Denied Client')
   })
 
-  it('keeps long organization names available to links and row actions', async () => {
+  it('keeps long organization names available without adding row actions', async () => {
     const longName = 'North Central Regional Healthcare and Community Services Cooperative'.repeat(3)
     renderOrganizations(client({ list: vi.fn().mockResolvedValue({ results: [{ ...acme, name: longName }], page: 1, page_size: 25, count: 1, has_more: false }) }))
 
     expect(await screen.findByRole('button', { name: longName })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: `Edit ${longName}` })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: `Edit ${longName}` })).not.toBeInTheDocument()
   })
 
   it('loads an off-page record from its URL and guards unfinished edits', async () => {

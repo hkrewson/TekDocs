@@ -188,17 +188,44 @@ Wiki updates, runtime evidence, known-risk disposition, and one descriptive comm
 Any required API or persistence change receives its own contract, migration,
 authorization, and compatibility review.
 
+## Clients rollout
+
+The approved reference direction now extends to Organizations, People, and
+Sites. These pages use one compact collection pattern: the record count sits
+with the page title, search remains visible, filters and column choices remain
+secondary, and the table contains records rather than a repeated set of row
+actions. Opening a record is the single way into its workflow.
+
+Organization records keep **Open workspace** and **Edit details** visible;
+billing, fields, and archive are in **More**. Person and site records keep
+**Edit details** visible and place infrequent or destructive actions in
+**More**. Site locations retain their contextual add and per-location action
+menu because those operations belong to the selected site rather than the
+collection. People search, field filter, ordering, and page state now survive a
+direct link or refresh. Existing authorization, denial, archive confirmation,
+dirty-state protection, and record URLs remain unchanged.
+
+Acceptance requires unit and browser coverage for search, filtering, sorting,
+direct links, record opening, create/edit/archive recovery, workspace isolation,
+keyboard use, responsive layout, and accessibility. No backend or persistence
+change is part of this slice.
+
 ## November 15, 2026 implementation evidence
 
 Verified:
 
-- all 888 frontend unit/component tests pass with the repository coverage gates;
+- all 889 frontend unit/component tests pass with the repository coverage gates;
 - lint, type checking, generated API agreement, the production build, CSP checks,
   untranslated-control coverage, and bundle budgets pass;
 - 60 reference shell/document browser cases pass across the six required widths,
   including Git-backed document and publication recovery paths;
 - eight Chromium/WebKit responsive cases pass across the required widths and
   200% zoom, including mobile navigation focus behavior;
+- 15 focused Chromium journeys pass for Clients and workspace switching,
+  including the new hub-to-destination behavior, URL-derived workspace state,
+  create/edit/archive recovery, denial, keyboard use, and axe checks;
+- the Organization record remains free of horizontal overflow and axe findings
+  at both 1440px and the required 320px minimum width;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

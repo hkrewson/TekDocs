@@ -30,7 +30,15 @@
 .record-facts dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
 .operational-record { display: grid; gap: 1.25rem; }
 .operational-record-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.operational-record-actions button { display: inline-flex; align-items: center; gap: .4rem; }
+.operational-record-actions button, .operational-record-actions a, .operational-record-actions summary { display: inline-flex; align-items: center; gap: .4rem; }
+.record-action-menu { position: relative; }
+.record-action-menu > summary { list-style: none; cursor: pointer; }
+.record-action-menu > summary::-webkit-details-marker { display: none; }
+.record-action-menu > div { position: absolute; top: calc(100% + 6px); right: 0; z-index: 12; min-width: 180px; display: grid; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-control); box-shadow: var(--shadow-popover); }
+.record-action-menu > div button { min-height: 36px; display: flex; align-items: center; gap: 8px; padding: 7px 9px; color: var(--text); background: transparent; border: 0; border-radius: 5px; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.record-action-menu > div button:hover, .record-action-menu > div button:focus-visible { background: var(--surface-subtle); }
+.record-action-menu > div button.danger { color: #7d3024; }
+.record-action-menu > div button.danger:not(:first-child) { border-top: 1px solid var(--border); border-radius: 0 0 5px 5px; }
 .operational-record-form { width: 100%; max-width: none; margin: 0; border: 0; box-shadow: none; }
 .operational-record-context { grid-column: 1 / -1; margin: 0; color: var(--muted); }
 .people-table { table-layout: fixed; white-space: normal; }

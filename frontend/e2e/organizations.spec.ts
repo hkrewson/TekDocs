@@ -13,7 +13,8 @@ type OrganizationInput = {
   classifications: string[]
 }
 
-test('organization administration supports create, edit, filter, and archive', async ({ page, baseURL }) => {
+test('organization administration supports create, edit, filter, and archive', async ({ page, baseURL }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
   const id = crypto.randomUUID()
   let organizations: Array<Record<string, unknown>> = []
   await page.context().addCookies([{ name: 'csrftoken', value: crypto.randomUUID().replaceAll('-', ''), url: baseURL }])
@@ -54,7 +55,16 @@ test('organization administration supports create, edit, filter, and archive', a
   await page.getByRole('button', { name: 'Save organization' }).click()
   await expect(page.getByRole('heading', { name: 'Acme Health' })).toBeVisible()
   await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
+  if (testInfo.project.name === 'chromium') await page.screenshot({ path: '../artifacts/clients-organization-record-1440.png', fullPage: true })
 
+  await page.setViewportSize({ width: 320, height: 900 })
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1))
+    .toBe(true)
+  await expect(new AxeBuilder({ page }).analyze()).resolves.toMatchObject({ violations: [] })
+  if (testInfo.project.name === 'chromium') await page.screenshot({ path: '../artifacts/clients-organization-record-320.png', fullPage: true })
+
+  await page.getByText('More', { exact: true }).click()
   await page.getByRole('button', { name: 'Archive', exact: true }).click()
   await page.getByRole('button', { name: 'Archive organization' }).click()
   await expect(page.getByRole('status')).toHaveText('Acme Health was moved to the recycle bin.')

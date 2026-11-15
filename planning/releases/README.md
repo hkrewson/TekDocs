@@ -9,14 +9,15 @@ the later release; the checkout's HEAD may be an evidence/tooling commit.
 ## Prepared 1.0.0 candidate
 
 The [1.0.0 candidate](1.0.0-candidate.md) aligns version metadata and records the
-intended Git-backed compatibility boundary. It is not accepted, authorized for
-release or published. The November 14 human
+intended Git-backed compatibility boundary. On November 14, 2026, the maintainer
+accepted the monitored latency risk and authorized the single versioned push to
+`main`, including automatic CI image, tag, receipt and evidence delivery.
+Publication is not claimed until that exact hosted run succeeds. The November 14 human
 [accessibility walkthrough](1.0-human-acceptance-walkthrough.md) passed across
 keyboard, touch/mobile, VoiceOver and native 200% zoom profiles. Codex Security
 scan `d6e6b1ca-e9e5-42e8-b780-a9ab06f16a88` completed the exact committed delta
 from `65598075` through `8c52b0da` with complete coverage and no findings.
-Exact-candidate hosted validation, current risk disposition and the maintainer's
-release decision remain open. The retained WebKit and recurring-
+Exact-candidate hosted validation and final Wiki publication remain open. The retained WebKit and recurring-
 template failures have a current
 [timing-risk investigation](1.0-timing-risk-disposition.md); local unchanged
 replays pass and the exact-candidate hosted replay remains open. The review of

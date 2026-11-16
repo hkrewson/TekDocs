@@ -235,14 +235,25 @@ describe('Compliance', () => {
     const router = setup(api, '/compliance?section=evidence')
     await user.click(await screen.findByRole('button', { name: 'Add or link evidence' }))
     await user.type(screen.getByLabelText('Title'), 'Draft evidence')
-    await user.click(screen.getByRole('link', { name: 'Risks' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Compliance view' }), 'risks')
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.search).toBe('?section=evidence')
     expect(screen.getByLabelText('Title')).toHaveValue('Draft evidence')
-    await user.click(screen.getByRole('link', { name: 'Risks' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Compliance view' }), 'risks')
     await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.search).toBe('?section=risks'))
     expect(screen.getByRole('heading', { name: 'Risk register' })).toBeInTheDocument()
+  })
+
+  it('preserves unrelated URL state when changing the compliance view', async () => {
+    const user = userEvent.setup()
+    const router = setup(client(), '/compliance?owner=me&section=evidence')
+
+    await screen.findByRole('heading', { name: 'Evidence' })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Compliance view' }), 'risks')
+
+    await waitFor(() => expect(router.state.location.search).toContain('section=risks'))
+    expect(router.state.location.search).toContain('owner=me')
   })
 
   it('retries a failed framework collection without reloading the page', async () => {

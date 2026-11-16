@@ -37,9 +37,8 @@ async function fixtures(page: Page) {
   await page.route(/\/compliance\/data-flows(\?|$)/, (route) => route.fulfill({ json: { results: [], page: 1, page_size: 50, count: 0, has_more: false, can_manage: true } }))
 }
 
-async function chooseSection(page: Page, section: 'evidence' | 'risks', mobile: boolean) {
-  if (mobile) await page.getByRole('combobox', { name: 'Sections' }).selectOption(section)
-  else await page.getByRole('link', { name: section === 'evidence' ? 'Evidence' : 'Risks' }).click()
+async function chooseSection(page: Page, section: 'evidence' | 'risks') {
+  await page.getByRole('combobox', { name: 'Compliance view' }).selectOption(section)
 }
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
@@ -52,17 +51,17 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await expect(page.getByRole('heading', { name: 'Risk register' })).toHaveCount(0)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 
-    await chooseSection(page, 'evidence', width < 768)
+    await chooseSection(page, 'evidence')
     await expect(page).toHaveURL(/section=evidence/)
     await expect(page.getByRole('heading', { name: 'Evidence' })).toBeVisible()
     await page.getByRole('button', { name: 'Add or link evidence' }).click()
     await page.getByLabel('Title').fill('Draft evidence')
-    await chooseSection(page, 'risks', width < 768)
+    await chooseSection(page, 'risks')
     await expect(page.getByRole('heading', { name: 'Unsaved changes' })).toBeVisible()
     await page.getByRole('button', { name: 'Keep editing' }).click()
     await expect(page).toHaveURL(/section=evidence/)
     await expect(page.getByLabel('Title')).toHaveValue('Draft evidence')
-    await chooseSection(page, 'risks', width < 768)
+    await chooseSection(page, 'risks')
     await page.getByRole('button', { name: 'Discard changes' }).click()
     await expect(page).toHaveURL(/section=risks/)
     await expect(page.getByRole('heading', { name: 'Risk register' })).toBeVisible()

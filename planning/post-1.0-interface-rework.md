@@ -281,11 +281,36 @@ browser coverage across the six required widths for collections, drawers, direct
 records, view selection, search, paging, recurring-invoice recovery, denial,
 keyboard use, and accessibility.
 
+## Assurance rollout
+
+Compliance is the single Assurance destination. Its Frameworks, Evidence, Risks,
+Review bundles, and Data flows are working views rather than permanent horizontal
+navigation. A compact **Compliance view** selector preserves the existing
+`section` query parameter and any unrelated query state. The active view exposes
+one primary task in the page header: create a framework, add or link evidence,
+record a risk, or create a locked review bundle. Data flows retains its contextual
+declaration action because its permission and unavailable state are independently
+enforced.
+
+Repeated introductory copy is removed from the page and section headings. Guidance
+remains where it changes a decision: new catalog versions retain history, accepted
+risks identify the accepting person and stay in the register, locked bundles are
+point-in-time records, and unverified data-flow drafts are explicitly not evidence.
+Existing framework selection, stable control identities, evidence reuse and
+linking, scored risk decisions, bundle verification, dirty-state recovery, direct
+links, permissions, APIs, and persistence are unchanged.
+
+Acceptance requires focused component coverage for all five views, retained query
+state, canceled and confirmed unsaved-change navigation, immutable framework and
+bundle behavior, evidence and risk decisions, and Data-flow provenance. Browser
+coverage must confirm the compact hierarchy, accessibility, and lack of horizontal
+overflow at all six required widths.
+
 ## November 15, 2026 implementation evidence
 
 Verified:
 
-- all 889 frontend unit/component tests pass with the repository coverage gates;
+- all 890 frontend unit/component tests pass with the repository coverage gates;
 - lint, type checking, generated API agreement, the production build, CSP checks,
   untranslated-control coverage, and bundle budgets pass;
 - 60 reference shell/document browser cases pass across the six required widths,
@@ -303,14 +328,19 @@ Verified:
   were also visually inspected;
 - 92 focused Chromium Operations journeys pass across the required widths for
   licenses, networks, domains, certificates, credential links, and the surrounding
-  shell; all 889 frontend unit/component tests, lint, type checking, and the
+  shell; all 890 frontend unit/component tests, lint, type checking, and the
   production bundle gate remain green;
 - 51 focused Chromium Business journeys pass across the required widths for
   services, vendors, products, invoices, recurring schedules, and stock. They
   include direct records, URL-backed supporting views, denial and recovery,
   keyboard use, 200% zoom, axe checks, and the reproduced narrow-header overflow;
-  all 889 frontend unit/component tests and the production bundle gate remain
+  all 890 frontend unit/component tests and the production bundle gate remain
   green;
+- ten focused Chromium Compliance and Data-flow journeys pass at 320, 390, 768,
+  1024, 1280, and 1440px. They cover URL-backed view selection, unsaved-change
+  recovery, accessible narrow-screen actions, retry behavior, keyboard authoring,
+  permission omission, non-colour provenance, axe checks, and horizontal overflow;
+  the rebuilt live Compliance page was also visually inspected;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

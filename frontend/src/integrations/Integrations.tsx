@@ -14,7 +14,6 @@ import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { browserNetworksClient } from '../networks/api'
 import type { NetBoxChoice, NetBoxObjectType, NetworksClient } from '../networks/api'
 import type { InventoryClient } from '../inventory/api'
-import { RecordSections } from '../records/RecordNavigation'
 import type { WorkspaceContext } from '../workspaces/api'
 import type { WebhooksClient } from './api'
 import { Imports } from './Imports'
@@ -38,18 +37,19 @@ const EMPTY_CONNECTION: IntegrationConnectionDraft = {
   provider: 'netbox', name: '', base_url: '', credentials: {}, sync_interval_minutes: 60,
 }
 
+type IntegrationSection = (typeof INTEGRATION_SECTIONS)[number]['id']
+
 export function Integrations({ workspace, client: webhookClient, documentsClient = browserDocumentsClient, providerClient = browserIntegrationsClient, networksClient = browserNetworksClient, importsClient, authClient = browserAuthClient }: {
   workspace: WorkspaceContext; client: WebhooksClient; documentsClient?: DocumentsClient; providerClient?: IntegrationsClient; networksClient?: NetworksClient; inventoryClient?: InventoryClient; importsClient?: ImportsClient; authClient?: Pick<AuthClient, 'reauthenticate'>
 }) {
   const [params, setParams] = useSearchParams()
-  const location = useLocation()
   const client = {
     ...webhookClient,
     gitExportDownloadUrl: (selectedWorkspace: WorkspaceContext, bundle: GitExportBundle) =>
       providerClient.gitExportDownloadUrl(selectedWorkspace, bundle),
   }
   const requestedSection = params.get('section')
-  const section = INTEGRATION_SECTIONS.some((item) => item.id === requestedSection) ? requestedSection! : 'connections'
+  const section: IntegrationSection = INTEGRATION_SECTIONS.some((item) => item.id === requestedSection) ? requestedSection as IntegrationSection : 'connections'
   const [connections, setConnections] = useState<IntegrationConnection[]>([])
   const [providers, setProviders] = useState<IntegrationProvider[]>([])
   const [jobs, setJobs] = useState<IntegrationJob[]>([])
@@ -177,6 +177,13 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
     if (page > 1) next.set('review_page', String(page)); else next.delete('review_page')
     if (search) next.set('review_search', search); else next.delete('review_search')
     if (type) next.set('review_type', type); else next.delete('review_type')
+    setParams(next)
+  }
+
+  function changeSection(nextSection: IntegrationSection) {
+    const next = new URLSearchParams(params)
+    if (nextSection === 'connections') next.delete('section')
+    else next.set('section', nextSection)
     setParams(next)
   }
 
@@ -344,17 +351,12 @@ export function Integrations({ workspace, client: webhookClient, documentsClient
   }
 
   return <>
-    <header className="page-header"><div><h1 id="integrations-heading" tabIndex={-1}>Integrations</h1></div></header>
-    <RecordSections current={section} sections={INTEGRATION_SECTIONS.map((item) => ({
-      ...item,
-      label: translate(item.label),
-      href: item.id === 'connections' ? location.pathname : `${location.pathname}?section=${item.id}`,
-    }))} />
+    <header className="page-header collection-page-header"><div><h1 id="integrations-heading" tabIndex={-1}>{translate('integrations.heading')}</h1></div><div className="page-actions"><label className="collection-view-picker"><span>{translate('integrations.view')}</span><select aria-label={translate('integrations.view')} value={section} onChange={(event) => changeSection(event.target.value as IntegrationSection)}>{INTEGRATION_SECTIONS.map((item) => <option key={item.id} value={item.id}>{translate(item.label)}</option>)}</select></label>{section === 'connections' && <button className="primary-button" type="button" disabled={showForm} onClick={() => setShowForm(true)}><Plus size={16} />{translate('integrations.newConnection')}</button>}</div></header>
     {error && <div className="form-message error" role="alert">{error}</div>}
     {phase === 'loading' && ['connections', 'reconciliation', 'exports'].includes(section) && <section className="content-section" role="status">Loading integration activity…</section>}
     {phase === 'error' && ['connections', 'reconciliation', 'exports'].includes(section) && <section className="content-section" role="alert"><h2>Integrations unavailable</h2><p>{translate('integrations.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => { setLoadState({ section, value: 'loading' }); setReload((current) => current + 1) }}>{translate('collections.retry')}</button></section>}
     {phase === 'ready' && section === 'connections' && <>
-      <section className="content-section"><div className="section-heading"><div><h2>Connections</h2></div><button className="primary-button" type="button" onClick={() => setShowForm(true)}><Plus size={16} />{translate('integrations.newConnection')}</button></div>
+      <section className="content-section" aria-label={translate('integrations.sections.connections')}>
         {connections.length === 0 ? <p className="empty-state">No systems are connected to this workspace.</p> : <div className="table-scroll" role="group" aria-label={translate('integrations.connectionTable')} tabIndex={0}><table><thead><tr><th>Name</th><th>System</th><th>Status</th><th>Last completed</th><th>Next update</th><th>Needs review</th><th>Actions</th></tr></thead><tbody>{connections.map((connection) => <tr key={connection.id}><td><strong>{connection.name}</strong><br /><small>{connection.provider_details.tenant_id ? `Tenant ${connection.provider_details.tenant_id}` : connection.base_url}</small></td><td>{providerFor(connection.provider)?.label ?? connection.provider} · {providerFor(connection.provider)?.direction === 'read_write_reviewed' ? translate('integrations.reviewedPublishing') : 'read-only'}<br /><small>{connection.provider_details.permission_status === 'verified' ? translate('integrations.permissionsVerified') : connection.provider_details.permission_status === 'not_validated' ? translate('integrations.permissionsUnchecked') : `Every ${connection.sync_interval_minutes} min`} · {connection.reconciliation_counts.observations ?? 0} records</small></td><td>{connection.active ? connection.health_status : 'paused'}{connection.last_error_code && <><br /><code>{connection.last_error_code}</code></>}</td><td>{connection.last_successful_sync_at ? new Date(connection.last_successful_sync_at).toLocaleString() : 'Not yet'}</td><td>{new Date(connection.next_sync_at).toLocaleString()}{connection.rate_limit_reset_at && <><br /><small>Rate limit resets {new Date(connection.rate_limit_reset_at).toLocaleString()}</small></>}</td><td>{connection.reconciliation_counts.review_required ?? 0}</td><td><div className="table-actions"><button className="secondary-button" type="button" disabled={saving || !connection.active} onClick={() => { void sync(connection) }}><Play size={14} />{translate('integrations.sync')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => beginEdit(connection)}><Pencil size={14} />{translate('common.edit')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => { void toggle(connection) }}>{connection.active ? 'Pause' : 'Resume'}</button><button className="secondary-button" type="button" disabled={saving} aria-label={`Replace the credential for ${connection.name}`} title={`Replace the credential for ${connection.name}`} onClick={() => beginRotate(connection)}><RefreshCw size={15} />{translate('integrations.rotateAction')}</button>{connection.provider === 'netbox' && <button className="secondary-button" type="button" disabled={saving} onClick={() => setWriteCredential({ connection, apiToken: '' })}>{connection.write_credential_configured ? translate('integrations.replacePublishToken') : translate('integrations.enablePublishing')}</button>}</div></td></tr>)}</tbody></table></div>}
         {rotating && providerFor(rotating.connection.provider) && <div className="archive-confirmation" role="alertdialog" aria-labelledby="replace-credential-heading" aria-describedby="replace-credential-help"><div><strong id="replace-credential-heading">{translate('integrations.rotateHeading', { name: rotating.connection.name })}</strong><p id="replace-credential-help">{translate('integrations.rotateHelp')}</p><div className="form-grid">{providerFor(rotating.connection.provider)?.credential_fields.map((field) => <label key={field.key}><span>{field.label}</span><input type={field.secret ? 'password' : 'text'} autoComplete={field.secret ? 'new-password' : 'off'} value={rotating.credentials[field.key] ?? ''} onChange={(event) => setRotating({ ...rotating, credentials: { ...rotating.credentials, [field.key]: event.target.value } })} /></label>)}</div></div><div className="form-actions"><button className="danger-button" type="button" disabled={saving || Boolean(providerFor(rotating.connection.provider)?.credential_fields.some((field) => (rotating.credentials[field.key]?.length ?? 0) < field.minimum_length))} onClick={() => { void rotate(rotating.connection, rotating.credentials) }}>{translate('integrations.rotateAction')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setRotating(null)}>{translate('common.cancel')}</button></div></div>}
         {writeCredential && <div className="archive-confirmation" role="alertdialog" aria-labelledby="netbox-write-heading"><div><strong id="netbox-write-heading">{translate('integrations.netboxWriteHeading')}</strong><p>{translate('integrations.netboxWriteHelp')}</p><label><span>{translate('integrations.netboxWriteToken')}</span><input autoFocus type="password" autoComplete="new-password" value={writeCredential.apiToken} onChange={(event) => setWriteCredential({ ...writeCredential, apiToken: event.target.value })} /></label></div><div className="form-actions"><button className="primary-button" type="button" disabled={saving || writeCredential.apiToken.length < 8} onClick={() => { void saveWriteCredential(writeCredential.connection, writeCredential.apiToken) }}>{translate('integrations.savePublishToken')}</button><button className="secondary-button" type="button" disabled={saving} onClick={() => setWriteCredential(null)}>{translate('common.cancel')}</button></div></div>}

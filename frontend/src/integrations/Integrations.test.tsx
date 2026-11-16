@@ -65,14 +65,13 @@ function setup(provider: IntegrationsClient, documents = documentsClient(), path
 }
 
 describe('Integrations', () => {
-  it('exposes each integration workflow as a durable link and loads only the active section', async () => {
+  it('exposes each integration workflow as a URL-backed view and loads only the active section', async () => {
     const provider = providerClient()
     const documents = documentsClient()
 
     setup(provider, documents)
 
-    expect(await screen.findByRole('link', { name: 'Connections' })).toHaveAttribute('href', '/workspaces/organizations/client-1/integrations')
-    expect(screen.getByRole('link', { name: 'Imports' })).toHaveAttribute('href', '/workspaces/organizations/client-1/integrations?section=imports')
+    expect(await screen.findByRole('combobox', { name: 'Integration view' })).toHaveValue('connections')
     expect(documents.list).not.toHaveBeenCalled()
     expect(provider.listGitExports).not.toHaveBeenCalled()
   })
@@ -92,7 +91,7 @@ describe('Integrations', () => {
     expect(provider.listConnections).toHaveBeenCalledWith(workspace, expect.any(AbortSignal))
     expect(documents.list).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'exports')
     await waitFor(() => expect(documents.list).toHaveBeenCalledWith({ organizationId: 'client-1' }, expect.any(AbortSignal)))
     await user.click(await screen.findByRole('checkbox', { name: /Switch replacement runbook/i }))
     await user.click(screen.getByRole('button', { name: 'Create bundle' }))
@@ -127,7 +126,7 @@ describe('Integrations', () => {
       })
     setup(provider, documents)
 
-    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'exports')
     const checkbox = await screen.findByRole('checkbox', { name: 'Include all accepted repository Markdown' })
     expect(screen.getByText(/not a backup/i)).toBeInTheDocument()
     expect(screen.getByText(/No legacy documents are available/i)).toBeInTheDocument()
@@ -136,7 +135,7 @@ describe('Integrations', () => {
     checkbox.focus()
     await user.keyboard(' ')
     expect(create).toBeEnabled()
-    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'imports')
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(checkbox).toBeChecked()
 
@@ -163,7 +162,7 @@ describe('Integrations', () => {
     })
     setup(provider, documents)
 
-    await user.click(screen.getByRole('link', { name: 'Git exports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'exports')
     expect(await screen.findByRole('status')).toHaveTextContent('Legacy document choices could not be loaded')
     const checkbox = screen.getByRole('checkbox', { name: 'Include all accepted repository Markdown' })
     await user.click(checkbox)
@@ -183,11 +182,11 @@ describe('Integrations', () => {
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     await user.click(await screen.findByRole('button', { name: 'New connection' }))
     await user.type(screen.getByLabelText('Name'), 'Draft connection')
-    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'imports')
     await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
     expect(router.state.location.search).toBe('')
     expect(screen.getByLabelText('Name')).toHaveValue('Draft connection')
-    await user.click(screen.getByRole('link', { name: 'Imports' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'imports')
     await user.click(await screen.findByRole('button', { name: 'Discard changes' }))
     await waitFor(() => expect(router.state.location.search).toBe('?section=imports'))
   })
@@ -252,7 +251,7 @@ describe('Integrations', () => {
       workspace, expect.objectContaining({ id: connection.id }), { api_token: 'replacement-token' },
     ))
 
-    await user.click(screen.getByRole('link', { name: 'Review queue' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Integration view' }), 'reconciliation')
     await waitFor(() => expect(provider.listConflicts).toHaveBeenCalledWith(workspace, {
       page: 1, page_size: 25, q: '', remote_type: '', status: 'open',
     }, expect.any(AbortSignal)))

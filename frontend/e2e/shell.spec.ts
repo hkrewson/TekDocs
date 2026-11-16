@@ -283,7 +283,7 @@ test('NinjaOne setup and review states are explicit and accessible', async ({ pa
 
   await page.goto('/integrations')
   await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Connections' })).toBeVisible()
   await expect(page.getByText(/Stale · source observed/)).toBeVisible()
   await page.getByRole('button', { name: 'New connection' }).click()
   const providerSelect = page.locator('.integration-connection-form select')
@@ -292,7 +292,7 @@ test('NinjaOne setup and review states are explicit and accessible', async ({ pa
   await expect(page.getByRole('link', { name: 'NinjaOne setup guidance' })).toHaveAttribute('href', /ninjaone\.com/)
   await expect(page.getByText(/read-only API application/)).toBeVisible()
   await page.locator('.integration-connection-form').getByRole('button', { name: 'Cancel' }).click()
-  await page.getByRole('link', { name: 'Review queue' }).click()
+  await page.getByRole('combobox', { name: 'Integration view' }).selectOption('reconciliation')
   await expect(page.getByRole('heading', { name: 'Review differences' })).toBeVisible()
   await expect(page.getByText('Reception laptop in TekDocs')).toBeVisible()
   await expect(page.getByText('changed', { exact: true })).toBeVisible()

@@ -157,14 +157,12 @@ export function CustomFields({ workspace, client = browserCustomFieldsClient }: 
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('dataModel.heading')}</h1></div><button className="primary-button" type="button" aria-label={translate('customFields.new')} title={translate('customFields.new')} onClick={() => { setClosingAfterSave(false); updateParameters({ field: 'new' }); setImpact(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('customFields.new')}</span></button></header>
-    <DataModelNavigation workspace={workspace} />
+    <header className="page-header collection-page-header"><div><h1>{translate('dataModel.heading')}</h1><p>{phase === 'ready' ? translate('customFields.count', { count: filtered.length }) : translate('common.loading')}</p></div><div className="page-actions"><DataModelNavigation workspace={workspace} /><button className="primary-button" type="button" aria-label={translate('customFields.new')} title={translate('customFields.new')} onClick={() => { setClosingAfterSave(false); updateParameters({ field: 'new' }); setImpact(null) }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('customFields.new')}</span></button></div></header>
     {editorId && (editorId === 'new' || editing) && <DefinitionForm key={`${scopeKey}:${editorId}`} definition={editing ?? null} organization={Boolean(workspace)} saving={saving} closingAfterSave={closingAfterSave} onCancel={() => updateParameters({ field: null })} onSave={save} />}
     {editorId && editorId !== 'new' && phase === 'ready' && !editing && <div className="form-message warning" role="alert">{translate('customFields.fieldUnavailable')} <button className="row-action" type="button" onClick={() => updateParameters({ field: null })}>{translate('common.close')}</button></div>}
     {error && phase !== 'error' && <div className="form-message error" role="alert">{error}</div>}
     {impact && <div className={`form-message${impact.incompatible ? ' warning' : ' success'}`} role="status">{versionCreatedMessage(impact)}</div>}
-    <section className="content-section" aria-busy={phase === 'loading'}>
-      <div className="section-heading"><h2>{translate('customFields.list')}</h2><span>{translate('customFields.count', { count: filtered.length })}</span></div>
+    <section className="content-section" aria-label={translate('customFields.list')} aria-busy={phase === 'loading'}>
       <div className="collection-toolbar metadata-toolbar">
         <label className="collection-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('customFields.search')}</span><input type="search" value={query} placeholder={translate('customFields.search')} onChange={(event) => updateParameters({ q: event.target.value, page: 1 }, true)} /></label>
         <FilterMenu groups={[{ kind: 'choices', label: translate('customFields.recordType'), value: entityType, choices: [{ value: '', label: translate('customFields.allRecordTypes') }, ...Object.entries(entityTypeLabels).map(([value, label]) => ({ value, label }))], onChange: (value) => updateParameters({ entity_type: value, page: 1 }) }]} activeCount={entityType ? 1 : 0} onClear={() => updateParameters({ entity_type: null, page: 1 })} />

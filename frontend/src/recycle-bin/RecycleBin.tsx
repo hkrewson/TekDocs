@@ -85,11 +85,10 @@ export function RecycleBin({ workspace, client = browserRecycleBinClient }: { wo
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('recycleBin.heading')}</h1><p>{translate('recycleBin.intro', { workspace: workspace?.name ?? translate('recycleBin.mspWorkspace') })}</p></div></header>
+    <header className="page-header collection-page-header"><div><h1>{translate('recycleBin.heading')}</h1><p>{result ? translate('recycleBin.count', { count: result.count }) : translate('common.loading')}</p></div></header>
     {restoreError && <div className="form-message error" role="alert">{restoreError}</div>}
     {notice && <div className="form-message success" role="status">{notice}</div>}
-    <section className="content-section" aria-labelledby="recycle-bin-heading">
-      <div className="section-heading recycle-bin-heading"><h2 id="recycle-bin-heading">{translate('recycleBin.archivedRecords')}</h2><span>{result ? translate('recycleBin.count', { count: result.count }) : translate('common.loading')}</span></div>
+    <section className="content-section" aria-label={translate('recycleBin.archivedRecords')}>
       <div className="recycle-bin-toolbar">
         <label className="recycle-bin-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('recycleBin.search')}</span><input type="search" value={query} onChange={(event) => updateParameters({ q: event.target.value, page: 1 }, true)} placeholder={translate('recycleBin.search')} /></label>
         <FilterMenu groups={[{ kind: 'choices', label: translate('recycleBin.recordType'), value: recordType, choices: [{ value: '', label: translate('recycleBin.allTypes') }, ...Object.entries(typeLabelKeys).map(([value, labelKey]) => ({ value, label: translate(labelKey) }))], onChange: (value) => updateParameters({ record_type: value, page: 1 }) }]} activeCount={recordType ? 1 : 0} onClear={() => updateParameters({ record_type: null, page: 1 })} menuLabel={translate('recycleBin.filters')} />

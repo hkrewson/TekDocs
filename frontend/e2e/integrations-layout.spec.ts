@@ -28,9 +28,8 @@ async function fixtures(page: Page) {
   await page.route('**/workspaces/msp/integrations/imports?*', (route) => route.fulfill({ json: { ...pageResult, page_size: 25 } }))
 }
 
-async function chooseSection(page: Page, section: 'imports', mobile: boolean) {
-  if (mobile) await page.getByRole('combobox', { name: 'Sections' }).selectOption(section)
-  else await page.getByRole('link', { name: 'Imports' }).click()
+async function chooseSection(page: Page, section: 'imports') {
+  await page.getByRole('combobox', { name: 'Integration view' }).selectOption(section)
 }
 
 for (const width of [320, 390, 768, 1024, 1280, 1440]) {
@@ -43,16 +42,16 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
       return route.fulfill({ json: [] })
     })
     await page.goto('/integrations')
-    await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Connections' })).toBeVisible()
     expect(exportReads).toBe(0)
     await page.getByRole('button', { name: 'New connection' }).click()
     await page.getByLabel('Name').fill('Draft NetBox')
-    await chooseSection(page, 'imports', width < 768)
+    await chooseSection(page, 'imports')
     await expect(page.getByRole('heading', { name: 'Unsaved changes' })).toBeVisible()
     await page.getByRole('button', { name: 'Keep editing' }).click()
     await expect(page).toHaveURL(/\/integrations$/)
     await expect(page.getByLabel('Name')).toHaveValue('Draft NetBox')
-    await chooseSection(page, 'imports', width < 768)
+    await chooseSection(page, 'imports')
     await page.getByRole('button', { name: 'Discard changes' }).click()
     await expect(page).toHaveURL(/section=imports/)
     await expect(page.getByRole('heading', { name: 'Preview an import' })).toBeVisible()
@@ -71,6 +70,6 @@ test('integration collections retry without reloading the page', async ({ page }
   await page.goto('/integrations')
   await expect(page.getByRole('alert')).toContainText('Integrations could not be loaded.')
   await page.getByRole('button', { name: 'Try again' }).click()
-  await expect(page.getByRole('heading', { name: 'Connections' })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Connections' })).toBeVisible()
   expect(attempts).toBe(2)
 })

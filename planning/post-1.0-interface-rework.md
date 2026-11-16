@@ -306,7 +306,45 @@ bundle behavior, evidence and risk decisions, and Data-flow provenance. Browser
 coverage must confirm the compact hierarchy, accessibility, and lack of horizontal
 overflow at all six required widths.
 
-## November 15, 2026 implementation evidence
+## Manage rollout
+
+Manage contains three destinations: **Integrations**, **Data model**, and
+**Recycle bin**. Settings remains in the permission-aware account menu until the
+product has workspace-level settings rather than only personal and administrative
+account controls.
+
+Integrations uses one compact **Integration view** selector for Connections,
+Imports, Review queue, Git exports, and Outgoing webhooks. Connections represent
+configured external systems and their controlled synchronization. The Review
+queue presents observed differences for an explicit operator decision; viewing a
+difference does not silently change either record. Outgoing webhooks send selected
+TekDocs events to an external endpoint and are therefore distinct from inbound or
+bidirectional connections. Git exports remain sanitized transfer bundles, not a
+backup. Existing `section` links, dirty-state protection, credentials,
+reconciliation decisions, reviewed publication, and authorization remain intact.
+
+Data model uses one compact **Data model view** selector for Fields and
+**Categories and tags**. Fields add structured values to supported record types;
+Categories and tags define controlled vocabularies for classifying supported
+content. Organization workspaces expose only their applicable Fields view. The
+existing custom-field and taxonomy paths, versioning, impact review, migration
+preview, and permission boundaries remain unchanged.
+
+Recycle bin removes repeated recovery copy and places its record count beside the
+page title. Search, type filtering, paging, restore eligibility, missing-parent
+handling, and the warning that restore is not backup remain unchanged. Across all
+three destinations, the active view and count are stated once, collection search
+stays visible, one create action is primary when applicable, and consequential
+guidance stays adjacent to the decision it affects.
+
+Acceptance requires component coverage for URL-backed view selection, lazy view
+loading, create/edit recovery, reconciliation, version impact, migration preview,
+restore success and failure, and loading/error/empty states. Browser coverage must
+confirm retained query state, keyboard operation, accessibility, and responsive
+layout at all six required widths. No API, schema, persistence, or authorization
+change is part of this slice.
+
+## November 15–16, 2026 implementation evidence
 
 Verified:
 
@@ -341,6 +379,10 @@ Verified:
   recovery, accessible narrow-screen actions, retry behavior, keyboard authoring,
   permission omission, non-colour provenance, axe checks, and horizontal overflow;
   the rebuilt live Compliance page was also visually inspected;
+- 29 focused Manage component tests and 41 focused Chromium browser journeys pass.
+  They cover the Integration and Data model selectors, lazy loading, retry,
+  unsaved-change recovery, reconciliation, custom-field and taxonomy workflows,
+  Recycle bin, shell behavior, and all six required widths;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

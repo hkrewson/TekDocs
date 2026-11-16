@@ -43,7 +43,7 @@ describe('Contracts', () => {
     const createCost = vi.fn().mockResolvedValue({ ...contract, costs: [{ id: 'cost-1', label: 'Managed devices', amount: '19.50', currency: 'USD', billing_interval: 'monthly', quantity: '25.000', starts_on: null, ends_on: null, reference: '' }] })
     const updateCost = vi.fn().mockResolvedValue({ ...contract, costs: [{ id: 'cost-1', label: 'Managed devices', amount: '21.00', currency: 'USD', billing_interval: 'monthly', quantity: '25.000', starts_on: null, ends_on: null, reference: '' }] })
     const user = userEvent.setup()
-    render(<Contracts preferenceClient={preferenceClient} workspace={workspace} client={commercialClient({ createContract, createCost, updateCost })} />)
+    render(<Contracts preferenceClient={preferenceClient} workspace={workspace} client={commercialClient({ createContract, createCost, updateCost })} />, '/services')
     await user.click(await screen.findByRole('button', { name: 'New contract' }))
     const form = screen.getByRole('dialog')
     await user.type(within(form).getByLabelText('Contract name'), 'Managed endpoint service')

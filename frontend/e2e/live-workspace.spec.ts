@@ -85,7 +85,7 @@ async function completeRequiredPrivilegedTotp(page: Page, password: string, acco
 
 async function rehearseRecurringDraft(page: Page) {
   await page.getByRole('link', { name: 'Invoices', exact: true }).click()
-  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Invoice view' }).selectOption('recurring')
   await page.getByRole('button', { name: 'Enroll recurring service' }).click()
   const sourceResponse = page.waitForResponse((response) => /\/recurring-invoices\/sources\/[^/]+$/.test(response.url()) && response.request().method() === 'GET')
   await page.getByRole('button', { name: /Managed service base/ }).click()
@@ -139,7 +139,7 @@ async function rehearseRecurringDraft(page: Page) {
   await expect(page.getByRole('button', { name: 'Issue invoice' })).toHaveCount(0)
 
   await page.getByRole('link', { name: 'Back to invoices' }).click()
-  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Invoice view' }).selectOption('recurring')
   await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live approved monthly support/ }).click()
   await page.getByRole('button', { name: 'Change future terms' }).click()
   await page.getByLabel('Effective billing period').fill(nextBoundary)
@@ -162,7 +162,7 @@ async function rehearseRecurringDraft(page: Page) {
 
   // A fresh page must retain the stop and rediscover the same invoice.
   await page.reload()
-  await page.getByRole('button', { name: 'Recurring invoices', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Invoice view' }).selectOption('recurring')
   await page.getByRole('region', { name: 'Recurring invoices', exact: true }).getByRole('button', { name: /^Live amended monthly support/ }).click()
   await expect(page.getByText('Future drafts are stopped. Existing invoices and billing history remain available. Restarting is not supported.')).toBeVisible()
   await page.getByLabel('Period starts from').fill(anchor)
@@ -350,7 +350,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
     if (route.request().method() === 'POST') await new Promise((resolve) => setTimeout(resolve, 1_000))
     await route.continue()
   })
-  await page.getByRole('tab', { name: 'Specification templates' }).click()
+  await page.getByRole('combobox', { name: 'Product view' }).selectOption('definitions')
   await page.getByRole('button', { name: 'New specification template' }).click()
   await page.getByLabel('Template name').fill('Managed switch')
   await page.getByLabel('Import name').fill('port_count')
@@ -359,7 +359,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Required').check()
   await page.getByRole('button', { name: 'Create template' }).click()
   await expect(page.getByText('Managed switch', { exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Products and models' }).click()
+  await page.getByRole('combobox', { name: 'Product view' }).selectOption('products')
   await page.getByRole('button', { name: 'New product' }).click()
   const hardwareProductEditor = page.getByRole('dialog', { name: 'New product' })
   await expect(hardwareProductEditor).toBeVisible()
@@ -380,7 +380,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('LIVE-ES-24 · Active · version 2')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Live EdgeSwitch' })).toHaveCount(0)
-  await page.getByRole('tab', { name: 'Specification templates' }).click()
+  await page.getByRole('combobox', { name: 'Product view' }).selectOption('definitions')
   await page.getByRole('button', { name: 'New specification template' }).click()
   await page.getByLabel('Template name').fill('Endpoint software')
   await page.getByLabel('Product type').selectOption('software')
@@ -389,7 +389,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByLabel('Required').check()
   await page.getByRole('button', { name: 'Create template' }).click()
   await expect(page.getByText('Endpoint software', { exact: true })).toBeVisible()
-  await page.getByRole('tab', { name: 'Products and models' }).click()
+  await page.getByRole('combobox', { name: 'Product view' }).selectOption('products')
   await page.getByRole('button', { name: 'New product' }).click()
   const softwareProductEditor = page.getByRole('dialog', { name: 'New product' })
   await expect(softwareProductEditor).toBeVisible()

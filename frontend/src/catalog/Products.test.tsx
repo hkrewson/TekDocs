@@ -103,7 +103,7 @@ describe('Products', () => {
     const api = catalogClient({ createDefinition, versionDefinition })
     const user = userEvent.setup()
     renderProducts(api)
-    await user.click(await screen.findByRole('tab', { name: 'Specification templates' }))
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Product view' }), 'definitions')
     await user.click(await screen.findByRole('button', { name: 'New specification template' }))
     let editor = screen.getByRole('heading', { name: 'New specification template' }).closest('section')!
     await user.type(within(editor).getByLabelText('Template name'), 'Wireless access point')
@@ -143,7 +143,7 @@ describe('Products', () => {
     expect(within(editor).queryByRole('button', { name: 'Add model' })).not.toBeInTheDocument()
     await user.click(within(editor).getByRole('button', { name: 'Cancel' }))
     expect(screen.queryByRole('heading', { name: 'Add model' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: 'Specification templates' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Product view' }), 'definitions')
     await user.click(screen.getByRole('button', { name: 'New specification template' }))
     expect(screen.getByRole('heading', { name: 'New specification template' })).toBeInTheDocument()
     expect(createModel).not.toHaveBeenCalled()

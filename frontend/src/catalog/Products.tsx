@@ -180,7 +180,7 @@ function ProductForm({ draft, creating, saving, onChange, onCancel, onSave }: { 
 
 export function Products({ workspace, client }: { workspace: WorkspaceContext; client: CatalogClient }) {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [tab, setTab] = useState<Tab>('products')
+  const tab: Tab = searchParams.get('catalog_view') === 'templates' ? 'definitions' : 'products'
   const [query, setQuery] = useState<ProductQuery>(() => initialQuery(searchParams))
   const [loaded, setLoaded] = useState<{ scope: string; result: ProductResult } | null>(null)
   const [definitions, setDefinitions] = useState<SpecificationDefinition[]>([])
@@ -246,6 +246,14 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
   const sort = (field: 'name' | 'updated_at') => changeQuery({ ordering: query.ordering === field ? `-${field}` : field })
   const sortIndicator = (field: string) => query.ordering === field ? <ArrowUp size={13} aria-hidden="true" /> : query.ordering === `-${field}` ? <ArrowDown size={13} aria-hidden="true" /> : null
   const closeDrawer = () => { setProductDraft(null); setModelDraft(null); setDocumentDraft(null); setArchivingProduct(null); setArchivingModel(null); setRemovingDocument(null); updateDrawerUrl(null) }
+  const changeView = (nextTab: Tab) => {
+    setProductDraft(null); setModelDraft(null); setDocumentDraft(null); setDefinitionDraft(null)
+    setArchivingProduct(null); setArchivingModel(null); setRemovingDocument(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('product')
+    if (nextTab === 'definitions') next.set('catalog_view', 'templates'); else next.delete('catalog_view')
+    setSearchParams(next)
+  }
 
   async function perform(action: () => Promise<unknown>) {
     setSaving(true); setError(null)
@@ -271,19 +279,16 @@ export function Products({ workspace, client }: { workspace: WorkspaceContext; c
   }
 
   return <>
-    <header className="page-header"><div><h1>{translate('catalog.heading', { supplier: workspace.name })}</h1></div>
+    <header className="page-header collection-page-header"><div><h1>{translate('catalog.heading', { supplier: workspace.name })}</h1><p>{phase !== 'ready' ? translate('common.loading') : tab === 'products' ? translate(result?.count === 1 ? 'catalog.productCount' : 'catalog.productCountPlural', { count: result?.count ?? 0 }) : translate(definitions.length === 1 ? 'catalog.templateCount' : 'catalog.templateCountPlural', { count: definitions.length })}</p></div><div className="page-actions">
+      <label className="collection-view-picker"><span>{translate('catalog.view')}</span><select aria-label={translate('catalog.view')} value={tab} onChange={(event) => changeView(event.target.value as Tab)}><option value="products">{translate('catalog.productsAndModels')}</option><option value="definitions">{translate('catalog.specificationTemplates')}</option></select></label>
       {canManage && tab === 'products' && <button className="primary-button" type="button" aria-label={translate('products.new')} title={translate('products.new')} onClick={() => { setProductDraft({ ...EMPTY_PRODUCT }); updateDrawerUrl('new') }}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('products.new')}</span></button>}
       {canManage && tab === 'definitions' && <button className="primary-button" type="button" aria-label={translate('catalog.newTemplate')} title={translate('catalog.newTemplate')} onClick={() => setDefinitionDraft('new')}><Plus size={16} aria-hidden="true" /><span className="button-label">{translate('catalog.newTemplate')}</span></button>}
+      </div>
     </header>
     {error && <div className="form-message error" role="alert">{error}</div>}
-    <div className="mode-tabs catalog-tabs" role="tablist" aria-label={translate('catalog.sections')}>
-      <button type="button" role="tab" aria-selected={tab === 'products'} className={tab === 'products' ? 'selected' : ''} onClick={() => setTab('products')}>{translate('catalog.productsAndModels')}</button>
-      <button type="button" role="tab" aria-selected={tab === 'definitions'} className={tab === 'definitions' ? 'selected' : ''} onClick={() => { setTab('definitions'); closeDrawer() }}>{translate('catalog.specificationTemplates')}</button>
-    </div>
     {phase === 'loading' && <section className="content-section" role="status">{translate('catalog.loading')}</section>}
     {phase === 'error' && <section className="content-section workspace-error" role="alert"><h2>{translate('catalog.unavailable')}</h2><p>{translate('catalog.loadFailed')}</p></section>}
-    {phase === 'ready' && tab === 'products' && <section className="content-section catalog-index" aria-labelledby="product-directory-heading">
-        <div className="section-heading"><h2 id="product-directory-heading">{translate('catalog.productDirectory')}</h2><span>{result ? translate('pagination.range', { first: result.count ? (result.page - 1) * result.page_size + 1 : 0, last: Math.min(result.page * result.page_size, result.count), count: result.count }) : translate('common.loading')}</span></div>
+    {phase === 'ready' && tab === 'products' && <section className="content-section catalog-index" aria-label={translate('catalog.productDirectory')}>
         <div className="catalog-filters">
           <label><span className="sr-only">{translate('catalog.search')}</span><Search size={16} /><input type="search" aria-label={translate('catalog.search')} placeholder={translate('catalog.searchPlaceholder')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} /></label>
           <FilterMenu groups={[{ kind: 'choices', label: translate('catalog.type'), value: query.kind, choices: [{ value: '', label: translate('catalog.allTypes') }, { value: 'hardware', label: translate('catalog.hardware') }, { value: 'software', label: translate('catalog.software') }], onChange: (value) => changeQuery({ kind: value as ProductKind | '' }) }]} activeCount={query.kind ? 1 : 0} onClear={() => changeQuery({ kind: '' })} menuLabel={translate('catalog.filters')} />

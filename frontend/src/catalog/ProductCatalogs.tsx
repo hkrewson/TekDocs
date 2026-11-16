@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { translate } from '../i18n/localization'
@@ -38,8 +37,8 @@ export function ProductCatalogs({ client }: { client: WorkspaceClient }) {
   }, [client])
 
   return <>
-    <header className="page-header"><div><h1>{translate('products.heading')}</h1><p>{translate('products.intro')}</p></div></header>
+    <header className="page-header"><div><h1>{translate('products.heading')}</h1><p>{suppliers ? translate(suppliers.length === 1 ? 'products.count' : 'products.countPlural', { count: suppliers.length }) : translate('common.loading')}</p></div></header>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <section className="content-section" aria-labelledby="supplier-catalogs-heading"><div className="section-heading"><div><h2 id="supplier-catalogs-heading">{translate('products.catalogs')}</h2><p>{translate('products.scope')}</p></div></div>{suppliers === null && !error ? <p role="status">{translate('products.loading')}</p> : suppliers?.length === 0 ? <p className="empty-state">{translate('products.empty')}</p> : <ul className="exposure-link-list">{suppliers?.map((supplier) => <li key={supplier.id}><span><strong>{supplier.name}</strong><small>{supplier.classifications.map((classification) => classification === 'manufacturer' ? translate('products.manufacturer') : classification === 'vendor' ? translate('products.vendor') : classification).join(' · ')}</small></span><Link className="secondary-button" to={`/workspaces/organizations/${encodeURIComponent(supplier.id)}/products`}>{translate('products.open')}<ExternalLink size={14} aria-hidden="true" /></Link></li>)}</ul>}</section>
+    <section className="content-section" aria-label={translate('products.catalogs')}>{suppliers === null && !error ? <p role="status">{translate('products.loading')}</p> : suppliers?.length === 0 ? <p className="empty-state">{translate('products.empty')}</p> : <ul className="exposure-link-list">{suppliers?.map((supplier) => <li key={supplier.id}><span><Link to={`/workspaces/organizations/${encodeURIComponent(supplier.id)}/products`}><strong>{supplier.name}</strong></Link><small>{supplier.classifications.map((classification) => classification === 'manufacturer' ? translate('products.manufacturer') : classification === 'vendor' ? translate('products.vendor') : classification).join(' · ')}</small></span></li>)}</ul>}</section>
   </>
 }

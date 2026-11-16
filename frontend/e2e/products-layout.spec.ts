@@ -62,7 +62,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await mockProductWorkspace(page, baseURL)
     await page.goto(`/workspaces/organizations/${supplierId}/products`)
 
-    await expect(page.getByRole('heading', { name: 'Product directory' })).toBeVisible()
+    await expect(page.getByText('1 product', { exact: true })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await page.locator('tbody .collection-name').click()
     const drawer = page.getByRole('dialog', { name: product.name })

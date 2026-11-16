@@ -72,7 +72,6 @@ export function Vendors({ workspace, client }: { workspace: WorkspaceContext; cl
   const sort = (field: 'name' | 'asset_count') => changeQuery({ ordering: query.ordering === field ? `-${field}` : field })
   const sortIndicator = (field: string) => query.ordering === field ? <ArrowUp size={13} aria-hidden="true" /> : query.ordering === `-${field}` ? <ArrowDown size={13} aria-hidden="true" /> : null
   const openVendor = (vendor: DerivedVendor) => { setSelected({ scope, record: vendor }); setDrawerErrorId(null); updateDrawerUrl(vendor.id) }
-  const intro = workspace.kind === 'msp' ? translate('vendors.introMsp') : translate('vendors.introClient')
   const returnHref = workspace.kind === 'msp' ? '/vendors' : `/workspaces/organizations/${workspace.id}/vendors`
   const organizationPath = drawerRecord ? `/workspaces/organizations/${drawerRecord.id}` : ''
   const rangeStart = result && result.count ? (result.page - 1) * result.page_size + 1 : 0
@@ -80,7 +79,7 @@ export function Vendors({ workspace, client }: { workspace: WorkspaceContext; cl
   const countLabel = useMemo(() => result ? translate('pagination.range', { first: rangeStart, last: rangeEnd, count: result.count }) : translate('common.loading'), [rangeEnd, rangeStart, result])
 
   return <>
-    <header className="page-header"><div><h1>{translate('vendors.heading')}</h1><p>{intro}</p></div></header>
+    <header className="page-header"><div><h1>{translate('vendors.heading')}</h1><p>{countLabel}</p></div></header>
     {drawerId && <QuickDrawer title={drawerRecord?.name ?? translate('vendors.supplierRecord')} onClose={() => updateDrawerUrl(null)} returnFocusId={`vendor-row-${drawerId}`} returnHref={returnHref} returnLabel={translate('vendors.back')}>
       {drawerPhase === 'loading' && <p role="status">{translate('vendors.loadingSupplier')}</p>}
       {drawerPhase === 'error' && <div className="workspace-error" role="alert"><h3>{translate('vendors.supplierUnavailable')}</h3><p>{translate('vendors.supplierUnavailableHelp')}</p></div>}
@@ -91,8 +90,7 @@ export function Vendors({ workspace, client }: { workspace: WorkspaceContext; cl
         <div><dt>{translate('vendors.websiteColumn')}</dt><dd>{drawerRecord.website ? <a href={drawerRecord.website} rel="noreferrer" target="_blank">{drawerRecord.website}<ExternalLink size={13} aria-hidden="true" /></a> : translate('vendors.notProvided')}</dd></div>
       </dl><div className="operational-record-actions"><Link className="primary-button" to={`${organizationPath}/overview`}>{translate('vendors.openWorkspace')}</Link><Link className="secondary-button" to={`${organizationPath}/products`}>{translate('vendors.openProducts')}</Link></div></div>}
     </QuickDrawer>}
-    <section className="content-section" aria-labelledby="vendor-list-heading">
-      <div className="section-heading"><h2 id="vendor-list-heading">{translate('vendors.directory')}</h2><span>{countLabel}</span></div>
+    <section className="content-section" aria-label={translate('vendors.directory')}>
       <label className="site-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('vendors.search')}</span><input type="search" aria-label={translate('vendors.search')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} placeholder={translate('vendors.searchPlaceholder')} /></label>
       {visiblePhase === 'loading' && <p role="status">{translate('vendors.loading')}</p>}
       {visiblePhase === 'error' && <div className="workspace-error" role="alert"><h2>{translate('vendors.unavailable')}</h2><p>{translate('vendors.loadFailed')}</p></div>}

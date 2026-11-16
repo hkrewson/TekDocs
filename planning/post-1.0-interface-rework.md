@@ -255,6 +255,32 @@ sorting, paging, direct off-page records, create/edit recovery, and denial; brow
 coverage must confirm the compact hierarchy and usable controls at desktop and the
 required narrow widths.
 
+## Business rollout
+
+Services, Vendors, Products, Invoices, and Stock follow the same compact
+collection hierarchy without flattening their distinct commercial boundaries.
+Counts sit with the page title, repeated directory headings and introductory
+sentences are removed, and record names remain the collection entry point.
+Services, invoices, and stock retain one visible create action when authorized;
+the derived Vendors collection and MSP catalog chooser do not imply a second way
+to create organization identity.
+
+Product specification templates and recurring invoice schedules are supporting
+working views, not permanent horizontal navigation or competing page actions.
+Compact selectors expose them and preserve `catalog_view=templates` and
+`invoice_view=recurring` in the URL. Opening a product or invoice returns to the
+primary record view while keeping existing collection search, filter, order,
+paging, drawer, record, and permission behavior unchanged. Issuance,
+reauthentication, immutable invoice evidence, cost visibility, stock quantities,
+and archive consequences retain their existing authorization and recovery
+boundaries. This slice does not change backend APIs, persistence, or accounting
+semantics.
+
+Acceptance requires component coverage for all five Business destinations and
+browser coverage across the six required widths for collections, drawers, direct
+records, view selection, search, paging, recurring-invoice recovery, denial,
+keyboard use, and accessibility.
+
 ## November 15, 2026 implementation evidence
 
 Verified:
@@ -279,6 +305,12 @@ Verified:
   licenses, networks, domains, certificates, credential links, and the surrounding
   shell; all 889 frontend unit/component tests, lint, type checking, and the
   production bundle gate remain green;
+- 51 focused Chromium Business journeys pass across the required widths for
+  services, vendors, products, invoices, recurring schedules, and stock. They
+  include direct records, URL-backed supporting views, denial and recovery,
+  keyboard use, 200% zoom, axe checks, and the reproduced narrow-header overflow;
+  all 889 frontend unit/component tests and the production bundle gate remain
+  green;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

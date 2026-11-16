@@ -40,7 +40,7 @@ test('supplier products use plain version language and explain archive consequen
   await page.setViewportSize({ width: 320, height: 720 })
   await page.goto(`/workspaces/organizations/${supplierId}/products`)
   await expect(page.getByRole('heading', { name: 'Example Manufacturer products' })).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'Specification templates' })).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Product view' })).toBeVisible()
   await page.getByRole('button', { name: 'EdgeSwitch', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'EdgeSwitch' }).getByText('ES-24 · Active · version 1')).toBeVisible()
 
@@ -112,7 +112,8 @@ for (const width of [1280, 390]) {
     await expect(page.getByRole('heading', { name: 'Add model' })).toHaveCount(0)
     await page.keyboard.press('Escape')
     await expect(drawer).toHaveCount(0)
-    await page.getByRole('tab', { name: 'Specification templates' }).click()
+    await page.getByRole('combobox', { name: 'Product view' }).selectOption('definitions')
+    await expect(page).toHaveURL(/catalog_view=templates/)
     await page.getByRole('button', { name: 'New specification template' }).click()
     await expect(page.getByRole('heading', { name: 'New specification template' })).toBeVisible()
     expect(errors).toEqual([])

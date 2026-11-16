@@ -6,7 +6,7 @@
   "type": "module",
   "dependencies": {
     "@mermaid-js/mermaid-cli": "11.16.0",
-    "puppeteer": "25.16.0"
+    "puppeteer": "25.17.0"
   },
   "overrides": {
     "katex": "0.18.3"

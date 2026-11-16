@@ -189,7 +189,7 @@ export function Certificates({ workspace, client }: { workspace: WorkspaceContex
   }, [parameters])
 
   return <>
-    <header className="page-header"><div><h1>{translate('certificates.heading')}</h1><p>{translate('certificates.intro')}</p></div></header>
+    <header className="page-header"><div><h1>{translate('certificates.heading')}</h1><p className="page-count">{phase === 'ready' ? translate(pageState.count === 1 ? 'certificates.countOne' : 'certificates.countMany', { count: pageState.count }) : translate('common.loading')}</p></div></header>
     <section className="content-section domain-collection" aria-busy={phase === 'loading'}>
       <div className="domain-toolbar certificate-toolbar"><label className="domain-search"><span>{translate('certificates.search')}</span><input type="search" value={query} placeholder="Domain name" onChange={(event) => changeCollection({ q: event.target.value }, true)} /></label><label className="collection-page-size"><span>Rows</span><select value={pageSize} onChange={(event) => changeCollection({ page_size: Number(event.target.value) })}>{PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label></div>
       {query && <div className="collection-active-filters"><button type="button" className="row-action" onClick={() => changeCollection({ q: null })}>{translate('collections.searchFilter', { value: query })}</button></div>}

@@ -184,7 +184,7 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
   const returnHref = workspace.kind === 'msp' ? '/licenses' : `/workspaces/organizations/${workspace.id}/licenses`
 
   return <>
-    <header className="page-header"><div><h1>{translate('licenses.heading')}</h1><p>{translate('licenses.pageHelp')}</p></div>{result?.can_manage && <button type="button" className="primary-button" onClick={startCreate}><Plus size={16} aria-hidden="true" /><span>{translate('licenses.new')}</span></button>}</header>
+    <header className="page-header"><div><h1>{translate('licenses.heading')}</h1><p className="page-count">{countLabel}</p></div>{result?.can_manage && <button type="button" className="primary-button" onClick={startCreate}><Plus size={16} aria-hidden="true" /><span>{translate('licenses.new')}</span></button>}</header>
     {drawerId && <QuickDrawer title={creating ? translate('licenses.newSoftware') : drawerRecord?.name ?? translate('licenses.record')} onClose={closeDrawer} returnFocusId={creating ? undefined : `license-row-${drawerId}`} returnHref={returnHref} returnLabel={translate('licenses.back')}>
       {error && <div className="form-message error" role="alert">{error}</div>}
       {drawerPhase === 'loading' && <p role="status">{translate('licenses.loadingRecord')}</p>}
@@ -192,8 +192,7 @@ export function Licenses({ workspace, client }: { workspace: WorkspaceContext; c
       {creating && <LicenseForm title={translate('licenses.newSoftware')} form={form} setForm={setForm} choices={choices} busy={busy} requireInstallation cancel={closeDrawer} submit={() => void perform(() => client.createLicense(workspace, payloadFromForm(form)), true)} />}
       {drawerPhase === 'ready' && drawerRecord && <LicenseDetail record={drawerRecord} canManage={Boolean(result?.can_manage)} choices={choices} mode={mode} setMode={setMode} seat={seat} setSeat={setSeat} linkId={linkId} setLinkId={setLinkId} busy={busy} attempt={attempt} perform={perform} client={client} workspace={workspace} form={form} setForm={setForm} />}
     </QuickDrawer>}
-    <section className="content-section" aria-labelledby="license-list-heading">
-      <div className="section-heading"><h2 id="license-list-heading">{translate('licenses.directory')}</h2><span>{countLabel}</span></div>
+    <section className="content-section" aria-label={translate('licenses.directory')}>
       <div className="collection-toolbar"><label className="collection-search"><Search size={16} aria-hidden="true" /><span className="sr-only">{translate('licenses.search')}</span><input type="search" aria-label={translate('licenses.search')} value={query.q} onChange={(event) => changeQuery({ q: event.target.value })} placeholder={translate('licenses.searchPlaceholder')} /></label><FilterMenu activeCount={Number(Boolean(query.kind)) + Number(Boolean(query.status))} onClear={() => changeQuery({ kind: '', status: '' })} groups={[
         { kind: 'choices', label: translate('licenses.kind'), value: query.kind, choices: ['', 'subscription', 'perpetual', 'trial'].map((value) => ({ value, label: value ? translate(`licenses.kind_${value}` as 'licenses.kind_subscription') : translate('licenses.allKinds') })), onChange: (value) => changeQuery({ kind: value as LicenseQuery['kind'] }) },
         { kind: 'choices', label: translate('licenses.status'), value: query.status, choices: ['', 'active', 'suspended', 'expired', 'terminated'].map((value) => ({ value, label: value ? translate(`licenses.status_${value}` as 'licenses.status_active') : translate('licenses.allStatuses') })), onChange: (value) => changeQuery({ status: value as LicenseQuery['status'] }) },

@@ -185,7 +185,7 @@ export function CredentialReferences({ workspace, client }: { workspace: Workspa
   const drawerTitle = selectedId === 'new' ? translate('credentials.newHeading') : drawerRecord?.title ?? translate('credentials.record')
 
   return <>
-    <header className="page-header"><div><h1>{translate('credentials.heading')}</h1><p>{translate('credentials.intro')}</p></div>{canManage && <button className="primary-button" type="button" onClick={openNew}><Plus size={16} aria-hidden="true" />{translate('credentials.new')}</button>}</header>
+    <header className="page-header"><div><h1>{translate('credentials.heading')}</h1><p className="page-count">{phase === 'ready' ? translate('credentials.count', { count: pageState.count }) : translate('common.loading')}</p></div>{canManage && <button className="primary-button" type="button" onClick={openNew}><Plus size={16} aria-hidden="true" />{translate('credentials.new')}</button>}</header>
     <section className="content-section credential-reference-section" aria-busy={phase === 'loading'}>
       <div className="credential-reference-boundary"><KeyRound size={18} aria-hidden="true" /><div><strong>{translate('credentials.staysInOnePassword')}</strong><p>{translate('credentials.boundaryHelp')}</p></div></div>
       <div className="credential-reference-toolbar">
@@ -197,7 +197,6 @@ export function CredentialReferences({ workspace, client }: { workspace: Workspa
       {phase === 'error' && <div className="empty-state" role="alert"><p>{translate('credentials.unavailable')}</p><button className="secondary-button" type="button" onClick={() => setRevision((value) => value + 1)}>{translate('common.retry')}</button></div>}
       {phase === 'ready' && references.length === 0 && <p className="empty-state">{query ? translate('credentials.noMatches') : translate('credentials.empty')}</p>}
       {phase === 'ready' && references.length > 0 && <>
-        <div className="section-heading credential-reference-list-heading"><h2>{translate('credentials.list')}</h2><span>{translate('credentials.count', { count: pageState.count })}</span></div>
         <ul className="credential-reference-list">{references.map((reference) => <li key={reference.id}><button id={`credential-row-${reference.id}`} className="collection-name" type="button" onClick={() => openReference(reference)}><strong>{reference.title}</strong><span>{reference.provider_label} · {translate('credentials.updated', { date: new Date(reference.updated_at).toLocaleDateString() })}</span></button></li>)}</ul>
         <CollectionPagination label={translate('credentials.heading')} page={page} pageSize={pageSize} count={pageState.count} hasMore={pageState.hasMore} onPageChange={(next) => changeCollection({ page: next })} />
       </>}

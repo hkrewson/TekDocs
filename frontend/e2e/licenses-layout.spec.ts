@@ -57,7 +57,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await mockLicenseWorkspace(page, baseURL)
     await page.goto(`/workspaces/organizations/${organizationId}/licenses`)
 
-    await expect(page.getByRole('heading', { name: 'Software licenses' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Licenses', level: 1 })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
     await page.locator('tbody .collection-name').click()
     const drawer = page.getByRole('dialog', { name: license.name })

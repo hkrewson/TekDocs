@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
 import { CollectionPagination } from '../CollectionPagination'
+import { FilterMenu } from '../FilterMenu'
 import { QuickDrawer } from '../collections/QuickDrawer'
 import '../collections/collections.css'
 import { translate } from '../i18n/localization'
@@ -256,11 +257,11 @@ export function Domains({ workspace, client }: { workspace: WorkspaceContext | n
   const title = creating ? translate('domains.newHeading') : record?.name ?? 'Domain record'
 
   return <>
-    <header className="page-header"><div><h1>Domains</h1><p>Registration ownership, renewal dates, and monitored DNS health.</p></div>{canManage && <button type="button" className="primary-button" onClick={openNew}><Plus size={16} aria-hidden="true" />{translate('domains.add')}</button>}</header>
+    <header className="page-header"><div><h1>Domains</h1><p className="page-count">{phase === 'ready' ? translate(pageState.count === 1 ? 'domains.countOne' : 'domains.countMany', { count: pageState.count }) : translate('common.loading')}</p></div>{canManage && <button type="button" className="primary-button" onClick={openNew}><Plus size={16} aria-hidden="true" />{translate('domains.add')}</button>}</header>
     <section className="content-section domain-collection" aria-busy={phase === 'loading'}>
       <div className="domain-toolbar">
         <label className="domain-search"><span>Search</span><input type="search" value={query} placeholder="Domain, registrar, or owner" onChange={(event) => changeCollection({ q: event.target.value }, true)} /></label>
-        <label><span>Status</span><select value={status} onChange={(event) => changeCollection({ status: event.target.value })}><option value="">All statuses</option>{STATUSES.map((value) => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label>
+        <FilterMenu activeCount={Number(Boolean(status))} onClear={() => changeCollection({ status: null })} groups={[{ kind: 'choices', label: 'Status', value: status, choices: [{ value: '', label: 'All statuses' }, ...STATUSES.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))], onChange: (value) => changeCollection({ status: value }) }]} />
         <label><span>Sort</span><select value={ordering} onChange={(event) => changeCollection({ ordering: event.target.value })}><option value="name">Name</option><option value="-name">Name, reverse</option><option value="expiration_date">Expiration, earliest</option><option value="-expiration_date">Expiration, latest</option><option value="status">Status</option><option value="-status">Status, reverse</option></select></label>
         <label className="collection-page-size"><span>Rows</span><select value={pageSize} onChange={(event) => changeCollection({ page_size: Number(event.target.value) })}>{PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}</select></label>
       </div>

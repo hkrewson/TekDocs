@@ -234,6 +234,27 @@ keyboard access to every Knowledge view, complete file ownership links, reposito
 focus restoration, and unchanged Git evidence and authorization behavior. No API,
 schema, or persistence change is part of this slice.
 
+## Remaining Operations rollout
+
+Licenses, Networks, Domains, Certificates, and Credential links now follow the
+compact collection hierarchy demonstrated by Assets. The page heading owns the
+record count, so collections no longer repeat a directory heading or explanatory
+sentence before the first task. Search remains visible, Domain status moves into
+the shared filter menu, and each row remains the single entry to its record or
+quick drawer. Create actions remain the only primary collection actions.
+
+Consequential guidance remains where it changes a decision: Credential links keep
+the 1Password storage boundary, domain monitoring stays distinct from entered
+registration data, and certificate checks retain their evidence and validation
+limits. Existing collection parameters, direct record links, dirty-state recovery,
+permission denials, monitoring actions, and Assets' drawer/full-page behavior are
+unchanged. This slice does not alter backend APIs, persistence, or authorization.
+
+Acceptance requires focused component coverage for collection loading, filtering,
+sorting, paging, direct off-page records, create/edit recovery, and denial; browser
+coverage must confirm the compact hierarchy and usable controls at desktop and the
+required narrow widths.
+
 ## November 15, 2026 implementation evidence
 
 Verified:
@@ -254,6 +275,10 @@ Verified:
   widths for Needs attention, all Files collection widths, direct links, ownership
   links, hub defaults, and axe checks; the 320px and 1440px Knowledge collections
   were also visually inspected;
+- 92 focused Chromium Operations journeys pass across the required widths for
+  licenses, networks, domains, certificates, credential links, and the surrounding
+  shell; all 889 frontend unit/component tests, lint, type checking, and the
+  production bundle gate remain green;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

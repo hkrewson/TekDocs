@@ -21,6 +21,10 @@ async function fixtures(page: Page) {
     tenant: { id: 'installation', name: 'Synthetic MSP' }, role: 'owner', permissions: [],
     surface: 'msp', organization: null, mfa_enrollment_required: false,
   } }))
+  await page.route('**/api/v1/workspaces/organizations?*', (route) => route.fulfill({ json: {
+    results: [], page: 1, page_size: 15, has_more: false,
+  } }))
+  await page.route('**/api/v1/workspaces/msp/reminders', (route) => route.fulfill({ json: [] }))
   await page.route('**/api/v1/search?*', (route) => {
     const parameters = new URL(route.request().url()).searchParams
     const pageNumber = Number(parameters.get('page') ?? 1)
@@ -67,8 +71,9 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await fixtures(page)
 
     await page.goto('/overview')
-    await expect(page.getByRole('heading', { name: 'Start here' })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Client organizations/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Set up your workspace' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Add organization' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible()
     await expect(page.getByRole('table')).toHaveCount(0)
     await expectContained(page)
 

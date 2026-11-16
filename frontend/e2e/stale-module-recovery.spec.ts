@@ -41,7 +41,7 @@ test('an old open tab recovers a missing route module only after an explicit rel
     return route.fulfill({ status: 404, contentType: 'text/html', body: 'Not found' })
   })
   await page.goto('/overview')
-  await page.getByRole('link', { name: 'Assets', exact: true }).click()
+  await page.getByRole('link', { name: 'Operations', exact: true }).click()
   await expect.poll(() => missingRequests).toBeGreaterThan(0)
   await expect(page.getByRole('heading', { name: 'Reload TekDocs to continue' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Reload TekDocs to continue' })).toBeFocused()

@@ -43,6 +43,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     })
     await page.goto(`/documentation?document=${documentId}`)
     await expect(page.locator('article')).toContainText('Visit OPS.')
+    await page.getByRole('button', { name: 'More' }).click()
     await page.getByRole('button', { name: /^Keys/ }).click()
     await expect(page.getByRole('alert')).toContainText('Keys could not be loaded')
     await expect(page.locator('article')).toContainText('Visit OPS.')

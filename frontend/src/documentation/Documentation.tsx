@@ -980,7 +980,11 @@ export function Documentation({ workspace, client = browserDocumentsClient, work
 
   }
   const beginPublication = (source: DocumentRecord, supersedes: DocumentPublication | null = null) => {
-    if (activePanel && documentDirectViews.has(activePanel as DocumentDirectView)) updateDocumentViewLocation(null)
+    // Leave a URL-backed document section before the publication draft becomes
+    // dirty. Deferring this navigation lets a fast first keystroke register the
+    // draft guard before the router transition starts, which opens a spurious
+    // unsaved-changes prompt inside the publication form.
+    if (activePanel && documentDirectViews.has(activePanel as DocumentDirectView)) updateDocumentViewLocation(null, {}, 'push', false)
     setPublicationControl(null)
     const audience = supersedes?.audience ?? 'msp_internal'
     setPublicationForm({ source, reason: '', audience, initialAudience: audience, retention: 'permanent', reviewOn: '', supersedesId: supersedes?.id ?? null })

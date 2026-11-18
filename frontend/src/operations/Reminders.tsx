@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Plus, Search } from 'lucide-react'
+import { Download, Ellipsis, Plus, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { CollectionPagination } from '../CollectionPagination'
 import { FilterMenu } from '../FilterMenu'
@@ -38,6 +38,15 @@ function domainLabel(domain: ReminderRecord['domain']) {
   return translate(`reminders.${domain}`)
 }
 
+function reminderDomainForEntityType(entityType: string): ReminderRecord['domain'] | null {
+  if (['compliance_framework', 'compliance_control', 'compliance_evidence', 'compliance_risk'].includes(entityType)) return 'compliance'
+  if (['client_asset', 'software_license', 'commercial_contract'].includes(entityType)) return 'inventory'
+  if (['registered_domain', 'managed_hostname'].includes(entityType)) return 'domain'
+  if (entityType === 'document') return 'documentation'
+  if (entityType === 'invoice') return 'invoice'
+  return null
+}
+
 export function Reminders({ workspace, relationshipsClient, client = browserOperationsClient }: { workspace: WorkspaceContext | null; relationshipsClient: RelationshipsClient; client?: OperationsClient }) {
   const [parameters, setParameters] = useSearchParams()
   const scope = useMemo(() => workspace ? { organizationId: workspace.id } : {}, [workspace])
@@ -56,6 +65,9 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
   const [draft, setDraft] = useState<ReminderInput>(emptyDraft)
   const [sourceQuery, setSourceQuery] = useState('')
   const [sources, setSources] = useState<EntityReference[]>([])
+  const [sourceResultKey, setSourceResultKey] = useState<string | null>(null)
+  const [sourceFailureKey, setSourceFailureKey] = useState<string | null>(null)
+  const [sourceRevision, setSourceRevision] = useState(0)
   const [saving, setSaving] = useState(false)
   const [closingAfterSave, setClosingAfterSave] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -64,7 +76,12 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
   const phase = failureKey === queryKey ? 'error' : result ? 'ready' : 'loading'
   const dirty = creating && !closingAfterSave && (JSON.stringify(draft) !== JSON.stringify(emptyDraft) || Boolean(sourceQuery))
 
-  const resetDraft = useCallback(() => { setDraft(emptyDraft); setSourceQuery(''); setSources([]); setMessage(null) }, [])
+  const sourceSearchKey = `${workspace?.id ?? 'msp'}\u0000${sourceQuery.trim()}`
+  const displayedSources = sourceResultKey === sourceSearchKey ? sources : []
+  const sourceSearchFailed = sourceFailureKey === sourceSearchKey
+  const sourceSearchReady = !sourceSearchFailed && sourceQuery.trim().length >= 2 && !draft.source_entity_id && sourceResultKey === sourceSearchKey
+
+  const resetDraft = useCallback(() => { setDraft(emptyDraft); setSourceQuery(''); setSources([]); setSourceResultKey(null); setSourceFailureKey(null); setMessage(null) }, [])
   const attempt = useUnsavedChanges(dirty, saving && !closingAfterSave, resetDraft, creating && !closingAfterSave)
 
   const updateParameters = useCallback((changes: Record<string, string | number | null>, replace = false) => {
@@ -88,16 +105,26 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
 
   useEffect(() => {
     if (!creating || sourceQuery.trim().length < 2 || draft.source_entity_id) {
-      const clearTimer = window.setTimeout(() => setSources([]), 0)
+      const clearTimer = window.setTimeout(() => { setSources([]); setSourceResultKey(null); setSourceFailureKey(null) }, 0)
       return () => window.clearTimeout(clearTimer)
     }
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       void relationshipsClient.search(scope, sourceQuery, undefined, controller.signal)
-        .then((value) => setSources(value.results)).catch(() => setSources([]))
+        .then((value) => {
+          if (controller.signal.aborted) return
+          setSources(value.results.filter((source) => reminderDomainForEntityType(source.entity_type) !== null))
+          setSourceResultKey(sourceSearchKey)
+          setSourceFailureKey(null)
+        }).catch(() => {
+          if (controller.signal.aborted) return
+          setSources([])
+          setSourceResultKey(null)
+          setSourceFailureKey(sourceSearchKey)
+        })
     }, 180)
     return () => { window.clearTimeout(timer); controller.abort() }
-  }, [creating, draft.source_entity_id, relationshipsClient, scope, sourceQuery])
+  }, [creating, draft.source_entity_id, relationshipsClient, scope, sourceQuery, sourceRevision, sourceSearchKey])
 
   const create = async () => {
     if (!draft.source_entity_id || !draft.title.trim() || !draft.due_on) return
@@ -131,19 +158,36 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
   return <>
     <header className="page-header">
       <div><h1>{translate('reminders.heading')}</h1><p>{translate('reminders.intro')}</p></div>
-      <div className="form-actions"><button className="primary-button" type="button" onClick={() => attempt(() => { setClosingAfterSave(false); updateParameters({ new: '1' }) })}><Plus size={16} />{translate('reminders.new')}</button><a className="secondary-button" href={client.reminderCalendarUrl(scope)}><Download size={16} />{translate('reminders.calendar')}</a></div>
+      <div className="form-actions">
+        {!creating && <button className="primary-button" type="button" onClick={() => attempt(() => { setClosingAfterSave(false); updateParameters({ new: '1' }) })}><Plus size={16} aria-hidden="true" />{translate('reminders.new')}</button>}
+        <details className="reminder-more-menu">
+          <summary className="secondary-button"><Ellipsis size={16} aria-hidden="true" />{translate('common.more')}</summary>
+          <div><a href={client.reminderCalendarUrl(scope)}><Download size={16} aria-hidden="true" />{translate('reminders.calendar')}</a></div>
+        </details>
+      </div>
     </header>
     {message && <div className={`form-message ${messageKind}`} role={messageKind === 'error' ? 'alert' : 'status'}>{message}</div>}
     {creating && <section className="content-section operations-create" aria-labelledby="new-reminder-heading">
       <div className="section-heading"><div><h2 id="new-reminder-heading">{translate('reminders.new')}</h2><p>{translate('reminders.newHelp')}</p></div></div>
-      <div className="operations-form">
-        <label>{translate('reminders.source')}<span className="search-input"><Search size={16} /><input autoFocus type="search" value={sourceQuery} onChange={(event) => { setSourceQuery(event.target.value); setDraft({ ...draft, source_entity_id: '' }) }} /></span></label>
-        {sources.length > 0 && <ul className="operations-source-results">{sources.map((source) => <li key={source.id}><button type="button" onClick={() => { setDraft({ ...draft, source_entity_id: source.id }); setSourceQuery(source.display_name); setSources([]) }}>{source.display_name}<small>{source.entity_type.replaceAll('_', ' ')}</small></button></li>)}</ul>}
-        <label>{translate('reminders.domain')}<select value={draft.domain} onChange={(event) => setDraft({ ...draft, domain: event.target.value as ReminderInput['domain'] })}><option value="documentation">{translate('reminders.documentation')}</option><option value="compliance">{translate('reminders.compliance')}</option><option value="inventory">{translate('reminders.inventory')}</option><option value="domain">{translate('reminders.domains')}</option></select></label>
+      <div className="operations-form reminder-form">
+        <label>{translate('reminders.source')}<span className="search-input"><Search size={16} aria-hidden="true" /><input autoFocus type="search" value={sourceQuery} onChange={(event) => { setSourceQuery(event.target.value); setDraft({ ...draft, source_entity_id: '' }) }} /></span></label>
+        {displayedSources.length > 0 && <ul className="operations-source-results">{displayedSources.map((source) => {
+          const domain = reminderDomainForEntityType(source.entity_type)
+          if (!domain) return null
+          return <li key={source.id}><button type="button" onClick={() => { setDraft({ ...draft, source_entity_id: source.id, domain }); setSourceQuery(source.display_name); setSources([]); setSourceResultKey(null) }}>{source.display_name}<small>{domainLabel(domain)}</small></button></li>
+        })}</ul>}
+        {sourceSearchFailed && <div className="operations-source-error" role="alert"><span>{translate('reminders.sourceSearchFailed')}</span><button className="row-action" type="button" onClick={() => setSourceRevision((value) => value + 1)}>{translate('notifications.tryAgain')}</button></div>}
+        {sourceSearchReady && displayedSources.length === 0 && <p className="operations-source-empty">{translate('reminders.noCompatibleSources')}</p>}
         <label>{translate('reminders.title')}<input maxLength={240} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
         <label>{translate('reminders.due')}<input type="date" value={draft.due_on} onChange={(event) => setDraft({ ...draft, due_on: event.target.value })} /></label>
-        <label>{translate('reminders.lead')}<input type="number" min={0} max={3650} value={draft.lead_days} onChange={(event) => setDraft({ ...draft, lead_days: Number(event.target.value) })} /></label>
-        <label>{translate('reminders.recurrence')}<select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as ReminderInput['recurrence'] })}><option value="none">{translate('reminders.once')}</option><option value="annual">{translate('reminders.annual')}</option></select></label>
+        <details className="reminder-options">
+          <summary>{translate('reminders.options')}</summary>
+          <div className="reminder-options-grid">
+            <label>{translate('reminders.domain')}<select value={draft.domain} onChange={(event) => setDraft({ ...draft, domain: event.target.value as ReminderInput['domain'] })}>{domains.map((domain) => <option key={domain} value={domain}>{domainLabel(domain)}</option>)}</select></label>
+            <label>{translate('reminders.lead')}<input type="number" min={0} max={3650} value={draft.lead_days} onChange={(event) => setDraft({ ...draft, lead_days: Number(event.target.value) })} /></label>
+            <label>{translate('reminders.recurrence')}<select value={draft.recurrence} onChange={(event) => setDraft({ ...draft, recurrence: event.target.value as ReminderInput['recurrence'] })}><option value="none">{translate('reminders.once')}</option><option value="annual">{translate('reminders.annual')}</option></select></label>
+          </div>
+        </details>
       </div>
       <div className="form-actions"><button className="primary-button" type="button" disabled={saving || !draft.source_entity_id || !draft.title.trim() || !draft.due_on} onClick={() => { void create() }}>{saving ? translate('common.saving') : translate('reminders.create')}</button><button className="secondary-button" type="button" disabled={saving} onClick={closeCreate}>{translate('common.cancel')}</button></div>
     </section>}

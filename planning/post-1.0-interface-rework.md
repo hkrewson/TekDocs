@@ -405,6 +405,26 @@ creation and collection links, empty/loading/error/retry states, capability
 omission, keyboard access, 320–1440px layout, axe, and the existing Activity
 deep-link contract.
 
+## Reminder creation refinement
+
+Reminder creation presents three essential choices first: **Related record**,
+**Title**, and **Due date**. Area, advance notice, and recurrence move into a
+plain **Options** disclosure. Selecting a supported record derives the matching
+area while preserving an explicit override for the server-supported record
+families. Unsupported record types are omitted from results instead of allowing
+the user to reach a predictable server rejection.
+
+The page retains one visible **New reminder** primary action. Calendar download
+moves into a secondary **More** menu. Existing `new=1`, search, filtering,
+ordering, paging, calendar, workspace scope, authorization, dirty-state,
+creation-denial, and retry contracts remain unchanged. No backend API,
+persistence, schema, or permission change is part of this refinement.
+
+Acceptance covers supported-source filtering and area derivation, empty search,
+advanced-option overrides, creation success and denial recovery, direct creation
+links, unsaved-change protection, calendar access, keyboard operation, all six
+review widths, zoom, axe, and untranslated-control coverage.
+
 ## November 15–17, 2026 implementation evidence
 
 Verified:
@@ -461,6 +481,13 @@ Verified:
   Eight reminder/Activity journeys preserve creation, dirty-work recovery, direct
   Activity links, and all six widths; eight Chromium/WebKit responsive journeys
   preserve mobile and 200% zoom behavior;
+- all 895 frontend tests pass with the repository coverage thresholds after the
+  reminder-creation refinement. Nine rebuilt-image Chromium journeys cover the
+  six required widths, supported record selection, inferred area, dirty-work
+  recovery, keyboard operation, the 200% effective viewport, axe, calendar access,
+  and horizontal overflow. Focused component cases additionally cover unsupported
+  record omission, empty compatible search, search retry, creation denial, retained
+  optional values, and successful recovery;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

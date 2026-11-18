@@ -425,6 +425,47 @@ advanced-option overrides, creation success and denial recovery, direct creation
 links, unsaved-change protection, calendar access, keyboard operation, all six
 review widths, zoom, axe, and untranslated-control coverage.
 
+## Reminder schedule refinement
+
+The schedule is quiet when there is nothing to manage. An unfiltered empty
+schedule keeps its heading, count, empty-state explanation, and **New reminder**
+action, but omits search, filtering, ordering, page-size, and paging controls
+until they can do useful work. A filtered empty result keeps its collection
+controls and **Clear filters** recovery so a narrow search never becomes a dead
+end.
+
+Once reminders exist, search and the shared filter menu remain visible. Page
+size appears only when the collection is large enough to page, and bounded
+pagination remains below the records. Existing search, domain, ordering, page,
+page-size, creation, calendar, workspace scope, authorization, loading, error,
+retry, and URL contracts remain unchanged. Reminder editing, completion, and
+deactivation are outside this slice because they require an explicit API,
+persistence, and authorization contract.
+
+Acceptance covers unfiltered and filtered empty states, clear-filter recovery,
+direct query URLs, ordering and paging preservation, loading and retry behavior,
+keyboard access, all six review widths, zoom, axe, and untranslated-control
+coverage.
+
+## November 18, 2026 reminder schedule evidence
+
+Verified:
+
+- all 896 frontend unit/component tests pass with the repository coverage gates;
+- lint, type checking, generated API agreement, the production build, bundle
+  budgets, UI-language checks, responsive inventories, and the Wiki checkout
+  pass;
+- ten focused Chromium reminder and activity journeys pass against the rebuilt
+  `tekdocs` Docker frontend, including all six review widths, filtered and
+  unfiltered empty states, clear-filter recovery, paging, dirty-state recovery,
+  keyboard use, 200% zoom, and axe checks;
+- the rebuilt development frontend is healthy at its retained port, and direct
+  inspection confirms the empty schedule omits inactive collection controls
+  while a filtered empty schedule keeps its recovery controls.
+
+The slice changes no backend API, persistence, schema, migration, capability,
+or authorization contract.
+
 ## November 15–17, 2026 implementation evidence
 
 Verified:

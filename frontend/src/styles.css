@@ -750,6 +750,9 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .reminder-options { grid-column: 1 / -1; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .reminder-options > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-size: 13px; font-weight: 600; }
 .reminder-options-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 12px; padding: 0 0 12px; }
+.reminder-filter-actions { display: flex; align-items: flex-end; gap: 8px; }
+.reminder-page-size { display: grid; gap: 5px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.reminder-page-size select { min-height: 38px; padding: 7px 26px 7px 9px; color: var(--text); background: #fff; border: 1px solid var(--border-strong); border-radius: 7px; font: inherit; }
 .data-table td small { display: block; margin-top: 3px; color: var(--muted); }
 .reuse-resolution { display: grid; grid-template-columns: minmax(160px, .35fr) minmax(160px, .35fr) minmax(260px, 1fr); gap: 10px; }
 .reuse-results { max-height: 300px; overflow: auto; margin: 10px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
@@ -765,6 +768,7 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .document-restructure-sections summary span { color: var(--muted); font-size: 12px; }
 @media (max-width: 800px) {
   .operations-form, .operations-filters, .reminder-options-grid { grid-template-columns: 1fr; }
+  .reminder-filter-actions { justify-content: space-between; }
   .document-reader-header { position: static; align-items: flex-start; flex-direction: column; }
   .document-reader-actions { justify-content: flex-start; }
   .document-page { padding: 34px 24px 52px; }

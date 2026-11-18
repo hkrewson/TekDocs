@@ -154,6 +154,11 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
     window.setTimeout(() => updateParameters({ new: null }), 0)
   })
   const activeFilters = [query.q ? translate('reminders.searchSummary', { query: query.q }) : '', query.domain ? domainLabel(query.domain) : ''].filter(Boolean)
+  const hasNarrowingFilters = Boolean(query.q || query.domain)
+  const hasCollectionState = hasNarrowingFilters || query.ordering !== 'due_on' || query.page > 1 || query.page_size !== 25
+  const hasResults = phase === 'ready' && Boolean(result?.results.length)
+  const showCollectionTools = hasCollectionState || hasResults
+  const showPageSize = hasResults && Boolean(result && (result.count > 25 || query.page_size !== 25 || query.page > 1))
 
   return <>
     <header className="page-header">
@@ -193,17 +198,19 @@ export function Reminders({ workspace, relationshipsClient, client = browserOper
     </section>}
     <section className="content-section" aria-labelledby="reminder-agenda-heading">
       <div className="section-heading"><div><h2 id="reminder-agenda-heading">{translate('reminders.schedule')}</h2><p>{result ? translate('reminders.count', { count: formatInteger(result.count) }) : translate('common.loading')}</p></div></div>
-      <div className="operations-filters">
-        <label>{translate('reminders.search')}<span className="search-input"><Search size={16} /><input type="search" value={query.q} onChange={(event) => updateParameters({ q: event.target.value, page: 1 }, true)} /></span></label>
-        <FilterMenu groups={[{ kind: 'choices', label: translate('reminders.domain'), value: query.domain, choices: [{ value: '', label: translate('reminders.allAreas') }, ...domains.map((value) => ({ value, label: domainLabel(value) }))], onChange: (value) => updateParameters({ domain: value, page: 1 }) }, { kind: 'choices', label: translate('reminders.order'), value: query.ordering, choices: [{ value: 'due_on', label: translate('reminders.dueSoonest') }, { value: '-due_on', label: translate('reminders.dueLatest') }, { value: 'title', label: translate('reminders.titleAscending') }, { value: '-title', label: translate('reminders.titleDescending') }], onChange: (value) => updateParameters({ ordering: value, page: 1 }) }]} activeCount={activeFilters.length + (query.ordering === 'due_on' ? 0 : 1)} onClear={() => updateParameters({ q: null, domain: null, ordering: null, page: 1 })} menuLabel={translate('reminders.filters')} />
-      </div>
+      {showCollectionTools && <div className="operations-filters">
+        <label>{translate('reminders.search')}<span className="search-input"><Search size={16} aria-hidden="true" /><input type="search" value={query.q} onChange={(event) => updateParameters({ q: event.target.value, page: 1 }, true)} /></span></label>
+        <div className="reminder-filter-actions">
+          <FilterMenu groups={[{ kind: 'choices', label: translate('reminders.domain'), value: query.domain, choices: [{ value: '', label: translate('reminders.allAreas') }, ...domains.map((value) => ({ value, label: domainLabel(value) }))], onChange: (value) => updateParameters({ domain: value, page: 1 }) }, { kind: 'choices', label: translate('reminders.order'), value: query.ordering, choices: [{ value: 'due_on', label: translate('reminders.dueSoonest') }, { value: '-due_on', label: translate('reminders.dueLatest') }, { value: 'title', label: translate('reminders.titleAscending') }, { value: '-title', label: translate('reminders.titleDescending') }], onChange: (value) => updateParameters({ ordering: value, page: 1 }) }]} activeCount={activeFilters.length + (query.ordering === 'due_on' ? 0 : 1)} onClear={() => updateParameters({ q: null, domain: null, ordering: null, page: 1 })} menuLabel={translate('reminders.filters')} />
+          {showPageSize && <label className="reminder-page-size">{translate('collections.pageSize')}<select value={query.page_size} onChange={(event) => updateParameters({ page_size: Number(event.target.value), page: 1 })}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label>}
+        </div>
+      </div>}
       {activeFilters.length > 0 && <div className="form-actions">{activeFilters.map((value) => <span key={value}>{value}</span>)}<button type="button" className="row-action" onClick={() => updateParameters({ q: null, domain: null, page: 1 })}>{translate('collections.clearFilters')}</button></div>}
       {phase === 'loading' && <p role="status">{translate('reminders.loading')}</p>}
       {phase === 'error' && <div role="alert"><p>{translate('reminders.loadFailed')}</p><button className="secondary-button" type="button" onClick={() => setRevision((value) => value + 1)}>{translate('notifications.tryAgain')}</button></div>}
-      {phase === 'ready' && result?.results.length === 0 && <p className="empty-state">{activeFilters.length ? translate('reminders.noMatches') : translate('reminders.empty')}</p>}
+      {phase === 'ready' && result?.results.length === 0 && <p className="empty-state">{hasNarrowingFilters ? translate('reminders.noMatches') : translate('reminders.empty')}</p>}
       {phase === 'ready' && result && result.results.length > 0 && <ol className="plain-detail-list">{result.results.map((record) => <li key={record.id}><div><strong>{record.title}</strong><span>{record.source} · {domainLabel(record.domain)} · {record.owner ?? translate('reminders.unassigned')}</span></div><div><time dateTime={record.due_on}>{new Date(`${record.due_on}T00:00:00`).toLocaleDateString()}</time><span>{record.recurrence === 'annual' ? translate('reminders.annual') : translate('reminders.once')}</span></div></li>)}</ol>}
-      {result && <CollectionPagination label={translate('reminders.schedule')} page={query.page} pageSize={query.page_size} count={result.count} hasMore={result.has_more} onPageChange={(page) => updateParameters({ page })} />}
-      <label>{translate('collections.pageSize')}<select value={query.page_size} onChange={(event) => updateParameters({ page_size: Number(event.target.value), page: 1 })}><option value={25}>25</option><option value={50}>50</option><option value={100}>100</option></select></label>
+      {hasResults && result && <CollectionPagination label={translate('reminders.schedule')} page={query.page} pageSize={query.page_size} count={result.count} hasMore={result.has_more} onPageChange={(page) => updateParameters({ page })} />}
     </section>
   </>
 }

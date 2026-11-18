@@ -18,6 +18,8 @@ it('lists reminders and creates one for a searched workspace record', async () =
 
   render(<ApplicationRouter initialPath="/deadlines"><Reminders workspace={null} client={client} relationshipsClient={relationshipsClient} /></ApplicationRouter>)
   expect(await screen.findByText('Review recovery runbook')).toBeVisible()
+  expect(screen.getByLabelText('Search reminders')).toBeVisible()
+  expect(screen.queryByLabelText('Rows per page')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'New reminder' }))
   expect(screen.queryByRole('button', { name: 'New reminder' })).not.toBeInTheDocument()
   await user.type(screen.getByLabelText('Related record'), 'Recovery')
@@ -51,6 +53,9 @@ it('offers only supported records, derives their area, and preserves optional en
 
   render(<ApplicationRouter initialPath="/deadlines"><Reminders workspace={null} client={client} relationshipsClient={relationshipsClient} /></ApplicationRouter>)
   await screen.findByText('No active reminders are scheduled for this workspace.')
+  expect(screen.queryByLabelText('Search reminders')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Filters' })).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Rows per page')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'New reminder' }))
   await user.type(screen.getByLabelText('Related record'), 'switch')
   expect(await screen.findByRole('button', { name: /Core switch/ })).toBeVisible()
@@ -83,4 +88,24 @@ it('recovers a failed record search and explains when no compatible records matc
   expect(await screen.findByRole('alert')).toHaveTextContent('Related records couldn’t be searched.')
   await user.click(screen.getByRole('button', { name: 'Try again' }))
   expect(await screen.findByText('No records that support reminders match this search.')).toBeVisible()
+})
+
+it('keeps a filtered empty schedule recoverable and becomes quiet after clearing filters', async () => {
+  const collection = { results: [], count: 0, page: 1, page_size: 25, has_more: false }
+  const reminderCollection = vi.fn().mockResolvedValue(collection)
+  const client = { reminders: vi.fn(), reminderCollection, createReminder: vi.fn(), reminderCalendarUrl: vi.fn().mockReturnValue('/calendar.ics'), activity: vi.fn() } satisfies OperationsClient
+  const relationshipsClient = { search: vi.fn() } as unknown as RelationshipsClient
+  const user = userEvent.setup()
+
+  render(<ApplicationRouter initialPath="/deadlines?q=missing&domain=documentation"><Reminders workspace={null} client={client} relationshipsClient={relationshipsClient} /></ApplicationRouter>)
+  expect(await screen.findByText('No reminders match these filters.')).toBeVisible()
+  expect(screen.getByLabelText('Search reminders')).toHaveValue('missing')
+  expect(screen.getByRole('button', { name: 'Filters (2)' })).toBeVisible()
+  expect(screen.queryByLabelText('Rows per page')).not.toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Clear filters' }))
+  expect(await screen.findByText('No active reminders are scheduled for this workspace.')).toBeVisible()
+  await waitFor(() => expect(reminderCollection).toHaveBeenLastCalledWith({}, expect.objectContaining({ q: '', domain: '' }), expect.any(AbortSignal)))
+  expect(screen.queryByLabelText('Search reminders')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Filters' })).not.toBeInTheDocument()
 })

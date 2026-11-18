@@ -19,7 +19,7 @@ const activity = Array.from({ length: 61 }, (_, index) => ({
   request_id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`, occurred_at: recordedAt,
 }))
 
-async function fixtures(page: Page) {
+async function fixtures(page: Page, reminderFixture = reminders) {
   await page.context().addCookies([{ name: 'csrftoken', value: 'layout-test', domain: 'localhost', path: '/' }])
   await page.route('**/api/v1/bootstrap/status', (route) => route.fulfill({ json: { bootstrap_required: false } }))
   await page.route('**/_allauth/browser/v1/auth/session', (route) => route.fulfill({ json: { meta: { is_authenticated: true } } }))
@@ -33,7 +33,7 @@ async function fixtures(page: Page) {
     const parameters = new URL(route.request().url()).searchParams
     const pageNumber = Number(parameters.get('page') ?? 1), pageSize = Number(parameters.get('page_size') ?? 25)
     const query = (parameters.get('q') ?? '').toLowerCase(), domain = parameters.get('domain')
-    let found = reminders.filter((record) => `${record.title} ${record.source}`.toLowerCase().includes(query))
+    let found = reminderFixture.filter((record) => `${record.title} ${record.source}`.toLowerCase().includes(query))
     if (domain) found = found.filter((record) => record.domain === domain)
     return route.fulfill({ json: { results: found.slice((pageNumber - 1) * pageSize, pageNumber * pageSize), count: found.length, page: pageNumber, page_size: pageSize, has_more: pageNumber * pageSize < found.length } })
   })
@@ -59,6 +59,7 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
 
     await page.goto('/deadlines')
     await expect(page.getByText('61 active reminders')).toBeVisible()
+    await expect(page.getByLabel('Rows per page')).toBeVisible()
     await expect(page.getByText(longSource).first()).toBeVisible()
     if (width === 390) {
       await expect(page.getByRole('link', { name: 'Download calendar' })).toBeHidden()
@@ -77,6 +78,28 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     if (width === 390) expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
   })
 }
+
+test('an empty reminder schedule reveals controls only when they provide recovery', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 600 })
+  await fixtures(page, [])
+
+  await page.goto('/deadlines')
+  await expect(page.getByText('No active reminders are scheduled for this workspace.')).toBeVisible()
+  await expect(page.getByLabel('Search reminders')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Filters' })).toHaveCount(0)
+  await expect(page.getByLabel('Rows per page')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New reminder' })).toBeVisible()
+  await expectContained(page)
+
+  await page.goto('/deadlines?q=missing')
+  await expect(page.getByText('No reminders match these filters.')).toBeVisible()
+  await expect(page.getByLabel('Search reminders')).toHaveValue('missing')
+  await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeVisible()
+  await page.getByRole('button', { name: 'Clear filters' }).click()
+  await expect(page).not.toHaveURL(/q=/)
+  await expect(page.getByLabel('Search reminders')).toHaveCount(0)
+  expect((await new AxeBuilder({ page }).include('main').analyze()).violations).toEqual([])
+})
 
 test('reminder creation retains dirty work and restores its URL state', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 600 })

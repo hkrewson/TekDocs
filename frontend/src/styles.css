@@ -194,6 +194,16 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .main-content { width: min(var(--content-width), 100%); padding: var(--space-5) var(--space-6) calc(var(--space-6) * 2); }
 .overview-setup { margin-bottom: var(--space-4); }
 .overview-setup > p { margin: 0 0 var(--space-4); color: var(--muted); }
+.home-reminders .section-heading { align-items: flex-start; }
+.home-reminders .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; text-wrap: pretty; }
+.home-reminder-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.home-reminder-actions .compact-button, .home-reminder-actions > a:last-child { min-height: 40px; }
+.home-reminder-actions > a:last-child { display: inline-flex; align-items: center; padding-inline: var(--space-1); }
+.home-reminder-list { margin-bottom: 0; }
+.home-reminder-list time { flex: none; font-variant-numeric: tabular-nums; }
+.home-reminder-error { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.home-reminder-error p { margin: 0; }
+@media (max-width: 560px) { .home-reminders .section-heading { flex-direction: column; } }
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-5); }
 .page-header h1 { margin: 0 0 var(--space-1); font-size: 24px; line-height: 1.2; letter-spacing: -.018em; }
 .page-header p { max-width: 680px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }

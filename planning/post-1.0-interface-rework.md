@@ -384,6 +384,27 @@ failure and revision-change recovery, dirty-draft preservation, direct links,
 small-screen layout, zoom, and accessible names. No API, persistence, schema, or
 authorization change is part of this refinement.
 
+## Home reminder-agenda refinement
+
+Home is the everyday workspace entry point, not an administrative dashboard.
+The first-organization setup prompt remains conditional and disappears once an
+organization exists. A shared reminder agenda appears on MSP Home and on any
+organization Home authorized for reminders, with **New reminder** as the working
+action and **View reminders** as the collection link. Creation opens the existing
+workspace-scoped reminder form through its current query-preserving route.
+
+Reminder loading and recovery are independent from setup detection and the rest
+of the organization overview. A reminder denial or transient failure must not
+hide setup, organization facts, provider tickets, or relationships. Activity
+remains available through System status and existing direct links, but is not
+reintroduced on Home. No API, persistence, authorization, or route change is
+part of this refinement.
+
+Acceptance covers conditional setup, MSP and organization reminder scope,
+creation and collection links, empty/loading/error/retry states, capability
+omission, keyboard access, 320–1440px layout, axe, and the existing Activity
+deep-link contract.
+
 ## November 15–17, 2026 implementation evidence
 
 Verified:
@@ -433,6 +454,13 @@ Verified:
   action hierarchy. Four rebuilt-image Chromium journeys verify keyboard-operated
   export menus, contextual safety guidance, axe, and no horizontal overflow at
   320, 390, 768, and 1440px;
+- all 893 frontend tests and 39 focused shell, authentication, and Home component
+  cases pass with the shared reminder agenda. Six rebuilt-image Chromium journeys
+  verify MSP and organization Home at 320, 390, 768, 1024, 1280, and 1440px,
+  including keyboard entry to reminder creation, scoped links, axe, and overflow.
+  Eight reminder/Activity journeys preserve creation, dirty-work recovery, direct
+  Activity links, and all six widths; eight Chromium/WebKit responsive journeys
+  preserve mobile and 200% zoom behavior;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

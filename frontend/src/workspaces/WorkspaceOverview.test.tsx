@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import { WorkspaceOverview } from './WorkspaceOverview'
 import type { RelationshipsClient } from '../relationships/api'
 import type { IntegrationsClient } from '../integrations/providerApi'
+import type { OperationsClient } from '../operations/api'
 import type { WorkspaceContext } from './api'
 
 const workspace: WorkspaceContext = {
@@ -40,9 +41,27 @@ it('identifies organization scope and the areas that will inherit it', async () 
   expect(screen.getByText('Client · Vendor workspace')).toBeInTheDocument()
   expect(screen.getByText('Acme Dental Associates, LLC')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Return to MSP organizations' })).toHaveAttribute('href', '/organizations')
+  expect(screen.queryByRole('heading', { name: 'Reminders' })).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Workspace areas' })).not.toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'Organization relationships' })).toBeInTheDocument()
   expect(await screen.findByText('No relationships have been added.')).toBeInTheDocument()
+})
+
+it('puts the authorized organization reminder agenda on Home with scoped actions', async () => {
+  const reminderWorkspace: WorkspaceContext = { ...workspace, capabilities: [...workspace.capabilities, 'deadlines'] }
+  const operationsClient = { reminders: vi.fn().mockResolvedValue([{
+    id: 'reminder-1', source_entity_id: 'document-1', source: 'Backup procedure', domain: 'documentation', kind: 'review',
+    title: 'Review backup procedure', due_on: '2026-11-30', lead_days: 30, recurrence: 'none', owner_id: null, owner: null,
+    active: true, created_at: '2026-11-01T12:00:00Z',
+  }]) } as unknown as OperationsClient
+
+  render(<MemoryRouter><WorkspaceOverview workspace={reminderWorkspace} relationshipsClient={relationshipsClient} operationsClient={operationsClient} /></MemoryRouter>)
+
+  expect(await screen.findByText('Review backup procedure')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'New reminder' })).toHaveAttribute('href', `/workspaces/organizations/${workspace.id}/deadlines?new=1`)
+  expect(screen.getByRole('link', { name: 'View reminders' })).toHaveAttribute('href', `/workspaces/organizations/${workspace.id}/deadlines`)
+  expect(screen.getByRole('heading', { name: 'Organization profile' })).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: /Activity/ })).not.toBeInTheDocument()
 })
 
 it('shows a scoped stale Halo ticket with a provider deep link', async () => {

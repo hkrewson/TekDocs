@@ -1305,12 +1305,16 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
 
   // Search and the two overview routes retain focused, real-stack navigation.
   await page.goto('/overview')
-  await expect(page.getByRole('heading', { name: 'Start here' })).toBeVisible()
-  await expect(page.getByRole('link', { name: /Client organizations/ })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Reminders' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'New reminder' })).toHaveAttribute('href', '/deadlines?new=1')
+  await expect(page.getByRole('heading', { name: 'Set up your workspace' })).toHaveCount(0)
   await expect(page.getByRole('table')).toHaveCount(0)
 
   await page.goto(`/workspaces/organizations/${clientId}/overview`)
   await expect(page.getByRole('heading', { name: 'Live Acme Client' })).toBeVisible()
+  await expect(page.getByText('Review live client documentation', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'New reminder' })).toHaveAttribute('href', `/workspaces/organizations/${clientId}/deadlines?new=1`)
   await expect(page.getByRole('heading', { name: 'Organization profile' })).toBeVisible()
 
   await page.goto(`/workspaces/organizations/${clientId}/search?q=Live%20library%20client%20document&page_size=50`)

@@ -39,7 +39,7 @@ async function fixtures(page: Page) {
   })
   await page.route(`**/api/v1/workspaces/organizations/${clientId}`, (route) => route.fulfill({ json: {
     kind: 'organization', id: clientId, name: 'Northwest Clinical Technology Group',
-    classifications: ['client'], capabilities: ['overview', 'integrations'],
+    classifications: ['client'], capabilities: ['overview', 'deadlines', 'integrations'],
     organization: {
       id: clientId, name: 'Northwest Clinical Technology Group',
       legal_name: 'Northwest Clinical Technology Group and Regional Recovery Services, LLC',
@@ -49,6 +49,12 @@ async function fixtures(page: Page) {
       billing_address_line_2: '', billing_city: '', billing_region: '', billing_postal_code: '', billing_country_code: '',
     },
   } }))
+  await page.route(`**/api/v1/workspaces/organizations/${clientId}/reminders`, (route) => route.fulfill({ json: [{
+    id: 'reminder-1', source_entity_id: 'document-1', source: 'Regional recovery runbook',
+    domain: 'documentation', kind: 'review', title: 'Review regional recovery procedure',
+    due_on: '2026-12-15', lead_days: 30, recurrence: 'none', owner_id: null, owner: null,
+    active: true, created_at: updatedAt,
+  }] }))
   await page.route('**/api/v1/entity-link-types', (route) => route.fulfill({ json: [] }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/links`, (route) => route.fulfill({ json: { relationships: [] } }))
   await page.route(`**/api/v1/workspaces/organizations/${clientId}/integrations/halo/tickets`, (route) => route.fulfill({ json: [{
@@ -73,9 +79,20 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
     await page.goto('/overview')
     await expect(page.getByRole('heading', { name: 'Set up your workspace' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Add organization' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Needs attention' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Reminders' })).toBeVisible()
+    const newReminder = page.getByRole('link', { name: 'New reminder' })
+    await expect(newReminder).toHaveAttribute('href', '/deadlines?new=1')
+    await expect(page.getByText('No active reminders.')).toBeVisible()
     await expect(page.getByRole('table')).toHaveCount(0)
     await expectContained(page)
+    if (width === 390) {
+      await newReminder.focus()
+      await page.keyboard.press('Enter')
+      await expect(page).toHaveURL('/deadlines?new=1')
+      await expect(page.getByRole('heading', { name: 'New reminder' })).toBeVisible()
+      await page.goBack()
+      await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+    }
 
     await page.goto('/search?q=runbook')
     await expect(page.getByText('31 records found.')).toBeVisible()
@@ -90,6 +107,8 @@ for (const width of [320, 390, 768, 1024, 1280, 1440]) {
 
     await page.goto(`/workspaces/organizations/${clientId}/overview`)
     await expect(page.getByRole('heading', { name: 'Northwest Clinical Technology Group' })).toBeVisible()
+    await expect(page.getByText('Review regional recovery procedure')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'New reminder' })).toHaveAttribute('href', `/workspaces/organizations/${clientId}/deadlines?new=1`)
     await expect(page.getByText(/#1042 Regional printer queue unavailable/)).toBeVisible()
     await expect(page.getByRole('table')).toHaveCount(0)
     await expectContained(page)

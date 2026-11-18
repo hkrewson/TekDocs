@@ -7,6 +7,9 @@ import type { WorkspaceContext } from './api'
 import { formatInstantDate, translate } from '../i18n/localization'
 import { browserIntegrationsClient } from '../integrations/providerApi'
 import type { HaloTicketSummary, IntegrationsClient } from '../integrations/providerApi'
+import { browserOperationsClient } from '../operations/api'
+import type { OperationsClient } from '../operations/api'
+import { HomeReminders } from './HomeReminders'
 
 const classificationLabels = {
   client: 'Client',
@@ -15,7 +18,7 @@ const classificationLabels = {
   partner: 'Partner',
 }
 
-export function WorkspaceOverview({ workspace, relationshipsClient, integrationsClient = browserIntegrationsClient }: { workspace: WorkspaceContext; relationshipsClient?: RelationshipsClient; integrationsClient?: IntegrationsClient }) {
+export function WorkspaceOverview({ workspace, relationshipsClient, integrationsClient = browserIntegrationsClient, operationsClient = browserOperationsClient }: { workspace: WorkspaceContext; relationshipsClient?: RelationshipsClient; integrationsClient?: IntegrationsClient; operationsClient?: OperationsClient }) {
   const organization = workspace.organization
   const showHaloTickets = workspace.kind === 'organization' && workspace.classifications.includes('client') && workspace.capabilities.includes('integrations')
   const [tickets, setTickets] = useState<HaloTicketSummary[] | null>(showHaloTickets ? null : [])
@@ -42,6 +45,7 @@ export function WorkspaceOverview({ workspace, relationshipsClient, integrations
         </div>
         <Link className="secondary-button workspace-return" to="/organizations">Return to MSP organizations</Link>
       </header>
+      {workspace.capabilities.includes('deadlines') && <HomeReminders workspace={workspace} client={operationsClient} />}
       <section className="content-section" aria-labelledby="organization-profile-heading">
         <div className="section-heading"><h2 id="organization-profile-heading">Organization profile</h2></div>
         <dl className="organization-profile">

@@ -122,7 +122,8 @@ describe('application shell', () => {
     expect(screen.queryByRole('navigation', { name: 'Home sections' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Accounting' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Tickets' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Reminders' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'New reminder' })).toHaveAttribute('href', '/deadlines?new=1')
   })
 
   it('does not advertise excluded capabilities through deep links', () => {

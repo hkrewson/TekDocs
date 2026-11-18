@@ -206,7 +206,7 @@ describe('authentication boundary', () => {
     await user.click(screen.getByRole('button', { name: /Account menu for Primary Owner/i }))
     await user.click(screen.getByRole('menuitem', { name: 'Sign out' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Sign out was not completed')
+    expect(await screen.findByText('Sign out was not completed.')).toHaveAttribute('role', 'alert')
     expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument()
   })
 

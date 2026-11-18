@@ -291,7 +291,6 @@ function SignInForm({ client, submit, forgotPassword }: {
   return (
     <AuthFrame>
       <h1>{translate('auth.signInHeading')}</h1>
-      <p className="auth-intro">{translate('auth.signInHelp')}</p>
       <form className="auth-form" onSubmit={(event) => { void handleSubmit(event) }}>
         <label>{translate('auth.emailAddress')}<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required autoFocus /></label>
         <label>{translate('auth.password')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required /></label>

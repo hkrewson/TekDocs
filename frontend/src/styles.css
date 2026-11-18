@@ -1019,9 +1019,10 @@ select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .auth-page { min-height: 100dvh; display: grid; place-items: center; padding: var(--space-6) var(--space-4); background: var(--canvas); }
 .auth-panel { width: min(440px, 100%); padding: var(--space-5); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); }
 .auth-brand { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-5); font-size: 16px; font-weight: 650; }
-.auth-panel h1 { margin: 0 0 var(--space-2); font-size: 24px; line-height: 1.25; letter-spacing: -.015em; }
-.auth-intro { margin: 0 0 var(--space-5); color: var(--muted); font-size: 14px; line-height: 1.55; }
+.auth-panel h1 { margin: 0 0 var(--space-2); font-size: 24px; line-height: 1.25; letter-spacing: -.015em; text-wrap: balance; }
+.auth-intro { margin: 0 0 var(--space-5); color: var(--muted); font-size: 14px; line-height: 1.55; text-wrap: pretty; }
 .auth-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.auth-panel h1 + .auth-form { margin-top: var(--space-5); }
 .bootstrap-token-help { display: grid; gap: var(--space-2); padding: var(--space-3); color: var(--muted); background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-panel); font-size: 12px; line-height: 1.45; }
 .bootstrap-token-help p { margin: 0; }
 .bootstrap-token-help strong { color: var(--text); font-size: 13px; }

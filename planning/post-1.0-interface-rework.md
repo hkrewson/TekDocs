@@ -344,7 +344,28 @@ confirm retained query state, keyboard operation, accessibility, and responsive
 layout at all six required widths. No API, schema, persistence, or authorization
 change is part of this slice.
 
-## November 15–16, 2026 implementation evidence
+## Authentication and client portal rollout
+
+Authentication remains a single restrained panel. Generic sign-in helper copy is
+removed, while first-owner setup, MFA, recovery, invitation, error, and security
+guidance remains available where it changes what the person must do.
+
+The client portal presents the organization and a compact **Portal view** selector
+for **Documents** and **Invoices**. Documents delivered through the legacy and
+repository-backed publication paths appear in one date-ordered client list; their
+storage and approval pipelines are not client navigation concepts. Existing
+`section=publications` and `publication=` links remain valid for notifications,
+saved links, refresh, and browser history. The separate authorization-checked APIs,
+sanitized content, exact-client scoping, revocation behavior, retained downloads,
+and invoice contract remain unchanged.
+
+Acceptance covers sign-in, setup, MFA, reset, invitation, and sign-out; merged
+document loading, pagination, partial failure, withdrawal, direct legacy links,
+notifications, and invoices; and keyboard, refresh, history, zoom, responsive, and
+accessibility behavior. This rollout does not change backend APIs, persistence,
+database schema, or authorization.
+
+## November 15–17, 2026 implementation evidence
 
 Verified:
 
@@ -383,6 +404,11 @@ Verified:
   They cover the Integration and Data model selectors, lazy loading, retry,
   unsaved-change recovery, reconciliation, custom-field and taxonomy workflows,
   Recycle bin, shell behavior, and all six required widths;
+- all 890 frontend tests and 30 focused authentication and portal component tests
+  pass for the final rollout. Twenty-four focused Chromium journeys cover sign-in,
+  setup, MFA, sign-out, protected portal documents, withdrawal recovery, and the
+  surrounding shell. Eight responsive Chromium/WebKit journeys cover the six
+  required widths, 200% zoom, refresh, browser history, keyboard access, and axe;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

@@ -102,7 +102,7 @@ describe('application shell', () => {
     render(<App initialPath="/overview" initialAuthContext={portalContext} authClient={authClient} />)
 
     expect(await screen.findByRole('heading', { name: 'Acme Dental' })).toBeInTheDocument()
-    expect(screen.getByText('Invoices and documents shared with your organization.')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Portal view' })).toHaveValue('documents')
     expect(screen.getByRole('heading', { name: 'Documents' })).toBeInTheDocument()
     expect(screen.queryByText(/STATIC|client-visible/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Organizations' })).not.toBeInTheDocument()

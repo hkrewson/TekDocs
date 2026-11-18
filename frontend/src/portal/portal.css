@@ -12,7 +12,7 @@
 .portal-document-list button { width: 100%; padding: var(--space-3) 0; border: 0; background: transparent; color: inherit; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); text-align: left; }
 .portal-document-list button:hover strong, .portal-document-list button:focus-visible strong { text-decoration: underline; }
 .portal-document-list button span:first-child { display: grid; gap: 4px; }
-.portal-document-list small, .portal-download-list span { color: var(--muted); }
+.portal-document-list small, .portal-download-list span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .portal-history-action { display: flex; justify-content: center; padding-top: var(--space-4); border-top: 1px solid var(--border); }
 .portal-document-list .visibility-label { padding: 0; color: var(--muted); background: transparent; border: 0; border-radius: 0; font-size: 12px; font-weight: 600; }
 .portal-document-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-5); }

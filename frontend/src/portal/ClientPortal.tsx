@@ -1,5 +1,5 @@
 import { ArrowLeft, Download, FileText, LogOut } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import type { AuthenticatedContext } from '../auth/api'
 import { InvoiceBillTo } from '../accounting/InvoiceBillTo'
@@ -9,7 +9,6 @@ import type { MessageId } from '../i18n/localization'
 import { NotificationInbox } from '../notifications/NotificationInbox'
 import { browserPortalNotificationsClient } from '../notifications/api'
 import type { NotificationsClient, NotificationTarget } from '../notifications/api'
-import { RecordSections } from '../records/RecordNavigation'
 import { portalClient, type PortalDocument, type PortalDocumentDetail, type PortalInvoice, type PortalRepositoryPublication, type PortalRepositoryPublicationDetail } from './api'
 import '../collections/collections.css'
 import './portal.css'
@@ -31,11 +30,6 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
   const documentId = section === 'documents' ? parameters.get('document') : null
   const publicationId = section === 'publications' ? parameters.get('publication') : null
   const invoiceId = section === 'invoices' ? parameters.get('invoice') : null
-  const sections = useMemo(() => [
-    { id: 'documents', label: translate('portal.documents'), href: '?section=documents' },
-    { id: 'publications', label: translate('portal.repositoryPublications'), href: '?section=publications' },
-    { id: 'invoices', label: translate('portal.invoices'), href: '?section=invoices' },
-  ], [])
   const [documents, setDocuments] = useState<PortalDocument[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [selected, setSelected] = useState<PortalDocumentDetail | null>(null)
@@ -75,6 +69,11 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
     if (id) next.set('publication', id)
     setParameters(next)
   }, [setParameters])
+
+  function changeView(nextView: 'documents' | 'invoices') {
+    if (nextView === 'invoices') showInvoices()
+    else showDocuments()
+  }
 
   const loadDocuments = useCallback(async (cursor?: string) => {
     if (cursor) setLoadingMore(true)
@@ -230,17 +229,15 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
       </header>
       <main id="portal-main-content" className="client-portal-main" aria-busy={activePhase === 'loading' || detailLoading || loadingMore || loadingMorePublications || loadingMoreInvoices}>
         {signOutError && <div className="form-error" role="alert">{signOutError}</div>}
-        <header className="page-header"><div><h1>{organization?.name ?? 'Client portal'}</h1><p>{translate('portal.summary')}</p></div></header>
-        <RecordSections sections={sections} current={section} />
+        <header className="page-header collection-page-header"><div><h1>{organization?.name ?? 'Client portal'}</h1></div><label className="collection-view-picker"><span>{translate('portal.view')}</span><select aria-label={translate('portal.view')} value={section} onChange={(event) => changeView(event.target.value === 'invoices' ? 'invoices' : 'documents')}><option value="publications" hidden>{translate('portal.documents')}</option><option value="documents">{translate('portal.documents')}</option><option value="invoices">{translate('portal.invoices')}</option></select></label></header>
         {error?.section === section && <div className="form-error" role="alert">{error.message}</div>}
         {detailLoading && (documentId || publicationId || invoiceId) && <section className="content-section" aria-live="polite"><p role="status">{translate(section === 'invoices' ? 'portal.loadingInvoice' : 'portal.loadingDocument')}</p></section>}
         {!detailLoading && section === 'invoices' && selectedInvoice?.id === invoiceId ? <InvoiceDetail invoice={selectedInvoice} onBack={() => showInvoices()} />
           : !detailLoading && section === 'documents' && selected?.id === documentId ? <DocumentDetail document={selected} onBack={() => showDocuments()} />
-            : !detailLoading && section === 'publications' && selectedPublication?.id === publicationId ? <RepositoryPublicationDetail publication={selectedPublication} onBack={() => { showPublications(); void loadPublications() }} />
+            : !detailLoading && section === 'publications' && selectedPublication?.id === publicationId ? <RepositoryPublicationDetail publication={selectedPublication} onBack={() => showDocuments()} />
               : section === 'invoices' ? <InvoiceCollection phase={invoicePhase} invoices={invoices} cursor={invoiceCursor} loadingMore={loadingMoreInvoices} detailLoading={detailLoading} onOpen={(id) => showInvoices(id)} onRetry={() => { void loadInvoices() }} onMore={() => { if (invoiceCursor) void loadInvoices(invoiceCursor) }} />
                 : section === 'publications' ? <RepositoryPublicationCollection phase={publicationPhase} publications={publications} cursor={publicationCursor} loadingMore={loadingMorePublications} detailLoading={detailLoading} loadError={publicationListError} onOpen={(id) => showPublications(id)} onRetry={() => { void loadPublications() }} onMore={() => { if (publicationCursor) void loadPublications(publicationCursor) }} />
-                  : <><DocumentCollection phase={phase} documents={documents} cursor={nextCursor} loadingMore={loadingMore} detailLoading={detailLoading} onOpen={(id) => showDocuments(id)} onRetry={() => { void loadDocuments() }} onMore={() => { if (nextCursor) void loadDocuments(nextCursor) }} />
-                    <RepositoryPublicationCollection phase={publicationPhase} publications={publications} cursor={publicationCursor} loadingMore={loadingMorePublications} detailLoading={detailLoading} loadError={publicationListError} onOpen={(id) => showPublications(id)} onRetry={() => { void loadPublications() }} onMore={() => { if (publicationCursor) void loadPublications(publicationCursor) }} /></>}
+                  : <DocumentCollection phase={phase} publicationPhase={publicationPhase} documents={documents} publications={publications} cursor={nextCursor} publicationCursor={publicationCursor} loadingMore={loadingMore || loadingMorePublications} detailLoading={detailLoading} publicationLoadError={publicationListError} onOpenDocument={(id) => showDocuments(id)} onOpenPublication={(id) => showPublications(id)} onRetryDocuments={() => { void loadDocuments() }} onRetryPublications={() => { void loadPublications() }} onMore={() => { if (nextCursor) void loadDocuments(nextCursor); if (publicationCursor) void loadPublications(publicationCursor) }} />}
       </main>
     </div>
   )
@@ -248,7 +245,7 @@ export function ClientPortal({ context, onSignOut, signingOut, signOutError, not
 
 function InvoiceCollection({ phase, invoices, cursor, loadingMore, detailLoading, onOpen, onRetry, onMore }: { phase: Phase; invoices: PortalInvoice[]; cursor: string | null; loadingMore: boolean; detailLoading: boolean; onOpen: (id: string) => void; onRetry: () => void; onMore: () => void }) {
   return <section className="content-section portal-workspace" aria-labelledby="portal-invoices-heading">
-    <div className="section-heading"><div><h2 id="portal-invoices-heading">{translate('portal.invoices')}</h2><p>{translate('portal.invoicesDescription')}</p></div></div>
+    <div className="section-heading"><div><h2 id="portal-invoices-heading">{translate('portal.invoices')}</h2></div></div>
     {phase === 'loading' && <p role="status">{translate('portal.loadingInvoices')}</p>}
     {phase === 'error' && <div role="alert"><p>{translate('portal.invoiceLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetry}>{translate('portal.tryAgain')}</button></div>}
     {phase === 'ready' && invoices.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noInvoices')}</p></div>}
@@ -257,20 +254,30 @@ function InvoiceCollection({ phase, invoices, cursor, loadingMore, detailLoading
   </section>
 }
 
-function DocumentCollection({ phase, documents, cursor, loadingMore, detailLoading, onOpen, onRetry, onMore }: { phase: Phase; documents: PortalDocument[]; cursor: string | null; loadingMore: boolean; detailLoading: boolean; onOpen: (id: string) => void; onRetry: () => void; onMore: () => void }) {
+function DocumentCollection({ phase, publicationPhase, documents, publications, cursor, publicationCursor, loadingMore, detailLoading, publicationLoadError, onOpenDocument, onOpenPublication, onRetryDocuments, onRetryPublications, onMore }: { phase: Phase; publicationPhase: Phase; documents: PortalDocument[]; publications: PortalRepositoryPublication[]; cursor: string | null; publicationCursor: string | null; loadingMore: boolean; detailLoading: boolean; publicationLoadError: string | null; onOpenDocument: (id: string) => void; onOpenPublication: (id: string) => void; onRetryDocuments: () => void; onRetryPublications: () => void; onMore: () => void }) {
+  const entries = [
+    ...documents.map((document) => ({ id: document.id, kind: 'document' as const, title: document.title, date: document.published_at ?? '', detail: document.category })),
+    ...publications.map((publication) => ({ id: publication.id, kind: 'publication' as const, title: publication.title, date: publication.created_at ?? '', detail: '' })),
+  ].sort((left, right) => right.date.localeCompare(left.date))
+  const loading = phase === 'loading' || publicationPhase === 'loading'
+  const empty = phase === 'ready' && publicationPhase === 'ready' && entries.length === 0
+  const bothFailed = phase === 'error' && publicationPhase === 'error'
+  const retryAll = () => { onRetryDocuments(); onRetryPublications() }
   return <section className="content-section portal-workspace" aria-labelledby="portal-documents-heading">
-    <div className="section-heading"><div><h2 id="portal-documents-heading">{translate('portal.documents')}</h2><p>{translate('portal.documentsDescription')}</p></div></div>
-    {phase === 'loading' && <p role="status">{translate('portal.loadingDocuments')}</p>}
-    {phase === 'error' && <div role="alert"><p>{translate('portal.documentsLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetry}>{translate('portal.tryAgain')}</button></div>}
-    {phase === 'ready' && documents.length === 0 && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noDocuments')}</p></div>}
-    {phase === 'ready' && documents.length > 0 && <ul className="portal-document-list">{documents.map((document) => <li key={document.id}><button type="button" disabled={detailLoading} onClick={() => onOpen(document.id)}><span><strong>{document.title}</strong><small>{document.category} · {translate('portal.publishedOn', { date: new Date(document.published_at).toLocaleDateString() })}</small></span></button></li>)}</ul>}
-    {phase === 'ready' && cursor && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={onMore}>{loadingMore ? translate('portal.loadingMoreDocuments') : translate('portal.loadMoreDocuments')}</button></div>}
+    <div className="section-heading"><div><h2 id="portal-documents-heading">{translate('portal.documents')}</h2></div></div>
+    {loading && entries.length === 0 && <p role="status">{translate('portal.loadingDocuments')}</p>}
+    {bothFailed && <div role="alert"><p>{translate('portal.documentsLoadFailed')}</p><button className="secondary-button" type="button" onClick={retryAll}>{translate('portal.tryAgain')}</button></div>}
+    {!bothFailed && phase === 'error' && <div role="alert"><p>{translate('portal.documentsLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetryDocuments}>{translate('portal.tryAgain')}</button></div>}
+    {!bothFailed && (publicationPhase === 'error' || publicationLoadError) && <div role="alert"><p>{publicationLoadError ?? translate('portal.publicationsLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetryPublications}>{translate('portal.tryAgain')}</button></div>}
+    {empty && <div className="empty-state"><FileText size={24} aria-hidden="true" /><p>{translate('portal.noDocuments')}</p></div>}
+    {entries.length > 0 && <ul className="portal-document-list">{entries.map((entry) => <li key={`${entry.kind}-${entry.id}`}><button type="button" disabled={detailLoading} onClick={() => entry.kind === 'document' ? onOpenDocument(entry.id) : onOpenPublication(entry.id)}><span><strong>{entry.title}</strong>{entry.date && <small>{entry.detail ? `${entry.detail} · ` : ''}{translate('portal.publishedOn', { date: new Date(entry.date).toLocaleDateString() })}</small>}</span></button></li>)}</ul>}
+    {(cursor || publicationCursor) && <div className="portal-history-action"><button className="secondary-button" type="button" disabled={loadingMore} onClick={onMore}>{loadingMore ? translate('portal.loadingMoreDocuments') : translate('portal.loadMoreDocuments')}</button></div>}
   </section>
 }
 
 function RepositoryPublicationCollection({ phase, publications, cursor, loadingMore, detailLoading, loadError, onOpen, onRetry, onMore }: { phase: Phase; publications: PortalRepositoryPublication[]; cursor: string | null; loadingMore: boolean; detailLoading: boolean; loadError: string | null; onOpen: (id: string) => void; onRetry: () => void; onMore: () => void }) {
   return <section className="content-section portal-workspace" aria-labelledby="portal-publications-heading">
-    <div className="section-heading"><div><h2 id="portal-publications-heading">{translate('portal.repositoryPublications')}</h2><p>{translate('portal.repositoryPublicationsDescription')}</p></div></div>
+    <div className="section-heading"><div><h2 id="portal-publications-heading">{translate('portal.repositoryPublications')}</h2></div></div>
     {phase === 'loading' && <p role="status">{translate('portal.loadingPublications')}</p>}
     {phase === 'error' && <div role="alert"><p>{translate('portal.publicationsLoadFailed')}</p><button className="secondary-button" type="button" onClick={onRetry}>{translate('portal.tryAgain')}</button></div>}
     {phase === 'ready' && loadError && <p role="alert">{loadError}</p>}

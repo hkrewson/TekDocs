@@ -57,9 +57,8 @@ describe('ClientPortal', () => {
 
     expect(screen.getByRole('link', { name: 'Skip to main content' })).toHaveAttribute('href', '#portal-main-content')
     expect(screen.getByRole('main')).toHaveAttribute('id', 'portal-main-content')
-    expect(screen.getByRole('link', { name: 'New publications' })).toHaveAttribute('href', '/portal?section=publications')
+    expect(screen.getByRole('combobox', { name: 'Portal view' })).toHaveValue('documents')
     expect(await screen.findByText('No documents have been shared with your organization.')).toBeInTheDocument()
-    expect(await screen.findByText('No new publications have been shared with your organization.')).toBeInTheDocument()
   })
 
   it('lists and opens a document without exposing publication internals', async () => {
@@ -110,13 +109,13 @@ describe('ClientPortal', () => {
     renderPortal()
 
     expect(await screen.findByRole('button', { name: /Existing guide/i })).toBeInTheDocument()
-    const repositorySection = screen.getByRole('heading', { name: 'New publications' }).closest('section')
+    const repositorySection = screen.getByRole('heading', { name: 'Documents' }).closest('section')
     if (!repositorySection) throw new Error('Repository publication section was not rendered.')
     expect(await within(repositorySection).findByRole('alert')).toHaveTextContent('Try again. If the problem continues, contact your MSP.')
   })
 
   it('shows a clear empty state without exposing MSP navigation', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 })))
     renderPortal()
     expect(await screen.findByText(/no documents have been shared/i)).toBeInTheDocument()
     expect(screen.queryByText('Organizations')).not.toBeInTheDocument()
@@ -195,7 +194,7 @@ describe('ClientPortal', () => {
 
     await user.click(await screen.findByRole('button', { name: /Old guide/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent('This document is no longer available.')
-    await user.click(screen.getByRole('link', { name: 'Invoices' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Portal view' }), 'invoices')
     await user.click(screen.getByRole('button', { name: /INV-OLD/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent('This invoice is no longer available.')
     expect(screen.queryByText(/Portal access was denied|Published documentation/)).not.toBeInTheDocument()
@@ -214,7 +213,7 @@ describe('ClientPortal', () => {
     fetchMock.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 })))
     await user.click(within(documentSection).getByRole('button', { name: 'Try again' }))
     expect(await within(documentSection).findByText('No documents have been shared with your organization.')).toBeInTheDocument()
-    await user.click(screen.getByRole('link', { name: 'Invoices' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Portal view' }), 'invoices')
     expect(await screen.findByText('No invoices have been issued to your organization.')).toBeInTheDocument()
   })
 
@@ -234,7 +233,7 @@ describe('ClientPortal', () => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       return url.includes('/portal/invoices')
     })).toBe(false)
-    await userEvent.click(screen.getByRole('link', { name: 'Invoices' }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Portal view' }), 'invoices')
     expect(await screen.findByText('No invoices have been issued to your organization.')).toBeInTheDocument()
   })
 
@@ -277,7 +276,7 @@ describe('ClientPortal', () => {
     })
     renderPortal('/portal?section=publications')
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Load more publications' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Load more documents' }))
     expect(fetchMock).toHaveBeenCalledWith('/api/v1/portal/repository-publications?cursor=repo-cursor', expect.anything())
     expect(screen.getByRole('button', { name: /current setup/i })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: /older setup/i })).toBeInTheDocument()
@@ -294,7 +293,7 @@ describe('ClientPortal', () => {
       return Promise.reject(new Error('private repository detail'))
     })
     renderPortal('/portal?section=publications&publication=repo-withdrawn')
-    const section = screen.getByRole('heading', { name: 'New publications' }).closest('section')
+    const section = screen.getByRole('heading', { name: 'Documents' }).closest('section')
     if (!section) throw new Error('Publication section was not rendered.')
     expect(await screen.findByText('This document is no longer available. Return to the document list and try again.')).toBeInTheDocument()
     expect(await within(section).findByRole('button', { name: 'Try again' })).toBeInTheDocument()
@@ -303,7 +302,7 @@ describe('ClientPortal', () => {
 
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
     await userEvent.click(within(section).getByRole('button', { name: 'Try again' }))
-    expect(await within(section).findByText('No new publications have been shared with your organization.')).toBeInTheDocument()
+    expect(await within(section).findByText('No documents have been shared with your organization.')).toBeInTheDocument()
   })
 
   it('does not reuse a previously opened publication after access is revoked', async () => {
@@ -314,6 +313,7 @@ describe('ClientPortal', () => {
       if (url.endsWith('/repo-revoked')) return Promise.resolve(available
         ? new Response(JSON.stringify({ ...publication, rendered_html: '<p>Retained instructions</p>', attachments: [] }), { status: 200 })
         : new Response('', { status: 404 }))
+      if (url.includes('/api/v1/portal/documents')) return Promise.resolve(new Response(JSON.stringify({ count: 0, has_more: false, next_cursor: null, results: [] }), { status: 200 }))
       return Promise.resolve(new Response(JSON.stringify({ count: 1, has_more: false, next_cursor: null, results: [publication] }), { status: 200 }))
     })
     const user = userEvent.setup()
@@ -321,7 +321,9 @@ describe('ClientPortal', () => {
 
     await user.click(await screen.findByRole('button', { name: /Enrollment guide/i }))
     expect(await screen.findByText('Retained instructions')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'All new publications' }))
+    expect(screen.getByRole('combobox', { name: 'Portal view' })).toHaveValue('publications')
+    await user.click(screen.getByRole('button', { name: 'All documents' }))
+    expect(screen.getByRole('combobox', { name: 'Portal view' })).toHaveValue('documents')
     available = false
     await user.click(await screen.findByRole('button', { name: /Enrollment guide/i }))
     expect(await screen.findByText('This document is no longer available. Return to the document list and try again.')).toBeInTheDocument()

@@ -151,7 +151,7 @@ test('authentication and client portal shells reflow at review widths and text z
 
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.evaluate(() => { document.body.style.zoom = '2' })
-  await page.getByRole('link', { name: 'Invoices' }).click()
+  await page.getByRole('combobox', { name: 'Portal view' }).selectOption('invoices')
   await expect(page.getByRole('button', { name: /INV-2026-000001/ })).toBeVisible()
   await expectNoHorizontalPageOverflow(page)
   const skipLink = page.getByRole('link', { name: 'Skip to main content' })
@@ -171,7 +171,7 @@ test('client portal sections and records survive refresh and browser navigation'
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Recovery steps' })).toBeVisible()
-  await page.getByRole('combobox', { name: 'Sections' }).selectOption('invoices')
+  await page.getByRole('combobox', { name: 'Portal view' }).selectOption('invoices')
   await expect(page).toHaveURL(/section=invoices/)
   await expect(page.getByRole('button', { name: /INV-2026-000001/ })).toBeVisible()
   await page.goBack()

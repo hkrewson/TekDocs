@@ -178,7 +178,7 @@ test('client portal uses plain language without exposing publication internals',
   await page.goto('/portal')
 
   await expect(page.getByRole('heading', { name: 'Example Client' })).toBeVisible()
-  await expect(page.getByText('Invoices and documents shared with your organization.')).toBeVisible()
+  await expect(page.getByRole('combobox', { name: 'Portal view' })).toHaveValue('documents')
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible()
   await expect(page.getByText(/STATIC|Client visible/)).not.toBeVisible()
   await page.getByRole('button', { name: /Network access guide/ }).click()

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
@@ -647,8 +647,12 @@ it('downloads only saved indexed HTML while keeping a dirty draft', async () => 
     expect(screen.queryByRole('button', { name: 'Download saved HTML' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
-    expect(screen.getByText(/^HTML uses the saved, indexed Git revision/)).toHaveTextContent('live entity and field values')
-    await user.click(screen.getByRole('button', { name: 'Download saved HTML' }))
+    const exportMenu = screen.getByText('File exports').closest('details')
+    expect(exportMenu).not.toHaveAttribute('open')
+    await user.click(screen.getByText('File exports'))
+    expect(exportMenu).toHaveAttribute('open')
+    expect(within(exportMenu!).getByText(/^HTML uses the saved, indexed Git revision/)).toHaveTextContent('live entity and field values')
+    await user.click(within(exportMenu!).getByRole('button', { name: 'Download saved HTML' }))
     await waitFor(() => expect(click).toHaveBeenCalledOnce())
     expect(exportHtml).toHaveBeenCalledWith('content-1', undefined)
     const exported = createObjectURL.mock.calls[0][0] as Blob
@@ -811,9 +815,13 @@ it('downloads a current Workspace snapshot and keeps a failed attempt recoverabl
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
   try {
     setup({ exportSources })
-    const download = await screen.findByRole('button', { name: 'Download Markdown source snapshot' })
+    const exportMenu = screen.getByText('Repository exports').closest('details')
+    expect(exportMenu).not.toHaveAttribute('open')
+    await user.click(screen.getByText('Repository exports'))
+    expect(exportMenu).toHaveAttribute('open')
+    const download = await within(exportMenu!).findByRole('button', { name: 'Download Markdown source snapshot' })
     await waitFor(() => expect(download).toBeEnabled())
-    expect(screen.getAllByText(/not a backup/)).toHaveLength(2)
+    expect(within(exportMenu!).getAllByText(/not a backup/)).toHaveLength(2)
     await user.click(download)
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be downloaded')
     expect(click).not.toHaveBeenCalled()

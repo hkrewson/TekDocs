@@ -1919,6 +1919,8 @@
   "repository.open": "Repository content",
   "repository.return": "Back to documentation",
   "repository.new": "New Markdown file",
+  "repository.repositoryExports": "Repository exports",
+  "repository.fileExports": "File exports",
   "repository.files": "Repository files",
   "repository.editor": "Markdown editor",
   "repository.search": "Search repository content",

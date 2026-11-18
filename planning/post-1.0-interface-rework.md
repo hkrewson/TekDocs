@@ -365,6 +365,25 @@ notifications, and invoices; and keyboard, refresh, history, zoom, responsive, a
 accessibility behavior. This rollout does not change backend APIs, persistence,
 database schema, or authorization.
 
+## Repository action-hierarchy refinement
+
+The repository editor is a contextual authoring workspace, not a second product
+navigation layer. Its header keeps **Back to documentation** and one **New
+Markdown file** primary action. Workspace-level source exports move to a plain
+secondary menu. Saved-file downloads move beside the editor's save and close
+controls in a separate export menu.
+
+Export guidance appears with the export choices instead of occupying the page at
+all times. It must still state the saved-revision boundary, possible live or
+sensitive values, excluded unsaved edits, and the distinction from a backup or
+STATIC publication. Git authority, conflict recovery, retained files, publishing,
+permissions, download integrity, and direct repository links remain unchanged.
+
+Acceptance covers menu keyboard operation, disabled and busy states, export
+failure and revision-change recovery, dirty-draft preservation, direct links,
+small-screen layout, zoom, and accessible names. No API, persistence, schema, or
+authorization change is part of this refinement.
+
 ## November 15–17, 2026 implementation evidence
 
 Verified:
@@ -409,6 +428,11 @@ Verified:
   setup, MFA, sign-out, protected portal documents, withdrawal recovery, and the
   surrounding shell. Eight responsive Chromium/WebKit journeys cover the six
   required widths, 200% zoom, refresh, browser history, keyboard access, and axe;
+- 45 repository component cases preserve export authorization, exact-revision
+  downloads, conflict and failure recovery, and dirty drafts behind the revised
+  action hierarchy. Four rebuilt-image Chromium journeys verify keyboard-operated
+  export menus, contextual safety guidance, axe, and no horizontal overflow at
+  320, 390, 768, and 1440px;
 - the rebuilt frontend and backend are healthy in the existing `tekdocs`
   Compose project; no parallel project or data volume is in use;
 - the retained development tenant preserves its existing owner and now contains

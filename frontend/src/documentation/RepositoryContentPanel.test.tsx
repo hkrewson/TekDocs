@@ -7,6 +7,19 @@ import type { DocumentPrimaryFile } from './api'
 import { RepositoryContentPanel } from './RepositoryContentPanel'
 import { RepositoryConflictError, RepositoryRecentAuthenticationRequiredError, type RepositoryClient, type RepositoryKeyState, type RepositorySource } from './repositoryApi'
 
+vi.mock('../editor/EditorSpike', () => ({
+  EditorSpike: ({ initialMarkdown, onMarkdownChange }: { initialMarkdown: string; onMarkdownChange: (value: string) => void }) => <>
+    <label htmlFor="mock-repository-markdown">Markdown body</label>
+    <textarea id="mock-repository-markdown" value={initialMarkdown} onChange={event => onMarkdownChange(event.target.value)} />
+  </>,
+}))
+
+async function openDisclosure(user: ReturnType<typeof userEvent.setup>, label: string | RegExp) {
+  const summary = await screen.findByText(label, typeof label === 'string' ? { exact: true } : undefined)
+  const disclosure = summary.closest('details')
+  if (disclosure && !disclosure.open) await user.click(summary)
+}
+
 const commit = 'a'.repeat(40)
 const blob = 'b'.repeat(40)
 const initial: RepositorySource = {
@@ -22,14 +35,17 @@ const keyState: RepositoryKeyState = {
   targets: [keySite, keyFragment], bound_targets: [], has_more: false, report: [], report_has_more: false,
 }
 
-it('stages field and content bindings with entity references and retains the complete draft after denial', async () => {
+it('stages field and content variables and retains the complete draft after denial', async () => {
   const user = userEvent.setup()
   const keys = vi.fn().mockResolvedValue(keyState)
   const save = vi.fn().mockRejectedValue(new Error('Save denied'))
   const { onClose } = setup({ keys, save }, 'org-1', initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Unsaved notes')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await screen.findByRole('button', { name: 'Bind key to Key site' })
   await user.type(screen.getByLabelText('Binding name'), 'site')
   await user.click(screen.getByRole('button', { name: 'Bind key to Key site' }))
@@ -37,20 +53,18 @@ it('stages field and content bindings with entity references and retains the com
   await user.type(screen.getByLabelText('Binding name'), 'steps')
   await user.click(screen.getByRole('button', { name: 'Bind key to Key procedure' }))
   await user.selectOptions(await screen.findByLabelText('Insert key for steps'), 'content')
-  await user.click(screen.getByRole('button', { name: 'Insert reference to Key site' }))
   expect(save).not.toHaveBeenCalled()
   const text = (body as HTMLTextAreaElement).value
   expect(text).toContain('<tekdocs://key/site.name>')
   expect(text).toContain('<tekdocs://key/steps.content>')
-  expect(text).toContain(`<tekdocs://entity/${keySite.id}>`)
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Save denied')
   expect(body).toHaveValue(text)
   expect(save).toHaveBeenCalledWith(expect.objectContaining({
     markdown: text, base_commit: commit, base_blob: blob,
     metadata_patch: { key_bindings: { site: keySite.id, steps: keyFragment.id } },
   }), 'org-1')
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(onClose).not.toHaveBeenCalled()
   expect(body).toHaveValue(text)
@@ -66,12 +80,15 @@ it('keeps a competing key edit and Markdown draft when the saved document confli
   setup({ keys: vi.fn().mockResolvedValue(keyState), save }, 'org-1', initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Local draft')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await screen.findByRole('button', { name: 'Bind key to Key procedure' })
   await user.type(screen.getByLabelText('Binding name'), 'steps')
   await user.click(screen.getByRole('button', { name: 'Bind key to Key procedure' }))
   await user.selectOptions(await screen.findByLabelText('Insert key for steps'), 'content')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   expect(await screen.findByText('Other saved bindings')).toBeVisible()
   expect(screen.getByText('My binding draft')).toBeVisible()
   expect(body).toHaveValue('First revision.\n Local draft\n\n<tekdocs://key/steps.content>\n')
@@ -84,7 +101,10 @@ it('requires review of a changed key source and protects Markdown when reloading
   const { client } = setup({ keys: vi.fn().mockResolvedValue({ ...keyState, source_blob: 'd'.repeat(40) }) }, 'org-1', initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Kept draft')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   expect(await screen.findByRole('alert')).toHaveTextContent('The saved document changed')
   await user.click(screen.getByRole('button', { name: 'Reload document' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
@@ -95,11 +115,15 @@ it('requires review of a changed key source and protects Markdown when reloading
 it('protects an unfinished binding name and disables publishing until it is resolved', async () => {
   const user = userEvent.setup()
   setup({ keys: vi.fn().mockResolvedValue(keyState) }, 'org-1', initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await screen.findByRole('button', { name: 'Bind key to Key site' })
   await user.type(screen.getByLabelText('Binding name'), 'site')
+  await openDisclosure(user, 'Review and publication')
   expect(screen.getByRole('button', { name: 'Publish document' })).toBeDisabled()
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(screen.getByLabelText('Binding name')).toHaveValue('site')
   await user.click(screen.getByRole('button', { name: 'Cancel binding' }))
@@ -107,12 +131,16 @@ it('protects an unfinished binding name and disables publishing until it is reso
 })
 
 it('offers key and reference controls for a saved Git-only document', async () => {
+  const user = userEvent.setup()
   setup({}, 'org-1', initial.content_id)
-  expect(await screen.findByRole('button', { name: 'Keys and references' })).toBeVisible()
+  await openDisclosure(user, 'Document tools')
+  expect(await screen.findByRole('button', { name: 'Variables' })).toBeVisible()
 })
 
 it('offers primary-file version controls for a saved Git-only document', async () => {
+  const user = userEvent.setup()
   setup({}, 'org-1', initial.content_id)
+  await openDisclosure(user, 'Document tools')
   expect(await screen.findByRole('button', { name: 'Primary file versions' })).toBeVisible()
 })
 
@@ -123,7 +151,8 @@ it('configures a Web source for a saved Git-only document', async () => {
     last_checked_at: null, last_applied_observation_id: null }
   const saveRemoteSource = vi.fn().mockResolvedValue(saved)
   setup({ saveRemoteSource }, 'org-1', initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Web source' }))
+  await openDisclosure(user, 'Document tools')
+  await user.click(screen.getByRole('button', { name: 'Web source' }))
   await user.type(await screen.findByLabelText('Public document URL'), saved.url)
   await user.selectOptions(screen.getByLabelText('Source format'), 'markdown')
   await user.clear(screen.getByLabelText('Check every (minutes)'))
@@ -150,17 +179,19 @@ it('protects a primary-file selection and Markdown draft through navigation and 
   const { onClose, save } = setup({ primaryFiles, appendPrimaryFile }, 'org-1', initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Unsaved notes')
+  await openDisclosure(user, 'Document tools')
   await user.click(screen.getByRole('button', { name: 'Primary file versions' }))
   await screen.findByText('No primary file yet.')
   await user.upload(screen.getByLabelText('Choose primary file'), new File(['first'], 'primary.txt'))
+  await openDisclosure(user, 'Review and publication')
   expect(screen.getByRole('button', { name: 'Publish document' })).toBeDisabled()
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(onClose).not.toHaveBeenCalled()
   expect(screen.getByText('Selected: primary.txt')).toBeVisible()
   expect(body).toHaveValue('First revision.\n Unsaved notes')
   await user.click(screen.getByRole('button', { name: 'Upload primary file' }))
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   expect(await screen.findByRole('button', { name: 'Discard changes' })).toBeDisabled()
   await act(async () => { finish(version); await pending })
   await waitFor(() => expect(screen.getByRole('button', { name: 'Discard changes' })).toBeEnabled())
@@ -181,6 +212,7 @@ it('offers publication controls for a saved native client document', async () =>
   const user = userEvent.setup()
   setup({}, 'org-1', 'content-1')
   expect(await screen.findByLabelText('Markdown body')).toHaveValue('First revision.\n')
+  await openDisclosure(user, 'Review and publication')
   await user.click(screen.getByRole('button', { name: 'Publish document' }))
   expect(await screen.findByRole('form', { name: 'Publish document' })).toBeInTheDocument()
 })
@@ -191,7 +223,8 @@ it('retains the reviewed Git revision and leaves a denied snapshot retryable', a
     id: 'evidence-new', content_id: initial.content_id, audience: 'client_visible', title: 'Frozen guide', source_commit: commit, signed_at: '2026-11-02T12:00:00Z',
   })
   setup({ createEvidence }, 'org-1', initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Publish document' }))
+  await openDisclosure(user, 'Review and publication')
+  await user.click(screen.getByRole('button', { name: 'Publish document' }))
   await user.selectOptions(screen.getByLabelText('Publication audience'), 'client_visible')
   await user.click(screen.getByRole('button', { name: 'Retain snapshot' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('could not be retained')
@@ -206,6 +239,7 @@ it('blocks new snapshots while Markdown changes are unsaved', async () => {
   const user = userEvent.setup()
   const { client } = setup({}, undefined, initial.content_id)
   await user.type(await screen.findByLabelText('Markdown body'), ' Unsaved')
+  await openDisclosure(user, 'Review and publication')
   expect(screen.getByRole('button', { name: 'Publish document' })).toBeDisabled()
   expect(client.createEvidence).not.toHaveBeenCalled()
 })
@@ -217,7 +251,8 @@ it.each(['identity', 'revision'])('rejects a workflow response for a different p
     listEvidence: vi.fn().mockResolvedValue({ results: [evidence], page: 1, count: 1, page_size: 25, has_more: false }),
     publicationWorkflow: vi.fn().mockResolvedValue({ evidence_id: mismatch === 'identity' ? 'other-evidence' : 'evidence-1', source_commit: mismatch === 'revision' ? 'f'.repeat(40) : commit, audience: 'client_visible', verified: true, stage: 'release', state: 'released', actions: [], active_publication_id: 'static-1', publication_id: 'static-1', content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }),
   }, 'org-1', initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await openDisclosure(user, 'Review and publication')
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Publication controls are unavailable')
   expect(screen.queryByRole('button', { name: 'Download retained PDF' })).not.toBeInTheDocument()
@@ -233,7 +268,8 @@ it('confirms recent authentication without automatically retrying client deliver
     publicationWorkflow: vi.fn().mockResolvedValue({ evidence_id: 'evidence-1', source_commit: commit, audience: 'client_visible', verified: true, stage: 'release', state: 'released', actions: ['authorize_delivery'], active_publication_id: 'publication-1', publication_id: 'publication-1', content_digest: 'd'.repeat(64), delivery_effective: false, events: [] }),
     publicationAction, reauthenticate,
   }, 'org-1', initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await openDisclosure(user, 'Review and publication')
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
   await user.click(await screen.findByRole('button', { name: 'Authorize client access' }))
   await user.type(screen.getByLabelText('Decision reason'), 'Reviewed delivery')
@@ -259,7 +295,8 @@ it('preserves a denied decision reason and requires explicit correction confirma
     publicationWorkflow,
     publicationAction,
   }, undefined, initial.content_id)
-  await user.click(await screen.findByRole('button', { name: 'Load publication history' }))
+  await openDisclosure(user, 'Review and publication')
+  await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   await user.click(await screen.findByRole('button', { name: /Frozen guide/ }))
   await user.click(await screen.findByRole('button', { name: 'Publish snapshot' }))
   await user.type(screen.getByLabelText('Decision reason'), 'Reviewed correction')
@@ -274,7 +311,7 @@ it('preserves a denied decision reason and requires explicit correction confirma
   expect(await screen.findByLabelText('Replace the current publication as a correction')).not.toBeChecked()
   expect(screen.getByLabelText('Decision reason')).toHaveValue('Reviewed correction')
   expect(screen.getByRole('button', { name: 'Confirm decision' })).toBeDisabled()
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   expect(onClose).not.toHaveBeenCalled()
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(onClose).not.toHaveBeenCalled()
@@ -343,6 +380,7 @@ it('archives only an unlinked file and leaves a denied archive retryable without
   const archiveAttachment = vi.fn().mockRejectedValueOnce(new Error('Conflict')).mockResolvedValue(undefined)
   setup({ listAttachments, archiveAttachment }, 'org-1')
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await openDisclosure(user, /^Files \(/)
   const body = screen.getByLabelText('Markdown body')
   const archive = await screen.findByRole('button', { name: 'Archive unused.txt' })
   await user.type(body, ' Unsaved')
@@ -361,6 +399,7 @@ it('does not offer archive for a saved link or when the unsaved draft references
   const unused = { id: '11111111-1111-4111-8111-111111111111', filename: 'unused.txt', size: 5, linked_current: false, can_archive: true }
   const { client } = setup({ listAttachments: vi.fn().mockResolvedValue({ results: [linked, unused], page: 1, page_size: 25, count: 2, has_more: false }) })
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await openDisclosure(user, /^Files \(/)
   expect(await screen.findByText(/linked.txt/)).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Archive linked.txt' })).not.toBeInTheDocument()
   await user.type(screen.getByLabelText('Markdown body'), ` tekdocs://attachment/${unused.id}`)
@@ -389,13 +428,13 @@ it('keeps a pending repository listing independent from an attachment upload', a
   })
   expect(screen.getByLabelText('Markdown body')).toHaveValue('First revision.\n[steps.txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n')
   expect(screen.getAllByRole('status').map(item => item.textContent)).toEqual([
-    'steps.txt was attached. Save to Git to keep its link in the document.', 'Loading repository content…',
+    'steps.txt was attached. Save to keep its link in the document.', 'Loading repository content…',
   ])
   await act(async () => {
     finishListing({ results: [{ id: 'content-1', title: 'Guide', kind: 'document', path: 'docs/guide.md' }], accepted_commit: commit, indexed_commit: commit, count: 1, has_more: false })
     await listing
   })
-  expect(screen.getByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(screen.getByRole('status')).toHaveTextContent('Save to keep its link')
   expect(save).not.toHaveBeenCalled()
 })
 
@@ -407,13 +446,13 @@ it('uploads to a saved indexed document and leaves its private-file link as an u
   await user.upload(screen.getByLabelText('Attach file to saved document'), file)
   await waitFor(() => expect(client.uploadAttachment).toHaveBeenCalledWith('content-1', file, 'org-1'))
   const linked = 'First revision.\n[setup \\[staff\\].txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n'
-  expect(await screen.findByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(await screen.findByRole('status')).toHaveTextContent('Save to keep its link')
   expect(screen.getByLabelText('Markdown body')).toHaveValue(linked)
   expect(save).not.toHaveBeenCalled()
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(screen.getByLabelText('Markdown body')).toHaveValue(linked)
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
     content_id: 'content-1', base_commit: commit, base_blob: blob, markdown: linked,
   }), 'org-1'))
@@ -434,7 +473,7 @@ it('preserves a dirty draft and supports retry when attachment upload is denied'
   expect(body).toHaveValue('First revision.\n Unsaved')
   await user.upload(screen.getByLabelText('Attach file to saved document'), file)
   await waitFor(() => expect(uploadAttachment).toHaveBeenCalledTimes(2))
-  expect(await screen.findByRole('status')).toHaveTextContent('Save to Git to keep its link')
+  expect(await screen.findByRole('status')).toHaveTextContent('Save to keep its link')
   expect(body).toHaveValue('First revision.\n Unsaved\n\n[steps.txt](tekdocs://attachment/11111111-1111-4111-8111-111111111111)\n')
 })
 
@@ -444,7 +483,7 @@ it('does not offer attachment upload for fragments or unsaved documents', async 
   const client = setup({ source: vi.fn().mockResolvedValue(fragment) }).client
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   expect(screen.queryByLabelText('Attach file to saved document')).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'New Markdown file' }))
+  await user.click(screen.getByRole('button', { name: 'New document' }))
   expect(screen.queryByLabelText('Attach file to saved document')).not.toBeInTheDocument()
   expect(client.uploadAttachment).not.toHaveBeenCalled()
 })
@@ -460,21 +499,21 @@ it('disables attachment upload while indexing is behind the accepted revision', 
 it('preserves a dirty draft through navigation and sends exact base identities on save', async () => {
   const user = userEvent.setup()
   const { save, onClose } = setup()
-  expect(screen.getByRole('heading', { name: 'Repository content' })).toHaveFocus()
+  expect(screen.getByRole('heading', { name: 'Document authoring' })).toHaveFocus()
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   const body = await screen.findByLabelText('Markdown body')
   await user.clear(body)
   await user.type(body, 'Changed revision.')
-  await user.click(screen.getByRole('button', { name: 'Back to documentation' }))
+  await user.click(screen.getByRole('button', { name: 'Documents' }))
   await user.click(await screen.findByRole('button', { name: 'Keep editing' }))
   expect(onClose).not.toHaveBeenCalled()
   expect(body).toHaveValue('Changed revision.')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
     operation: 'update', content_id: 'content-1', base_commit: commit, base_blob: blob,
     markdown: 'Changed revision.', title: undefined,
   }), undefined))
-  expect(await screen.findByText('Saved as one accepted Git commit.')).toBeInTheDocument()
+  expect(await screen.findByText('Saved.')).toBeInTheDocument()
 })
 
 it('loads document-scoped publication history and distinguishes signed evidence from a verified STATIC record', async () => {
@@ -490,6 +529,7 @@ it('loads document-scoped publication history and distinguishes signed evidence 
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
   expect(listEvidence).not.toHaveBeenCalled()
+  await openDisclosure(user, 'Review and publication')
   await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   expect(await screen.findByRole('button', { name: /Evidence A/ })).toBeInTheDocument()
   expect(screen.getByText(/MSP internal/)).toBeInTheDocument()
@@ -510,6 +550,7 @@ it('keeps publication history denial retryable and does not claim unfinalized ev
   const staticPublication = vi.fn().mockResolvedValue(null)
   setup({ listEvidence, staticPublication })
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await openDisclosure(user, 'Review and publication')
   await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Publication history is unavailable')
   await user.click(screen.getByRole('button', { name: 'Retry' }))
@@ -541,6 +582,7 @@ it('keeps review-PDF denial retryable without turning signed evidence into a pub
     })
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
+    await openDisclosure(user, 'Review and publication')
     await user.click(screen.getByRole('button', { name: 'Load publication history' }))
     await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
     expect(await screen.findByText(/No finalized STATIC record exists/)).toBeInTheDocument()
@@ -574,6 +616,7 @@ it('keeps a denied STATIC check retryable and flags an unverified finalized reco
     staticPublication,
   })
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
+  await openDisclosure(user, 'Review and publication')
   await user.click(screen.getByRole('button', { name: 'Load publication history' }))
   await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
   expect(await screen.findByRole('alert')).toHaveTextContent('STATIC record could not be checked')
@@ -609,6 +652,7 @@ it('downloads a verified retained file after approval and keeps denial retryable
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
     expect(screen.queryByRole('button', { name: 'Download retained PDF' })).not.toBeInTheDocument()
+    await openDisclosure(user, 'Review and publication')
     await user.click(screen.getByRole('button', { name: 'Load publication history' }))
     await user.click(await screen.findByRole('button', { name: /Evidence A/ }))
     const download = await screen.findByRole('button', { name: 'Download retained PDF' })
@@ -651,7 +695,7 @@ it('downloads only saved indexed HTML while keeping a dirty draft', async () => 
     expect(exportMenu).not.toHaveAttribute('open')
     await user.click(screen.getByText('File exports'))
     expect(exportMenu).toHaveAttribute('open')
-    expect(within(exportMenu!).getByText(/^HTML uses the saved, indexed Git revision/)).toHaveTextContent('live entity and field values')
+    expect(within(exportMenu!).queryByText(/live entity and field values/)).not.toBeInTheDocument()
     await user.click(within(exportMenu!).getByRole('button', { name: 'Download saved HTML' }))
     await waitFor(() => expect(click).toHaveBeenCalledOnce())
     expect(exportHtml).toHaveBeenCalledWith('content-1', undefined)
@@ -719,7 +763,7 @@ it('offers live PDF only for an indexed document and keeps denial and stale revi
     expect(screen.queryByRole('button', { name: 'Download saved PDF' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
-    expect(screen.getByText(/PDF uses the saved, indexed Git revision/)).toBeInTheDocument()
+    expect(screen.queryByText(/PDF uses the saved, indexed Git revision/)).not.toBeInTheDocument()
     const download = screen.getByRole('button', { name: 'Download saved PDF' })
     await user.click(download)
     expect(await screen.findByRole('alert')).toHaveTextContent('saved PDF could not be downloaded')
@@ -762,7 +806,7 @@ it('offers live DOCX only for an indexed document and preserves an unsaved draft
     expect(screen.queryByRole('button', { name: 'Download saved DOCX' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
-    expect(screen.getByText(/DOCX uses the saved, indexed Git revision/)).toBeInTheDocument()
+    expect(screen.queryByText(/DOCX uses the saved, indexed Git revision/)).not.toBeInTheDocument()
     const download = screen.getByRole('button', { name: 'Download saved DOCX' })
     await user.click(download)
     expect(await screen.findByRole('alert')).toHaveTextContent('saved DOCX could not be downloaded')
@@ -815,13 +859,13 @@ it('downloads a current Workspace snapshot and keeps a failed attempt recoverabl
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL })
   try {
     setup({ exportSources })
-    const exportMenu = screen.getByText('Repository exports').closest('details')
+    const exportMenu = screen.getByText('More').closest('details')
     expect(exportMenu).not.toHaveAttribute('open')
-    await user.click(screen.getByText('Repository exports'))
+    await user.click(screen.getByText('More'))
     expect(exportMenu).toHaveAttribute('open')
     const download = await within(exportMenu!).findByRole('button', { name: 'Download Markdown source snapshot' })
     await waitFor(() => expect(download).toBeEnabled())
-    expect(within(exportMenu!).getAllByText(/not a backup/)).toHaveLength(2)
+    expect(within(exportMenu!).queryByText(/not a backup/)).not.toBeInTheDocument()
     await user.click(download)
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be downloaded')
     expect(click).not.toHaveBeenCalled()
@@ -888,10 +932,10 @@ it('keeps a denied or conflicting draft and exposes all three versions for revie
   await user.click(await screen.findByRole('button', { name: /Guide/ }))
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Local change')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Editing denied')
   expect(body).toHaveValue('First revision.\n Local change')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   expect(await screen.findByText('Current source')).toBeInTheDocument()
   expect(screen.getByText('Base source')).toBeInTheDocument()
   expect(screen.getByText('My source')).toBeInTheDocument()
@@ -912,14 +956,14 @@ it('refreshes a new-file base after an unrelated repository advance without disc
     .mockResolvedValue({ ...initial, accepted_commit: advanced, indexed_commit: advanced })
   setup({ list, save })
   await screen.findByText('No repository content matches this search.')
-  await user.click(screen.getByRole('button', { name: 'New Markdown file' }))
+  await user.click(screen.getByRole('button', { name: 'New document' }))
   await user.type(screen.getByRole('textbox', { name: 'Title' }), 'New guide')
   await user.type(screen.getByLabelText('Markdown body'), 'Keep this draft')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
-  expect(await screen.findByRole('alert')).toHaveTextContent('The repository changed')
+  await user.click(screen.getByRole('button', { name: 'Save' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('This document changed after you opened it')
   await user.click(screen.getByRole('button', { name: 'Use current as base and review my draft' }))
   expect(screen.getByLabelText('Markdown body')).toHaveValue('Keep this draft')
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ base_commit: advanced }), undefined))
 })
 
@@ -939,7 +983,7 @@ it('downloads only the loaded saved source, including frontmatter, while a draft
     setup()
     expect(screen.queryByRole('button', { name: 'Download loaded Markdown file' })).not.toBeInTheDocument()
     await user.click(await screen.findByRole('button', { name: /Guide/ }))
-    expect(screen.getByText(`Loaded Git revision ${commit.slice(0, 12)}. Download includes the saved source and portable metadata, not unsaved edits or other files.`)).toBeInTheDocument()
+    expect(screen.queryByText(/Loaded Git revision/)).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Markdown body'), ' Unsaved')
     await user.click(screen.getByRole('button', { name: 'Download loaded Markdown file' }))
     expect(click).toHaveBeenCalledOnce()
@@ -967,12 +1011,14 @@ it('keeps promoted key configuration read-only while allowing saved-source repor
   const save = vi.fn()
   setup({ keys: vi.fn().mockResolvedValue({ ...keyState, read_only: true, key_bindings: { site: keySite.id }, bound_targets: [keySite] }), save }, undefined, initial.content_id)
   await screen.findByLabelText('Markdown body')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await screen.findByRole('button', { name: 'Bind key to Key site' })
   expect(screen.getByLabelText('Binding name')).toBeDisabled()
   expect(screen.getByLabelText('Insert key for site')).toBeDisabled()
   expect(screen.getByRole('button', { name: 'Remove binding site' })).toBeDisabled()
-  expect(screen.getByRole('button', { name: 'Insert reference to Key site' })).toBeDisabled()
   expect(save).not.toHaveBeenCalled()
 })
 
@@ -982,7 +1028,10 @@ it('retries denied key reads without losing the Markdown draft', async () => {
   setup({ keys }, undefined, initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' Preserved draft')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await screen.findByRole('alert')
   await user.click(screen.getByRole('button', { name: 'Retry keys' }))
   await screen.findByRole('button', { name: 'Bind key to Key site' })
@@ -996,10 +1045,13 @@ it('retires a native binding in the same protected Git draft without removing it
   setup({ keys: vi.fn().mockResolvedValue({ ...keyState, key_bindings: { site: keySite.id }, bound_targets: [keySite] }), save }, undefined, initial.content_id)
   const body = await screen.findByLabelText('Markdown body')
   await user.type(body, ' <tekdocs://key/site.name>')
-  await user.click(screen.getByRole('button', { name: 'Keys and references' }))
+  await openDisclosure(user, 'Document tools')
+
+  await user.click(screen.getByRole('button', { name: 'Variables' }))
+  await user.type(screen.getByLabelText('Find a record or reusable fragment'), 'Key')
   await user.click(await screen.findByRole('button', { name: 'Remove binding site' }))
   expect(screen.queryByLabelText('Insert key for site')).not.toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Save to Git' }))
+  await user.click(screen.getByRole('button', { name: 'Save' }))
   await screen.findByRole('alert')
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ metadata_patch: { key_bindings: {} } }), undefined)
   expect(body).toHaveValue('First revision.\n <tekdocs://key/site.name>')
@@ -1008,7 +1060,8 @@ it('retires a native binding in the same protected Git draft without removing it
 it('keeps the saved document open when discarding an unfinished template declaration', async () => {
   const user = userEvent.setup()
   setup({ template: vi.fn().mockResolvedValue({ role: 'source', read_only: false, source: { enabled: false, library_visible: false, fragments: [], selected_fragment_ids: [] } }) }, undefined, 'content-1')
-  await user.click(await screen.findByRole('button', { name: 'Template settings and updates' }))
+  await openDisclosure(user, 'Document tools')
+  await user.click(screen.getByRole('button', { name: 'Template settings and updates' }))
   await user.click(await screen.findByLabelText('Use as a template'))
   expect(screen.getByLabelText('Markdown body')).toBeDisabled()
   const region = screen.getByRole('region', { name: 'Template settings and updates' })

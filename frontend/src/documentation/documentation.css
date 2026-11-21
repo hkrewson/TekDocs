@@ -21,6 +21,10 @@
   font-size: 13px;
 }
 
+.knowledge-page-header .page-actions {
+  align-items: end;
+}
+
 .document-sort-field {
   display: grid;
   gap: 5px;
@@ -258,6 +262,20 @@
   align-items: start;
 }
 
+.repository-authoring-header > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.repository-authoring-header .document-library-return {
+  width: max-content;
+  margin-left: -8px;
+}
+
+.repository-authoring-header .page-actions {
+  align-items: end;
+}
+
 .repository-authoring-grid > section {
   min-width: 0;
 }
@@ -266,6 +284,95 @@
 .repository-editor-fields {
   display: grid;
   gap: 0.5rem;
+}
+
+.repository-editor-fields > .editor-section {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: 4px;
+}
+
+.repository-editor-fields > .editor-section :is(.editor-toolbar, .mode-tabs, .editor-format-controls, .milkdown-host) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.repository-context-disclosure {
+  border-top: 1px solid var(--border);
+}
+
+.repository-context-disclosure > summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.repository-context-body {
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 16px;
+}
+
+.repository-document-tools > .repository-context-body > .content-section,
+.repository-document-tools > .repository-context-body > .document-actions {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.repository-file-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.repository-file-list li {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.repository-file-list span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.repository-file-list small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.repository-insert-picker {
+  width: min(620px, 100%);
+}
+
+.repository-insert-picker > label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.repository-insert-picker > label input {
+  width: 100%;
+  min-height: var(--field-height);
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  font: inherit;
 }
 
 .repository-authoring-grid input,
@@ -304,13 +411,21 @@
 
 @media (max-width: 48rem) {
   .repository-authoring-grid { grid-template-columns: minmax(0, 1fr); }
+  .repository-authoring-header { align-items: stretch; flex-direction: column; }
+  .repository-authoring-header .page-actions { width: 100%; justify-content: space-between; }
 }
 
 .repository-editor-fields {
+  position: relative;
   border: 0;
   padding: 0;
   margin: 0;
   min-width: 0;
+}
+
+.repository-editor-fields > .sr-only {
+  top: 0;
+  left: 0;
 }
 
 .repository-template-library pre {

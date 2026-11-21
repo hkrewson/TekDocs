@@ -1,6 +1,76 @@
 # Post-1.0 interface rework
 
-Status: second reference pass implemented and automated evidence complete; hands-on acceptance pending.
+Status: Knowledge authoring revision implemented; maintainer re-review pending.
+
+## Knowledge authoring revision
+
+The November 21 maintainer walkthrough rejected the repository authoring surface
+as an acceptable end-user document experience. The implementation exposed Git
+path and portable metadata as ordinary fields, permanently stacked file,
+template, key, remote-source, and publication controls below the editor, and
+presented a mixed page of records before the author had searched for one. The
+Knowledge header also aligned its actions to the view label rather than to the
+view control. These are changes requested, not acceptance evidence.
+
+This revision keeps Markdown, Git custody, authorization, conflicts, retained
+files, and publication evidence unchanged while changing their working
+hierarchy:
+
+- Documents, templates, and Git-backed content use the same visual/Markdown
+  editor. Storage authority is provenance, not a separate authoring style.
+- The Knowledge selector, **More**, and **New document** share one compact
+  baseline and control scale. Narrow layouts keep a 44px target without making
+  desktop controls visually oversized.
+- Repository path, raw source, portable metadata, repository exports, and
+  remote-source configuration are contextual source details rather than the
+  default form.
+- Files, variables, template behavior, primary-file history, review,
+  publication, and history open only when selected. Consequential guidance
+  remains inside the affected workflow.
+- The editor's `/` menu provides the maintained Markdown blocks plus TekDocs
+  commands for linking a document, inserting reusable content, referencing an
+  authorized record, and adding a file.
+- Record and reusable-content selection is search-first. An empty query returns
+  no candidate list; results remain permission-scoped and bounded. Ordinary
+  record references are separate from advanced field/content variables, whose
+  inspector shows existing bindings and saved resolution state.
+
+Acceptance requires keyboard operation of the `/` menu and every picker, focus
+return after insert/cancel, no unqueried entity result list, retained direct-link
+and dirty-state behavior, conflict recovery, file scanning, Git indexing and
+publication authorization, responsive operation at the reference widths, and
+Docker runtime evidence in the existing `tekdocs` project. The maintainer will
+perform another interface review after the complete revision; this milestone
+does not close the broader interface acceptance.
+
+### November 21, 2026 implementation evidence
+
+Verified:
+
+- Git-backed documents and ordinary Markdown documents now share the visual
+  editor, with canonical Markdown still available as an explicit editor mode;
+- the `/` menu exposes formatting plus document, reusable-content, authorized
+  record, and file insertion, and the new picker remains empty until searched;
+- blank record searches return no candidates at the API boundary while already
+  bound records remain visible for review;
+- repository provenance, files, advanced document tools, and review/publication
+  controls are collapsed by default, while direct links, conflict handling,
+  retained files, publication authorization, and Git evidence remain intact;
+- all 900 frontend unit/component tests, lint and CSP checks, the production
+  build and bundle budgets pass; the focused Django content-authoring regression
+  passes inside the existing `tekdocs` database service using the migration role;
+- four rebuilt-image Chromium journeys pass at 320, 390, 768, and 1440px with
+  canonical-Markdown checks, contextual disclosures, axe checks, and no page
+  overflow. The 320px editor retains intentionally scrollable formatting rows
+  without widening the page;
+- hands-on inspection of the retained seeded MSP workspace confirms the compact
+  Knowledge header, unified editor, collapsed secondary controls, and the visible
+  TekDocs insert group in the `/` menu. The test interaction was undone and did
+  not change the retained document.
+
+The broader interface remains open for the maintainer's next review. This
+milestone records implementation and compatibility evidence, not product
+acceptance or interface closeout.
 
 The first pass proved route, permission, and recovery compatibility but did not
 materially reduce interface complexity. Maintainer review therefore rejected the

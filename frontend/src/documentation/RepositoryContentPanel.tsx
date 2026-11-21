@@ -1,5 +1,6 @@
-import { ArrowLeft, Download, Plus } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Download, Ellipsis, Plus } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import type { EditorInsert, EditorInsertCommand } from '../editor/EditorSpike'
 import { translate } from '../i18n/localization'
 import { useUnsavedChanges } from '../navigation/navigationGuard'
 import { RepositoryPublicationHistory } from './RepositoryPublicationHistory'
@@ -7,6 +8,7 @@ import { RepositoryPrimaryFiles } from './RepositoryPrimaryFiles'
 import { RepositoryKeys } from './RepositoryKeys'
 import { RepositoryTemplates } from './RepositoryTemplates'
 import { RepositoryRemoteSource } from './RepositoryRemoteSource'
+import { RepositoryInsertPicker, type RepositoryInsertMode, type RepositoryInsertTarget } from './RepositoryInsertPicker'
 import {
   browserRepositoryClient, RepositoryConflictError,
   type RepositoryAttachmentStatus, type RepositoryClient, type RepositoryConflict, type RepositoryListing, type RepositorySource,
@@ -21,8 +23,20 @@ type Draft = {
   metadataText: string
 }
 
+const Editor = lazy(async () => ({ default: (await import('../editor/EditorSpike')).EditorSpike }))
+
 function draftFromSource(source: RepositorySource): Draft {
   return { id: source.content_id, kind: source.kind, title: source.title, markdown: source.markdown, path: source.path, metadataText: '{}' }
+}
+
+function availableBindingName(title: string, bindings: Record<string, string>): string | null {
+  const normalized = title.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  const root = (/^[a-z]/.test(normalized) ? normalized : `content_${normalized}`).slice(0, 32) || 'content'
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const name = suffix === 0 ? root : `${root.slice(0, 38 - String(suffix).length)}_${suffix}`
+    if (!Object.hasOwn(bindings, name)) return name
+  }
+  return null
 }
 
 export function RepositoryContentPanel({ organizationId, initialContentId, onClose, client = browserRepositoryClient }: {
@@ -32,7 +46,8 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   client?: RepositoryClient
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const markdownId = useId()
+  const uploadInput = useRef<HTMLInputElement>(null)
+  const pendingFileInsert = useRef<EditorInsert | null>(null)
   const [listing, setListing] = useState<RepositoryListing | null>(null)
   const [query, setQuery] = useState('')
   const [reload, setReload] = useState(0)
@@ -58,6 +73,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   const [keysEditing, setKeysEditing] = useState(false)
   const [templateEditing, setTemplateEditing] = useState(false)
   const [remoteSourceEditing, setRemoteSourceEditing] = useState(false)
+  const [insertPicker, setInsertPicker] = useState<{ mode: RepositoryInsertMode; insert: EditorInsert } | null>(null)
   const sourceRef = useRef(source)
   const dirty = useMemo(() => draft !== null && (
     source === null || draft.title !== source.title || draft.markdown !== source.markdown
@@ -90,6 +106,41 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
     setDraft(current => current?.id === source.content_id ? {
       ...current, markdown: `${current.markdown}${current.markdown && !current.markdown.endsWith('\n') ? '\n\n' : ''}${value}\n`,
     } : current)
+  }
+
+  function openInsertCommand(command: EditorInsertCommand, insert: EditorInsert) {
+    if (!source || !canDownloadSaved) {
+      setError(translate('repository.insertUnavailable'))
+      insert('')
+      return
+    }
+    if (command === 'file') {
+      pendingFileInsert.current = insert
+      uploadInput.current?.click()
+      return
+    }
+    setInsertPicker({ mode: command, insert })
+  }
+
+  function chooseInsertTarget(target: RepositoryInsertTarget, savedBindings: Record<string, string> = {}) {
+    if (!insertPicker) return
+    if (insertPicker.mode === 'document') {
+      insertPicker.insert(`[[${target.id}|${target.title.replaceAll(']', '\\]')}]]`)
+    } else if (insertPicker.mode === 'record') {
+      insertPicker.insert(`[${target.title.replaceAll(']', '\\]')}](tekdocs://entity/${target.id})`)
+    } else {
+      const bindings = bindingDraft.bindings ?? savedBindings
+      const name = availableBindingName(target.title, bindings)
+      if (!name || Object.keys(bindings).length >= 64) {
+        setError(translate('repository.keys.bindingLimit'))
+        insertPicker.insert('')
+        setInsertPicker(null)
+        return
+      }
+      changeBindings({ ...bindings, [name]: target.id })
+      insertPicker.insert(`<tekdocs://key/${name}.content>`)
+    }
+    setInsertPicker(null)
   }
 
   const canDownloadSaved = source?.kind === 'document' && !!source.accepted_commit
@@ -192,7 +243,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
     } finally { setBusy(false) }
   }
 
-  async function uploadAttachment(file: File) {
+  async function uploadAttachment(file: File, insert?: EditorInsert) {
     if (!source || source.kind !== 'document' || !source.accepted_commit
       || source.accepted_commit !== source.indexed_commit || busy) return
     const selectedId = source.content_id
@@ -202,7 +253,8 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
       if (sourceRef.current?.content_id !== selectedId) return
       const label = attachment.filename.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]')
       const link = `[${label}](tekdocs://attachment/${attachment.id})`
-      setDraft((current) => current?.id === selectedId
+      if (insert) insert(link)
+      else setDraft((current) => current?.id === selectedId
         ? { ...current, markdown: `${current.markdown}${current.markdown && !current.markdown.endsWith('\n') ? '\n\n' : ''}${link}\n` }
         : current)
       setMessage(translate('repository.attachmentLinked', { filename: attachment.filename }))
@@ -359,7 +411,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
   }
 
   return <section className="repository-authoring">
-    <header className="page-header"><div><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1></div><div className="page-actions"><button type="button" className="secondary-button" onClick={() => attempt(onClose)}><ArrowLeft size={16} aria-hidden="true" />{translate('repository.return')}</button><details className="document-more-menu repository-export-menu"><summary className="secondary-button"><Download size={16} aria-hidden="true" />{translate('repository.repositoryExports')}</summary><div><button type="button" aria-label={translate('repository.snapshotDownload')} onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}><span><strong>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</strong><small>{translate('repository.snapshotNotice')}</small></span></button><button type="button" aria-label={translate('repository.bundleDownload')} onClick={() => { void downloadEditableBundle() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || bundleExporting}><span><strong>{bundleExporting ? translate('repository.bundlePreparing') : translate('repository.bundleDownload')}</strong><small>{translate('repository.bundleNotice')}</small></span></button></div></details><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}><Plus size={16} aria-hidden="true" />{translate('repository.new')}</button></div></header>
+    <header className="page-header repository-authoring-header"><div><button type="button" className="document-library-return" onClick={() => attempt(onClose)}><ArrowLeft size={16} aria-hidden="true" />{translate('documentation.documents')}</button><h1 ref={headingRef} tabIndex={-1}>{translate('repository.heading')}</h1></div><div className="page-actions"><details className="document-more-menu repository-export-menu"><summary className="secondary-button"><Ellipsis size={16} aria-hidden="true" />{translate('repository.more')}</summary><div><button type="button" aria-label={translate('repository.snapshotDownload')} onClick={() => { void downloadSnapshot() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || exporting}>{exporting ? translate('repository.snapshotPreparing') : translate('repository.snapshotDownload')}</button><button type="button" aria-label={translate('repository.bundleDownload')} onClick={() => { void downloadEditableBundle() }} disabled={!listing?.accepted_commit || listing.accepted_commit !== listing.indexed_commit || bundleExporting}>{bundleExporting ? translate('repository.bundlePreparing') : translate('repository.bundleDownload')}</button></div></details><button type="button" className="primary-button" onClick={create} disabled={!listing || loading}><Plus size={16} aria-hidden="true" />{translate('repository.new')}</button></div></header>
     {error && <p role="alert" className="form-message error">{error}</p>}
     {message && <p role="status" className="form-message success">{message}</p>}
     {listing && listing.accepted_commit !== listing.indexed_commit && <p role="status" className="form-message">{translate('repository.indexPending')}</p>}
@@ -368,7 +420,7 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
         <label>{translate('repository.search')}<input type="search" value={query} onChange={(event) => { setQuery(event.target.value); setLoading(true) }} /></label>
         {loading && <p role="status">{translate('repository.loading')}</p>}
         {!loading && listing?.results.length === 0 && <p className="empty-state">{translate('repository.empty')}</p>}
-        {!loading && listing && <ul className="document-title-list">{listing.results.map((item) => <li key={item.id}><button type="button" aria-current={draft?.id === item.id ? 'true' : undefined} onClick={() => open(item.id)}><span><strong>{item.title}</strong><small>{item.kind === 'fragment' ? translate('repository.fragment') : translate('repository.document')} · {item.path}</small></span></button></li>)}</ul>}
+        {!loading && listing && <ul className="document-title-list">{listing.results.map((item) => <li key={item.id}><button type="button" aria-current={draft?.id === item.id ? 'true' : undefined} onClick={() => open(item.id)}><span><strong>{item.title}</strong><small>{item.kind === 'fragment' ? translate('repository.fragment') : translate('repository.document')}</small></span></button></li>)}</ul>}
         {listing?.has_more && <p>{translate('repository.moreResults')}</p>}
       </section>
       <section aria-label={translate('repository.editor')}>
@@ -376,31 +428,20 @@ export function RepositoryContentPanel({ organizationId, initialContentId, onClo
         {draft && <><fieldset className="repository-editor-fields" disabled={templateEditing}>
           {!source && <label>{translate('repository.kind')}<select value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value as Draft['kind'] })}><option value="document">{translate('repository.document')}</option><option value="fragment">{translate('repository.fragment')}</option></select></label>}
           <label>{translate('repository.title')}<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-          <label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label>
-          <label htmlFor={markdownId}>{translate('repository.markdown')}</label><textarea id={markdownId} rows={16} value={draft.markdown} onChange={(event) => setDraft({ ...draft, markdown: event.target.value })} />
-          {source?.kind === 'document' && <><label>{translate('repository.attachFile')}<input type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadAttachment(file) }} /></label><p className="field-hint">{translate('repository.attachmentNotice')}</p>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}
-            {canDownloadSaved && <section aria-label={translate('repository.attachmentFiles')}><h2>{translate('repository.attachmentFiles')}</h2>{attachmentError && <p role="alert">{attachmentError}</p>}
-              {attachments.length === 0 && !attachmentError && <p>{translate('repository.attachmentEmpty')}</p>}
-              <ul>{attachments.map((attachment) => <li key={attachment.id}>{attachment.filename} · {attachment.size} B · {attachment.linked_current ? translate('repository.attachmentLinkedStatus') : translate('repository.attachmentRetainedStatus')}{attachment.can_archive && <button type="button" className="secondary-button" disabled={busy || !!draft?.markdown.includes(attachment.id)} onClick={() => { void archiveAttachment(attachment) }}>{translate('repository.attachmentArchive', { filename: attachment.filename })}</button>}</li>)}</ul>
-              {attachmentMore && <button type="button" className="secondary-button" onClick={() => setAttachmentPage((page) => page + 1)}>{translate('repository.attachmentMore')}</button>}
-            </section>}
-          </>}
-          <details><summary>{translate('repository.metadata')}</summary><p>{translate('repository.metadataHelp')}</p><textarea rows={6} aria-label={translate('repository.metadataPatch')} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /><p>{translate('repository.sourceNotice')}</p><pre>{source?.source ?? ''}</pre></details>
+          <Suspense fallback={<p role="status">{translate('common.loading')}</p>}><Editor key={`${draft.id}:${source?.source_blob ?? 'new'}`} initialMarkdown={draft.markdown} title={translate('documentation.content')} description="" organizationId={organizationId} documentId={draft.id} disabled={templateEditing} onMarkdownChange={markdown => setDraft(current => current?.id === draft.id ? { ...current, markdown } : current)} onInsertCommand={openInsertCommand} /></Suspense>
+          {source?.kind === 'document' && <input ref={uploadInput} className="sr-only" aria-label={translate('repository.attachFile')} type="file" disabled={!canDownloadSaved || busy} onChange={(event) => { const file = event.currentTarget.files?.[0]; const insert = pendingFileInsert.current ?? undefined; pendingFileInsert.current = null; event.currentTarget.value = ''; if (file) void uploadAttachment(file, insert) }} />}
+          {source?.kind === 'document' && <details className="repository-context-disclosure"><summary>{translate('documentation.filesWithCount', { count: attachments.length })}</summary><div className="repository-context-body"><button type="button" className="secondary-button" disabled={!canDownloadSaved || busy} onClick={() => { pendingFileInsert.current = null; uploadInput.current?.click() }}>{translate('repository.attachFile')}</button>{uploading && <p role="status">{translate('repository.attachmentUploading')}</p>}{attachmentError && <p role="alert">{attachmentError}</p>}{canDownloadSaved && attachments.length === 0 && !attachmentError && <p className="empty-state">{translate('repository.attachmentEmpty')}</p>}{attachments.length > 0 && <ul className="repository-file-list">{attachments.map((attachment) => <li key={attachment.id}><span>{attachment.filename}<small>{attachment.size} B · {attachment.linked_current ? translate('repository.attachmentLinkedStatus') : translate('repository.attachmentRetainedStatus')}</small></span>{attachment.can_archive && <button type="button" className="secondary-button" disabled={busy || !!draft?.markdown.includes(attachment.id)} onClick={() => { void archiveAttachment(attachment) }}>{translate('repository.attachmentArchive', { filename: attachment.filename })}</button>}</li>)}</ul>}{attachmentMore && <button type="button" className="secondary-button" onClick={() => setAttachmentPage((page) => page + 1)}>{translate('repository.attachmentMore')}</button>}</div></details>}
+          <details className="repository-context-disclosure"><summary>{translate('repository.sourceDetails')}</summary><div className="repository-context-body"><label>{translate('repository.path')}<input value={draft.path} placeholder={source ? undefined : translate('repository.generatedPath')} onChange={(event) => setDraft({ ...draft, path: event.target.value })} /></label><label>{translate('repository.metadataPatch')}<textarea rows={6} value={draft.metadataText} onChange={(event) => setDraft({ ...draft, metadataText: event.target.value })} /></label>{source && <pre>{source.source}</pre>}</div></details>
         </fieldset>
         {conflict && <div role="alert" className="form-message error"><p>{translate('repository.conflict')}</p>{(conflict.base || conflict.current || conflict.proposed) && <details open><summary>{translate('repository.compare')}</summary><h3>{translate('repository.base')}</h3><pre>{conflict.base}</pre><h3>{translate('repository.current')}</h3><pre>{conflict.current}</pre><h3>{translate('repository.yours')}</h3><pre>{conflict.proposed}</pre></details>}<button type="button" className="secondary-button" onClick={() => { void rebase() }} disabled={busy}>{translate('repository.rebase')}</button></div>}
         <div className="form-actions">
           <button type="button" className="primary-button" onClick={() => { void save() }} disabled={busy || templateEditing || remoteSourceEditing || !draft.title.trim() || (source !== null && !dirty)}>{busy ? translate('repository.saving') : translate('repository.save')}</button>
-          {source?.accepted_commit && <details className="document-more-menu repository-export-menu"><summary className="secondary-button"><Download size={16} aria-hidden="true" />{translate('repository.fileExports')}</summary><div><button type="button" aria-label={translate('repository.downloadLoaded')} onClick={downloadLoadedSource}><span><strong>{translate('repository.downloadLoaded')}</strong><small>{translate('repository.loadedRevision', { commit: source.accepted_commit.slice(0, 12) })}</small></span></button>{canDownloadSaved && <><button type="button" aria-label={translate('repository.htmlDownload')} onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}><span><strong>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</strong><small>{translate('repository.htmlNotice')}</small></span></button><button type="button" aria-label={translate('repository.pdfDownload')} onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}><span><strong>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</strong><small>{translate('repository.pdfNotice')}</small></span></button><button type="button" aria-label={translate('repository.docxDownload')} onClick={() => { void downloadDocx() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}><span><strong>{docxExporting ? translate('repository.docxPreparing') : translate('repository.docxDownload')}</strong><small>{translate('repository.docxNotice')}</small></span></button></>}</div></details>}
+          {source?.accepted_commit && <details className="document-more-menu repository-export-menu"><summary className="secondary-button"><Download size={16} aria-hidden="true" />{translate('repository.fileExports')}</summary><div><button type="button" aria-label={translate('repository.downloadLoaded')} onClick={downloadLoadedSource}>{translate('repository.downloadLoaded')}</button>{canDownloadSaved && <><button type="button" aria-label={translate('repository.htmlDownload')} onClick={() => { void downloadHtml() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{htmlExporting ? translate('repository.htmlPreparing') : translate('repository.htmlDownload')}</button><button type="button" aria-label={translate('repository.pdfDownload')} onClick={() => { void downloadPdf() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{pdfExporting ? translate('repository.pdfPreparing') : translate('repository.pdfDownload')}</button><button type="button" aria-label={translate('repository.docxDownload')} onClick={() => { void downloadDocx() }} disabled={busy || htmlExporting || pdfExporting || docxExporting}>{docxExporting ? translate('repository.docxPreparing') : translate('repository.docxDownload')}</button></>}</div></details>}
           <button type="button" className="secondary-button" onClick={() => attempt(() => { setDraft(null); setSource(null); setConflict(null) })}>{translate('common.close')}</button>
         </div></>}
-        {source?.kind === 'document' && source.accepted_commit && <>
-          <RepositoryTemplates key={'template:' + (organizationId ?? 'msp') + ':' + source.content_id} source={source} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || remoteSourceEditing} onEditingChange={setTemplateEditing} onSaved={saved => { setSource(saved); setDraft(draftFromSource(saved)); setConflict(null); setReload(value => value + 1) }} />
-          <RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy || templateEditing || remoteSourceEditing} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} />
-          <RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy && !templateEditing && !remoteSourceEditing} onEditingChange={setPrimaryEditing} />
-          <RepositoryRemoteSource key={'remote:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || templateEditing} onEditingChange={setRemoteSourceEditing} />
-          <RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing && !templateEditing && !remoteSourceEditing} />
-        </>}
+        {source?.kind === 'document' && source.accepted_commit && <><details className="repository-context-disclosure repository-document-tools"><summary>{translate('repository.documentTools')}</summary><div className="repository-context-body"><RepositoryTemplates key={'template:' + (organizationId ?? 'msp') + ':' + source.content_id} source={source} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || remoteSourceEditing} onEditingChange={setTemplateEditing} onSaved={saved => { setSource(saved); setDraft(draftFromSource(saved)); setConflict(null); setReload(value => value + 1) }} /><RepositoryKeys key={'keys:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} sourceBlob={source.source_blob} organizationId={organizationId} client={client} bindings={bindingDraft.bindings} invalidMetadata={bindingDraft.invalid} disabled={!canDownloadSaved || busy || templateEditing || remoteSourceEditing} onBindingsChange={changeBindings} onInsert={insertReference} onReload={() => open(source.content_id)} onEditingChange={setKeysEditing} /><RepositoryPrimaryFiles key={'primary:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} canWrite={!!canDownloadSaved && !busy && !templateEditing && !remoteSourceEditing} onEditingChange={setPrimaryEditing} /><RepositoryRemoteSource key={'remote:' + (organizationId ?? 'msp') + ':' + source.content_id} contentId={source.content_id} organizationId={organizationId} client={client} disabled={!canDownloadSaved || dirty || busy || primaryEditing || keysEditing || templateEditing} onEditingChange={setRemoteSourceEditing} /></div></details><details className="repository-context-disclosure"><summary>{translate('repository.reviewAndPublication')}</summary><RepositoryPublicationHistory key={`${organizationId ?? 'msp'}:${source.content_id}`} contentId={source.content_id} organizationId={organizationId} client={client} commit={source.accepted_commit} canRetain={!!canDownloadSaved && !dirty && !busy && !primaryEditing && !keysEditing && !templateEditing && !remoteSourceEditing} /></details></>}
       </section>
     </div>
+    {insertPicker && source && <RepositoryInsertPicker mode={insertPicker.mode} source={source} organizationId={organizationId} client={client} onChoose={chooseInsertTarget} onClose={() => { insertPicker.insert(''); setInsertPicker(null) }} />}
   </section>
 }

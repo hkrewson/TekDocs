@@ -228,6 +228,8 @@ def test_native_nested_keys_freeze_entities_and_remain_valid_after_live_edits(au
     state = browser.get(keys_url)
     assert state.status_code == 200, state.content
     assert state.json()["read_only"] is False
+    assert state.json()["targets"] == []
+    assert {row["id"] for row in state.json()["bound_targets"]} == {str(site.entity_id), str(fragment.content_id)}
     assert {row["expression"] for row in state.json()["report"]} == {"site.name", "steps.content"}
     assert all(row["state"] == "resolved" for row in state.json()["report"])
     detail_url = reverse("msp-content-document-detail", args=[document.content_id])

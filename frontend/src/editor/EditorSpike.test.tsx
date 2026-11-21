@@ -11,6 +11,7 @@ const editorChain = {
   action: vi.fn(),
 }
 const getMarkdown = vi.fn(() => '# Current editor value')
+let crepeOptions: { featureConfigs?: Record<string, { buildMenu?: (builder: unknown) => void }> } | undefined
 editorChain.config.mockReturnValue(editorChain)
 editorChain.use.mockReturnValue(editorChain)
 
@@ -18,11 +19,14 @@ vi.mock('@milkdown/crepe', () => ({
   CrepeFeature: {
     ImageBlock: 'image-block',
     Latex: 'latex',
+    BlockEdit: 'block-edit',
     Toolbar: 'toolbar',
     TopBar: 'top-bar',
   },
   Crepe: class {
     editor = editorChain
+
+    constructor(options: typeof crepeOptions) { crepeOptions = options }
 
     on(callback: (listener: { markdownUpdated: typeof markdownUpdated }) => void) {
       callback({ markdownUpdated })
@@ -58,6 +62,27 @@ describe('editor feasibility spike', () => {
     expect(destroy).toHaveBeenCalledOnce()
   })
 
+  it('adds workspace content and file actions to the slash menu', async () => {
+    render(<EditorSpike onInsertCommand={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Task list' })).toBeEnabled())
+    const addItem = vi.fn()
+    const addGroup = vi.fn(() => ({ addItem }))
+
+    crepeOptions?.featureConfigs?.['block-edit']?.buildMenu?.({ addGroup })
+
+    expect(addGroup).toHaveBeenCalledWith('tekdocs', 'Insert')
+    expect(addItem.mock.calls.map((call) => {
+      const name = call[0] as string
+      const config = call[1] as { label: string }
+      return [name, config.label]
+    })).toEqual([
+      ['document', 'Link to document'],
+      ['fragment', 'Insert reusable content'],
+      ['record', 'Reference a record'],
+      ['file', 'Add a file'],
+    ])
+  })
+
   it('switches to canonical Markdown and carries edits back to the editor', async () => {
     const user = userEvent.setup()
     render(<EditorSpike />)
@@ -71,6 +96,17 @@ describe('editor feasibility spike', () => {
     await user.click(screen.getByRole('tab', { name: 'Editor' }))
     expect(screen.queryByRole('textbox', { name: 'Markdown source' })).not.toBeInTheDocument()
     expect(create).toHaveBeenCalledTimes(2)
+  })
+
+  it('applies content inserted by an external document tool', async () => {
+    const user = userEvent.setup()
+    const view = render(<EditorSpike initialMarkdown="Original" />)
+    await user.click(screen.getByRole('tab', { name: 'Markdown' }))
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('# Current editor value')
+
+    view.rerender(<EditorSpike initialMarkdown={'Original\n\n<tekdocs://key/site.name>\n'} />)
+
+    expect(screen.getByRole('textbox', { name: 'Markdown source' })).toHaveValue('Original\n\n<tekdocs://key/site.name>\n')
   })
 
   it('exposes visual, source, secure preview, and formatting-help modes', async () => {

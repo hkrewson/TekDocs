@@ -76,9 +76,21 @@ async function saveRepositoryDraft(page: Page) {
   const saved = page.waitForResponse(response =>
     new URL(response.url()).pathname.endsWith('/content-graph/authoring')
       && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await saved).status()).toBe(200)
-  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  await expect(page.getByRole('status')).toHaveText('Saved.')
+}
+
+async function expectRepositoryMarkdown(page: Page, markdown: string) {
+  await page.getByRole('tab', { name: 'Markdown', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Markdown source', exact: true })).toHaveValue(markdown)
+  await page.getByRole('tab', { name: 'Editor', exact: true }).click()
+}
+
+async function openRepositoryDisclosure(page: Page, label: 'Document tools' | 'Review and publication') {
+  const summary = page.locator('summary').filter({ hasText: label }).first()
+  await expect(summary).toBeVisible()
+  if (!await summary.evaluate(element => element.parentElement?.hasAttribute('open') ?? false)) await summary.click()
 }
 
 async function templateJourney(page: Page, state: State) {
@@ -155,20 +167,21 @@ async function nativePublicationDocument(page: Page, title: string, organization
   const scope = organizationId ? `/workspaces/organizations/${organizationId}` : ''
   await page.goto(`${scope}/documentation`)
   await page.getByRole('button', { name: 'Repository content', exact: true }).click()
-  await page.getByRole('button', { name: 'New Markdown file' }).click()
+  await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Content type').selectOption(kind)
   await page.getByLabel('Title', { exact: true }).fill(title)
   await page.getByLabel('Markdown body').fill('Native publication original.\n')
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   const response = await saved
   expect(response.status()).toBe(200)
   const source = await response.json() as { content_id: string }
-  await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   return { id: source.content_id, path: `${scope}/documentation?repository=${source.content_id}` }
 }
 
 async function retainNativeSnapshot(page: Page, clientVisible = false) {
+  await openRepositoryDisclosure(page, 'Review and publication')
   await page.getByRole('button', { name: 'Publish document', exact: true }).click()
   if (clientVisible) await page.getByLabel('Publication audience').selectOption('client_visible')
   const created = page.waitForResponse(response => response.url().endsWith('/repository-publication-evidence') && response.request().method() === 'POST')
@@ -217,6 +230,7 @@ async function nativeRetainedPdf(page: Page) {
 }
 
 async function nativePrimaryPanel(page: Page) {
+  await openRepositoryDisclosure(page, 'Document tools')
   const panel = page.getByRole('region', { name: 'Primary file versions', exact: true })
   const loaded = page.waitForResponse(response => response.url().endsWith('/primary-file?page=1') && response.request().method() === 'GET')
   if (await panel.count()) await panel.getByRole('button', { name: 'Refresh file versions' }).click()
@@ -256,8 +270,9 @@ async function downloadNativePrimary(page: Page, filename: string, version: numb
 }
 
 async function configureNativeKeys(page: Page, fragment: { id: string; title: string }, site: { id: string; title: string }) {
-  await page.getByRole('button', { name: 'Keys and references', exact: true }).click()
-  const keys = page.getByRole('region', { name: 'Keys and references', exact: true })
+  await openRepositoryDisclosure(page, 'Document tools')
+  await page.getByRole('button', { name: 'Variables', exact: true }).click()
+  const keys = page.getByRole('region', { name: 'Variables', exact: true })
   await keys.getByLabel('Binding name', { exact: true }).focus()
   await page.keyboard.press('Tab')
   await expect(keys.getByLabel('Find a record or reusable fragment')).toBeFocused()
@@ -270,13 +285,18 @@ async function configureNativeKeys(page: Page, fragment: { id: string; title: st
     await expect(keys.getByLabel('Insert key for ' + name, { exact: true })).toBeEnabled()
     await keys.getByLabel('Insert key for ' + name, { exact: true }).selectOption(name === 'site' ? 'name' : 'content')
   }
-  await keys.getByLabel('Find a record or reusable fragment').fill(site.title)
-  await expect(keys.getByRole('button', { name: 'Insert reference to ' + site.title, exact: true })).toBeEnabled()
-  await keys.getByRole('button', { name: 'Insert reference to ' + site.title, exact: true }).click()
+  await keys.getByRole('button', { name: 'Close', exact: true }).click()
+  const editor = page.getByLabel('Markdown body')
+  await editor.click()
+  await page.keyboard.press('End')
+  await page.keyboard.type('/')
+  await page.getByText('Reference a record', { exact: true }).click()
+  await page.getByRole('searchbox').fill(site.title)
+  await page.getByRole('button', { name: 'Insert ' + site.title, exact: true }).click()
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await saved).status()).toBe(200)
-  await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
 }
 
 test('new keyed documents freeze field values, fragment text and entity references independently of later edits', async ({ page }) => {
@@ -305,15 +325,16 @@ test('new keyed documents freeze field values, fragment text and entity referenc
   await page.goto(fragment.path)
   await page.getByLabel('Markdown body').fill('Native browser later fragment.\n')
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await saved).status()).toBe(200)
   const later = await page.request.get('/api/v1/workspaces/msp/content-graph/documents/' + native.id)
   expect((await later.json() as { sanitized_html: string }).sanitized_html).toContain('Native browser later fragment.')
   expect(await (await page.request.get(evidenceUrl)).json()).toEqual(body)
   expect(await (await page.request.get(evidenceUrl + '/review/html')).text()).toBe(originalHtml)
   await page.goto(native.path)
+  await openRepositoryDisclosure(page, 'Review and publication')
   await page.getByRole('button', { name: 'Load publication history' }).click()
-  await page.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native keyed browser guide/ }).click()
+  await page.getByRole('region', { name: 'Publication history', exact: true }).getByRole('button', { name: /Native keyed browser guide/ }).click()
   expect(await nativeRetainedPdf(page)).toBe(pdf)
   await page.setViewportSize({ width: 390, height: 844 })
   await expect(page.locator('.app-body')).toHaveCSS('margin-left', '0px')
@@ -331,9 +352,9 @@ test('new staff documents publish, correct and withdraw while retaining their or
   const originalPdf = await nativeRetainedPdf(page)
   await page.getByLabel('Markdown body').fill('Native publication corrected.\n')
   const save = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await save).status()).toBe(200)
-  await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   await appendNativePrimary(page, 'staff-primary-v2.txt', 'Staff primary version two.\n', 1)
   const second = await retainNativeSnapshot(page)
   expect(second.id).not.toBe(first.id)
@@ -347,8 +368,9 @@ test('new staff documents publish, correct and withdraw while retaining their or
   await downloadNativePrimary(page, 'staff-primary-v2.txt', 2, 'Staff primary version two.\n')
   await downloadNativePrimary(page, 'staff-primary-v3.txt', 3, 'Staff primary after publication.\n')
   await page.goto(native.path)
+  await openRepositoryDisclosure(page, 'Review and publication')
   await page.getByRole('button', { name: 'Load publication history' }).click()
-  const history = page.getByRole('region', { name: 'Repository publication history', exact: true })
+  const history = page.getByRole('region', { name: 'Publication history', exact: true })
   await history.getByRole('button', { name: /Native staff browser guide/ }).last().click()
   await expect(publishing.getByRole('status')).toHaveText('Superseded')
   expect(await nativeRetainedPdf(page)).toBe(originalPdf)
@@ -373,8 +395,9 @@ test('new client documents require independent approval and revoke portal access
     const evidenceRoot = `/api/v1/workspaces/organizations/${organizationId}/repository-publication-evidence`
     const selectLatest = async (actor: Page) => {
       await actor.goto(native.path)
+      await openRepositoryDisclosure(actor, 'Review and publication')
       await actor.getByRole('button', { name: 'Load publication history' }).click()
-      await actor.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).first().click()
+      await actor.getByRole('region', { name: 'Publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).first().click()
     }
     let originalPublication = ''
     let originalPdf = ''
@@ -383,9 +406,9 @@ test('new client documents require independent approval and revoke portal access
       if (iteration) {
         await page.getByLabel('Markdown body').fill('Native client publication corrected.\n')
         const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-        await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+        await page.getByRole('button', { name: 'Save', exact: true }).click()
         expect((await saved).status()).toBe(200)
-        await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeDisabled()
+        await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
       }
       const primary = await appendNativePrimary(page, 'client-primary-v' + (iteration + 1) + '.txt', 'Client primary version ' + (iteration + 1) + '.\n', iteration)
       if (iteration) {
@@ -442,8 +465,9 @@ test('new client documents require independent approval and revoke portal access
       }
     }
     await page.goto(native.path)
+    await openRepositoryDisclosure(page, 'Review and publication')
     await page.getByRole('button', { name: 'Load publication history' }).click()
-    await page.getByRole('region', { name: 'Repository publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).last().click()
+    await page.getByRole('region', { name: 'Publication history', exact: true }).getByRole('button', { name: /Native client browser guide/ }).last().click()
     expect(await nativeRetainedPdf(page)).toBe(originalPdf)
     expect((await portal.request.get(`${evidenceRoot}`)).status()).toBe(403)
     expect((await portal.request.get('/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id + '/keys')).status()).toBe(403)
@@ -462,7 +486,7 @@ test('new primary-file documents retain every version and require review after c
   try {
     additionalDiagnostics.set(page, [attachPublicationDiagnostics(other, { scenario: 'native_primary_files' })])
     await other.goto(native.path)
-    await expect(other.getByLabel('Markdown body')).toHaveValue('Native publication original.\n')
+    await expectRepositoryMarkdown(other, 'Native publication original.\n')
     const files = await nativePrimaryPanel(other)
     await other.getByLabel('Markdown body').fill('Unsaved primary-file draft.\n')
     await files.getByLabel('Choose primary file').setInputFiles({ name: 'primary-v3.txt', mimeType: 'text/plain', buffer: Buffer.from('Primary browser reviewed retry.\n') })
@@ -486,8 +510,8 @@ test('new primary-file documents retain every version and require review after c
     await downloadNativePrimary(other, 'primary-v1.txt', 1, 'Primary browser original.\n')
     await downloadNativePrimary(other, 'primary-v2.txt', 2, 'Primary browser concurrent replacement.\n')
     await downloadNativePrimary(other, 'primary-v3.txt', 3, 'Primary browser reviewed retry.\n')
-    await expect(other.getByLabel('Markdown body')).toHaveValue('Unsaved primary-file draft.\n')
-    await other.getByRole('button', { name: 'Back to documentation' }).click()
+    await expectRepositoryMarkdown(other, 'Unsaved primary-file draft.\n')
+    await other.getByRole('button', { name: 'Documents' }).click()
     await other.getByRole('button', { name: 'Keep editing', exact: true }).click()
     const endpoint = '/api/v1/workspaces/organizations/' + organizationId + '/content-graph/authoring/' + native.id
     const stored = await page.request.get(endpoint)
@@ -501,7 +525,7 @@ test('new primary-file documents retain every version and require review after c
     expect((await portal.request.get(downloadPath)).status()).toBe(403)
     await page.goto(native.path)
     expect(new URL(page.url()).searchParams.get('repository') === native.id).toBe(true)
-    await expect(page.getByLabel('Markdown body')).toHaveValue('Native publication original.\n')
+    await expectRepositoryMarkdown(page, 'Native publication original.\n')
     await page.reload()
     await nativePrimaryPanel(page)
     await expect(page.getByRole('button', { name: /^Download primary-v/ })).toHaveCount(3)
@@ -695,9 +719,9 @@ async function runKeyPublicationJourney(page: Page, state: State, fixture: Addre
   await page.goto(`${fixture.source_msp ? "/documentation" : path}?repository=${fixture.fragment_id}`)
   await page.getByLabel('Markdown body').fill(fixture.edited_markdown)
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await saved).status()).toBe(200)
-  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  await expect(page.getByRole('status')).toHaveText('Saved.')
   await openCurrentDocument()
   await expect(page.locator('article')).toContainText(expected.current)
   if (fixture.observation_id) {
@@ -997,6 +1021,7 @@ test('new template documents preserve copy live and pinned sections through revi
     expect((await authenticated.json() as { role: string }).role).toBe('read_only')
     expect((await workspace).status()).toBe(200)
     expect((await source).status()).toBe(200)
+    await openRepositoryDisclosure(reader, 'Document tools')
     const settings = reader.getByRole('button', { name: 'Template settings and updates', exact: true })
     await expect(settings).toBeVisible()
     await expect(settings).toBeEnabled()

@@ -83,8 +83,8 @@ def _keys(request: Request, content_id: UUID, organization_entity_id: UUID | Non
         tenant_id=repository.tenant_id, workspace_id=repository.workspace_id,
         organization=workspace.organization,
     ).values('id'))
-    selected_entities = list(entities.filter(display_name__icontains=term).order_by('display_name', 'id')[:26])
-    selected_fragments = list(fragments.filter(title__icontains=term).order_by('title', 'content_id')[:26])
+    selected_entities = list(entities.filter(display_name__icontains=term).order_by('display_name', 'id')[:26]) if term else []
+    selected_fragments = list(fragments.filter(title__icontains=term).order_by('title', 'content_id')[:26]) if term else []
 
     def visible(entity: Entity) -> bool:
         return entity_visible_to_audience(

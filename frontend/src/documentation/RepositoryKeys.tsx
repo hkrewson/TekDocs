@@ -41,10 +41,10 @@ export function RepositoryKeys({ contentId, sourceBlob, organizationId, client, 
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [client, contentId, key, open, organizationId, query, sourceBlob, targetIds])
 
-  if (!open) return <button type="button" className="secondary-button" onClick={() => setOpen(true)}>{translate('repository.keys.heading')}</button>
+  if (!open) return <button type="button" className="secondary-button" onClick={() => setOpen(true)}>{translate('repository.variables')}</button>
   const targets = new Map([...(data?.targets ?? []), ...(data?.bound_targets ?? [])].map(target => [target.id, target]))
   return <section className="document-context-panel document-keys" aria-labelledby={headingId}>
-    <div className="section-heading"><h2 id={headingId}>{translate('repository.keys.heading')}</h2>
+    <div className="section-heading"><h2 id={headingId}>{translate('repository.variables')}</h2>
       <button type="button" className="secondary-button" disabled={name !== ''} onClick={() => setOpen(false)}>{translate('common.close')}</button>
     </div>
     {loaded?.key !== key && <p role="status">{translate('documentation.loadingKeys')}</p>}
@@ -61,12 +61,8 @@ export function RepositoryKeys({ contentId, sourceBlob, organizationId, client, 
       <button type="button" className="secondary-button" onClick={() => setName('')}>{translate('repository.keys.cancelBinding')}</button></>}
     <label>{translate('repository.keys.search')}<input type="search" value={query} maxLength={120} disabled={disabled} onChange={event => setQuery(event.target.value)} /></label>
     {data && <>
-      <ul>{data.targets.map(target => <li key={target.id}><span><strong>{target.title}</strong><small>{target.kind === 'fragment' ? translate('repository.fragment') : target.entity_type.replaceAll('_', ' ')}</small></span>
-        <div className="form-actions"><button type="button" className="secondary-button" disabled={!writable || !validName || declared || target.fields.length === 0 || Object.keys(current).length >= 64} onClick={() => { onBindingsChange({ ...current, [name]: target.id }); setName('') }} aria-label={translate('repository.keys.bindTarget', { title: target.title })}>{translate('repository.keys.bind')}</button>
-          {target.kind === 'entity' && <button type="button" className="secondary-button" disabled={!writable} onClick={() => onInsert(`<tekdocs://entity/${target.id}>`)} aria-label={translate('repository.keys.referenceTarget', { title: target.title })}>{translate('repository.keys.reference')}</button>}</div>
-      </li>)}</ul>
-      {data.targets.length === 0 && <p>{translate('repository.keys.noTargets')}</p>}
-      {data.has_more && <p>{translate('repository.keys.refineSearch')}</p>}
+      {!query.trim() && <p className="empty-state">{translate('repository.insertSearchHelp')}</p>}
+      {query.trim() && <><ul>{data.targets.map(target => <li key={target.id}><span><strong>{target.title}</strong><small>{target.kind === 'fragment' ? translate('repository.fragment') : target.entity_type.replaceAll('_', ' ')}</small></span><div className="form-actions"><button type="button" className="secondary-button" disabled={!writable || !validName || declared || target.fields.length === 0 || Object.keys(current).length >= 64} onClick={() => { onBindingsChange({ ...current, [name]: target.id }); setName('') }} aria-label={translate('repository.keys.bindTarget', { title: target.title })}>{translate('repository.keys.bind')}</button></div></li>)}</ul>{data.targets.length === 0 && <p>{translate('repository.keys.noTargets')}</p>}{data.has_more && <p>{translate('repository.keys.refineSearch')}</p>}</>}
       <ul aria-label={translate('documentation.keyBindingsTable')}>{Object.entries(current).map(([binding, id]) => <li key={binding}>
         <span><strong>{binding}</strong><small>{targets.get(id)?.title ?? translate('repository.keys.unavailable')}</small></span>
         <div className="form-actions"><label htmlFor={headingId + '-field-' + binding}>{translate('repository.keys.insertFor', { name: binding })}</label><select id={headingId + '-field-' + binding} defaultValue="" disabled={!writable || !targets.get(id)?.fields.length} onChange={event => { if (event.target.value) { onInsert(`<tekdocs://key/${binding}.${event.target.value}>`); event.target.value = '' } }}>

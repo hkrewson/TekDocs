@@ -5,13 +5,18 @@ import type { RepositorySource } from '../src/documentation/repositoryApi'
 export type NativeTemplateFixture = { organization_id: string; source_id: string; fragments: Record<'copy' | 'live' | 'pinned', { id: string; title: string }> }
 const modes = ['copy', 'live', 'pinned'] as const
 const templateRegion = (page: Page) => page.getByRole('region', { name: 'Template settings and updates', exact: true })
+async function expectMarkdown(page: Page, markdown: string) {
+  await page.getByRole('tab', { name: 'Markdown', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Markdown source', exact: true })).toHaveValue(markdown)
+  await page.getByRole('tab', { name: 'Editor', exact: true }).click()
+}
 async function edit(page: Page, path: string, markdown: string) {
   await page.goto(path)
   await page.getByLabel('Markdown body', { exact: true }).fill(markdown)
   const saved = page.waitForResponse(response => response.url().endsWith('/content-graph/authoring') && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   expect((await saved).status()).toBe(200)
-  await expect(page.getByRole('status').filter({ hasText: /^Saved as one accepted Git commit\.$/ })).toHaveText('Saved as one accepted Git commit.')
+  await expect(page.getByRole('status').filter({ hasText: /^Saved\.$/ })).toHaveText('Saved.')
 }
 async function mutation(page: Page, name: string, status = 200) {
   const saved = page.waitForResponse(response => response.url().endsWith('/template') && response.request().method() === 'POST')
@@ -22,6 +27,7 @@ export async function rehearseNativeTemplates(page: Page, fixture: NativeTemplat
   const clientPath = `/workspaces/organizations/${fixture.organization_id}/documentation`
   const clientApi = `/api/v1/workspaces/organizations/${fixture.organization_id}/content-graph`
   await page.goto(`/documentation?repository=${fixture.source_id}`)
+  await page.getByText('Document tools', { exact: true }).click()
   await page.getByRole('button', { name: 'Template settings and updates', exact: true }).click()
   await page.getByLabel('Use as a template', { exact: true }).check()
   await page.getByLabel('Offer in the client template library', { exact: true }).check()
@@ -49,7 +55,7 @@ export async function rehearseNativeTemplates(page: Page, fixture: NativeTemplat
   const openedSource = await sourceRead
   expect(openedSource.status()).toBe(200)
   expect((await openedSource.json() as RepositorySource).content_id).toBe(enrolledDocument.content_id)
-  await expect(page.getByLabel('Markdown body', { exact: true })).toHaveValue('Native template introduction.\n')
+  await expectMarkdown(page, 'Native template introduction.\n')
   await edit(page, documentPath, 'Native enrolled local introduction.\n')
   const listing = await page.request.get(`${clientApi}/documents?q=${encodeURIComponent(fixture.fragments.copy.title)}`)
   expect(listing.status()).toBe(200)
@@ -70,6 +76,7 @@ export async function rehearseNativeTemplates(page: Page, fixture: NativeTemplat
   expect(current).toContain('Native pinned original.')
   expect(current).not.toContain('Native copy updated.')
   await page.goto(documentPath)
+  await page.getByText('Document tools', { exact: true }).click()
   await page.getByRole('button', { name: 'Template settings and updates', exact: true }).click()
   await templateRegion(page).getByLabel(`Behavior for ${fixture.fragments.pinned.title}`, { exact: true }).selectOption('pinned')
   await templateRegion(page).getByLabel(`Behavior for ${fixture.fragments.copy.title}`, { exact: true }).selectOption('keep')
@@ -92,10 +99,11 @@ export async function rehearseNativeTemplates(page: Page, fixture: NativeTemplat
   expect(await rendered()).not.toContain('Native live after detach.')
   expect((await page.request.get(`/api/v1/workspaces/organizations/${foreignOrganizationId}/content-graph/authoring/${enrolledDocument.content_id}/template`)).status()).toBe(404)
   await page.goto(documentPath)
+  await page.getByText('Document tools', { exact: true }).click()
   await page.getByRole('button', { name: 'Template settings and updates', exact: true }).focus()
   await page.keyboard.press('Enter')
   await expect(templateRegion(page).getByRole('button', { name: `Make ${fixture.fragments.live.title} a local copy`, exact: true })).toHaveCount(0)
-  await expect(page.getByLabel('Markdown body', { exact: true })).toHaveValue('Native enrolled local introduction.\n')
+  await expectMarkdown(page, 'Native enrolled local introduction.\n')
   await page.setViewportSize({ width: 390, height: 844 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true)
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([])

@@ -346,7 +346,7 @@ it('opens a newly enrolled native document through the complete organization she
     await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
     await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
     await waitFor(() => expect(window.location.search).toContain(`repository=${source.content_id}`))
-    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Native template introduction.\n')
+    expect(await screen.findByLabelText('Markdown body')).toHaveTextContent('Native template introduction.')
     expect(requests).toContain(`/api/v1/workspaces/organizations/${organizationId}/content-graph/authoring/${source.content_id}`)
   } finally { transport.mockRestore(); window.history.replaceState(null, '', previous); document.cookie = 'csrftoken=; Max-Age=0' }
 })

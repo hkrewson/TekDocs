@@ -249,7 +249,7 @@ it('opens a discovered native document in the repository editor without legacy d
     const source = vi.spyOn(browserRepositoryClient, 'source').mockResolvedValue({ content_id: 'native-content', title: 'Native guide', kind: 'document', path: 'docs/native.md', markdown: 'Native saved body', source: '', source_blob: 'blob', accepted_commit: null, indexed_commit: null })
     render(<Documentation workspace={null} client={documents} workspaceClient={workspaces} />)
     await user.click(await screen.findByRole('button', { name: /Firewall standard/ }))
-    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Native saved body')
+    expect(await screen.findByLabelText('Document Markdown')).toHaveValue('Native saved body')
     expect(source).toHaveBeenCalledWith('native-content', undefined, expect.any(AbortSignal))
     expect(getDocument).not.toHaveBeenCalled()
   } finally {
@@ -1794,7 +1794,7 @@ it('opens the exact newly enrolled native document from the template library', a
     await user.click(await screen.findByRole('button', { name: 'Use Git-backed template' }))
     await user.click(screen.getByRole('button', { name: 'Create Git-backed document' }))
     await waitFor(() => expect(window.location.search).toContain('repository=native-enrolled'))
-    expect(await screen.findByLabelText('Markdown body')).toHaveValue('Independent introduction.\n')
+    expect(await screen.findByLabelText('Document Markdown')).toHaveValue('Independent introduction.\n')
     expect(read).toHaveBeenCalledWith('native-enrolled', 'org-1', expect.any(AbortSignal))
   } finally { enrollment.mockRestore(); read.mockRestore(); list.mockRestore(); attachments.mockRestore() }
 })

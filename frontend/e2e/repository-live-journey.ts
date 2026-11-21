@@ -6,14 +6,27 @@ import type { RepositorySource } from '../src/documentation/repositoryApi'
 async function saveToGit(page: Page, endpoint: string): Promise<RepositorySource> {
   const responsePromise = page.waitForResponse((response) =>
     new URL(response.url()).pathname === endpoint && response.request().method() === 'POST')
-  await page.getByRole('button', { name: 'Save to Git', exact: true }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
   const response = await responsePromise
   expect(response.status()).toBe(200)
   const saved = await response.json() as RepositorySource
   expect(saved.accepted_commit).toMatch(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/)
   expect(saved.indexed_commit).toBe(saved.accepted_commit)
-  await expect(page.getByRole('status')).toHaveText('Saved as one accepted Git commit.')
+  await expect(page.getByRole('status')).toHaveText('Saved.')
   return saved
+}
+
+async function expectMarkdown(page: Page, markdown: string) {
+  await page.getByRole('tab', { name: 'Markdown', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Markdown source', exact: true })).toHaveValue(markdown)
+  await page.getByRole('tab', { name: 'Editor', exact: true }).click()
+}
+
+async function readMarkdown(page: Page) {
+  await page.getByRole('tab', { name: 'Markdown', exact: true }).click()
+  const markdown = await page.getByRole('textbox', { name: 'Markdown source', exact: true }).inputValue()
+  await page.getByRole('tab', { name: 'Editor', exact: true }).click()
+  return markdown
 }
 
 /** Use the real session, HTTP routes, PostgreSQL projection, and managed Git. */
@@ -27,8 +40,9 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
 
   await page.goto(documentation)
   await page.getByRole('button', { name: 'Repository content', exact: true }).click()
-  await page.getByRole('button', { name: 'New Markdown file' }).click()
+  await page.getByRole('button', { name: 'New document' }).click()
   await page.getByLabel('Title', { exact: true }).fill('Live Git setup guide')
+  await page.getByText('Source details', { exact: true }).click()
   await page.getByLabel('Repository path', { exact: true }).fill('docs/live-git-setup.md')
   await page.getByLabel('Markdown body').fill(initialBody)
   const created = await saveToGit(page, endpoint)
@@ -36,39 +50,39 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   // A fresh Git-only document is discoverable in the ordinary library too.
   await page.goto(documentation)
   await page.getByRole('button', { name: /Live Git setup guide/ }).click()
-  await expect(page.getByLabel('Markdown body')).toHaveValue(initialBody)
+  await expectMarkdown(page, initialBody)
   await expect(page).toHaveURL(new RegExp(`repository=${created.content_id}`))
   const directLink = `${documentation}?repository=${created.content_id}`
 
   // Reopening must read the saved Git file, including after a browser reload.
   await page.goto(directLink)
-  await expect(page.getByLabel('Markdown body')).toHaveValue(initialBody)
+  await expectMarkdown(page, initialBody)
   await page.reload()
-  await expect(page.getByLabel('Markdown body')).toHaveValue(initialBody)
+  await expectMarkdown(page, initialBody)
 
   // Two tabs start from the same revision. The second save must compare versions
   // and retain its draft until the user explicitly rebases and saves again.
   const secondPage = await page.context().newPage()
   try {
     await secondPage.goto(directLink)
-    await expect(secondPage.getByLabel('Markdown body')).toHaveValue(initialBody)
+    await expectMarkdown(secondPage, initialBody)
     await page.getByLabel('Markdown body').fill(currentBody)
     const current = await saveToGit(page, endpoint)
     expect(current.accepted_commit).not.toBe(created.accepted_commit)
     await secondPage.getByLabel('Markdown body').fill(proposedBody)
     const conflictPromise = secondPage.waitForResponse((response) =>
       new URL(response.url()).pathname === endpoint && response.request().method() === 'POST')
-    await secondPage.getByRole('button', { name: 'Save to Git', exact: true }).click()
+    await secondPage.getByRole('button', { name: 'Save', exact: true }).click()
     expect((await conflictPromise).status()).toBe(409)
     const conflict = secondPage.getByRole('alert')
-    await expect(conflict).toContainText('The repository changed.')
+    await expect(conflict).toContainText('This document changed after you opened it.')
     await expect(conflict).toContainText(initialBody.trim())
     await expect(conflict).toContainText(currentBody.trim())
     await expect(conflict).toContainText(proposedBody.trim())
-    await expect(secondPage.getByLabel('Markdown body')).toHaveValue(proposedBody)
+    await expectMarkdown(secondPage, proposedBody)
     await secondPage.getByRole('button', { name: 'Use current as base and review my draft' }).click()
     await expect(secondPage.getByRole('status')).toHaveText('Your draft is retained with the latest version as its base. Review it before saving.')
-    await expect(secondPage.getByLabel('Markdown body')).toHaveValue(proposedBody)
+    await expectMarkdown(secondPage, proposedBody)
     const rebased = await saveToGit(secondPage, endpoint)
     expect(rebased.accepted_commit).not.toBe(current.accepted_commit)
   } finally {
@@ -76,10 +90,10 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   }
 
   await page.goto(directLink)
-  await expect(page.getByLabel('Markdown body')).toHaveValue(proposedBody)
+  await expectMarkdown(page, proposedBody)
   // Source and repository listing load independently. Finish the listing before
   // asserting a single upload status, then verify the actual scanned intake.
-  await expect(page.getByRole('button', { name: 'New Markdown file', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'New document', exact: true })).toBeEnabled()
   const attachmentResponse = page.waitForResponse(response =>
     new URL(response.url()).pathname === `${endpoint}/${created.content_id}/attachments`
       && response.request().method() === 'POST')
@@ -87,8 +101,8 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
     name: 'live-git-setup.txt', mimeType: 'text/plain', buffer: Buffer.from('Live device setup details.'),
   })
   expect((await attachmentResponse).status()).toBe(201)
-  await expect(page.getByRole('status')).toContainText('Save to Git to keep its link')
-  const linkedBody = await page.getByLabel('Markdown body').inputValue()
+  await expect(page.getByRole('status')).toContainText('Save to keep its link')
+  const linkedBody = await readMarkdown(page)
   expect(linkedBody).toMatch(/\[live-git-setup\.txt\]\(tekdocs:\/\/attachment\/[0-9a-f-]{36}\)/)
   const beforeSavingLink = await page.request.get(`${endpoint}/${created.content_id}`)
   expect(beforeSavingLink.status()).toBe(200)
@@ -96,14 +110,16 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   const saved = await saveToGit(page, endpoint)
   expect(saved.markdown).toBe(linkedBody)
   await page.reload()
-  await expect(page.getByLabel('Markdown body')).toHaveValue(linkedBody)
-  await expect(page.getByRole('region', { name: 'Files for this document' })).toContainText('Linked in current Markdown')
+  await expectMarkdown(page, linkedBody)
+  await page.getByText(/Files \(\d+\)/).click()
+  await expect(page.getByText('Linked in current Markdown')).toBeVisible()
 
   // A saved export excludes a later unsaved draft and names its actual Git commit.
   await page.getByLabel('Markdown body').fill(`${linkedBody}\nUnsaved browser-only text.\n`)
   const exportPromise = page.waitForResponse((response) =>
     new URL(response.url()).pathname === `${graph}/documents/${created.content_id}/export/html`)
   const downloadPromise = page.waitForEvent('download')
+  await page.getByText('File exports', { exact: true }).click()
   await page.getByRole('button', { name: 'Download saved HTML' }).click()
   const exported = await exportPromise
   expect(exported.status()).toBe(200)
@@ -127,6 +143,7 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
 
   // Configure monitoring on the newly authored Git-only document through the
   // visible editor, then reload it from the retained SQL settings.
+  await page.getByText('Document tools', { exact: true }).click()
   await page.getByRole('button', { name: 'Web source', exact: true }).click()
   await page.getByLabel('Public document URL').fill('https://example.invalid/live-git-setup.md')
   await page.getByLabel('Source format').selectOption('markdown')
@@ -141,6 +158,7 @@ export async function rehearseRepositoryContent(page: Page, organizationId: stri
   // baseline. Wait for the real dirty-state control before navigating.
   await expect(page.getByRole('button', { name: 'Save source', exact: true })).toBeDisabled()
   await page.goto(directLink)
+  await page.getByText('Document tools', { exact: true }).click()
   await page.getByRole('button', { name: 'Web source', exact: true }).click()
   await expect(page.getByLabel('Public document URL')).toHaveValue('https://example.invalid/live-git-setup.md')
   await expect(page.getByLabel('Source format')).toHaveValue('markdown')

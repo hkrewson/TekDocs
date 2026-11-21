@@ -126,9 +126,11 @@ async function measureProfile(
       await page.getByText('More', { exact: true }).click()
       await page.getByRole('button', { name: 'Repository content', exact: true }).click()
       await page.getByRole('button', { name: /Git capacity runbook/ }).click()
-      await expect(page.getByLabel('Markdown body')).toHaveValue(documentRecord.markdown, { timeout: 12_000 })
+      await page.getByRole('tab', { name: 'Markdown', exact: true }).click()
+      await expect(page.getByRole('textbox', { name: 'Markdown source', exact: true })).toHaveValue(documentRecord.markdown, { timeout: 12_000 })
+      await page.getByRole('tab', { name: 'Editor', exact: true }).click()
       await page.getByLabel('Markdown body').fill(`${documentRecord.markdown}\nDraft update.`)
-      await expect(page.getByRole('button', { name: 'Save to Git', exact: true })).toBeEnabled()
+      await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled()
     } else {
       await page.getByRole('button', { name: 'Capacity Runbook' }).click()
       diagnostics.phase('document-open')

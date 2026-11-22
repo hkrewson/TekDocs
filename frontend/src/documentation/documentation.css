@@ -409,7 +409,7 @@
 .repository-publication-history h2 { margin: 0 0 0.5rem; }
 .repository-publication-detail { margin-top: 1rem; overflow-wrap: anywhere; }
 
-@media (max-width: 48rem) {
+@media (max-width: 64rem) {
   .repository-authoring-grid { grid-template-columns: minmax(0, 1fr); }
   .repository-authoring-header { align-items: stretch; flex-direction: column; }
   .repository-authoring-header .page-actions { width: 100%; justify-content: space-between; }

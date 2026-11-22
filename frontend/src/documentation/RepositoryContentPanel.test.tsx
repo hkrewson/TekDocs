@@ -7,11 +7,20 @@ import type { DocumentPrimaryFile } from './api'
 import { RepositoryContentPanel } from './RepositoryContentPanel'
 import { RepositoryConflictError, RepositoryRecentAuthenticationRequiredError, type RepositoryClient, type RepositoryKeyState, type RepositorySource } from './repositoryApi'
 
+let openEditorInsert: ((command: 'document' | 'fragment' | 'record' | 'file', insert: (markdown: string) => void) => void) | undefined
+
 vi.mock('../editor/EditorSpike', () => ({
-  EditorSpike: ({ initialMarkdown, onMarkdownChange }: { initialMarkdown: string; onMarkdownChange: (value: string) => void }) => <>
-    <label htmlFor="mock-repository-markdown">Markdown body</label>
-    <textarea id="mock-repository-markdown" value={initialMarkdown} onChange={event => onMarkdownChange(event.target.value)} />
-  </>,
+  EditorSpike: ({ initialMarkdown, onMarkdownChange, onInsertCommand }: {
+    initialMarkdown: string
+    onMarkdownChange: (value: string) => void
+    onInsertCommand: typeof openEditorInsert
+  }) => {
+    openEditorInsert = onInsertCommand
+    return <>
+      <label htmlFor="mock-repository-markdown">Markdown body</label>
+      <textarea id="mock-repository-markdown" value={initialMarkdown} onChange={event => onMarkdownChange(event.target.value)} />
+    </>
+  },
 }))
 
 async function openDisclosure(user: ReturnType<typeof userEvent.setup>, label: string | RegExp) {
@@ -34,6 +43,22 @@ const keyState: RepositoryKeyState = {
   source_blob: blob, accepted_commit: commit, read_only: false, key_bindings: {},
   targets: [keySite, keyFragment], bound_targets: [], has_more: false, report: [], report_has_more: false,
 }
+
+it('returns cancellation through the editor insertion callback', async () => {
+  const user = userEvent.setup()
+  const insert = vi.fn()
+  setup({}, 'org-1', initial.content_id)
+  await screen.findByLabelText('Markdown body')
+
+  act(() => openEditorInsert?.('document', insert))
+  const picker = await screen.findByRole('dialog', { name: 'Link a document' })
+  expect(within(picker).getByRole('searchbox')).toHaveFocus()
+  await user.keyboard('{Escape}')
+
+  expect(insert).toHaveBeenCalledOnce()
+  expect(insert).toHaveBeenCalledWith('')
+  expect(screen.queryByRole('dialog', { name: 'Link a document' })).not.toBeInTheDocument()
+})
 
 it('stages field and content variables and retains the complete draft after denial', async () => {
   const user = userEvent.setup()

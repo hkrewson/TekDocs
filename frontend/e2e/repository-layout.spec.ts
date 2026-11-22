@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test } from '@playwright/test'
 
-for (const width of [320, 390, 768, 1440]) {
+for (const width of [320, 390, 768, 1024, 1280, 1440]) {
   test(`saved Git editor fits ${width}px with files and source metadata`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     const id = crypto.randomUUID()

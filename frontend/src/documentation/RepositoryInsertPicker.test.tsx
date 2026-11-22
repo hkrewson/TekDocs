@@ -45,3 +45,16 @@ it('excludes the open document and closes with Escape', async () => {
   await user.keyboard('{Escape}')
   expect(onClose).toHaveBeenCalledTimes(1)
 })
+
+it('keeps keyboard focus inside the picker', async () => {
+  const user = userEvent.setup()
+  render(<RepositoryInsertPicker mode="document" source={source} client={{ list: vi.fn() } as unknown as RepositoryClient} onChoose={vi.fn()} onClose={vi.fn()} />)
+
+  const search = screen.getByRole('searchbox')
+  const close = screen.getByRole('button', { name: 'Close' })
+  await waitFor(() => expect(search).toHaveFocus())
+  await user.tab()
+  expect(close).toHaveFocus()
+  await user.tab({ shift: true })
+  expect(search).toHaveFocus()
+})

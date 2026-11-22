@@ -72,6 +72,29 @@ The broader interface remains open for the maintainer's next review. This
 milestone records implementation and compatibility evidence, not product
 acceptance or interface closeout.
 
+### November 22, 2026 objective acceptance evidence
+
+Verified against the rebuilt frontend image in the retained `tekdocs` Compose
+project:
+
+- all 902 frontend tests pass with coverage; the focused 56-test editor,
+  repository-panel, and insert-picker set includes slash-command insertion at
+  the active cursor, editor-focus restoration, cancellation through the
+  insertion callback, search-first behavior, and keyboard focus containment;
+- lint, CSP source validation, TypeScript checking, the production frontend
+  build, and bundle budgets pass;
+- six Chromium/axe journeys pass at 320, 390, 768, 1024, 1280, and 1440px with
+  canonical-Markdown checks, contextual files and source details, keyboard
+  export access, and no page overflow;
+- the first 1024px run reproduced a 48px horizontal page overflow because the
+  persistent desktop sidebar left the two-column repository grid too narrow.
+  The repository layout now changes to one column through the 64rem viewport
+  boundary; the rebuilt-image rerun passes at all six widths.
+
+The maintainer's hands-on re-review and subjective product acceptance remain
+open. This evidence closes automated interaction and reference-width gaps; it
+does not substitute for that review or authorize the next interface rollout.
+
 The first pass proved route, permission, and recovery compatibility but did not
 materially reduce interface complexity. Maintainer review therefore rejected the
 horizontal local-navigation row and the permanent exposure of setup, diagnostic,

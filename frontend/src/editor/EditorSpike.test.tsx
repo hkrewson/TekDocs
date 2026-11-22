@@ -11,6 +11,7 @@ const editorChain = {
   action: vi.fn(),
 }
 const getMarkdown = vi.fn(() => '# Current editor value')
+type MenuItemConfig = { label: string; onRun: (ctx: { get: ReturnType<typeof vi.fn> }) => void }
 let crepeOptions: { featureConfigs?: Record<string, { buildMenu?: (builder: unknown) => void }> } | undefined
 editorChain.config.mockReturnValue(editorChain)
 editorChain.use.mockReturnValue(editorChain)
@@ -63,7 +64,8 @@ describe('editor feasibility spike', () => {
   })
 
   it('adds workspace content and file actions to the slash menu', async () => {
-    render(<EditorSpike onInsertCommand={vi.fn()} />)
+    const onInsertCommand = vi.fn()
+    render(<EditorSpike onInsertCommand={onInsertCommand} />)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Task list' })).toBeEnabled())
     const addItem = vi.fn()
     const addGroup = vi.fn(() => ({ addItem }))
@@ -81,6 +83,23 @@ describe('editor feasibility spike', () => {
       ['record', 'Reference a record'],
       ['file', 'Add a file'],
     ])
+
+    const command = addItem.mock.calls[0]?.[1] as MenuItemConfig
+    const clearBlock = vi.fn()
+    const dispatch = vi.fn()
+    const focus = vi.fn()
+    const insertText = vi.fn(() => ({ scrollIntoView: vi.fn(() => 'transaction') }))
+    const view = { state: { selection: { from: 7 }, tr: { insertText } }, dispatch, focus }
+    const get = vi.fn().mockReturnValueOnce({ call: clearBlock }).mockReturnValueOnce(view)
+    command.onRun({ get })
+    expect(clearBlock).toHaveBeenCalledOnce()
+    expect(onInsertCommand).toHaveBeenCalledWith('document', expect.any(Function))
+
+    const insert = onInsertCommand.mock.calls[0]?.[1] as (value: string) => void
+    insert('[[document-id|Runbook]]')
+    expect(insertText).toHaveBeenCalledWith('[[document-id|Runbook]]', 7)
+    expect(dispatch).toHaveBeenCalledWith('transaction')
+    expect(focus).toHaveBeenCalledOnce()
   })
 
   it('switches to canonical Markdown and carries edits back to the editor', async () => {

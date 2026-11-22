@@ -77,7 +77,7 @@ acceptance or interface closeout.
 Verified against the rebuilt frontend image in the retained `tekdocs` Compose
 project:
 
-- all 902 frontend tests pass with coverage; the focused 56-test editor,
+- all 907 frontend tests pass with coverage; the focused editor,
   repository-panel, and insert-picker set includes slash-command insertion at
   the active cursor, editor-focus restoration, cancellation through the
   insertion callback, search-first behavior, and keyboard focus containment;
@@ -86,6 +86,15 @@ project:
 - six Chromium/axe journeys pass at 320, 390, 768, 1024, 1280, and 1440px with
   canonical-Markdown checks, contextual files and source details, keyboard
   export access, and no page overflow;
+- a seventh rebuilt-image Chromium journey operates the real Milkdown `/` menu
+  and document picker entirely by keyboard at a 640px CSS viewport, equivalent
+  to a 1280px display at 200% zoom. It verifies search-first behavior, Escape
+  cancellation, focus return after cancellation and insertion, canonical
+  wikilink output, and no page overflow;
+- that journey reproduced visual-editor serialization of inserted TekDocs
+  syntax as escaped literal text. Strict dialect normalization now preserves
+  generated document wikilinks, record references, reusable-content keys, and
+  file references; model-level round-trip coverage protects all four forms;
 - the first 1024px run reproduced a 48px horizontal page overflow because the
   persistent desktop sidebar left the two-column repository grid too narrow.
   The repository layout now changes to one column through the 64rem viewport

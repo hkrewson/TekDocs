@@ -27,15 +27,19 @@ type MarkdownHandlerInfo = {
 
 const highlightPattern = /(?<![\w=])==(?=\S)([^=\n]*?\S)==(?![\w=])/g
 const calloutPattern = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/
+const escapedWikilinkPattern = /\\\[\\\[([0-9a-fA-F-]{36}(?:#[a-z][a-z0-9_-]{0,119})?(?:\|[^\r\n]{1,480}?)?)(?:\\?\]){2}/g
+const escapedTekDocsLinkPattern = /\\\[([^\r\n]{1,480}?)\]\\\(tekdocs\\:\/\/((?:entity|attachment)\/[0-9a-fA-F-]{36})\)/g
+const escapedKeyPattern = /\\<tekdocs\\:\/\/key\/([a-z][a-z0-9_]{0,39}(?:\.[a-z][a-z0-9_]{0,39}){1,3})>/g
 
 export const calloutTypes = ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'] as const
 export type CalloutType = (typeof calloutTypes)[number]
 
 export function normalizeTekDocsMarkdown(markdown: string): string {
-  return markdown.replace(
-    /^(\s*>\s*)\\(\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\])/gm,
-    '$1$2',
-  )
+  return markdown
+    .replace(/^(\s*>\s*)\\(\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\])/gm, '$1$2')
+    .replace(escapedWikilinkPattern, '[[$1]]')
+    .replace(escapedTekDocsLinkPattern, '[$1](tekdocs://$2)')
+    .replace(escapedKeyPattern, '<tekdocs://key/$1>')
 }
 
 function splitHighlights(node: MarkdownNode): void {

@@ -1607,8 +1607,8 @@
       "reproduction": "docker compose build --no-cache diagram-renderer reproduced the manual full-build failure before application tests: the renderer required Chromium 156.x while Alpine supplied Chromium 158.0.8127.36. The other renderer-dependent jobs failed on the same build assertion and Validation passed failed consequentially.",
       "cause": "The moving Alpine package repository advanced Chromium from series 156 to 158 while the deliberate renderer build assertion retained the previously reviewed series. The pinned Node base digest, renderer dependency contract and supply-chain pin checks remained intact and failed closed as designed.",
       "next_action": "Keep the strict browser-series assertion, advance the reviewed series to 158, and validate the image build, recorded runtime version, isolated render/export behavior, sandbox, deterministic output, cleanup, dependency contract, licenses and supply-chain pins. Require an exact corrected-source hosted full build before treating weekly assurance as current.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "05df75b3a1178e6ea0a94065056be714cd5eaefd",
+      "retest_run": "45257682852"
     },
     {
       "run_id": "45246599462",
@@ -1619,6 +1619,42 @@
       "reproduction": "The delayed schedule-triggered full build independently failed with the same Chromium-series assertion as manual run 45236481151: Alpine supplied Chromium 158.0.8127.36 while the renderer required 156.x. All other substantive failures were renderer-build dependents or the consequential final aggregate.",
       "cause": "Same source defect as manual run 45236481151; the scheduled event eventually fired against the same commit and confirmed the failure was deterministic rather than a hosted-runner interruption.",
       "next_action": "Use the single reviewed series-158 correction and require one exact-source hosted full build to pass all renderer-dependent jobs and final validation. Do not rerun either unchanged failing source.",
+      "fix_commit": "05df75b3a1178e6ea0a94065056be714cd5eaefd",
+      "retest_run": "45257682852"
+    },
+    {
+      "run_id": "45257682852",
+      "run_attempt": 1,
+      "job_id": "137990087419",
+      "job": "release-extended / Public-beta performance reference",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The exact repository constrained-desktop profile failed locally unchanged after opening the repository editor: all timing and decoded-JavaScript budgets passed, the editor remained absent from the shell resources and then loaded on demand, but the test expected the shared EditorSpike chunk to remain absent. All four corrected local profiles pass under their original CPU, network, timing and bundle budgets.",
+      "cause": "Commit 778141d9 intentionally replaced the repository Markdown textarea with the same lazy EditorSpike used by legacy authoring, but the older performance resource assertion still treated EditorSpike as legacy-only. The lazy-load and size boundaries remained correct; the surface identity assertion was stale.",
+      "next_action": "Require both editor paths to load the shared editor chunk only after editor entry, retain the shell and decoded-JavaScript budgets, and confirm the corrected exact source in hosted Extended validation.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "45257682852",
+      "run_attempt": 1,
+      "job_id": "137990087630",
+      "job": "release-extended / Browser (chromium) and Chromium regression",
+      "owner": "TekDocs maintainer",
+      "reproduction": "Both independent Chromium suites failed the same new slash-menu journey because zero-delay keyboard input left all matching commands hidden under hosted load. The unchanged local journey passed without contention; a four-worker, twelve-repetition reproduction proved that editor readiness plus human-cadence keyboard input passes 12/12 while retaining two complete keyboard opens, cancel/focus restoration, insertion and 200%-equivalent viewport assertions.",
+      "cause": "The acceptance test delivered the complete slash command with no inter-key cadence immediately after focusing the asynchronous Milkdown editor. Hosted load could outpace the menu transaction updates; this was test synchronization, not a missing command or product failure.",
+      "next_action": "Synchronize on the visible and focused editor and use a 20ms keyboard cadence without increasing the assertion timeout or replacing keyboard behavior with clicks. Confirm both corrected Chromium suites on exact source.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "45257682852",
+      "run_attempt": 1,
+      "job_id": "137992243628",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The live journey reached the created vendor product URL, loaded the Products chunk and received both product APIs with HTTP 200, then failed only the exact heading assertion. Source and localization inspection show the rendered heading is `Live Northwind Vendor products`; the journey expected `Products` at both vendor-product transitions.",
+      "cause": "The test repair in 08b1807c correctly replaced a removed intermediate navigation click with direct route verification but introduced an exact generic heading that never matched the supplier-scoped catalog heading.",
+      "next_action": "Assert the exact supplier-scoped heading at both transitions and require the corrected hosted live journey to continue through product, model and publication acceptance without changing retries or timeouts.",
       "fix_commit": null,
       "retest_run": null
     }

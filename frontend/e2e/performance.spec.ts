@@ -152,7 +152,7 @@ async function measureProfile(
     expect(editorReadyMs, `${profile.name} editor ready time`).toBeLessThan(12_000)
     expect(initialJavaScript, `${profile.name} initial decoded JavaScript`).toBeLessThan(900 * 1024)
     expect(editorJavaScript, `${profile.name} editor decoded JavaScript`).toBeLessThan(editorDecodedJavaScriptBudget)
-    expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(editor === 'legacy')
+    expect(afterEditor.some((entry) => entry.name.includes('EditorSpike-'))).toBe(true)
     diagnostics.phase('budgets-passed')
     return { ...profile, editor, shellReadyMs, editorReadyMs, initialJavaScript, editorJavaScript }
   } finally {

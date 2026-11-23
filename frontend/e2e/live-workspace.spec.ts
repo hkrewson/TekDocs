@@ -347,7 +347,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(page.getByText('Backlink')).toBeVisible()
   await page.getByRole('link', { name: 'Business', exact: true }).click()
   await expect(page).toHaveURL(vendorHref.replace(/\/overview$/, '/products'))
-  await expect(page.getByRole('heading', { name: 'Products', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Live Northwind Vendor products', exact: true })).toBeVisible()
   await page.route('**/catalog/specification-definitions', async (route) => {
     if (route.request().method() === 'POST') await new Promise((resolve) => setTimeout(resolve, 1_000))
     await route.continue()
@@ -436,7 +436,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await expect(successStatus(staffPage)).toHaveText('Published version approved for the selected audience.')
   await page.getByRole('link', { name: 'Business', exact: true }).click()
   await expect(page).toHaveURL(vendorHref.replace(/\/overview$/, '/products'))
-  await expect(page.getByRole('heading', { name: 'Products', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Live Northwind Vendor products', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Live EdgeSwitch', exact: true }).click()
   await page.getByRole('button', { name: 'Add document' }).click()
   await page.getByLabel('Published document').selectOption({ label: 'Live EdgeSwitch installation guide' })

@@ -93,11 +93,14 @@ test('slash-menu document picker is keyboard operable at a 200%-equivalent viewp
   const editor = page.getByLabel('Markdown body', { exact: true })
 
   const openDocumentPicker = async () => {
+    await expect(editor).toBeVisible()
     await editor.focus()
+    await expect(editor).toBeFocused()
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.press('Enter')
-    await page.keyboard.type('/Link to document')
-    await expect(page.locator('.milkdown-slash-menu').getByText('Link to document', { exact: true })).toBeVisible()
+    await page.keyboard.type('/Link to document', { delay: 20 })
+    const documentCommand = page.locator('.milkdown-slash-menu').getByText('Link to document', { exact: true })
+    await expect(documentCommand).toBeVisible()
     await page.keyboard.press('Enter')
     return page.getByRole('dialog', { name: 'Link a document' })
   }

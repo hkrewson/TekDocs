@@ -37,6 +37,28 @@ Production remains on its previously selected release until a separately
 authorized deployment. The pinned manifest's only remaining action is that
 operator decision.
 
+## Post-1.0 renderer browser maintenance
+
+The delayed November 23 weekly Build and the maintainer-dispatched full Build
+both failed before their renderer-dependent acceptance work. Alpine's moving
+package repository supplied Chromium `158.0.8127.36` while the renderer's
+deliberate build assertion still required the previously reviewed 156 series.
+The failures were deterministic and local `docker compose build --no-cache
+diagram-renderer` reproduced the exact assertion; the final validation failures
+were consequential. No released image, application behavior, migration or
+production service changed.
+
+The bounded correction advances only the retained strict browser-series
+assertion to 158. Local validation rebuilt and recreated the existing project's
+stateless renderer, confirmed its recorded and running Chromium versions match,
+and passed health, unprivileged UID/GID, no-network, read-only-root,
+all-capabilities-dropped, no-new-privileges, license, cleanup, dependency-contract
+and supply-chain-pin checks. The complete 110-case diagram export and document
+suite passed against the existing PostgreSQL service, including runtime
+rendering, deterministic bytes and runtime-role transitions. Exact corrected-
+source hosted full Build and final validation remain required; neither failed
+source is rerun unchanged.
+
 ## Future release delivery
 
 The [single-push delivery contract](ci-release-delivery.md) makes image verification,

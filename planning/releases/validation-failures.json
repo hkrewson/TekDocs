@@ -1597,6 +1597,30 @@
       "next_action": "Wait for the saved-source control to become disabled before navigation and keep diagnostics passive by not subscribing to native dialogs. Require the corrected source to pass the hosted live journey without changing its timeout, retry budget, product guard, save assertion, retained-byte proof or runtime-role checks.",
       "fix_commit": "8badd87d849a7514d32e0f136194e0b05f3f1a36",
       "retest_run": "43663469095"
+    },
+    {
+      "run_id": "45236481151",
+      "run_attempt": 1,
+      "job_id": "137909969199",
+      "job": "PostgreSQL shard (diagram-migration)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "docker compose build --no-cache diagram-renderer reproduced the manual full-build failure before application tests: the renderer required Chromium 156.x while Alpine supplied Chromium 158.0.8127.36. The other renderer-dependent jobs failed on the same build assertion and Validation passed failed consequentially.",
+      "cause": "The moving Alpine package repository advanced Chromium from series 156 to 158 while the deliberate renderer build assertion retained the previously reviewed series. The pinned Node base digest, renderer dependency contract and supply-chain pin checks remained intact and failed closed as designed.",
+      "next_action": "Keep the strict browser-series assertion, advance the reviewed series to 158, and validate the image build, recorded runtime version, isolated render/export behavior, sandbox, deterministic output, cleanup, dependency contract, licenses and supply-chain pins. Require an exact corrected-source hosted full build before treating weekly assurance as current.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "45246599462",
+      "run_attempt": 1,
+      "job_id": "137945284262",
+      "job": "PostgreSQL shard (diagram-migration)",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The delayed schedule-triggered full build independently failed with the same Chromium-series assertion as manual run 45236481151: Alpine supplied Chromium 158.0.8127.36 while the renderer required 156.x. All other substantive failures were renderer-build dependents or the consequential final aggregate.",
+      "cause": "Same source defect as manual run 45236481151; the scheduled event eventually fired against the same commit and confirmed the failure was deterministic rather than a hosted-runner interruption.",
+      "next_action": "Use the single reviewed series-158 correction and require one exact-source hosted full build to pass all renderer-dependent jobs and final validation. Do not rerun either unchanged failing source.",
+      "fix_commit": null,
+      "retest_run": null
     }
   ]
 }

@@ -1631,8 +1631,8 @@
       "reproduction": "The exact repository constrained-desktop profile failed locally unchanged after opening the repository editor: all timing and decoded-JavaScript budgets passed, the editor remained absent from the shell resources and then loaded on demand, but the test expected the shared EditorSpike chunk to remain absent. All four corrected local profiles pass under their original CPU, network, timing and bundle budgets.",
       "cause": "Commit 778141d9 intentionally replaced the repository Markdown textarea with the same lazy EditorSpike used by legacy authoring, but the older performance resource assertion still treated EditorSpike as legacy-only. The lazy-load and size boundaries remained correct; the surface identity assertion was stale.",
       "next_action": "Require both editor paths to load the shared editor chunk only after editor entry, retain the shell and decoded-JavaScript budgets, and confirm the corrected exact source in hosted Extended validation.",
-      "fix_commit": null,
-      "retest_run": null
+      "fix_commit": "642b09e4a4f82ceb010fad0803cc3c9cca00bbbb",
+      "retest_run": "45315430869"
     },
     {
       "run_id": "45257682852",
@@ -1655,6 +1655,30 @@
       "reproduction": "The live journey reached the created vendor product URL, loaded the Products chunk and received both product APIs with HTTP 200, then failed only the exact heading assertion. Source and localization inspection show the rendered heading is `Live Northwind Vendor products`; the journey expected `Products` at both vendor-product transitions.",
       "cause": "The test repair in 08b1807c correctly replaced a removed intermediate navigation click with direct route verification but introduced an exact generic heading that never matched the supplier-scoped catalog heading.",
       "next_action": "Assert the exact supplier-scoped heading at both transitions and require the corrected hosted live journey to continue through product, model and publication acceptance without changing retries or timeouts.",
+      "fix_commit": "642b09e4a4f82ceb010fad0803cc3c9cca00bbbb",
+      "retest_run": "45315430869"
+    },
+    {
+      "run_id": "45315430869",
+      "run_attempt": 1,
+      "job_id": "138183346510",
+      "job": "release-extended / Chromium regression",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The exact hosted full Chromium suite passed 416 cases and skipped four before the repository slash-menu journey timed out with fourteen hidden `Link to document` matches. The earlier cadence-only correction passed twelve focused repetitions locally but did not synchronize the caret or new ProseMirror paragraph. The corrected test first anchors the caret in the final rendered paragraph, waits for the new empty paragraph transaction, and selects the visible slash menu; a focused eight-worker, twelve-repetition run passed 12/12.",
+      "cause": "The test relied on the platform-dependent ControlOrMeta+End shortcut and immediately typed after Enter. Under full-suite load, the caret or new paragraph transaction could lag, so Milkdown correctly kept its debounced slash provider hidden. The command and keyboard product path remain functional when synchronized on rendered editor state.",
+      "next_action": "Anchor the caret to the last rendered paragraph, wait for the new empty paragraph, retain human-cadence keyboard input, and select the visible menu instance. Require the exact corrected source to pass both Chromium suites without wider timeouts or retries.",
+      "fix_commit": null,
+      "retest_run": null
+    },
+    {
+      "run_id": "45315430869",
+      "run_attempt": 1,
+      "job_id": "138183346500",
+      "job": "Live browser-to-PostgreSQL journey",
+      "owner": "TekDocs maintainer",
+      "reproduction": "The hosted journey switched into the client workspace at its Vendors route and then timed out waiting for a `Data model` link. The focused mocked browser regression reproduced the navigation contract: `Manage` is itself the link to the client custom-fields route, and the destination renders the `Data model` heading; there is no second child link.",
+      "cause": "The journey treated `Manage` as an expandable hub and attempted a second `Data model` navigation click. The application intentionally uses the hub link as the default destination and exposes `Data model` as that page's heading, so the extra click targeted a control that does not exist.",
+      "next_action": "Navigate once through the exact `Manage` link and assert the client-scoped custom-fields URL and Data model page. Retain the subsequent custom-field, site and clean-start acceptance work and require the corrected hosted live journey to complete.",
       "fix_commit": null,
       "retest_run": null
     }

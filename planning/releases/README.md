@@ -55,8 +55,15 @@ and passed health, unprivileged UID/GID, no-network, read-only-root,
 all-capabilities-dropped, no-new-privileges, license, cleanup, dependency-contract
 and supply-chain-pin checks. The complete 110-case diagram export and document
 suite passed against the existing PostgreSQL service, including runtime
-rendering, deterministic bytes and runtime-role transitions. Exact corrected-
-source hosted full Build and final validation remain required; neither failed
+rendering, deterministic bytes and runtime-role transitions. Exact-source full
+Build [45315430869](https://github.com/hkrewson/TekDocs/actions/runs/45315430869)
+then passed the production container builds, scans, database shards, performance,
+CodeQL and other browser coverage but exposed two acceptance-test defects. The
+repository slash-menu journey did not synchronize the final ProseMirror paragraph,
+and the live client journey looked for a nonexistent second Data model link after
+the Manage destination. The bounded correction now synchronizes on rendered editor
+state and exercises the actual one-link Manage navigation contract. Exact
+corrected-source hosted full Build and final validation remain required; no failed
 source is rerun unchanged.
 
 ## Future release delivery

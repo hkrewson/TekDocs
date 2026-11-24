@@ -508,7 +508,7 @@ test('real owner creates and enters a PostgreSQL-backed organization workspace',
   await page.getByRole('button', { name: 'Live Acme Client. Client · Vendor' }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/vendors$/)
 
-  await page.getByRole('link', { name: 'Data model' }).click()
+  await page.getByRole('link', { name: 'Manage', exact: true }).click()
   await expect(page).toHaveURL(/\/workspaces\/organizations\/[0-9a-f-]+\/custom_fields$/)
   await page.getByRole('button', { name: /New field/ }).click()
   await page.getByLabel('Label').fill('Support tier')

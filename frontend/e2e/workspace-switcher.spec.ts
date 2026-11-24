@@ -368,8 +368,10 @@ test('client Sites area shows nested workspace-owned locations accessibly', asyn
 
 test('client custom-field definitions and Site values remain workspace scoped and accessible', async ({ page }) => {
   await mockWorkspaceApplication(page)
-  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/custom_fields`)
+  await page.goto(`/workspaces/organizations/${clientWorkspace.id}/vendors`)
+  await page.getByRole('link', { name: 'Manage', exact: true }).click()
 
+  await expect(page).toHaveURL(new RegExp(`/workspaces/organizations/${clientWorkspace.id}/custom_fields$`))
   await expect(page.getByRole('heading', { name: 'Data model' })).toBeVisible()
   await expect(page.getByText('Door code', { exact: true })).toBeVisible()
   await expect(page.getByText(/This workspace · Version 1/)).toBeVisible()
